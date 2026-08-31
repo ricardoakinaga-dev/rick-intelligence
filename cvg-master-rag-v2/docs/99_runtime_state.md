@@ -289,3 +289,47 @@ evidência. O resultado final e o parecer independente estão em
 `docs/progress/phase-0.5-report.md` e
 `docs/progress/phase-0.5-independent-review.md`; nenhum publish ou trabalho de
 Phase 1 é autorizado por este estado.
+
+---
+
+## PHASE 0.6 RBAC SESSION CLOSURE — 2026-08-31
+
+### Estado atual
+
+`IMPLEMENTED / VALIDATION BLOCKED`: o contrato PH06-RBAC foi implementado no
+recorte permitido. A execução automatizada de pytest permanece bloqueada neste
+ambiente porque o comando `pytest` e o módulo Python correspondente não estão
+instalados. Nenhum veredito `PASS` é emitido por este estado.
+
+### Implementação registrada
+
+- Adições e remoções de permissões são normalizadas para identificadores
+  canônicos, com remoção vencendo conflitos.
+- Wildcard sem remoções preserva `*`; wildcard com remoções expande o catálogo
+  canônico e subtrai as remoções, impedindo regrant por fallback de role.
+- Snapshots de sessão presentes, inclusive listas vazias e aliases legados,
+  permanecem autoritativos até invalidação por status, senha, role, revogação ou
+  expiração.
+- VETERINARIAN ficou limitado a query, histórico próprio, sources e leitura de
+  collections; browsing de biblioteca e leitura irrestrita de documentos
+  permanecem fora do role. KM conserva o acesso operacional de ingestão,
+  browsing, documentos e collections.
+- O caminho de criação/atualização de usuário aceita `permission_overrides` sem
+  remover compatibilidade com os payloads legados.
+
+### Evidência de validação
+
+- `py_compile` dos arquivos PH06: exit `0`.
+- Probe determinístico da política de autorização: exit `0`.
+- `pytest -q src/tests/test_phase06_rbac.py`: exit `127`, `pytest: command not found`.
+- `pytest -q src/tests/test_phase05_security.py src/tests/test_phase05_contract.py`:
+  exit `127`, `pytest: command not found`.
+- `python3 -m pytest -q src/tests/test_phase06_rbac.py`: exit `1`, módulo
+  `pytest` ausente.
+
+### Próxima ação
+
+Executar o módulo focado, os testes de segurança/contrato da Phase 0.5 e o
+subconjunto CVG relevante em um ambiente Python com as dependências do child
+repository instaladas; registrar os resultados antes de qualquer decisão de
+promoção.

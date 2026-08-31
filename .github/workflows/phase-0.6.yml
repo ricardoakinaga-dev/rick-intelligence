@@ -1,0 +1,538 @@
+name: Phase 0.6 CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: phase-0.6-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# These values reproduce the Phase 0.5 local baseline.  Do not replace them
+# with floating major/minor tags without updating docs/ci/README.md and the
+# corresponding evidence baseline.
+env:
+  PYTHON_VERSION: "3.12.3"
+  NODE_VERSION: "22.19.0"
+  QDRANT_IMAGE: "qdrant/qdrant:v1.7.4"
+  REDIS_IMAGE: "redis:7.0.15-alpine"
+  PYTHON_INSTALL_MODE: "python -m pip install --requirement cvg-master-rag-v2/src/requirements.txt"
+  NODE_INSTALL_MODE: "npm ci --ignore-scripts --no-audit --no-fund"
+
+jobs:
+  fast-security:
+    name: fast / secret scan
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.2.2
+        with:
+          fetch-depth: 0
+
+      - name: Setup pinned Python
+        uses: actions/setup-python@v5.6.0
+        with:
+          python-version: "3.12.3"
+
+      - name: Run repository secret scanner
+        run: python cvg-master-rag-v2/src/scripts/scan_secrets.py
+
+      - name: Run pinned Gitleaks scanner
+        run: >-
+          docker run --rm --network none
+          -v "$GITHUB_WORKSPACE:/repo:ro"
+          ghcr.io/gitleaks/gitleaks:v8.30.1
+          dir /repo --redact --no-banner --log-level warn
+
+  fast-control-plane:
+    name: fast / control-plane
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v4.2.2
+        with:
+          fetch-depth: 0
+
+      - name: Setup pinned Python
+        uses: actions/setup-python@v5.6.0
+        with:
+          python-version: "3.12.3"
+
+      - name: Validate control-plane pointers and Git observation
+        run: |
+          args=(--require-clean --require-remote)
+          if [[ "${GITHUB_EVENT_NAME}" == "push" && "${GITHUB_REF_NAME}" == "main" ]]; then
+            args+=(--require-main-sync)
+          fi
+          python docs/ci/check_control_plane.py "${args[@]}"
+          git diff --check
+
+  fast-locker-boundary:
+    name: fast / Locker deployment boundary
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.2.2
+
+      - name: Setup pinned Python
+        uses: actions/setup-python@v5.6.0
+        with:
+          python-version: "3.12.3"
+
+      - name: Run Locker deployment lint
+        run: python scripts/phase06/check_locker_boundary.py
+
+      - name: Compile boundary/control checks
+        run: python -m py_compile scripts/phase06/check_locker_boundary.py docs/ci/check_control_plane.py
+
+  fast-cvg-contract-security:
+    name: fast / CVG contract-security
+    runs-on: ubuntu-24.04
+    env:
+      PYTHONPATH: cvg-master-rag-v2/src
+      OPENAI_API_KEY: ""
+      RAG_SKIP_QDRANT_BOOTSTRAP: "1"
+      SESSION_COOKIE_SECURE: "false"
+      RERANKING_ENABLED: "false"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.2.2
+
+      - name: Setup pinned Python
+        uses: actions/setup-python@v5.6.0
+        with:
+          python-version: "3.12.3"
+          cache: pip
+          cache-dependency-path: cvg-master-rag-v2/src/requirements.txt
+
+      - name: Install pinned CVG requirements
+        run: python -m pip install --disable-pip-version-check --no-cache-dir -r cvg-master-rag-v2/src/requirements.txt
+
+      - name: Run Phase 0.5/0.6 contract and security tests
+        run: >-
+          python -m pytest -q
+          cvg-master-rag-v2/src/tests/test_phase05_contract.py
+          cvg-master-rag-v2/src/tests/test_phase05_security.py
+          cvg-master-rag-v2/src/tests/test_phase06_rbac.py
+          cvg-master-rag-v2/src/tests/test_p0_closeout.py
+
+  fast-professor:
+    name: fast / Professor tests-build
+    runs-on: ubuntu-24.04
+    env:
+      OPENAI_API_KEY: ci-test-only-no-provider
+      API_KEY: ci-test-only-api-key
+      TELEGRAM_WEBHOOK_SECRET_TOKEN: ci-test-only-telegram-secret
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.2.2
+
+      - name: Setup pinned Node.js
+        uses: actions/setup-node@v4.4.0
+        with:
+          node-version: "22.19.0"
+          cache: npm
+          cache-dependency-path: rick-professor/package-lock.json
+
+      - name: Install from Professor lockfile
+        working-directory: rick-professor
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Run Professor tests with forced runner exit
+        working-directory: rick-professor
+        run: timeout 120s npm test -- --test-force-exit
+
+      - name: Validate emitted real-protocol provider artifact
+        run: python scripts/phase06/check_provider_artifact.py
+
+      - name: Build Professor
+        working-directory: rick-professor
+        run: npm run build
+
+  fast-locker:
+    name: fast / Locker tests
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.2.2
+
+      - name: Setup pinned Node.js
+        uses: actions/setup-node@v4.4.0
+        with:
+          node-version: "22.19.0"
+          cache: npm
+          cache-dependency-path: modulo-redis-locker/package-lock.json
+
+      - name: Install from Locker lockfile
+        working-directory: modulo-redis-locker
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Run Locker tests
+        working-directory: modulo-redis-locker
+        run: npm test
+
+      - name: Check Locker JavaScript syntax
+        run: node --check modulo-redis-locker/server.js
+
+  fast-frontend:
+    name: fast / frontend lint-build
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.2.2
+
+      - name: Setup pinned Node.js
+        uses: actions/setup-node@v4.4.0
+        with:
+          node-version: "22.19.0"
+          cache: npm
+          cache-dependency-path: cvg-master-rag-v2/frontend/package-lock.json
+
+      - name: Install from frontend lockfile
+        working-directory: cvg-master-rag-v2/frontend
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Run frontend lint
+        working-directory: cvg-master-rag-v2/frontend
+        run: npm run lint
+
+      - name: Build frontend
+        working-directory: cvg-master-rag-v2/frontend
+        run: npm run build
+
+  fast-dependency-audit:
+    name: fast / dependency audit
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.2.2
+
+      - name: Setup pinned Python
+        uses: actions/setup-python@v5.6.0
+        with:
+          python-version: "3.12.3"
+
+      - name: Install pinned Python audit tool
+        run: python -m pip install --disable-pip-version-check --no-cache-dir pip-audit==2.9.0
+
+      - name: Audit pinned Python requirements
+        run: pip-audit -r cvg-master-rag-v2/src/requirements.txt --strict
+
+      - name: Setup pinned Node.js
+        uses: actions/setup-node@v4.4.0
+        with:
+          node-version: "22.19.0"
+
+      - name: Audit all preserved Node lockfiles
+        run: |
+          for component in rick-professor modulo-redis-locker cvg-master-rag-v2/frontend; do
+            npm --prefix "$component" ci --ignore-scripts --no-audit --no-fund
+            npm --prefix "$component" audit --audit-level=high
+          done
+
+  integration-cvg-contract-fixture:
+    name: integration / CVG Python-Qdrant contract fixture
+    needs: [fast-security, fast-control-plane, fast-cvg-contract-security]
+    runs-on: ubuntu-24.04
+    services:
+      qdrant:
+        image: qdrant/qdrant:v1.7.4
+        ports:
+          - 6333:6333
+      redis:
+        image: redis:7.0.15-alpine
+        ports:
+          - 6379:6379
+    env:
+      PYTHONPATH: cvg-master-rag-v2/src
+      OPENAI_API_KEY: ""
+      QDRANT_HOST: 127.0.0.1
+      QDRANT_PORT: "6333"
+      QDRANT_COLLECTION: rag_phase0
+      RERANKING_ENABLED: "false"
+      SESSION_COOKIE_SECURE: "false"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.2.2
+
+      - name: Setup pinned Python
+        uses: actions/setup-python@v5.6.0
+        with:
+          python-version: "3.12.3"
+          cache: pip
+          cache-dependency-path: cvg-master-rag-v2/src/requirements.txt
+
+      - name: Install pinned CVG requirements
+        run: python -m pip install --disable-pip-version-check --no-cache-dir -r cvg-master-rag-v2/src/requirements.txt
+
+      - name: Wait for real Qdrant and Redis services
+        run: |
+          python - <<'PY'
+          import socket
+          import time
+          import urllib.request
+
+          for _ in range(60):
+              try:
+                  with urllib.request.urlopen("http://127.0.0.1:6333/readyz", timeout=1) as response:
+                      if response.status == 200:
+                          break
+              except Exception:
+                  time.sleep(1)
+          else:
+              raise SystemExit("Qdrant did not become ready")
+
+          for _ in range(60):
+              try:
+                  with socket.create_connection(("127.0.0.1", 6379), timeout=1) as connection:
+                      connection.sendall(b"*1\r\n$4\r\nPING\r\n")
+                      if b"PONG" in connection.recv(64):
+                          break
+              except OSError:
+                  time.sleep(1)
+          else:
+              raise SystemExit("Redis did not become ready")
+          PY
+
+      - name: Run CVG integration security regression
+        run: python -m pytest -q cvg-master-rag-v2/src/tests/integration/test_tkt_010_non_leakage.py
+
+      - name: Run deterministic contract fixture
+        run: python scripts/phase05/phase05_e2e.py --mode full
+
+  integration-locker-redis:
+    name: integration / Locker Redis boundary
+    needs: [fast-security, fast-locker, fast-locker-boundary]
+    runs-on: ubuntu-24.04
+    services:
+      redis:
+        image: redis:7.0.15-alpine
+        ports:
+          - 6379:6379
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.2.2
+
+      - name: Setup pinned Node.js
+        uses: actions/setup-node@v4.4.0
+        with:
+          node-version: "22.19.0"
+          cache: npm
+          cache-dependency-path: modulo-redis-locker/package-lock.json
+
+      - name: Install Locker from lockfile
+        working-directory: modulo-redis-locker
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Wait for Redis and start Locker on an ephemeral CI port
+        env:
+          REDIS_URL: redis://127.0.0.1:6379
+          PORT: "3317"
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import socket
+          import time
+
+          for _ in range(60):
+              try:
+                  with socket.create_connection(("127.0.0.1", 6379), timeout=1) as connection:
+                      connection.sendall(b"*1\r\n$4\r\nPING\r\n")
+                      if b"PONG" in connection.recv(64):
+                          break
+              except OSError:
+                  time.sleep(1)
+          else:
+              raise SystemExit("Redis did not become ready")
+          PY
+
+          locker_log="${RUNNER_TEMP}/redis-locker.log"
+          npm --prefix modulo-redis-locker start >"$locker_log" 2>&1 &
+          locker_pid=$!
+          cleanup() {
+            kill "$locker_pid" 2>/dev/null || true
+            wait "$locker_pid" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          ready=0
+          for _ in {1..30}; do
+            if curl -fsS http://127.0.0.1:3317/healthz >/dev/null; then
+              ready=1
+              break
+            fi
+            if ! kill -0 "$locker_pid" 2>/dev/null; then
+              cat "$locker_log"
+              exit 1
+            fi
+            sleep 1
+          done
+          if [[ "$ready" != 1 ]]; then
+            cat "$locker_log"
+            exit 1
+          fi
+
+          LOCKER_URL=http://127.0.0.1:3317 node scripts/phase05/locker_e2e.mjs
+
+  integration-frontend-smoke:
+    name: integration / frontend smoke
+    needs: [fast-security, fast-frontend]
+    runs-on: ubuntu-24.04
+    services:
+      qdrant:
+        image: qdrant/qdrant:v1.7.4
+        ports:
+          - 6337:6333
+    env:
+      OPENAI_API_KEY: ""
+      RAG_SKIP_QDRANT_BOOTSTRAP: ""
+      SESSION_COOKIE_SECURE: "false"
+      QDRANT_HOST: 127.0.0.1
+      QDRANT_PORT: "6337"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.2.2
+
+      - name: Setup pinned Python
+        uses: actions/setup-python@v5.6.0
+        with:
+          python-version: "3.12.3"
+          cache: pip
+          cache-dependency-path: cvg-master-rag-v2/src/requirements.txt
+
+      - name: Install pinned CVG requirements
+        run: python -m pip install --disable-pip-version-check --no-cache-dir -r cvg-master-rag-v2/src/requirements.txt
+
+      - name: Setup pinned Node.js
+        uses: actions/setup-node@v4.4.0
+        with:
+          node-version: "22.19.0"
+          cache: npm
+          cache-dependency-path: cvg-master-rag-v2/frontend/package-lock.json
+
+      - name: Install from frontend lockfile
+        working-directory: cvg-master-rag-v2/frontend
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Install pinned Playwright browser
+        working-directory: cvg-master-rag-v2/frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Run real frontend smoke flow
+        working-directory: cvg-master-rag-v2/frontend
+        env:
+          CVG_PYTHON: python
+        run: npm run test:smoke
+
+  legacy-historical:
+    name: legacy / historical baseline (waived if unavailable)
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    services:
+      qdrant:
+        image: qdrant/qdrant:v1.7.4
+        ports:
+          - 6333:6333
+      redis:
+        image: redis:7.0.15-alpine
+        ports:
+          - 6379:6379
+    env:
+      PYTHONPATH: cvg-master-rag-v2/src
+      OPENAI_API_KEY: ""
+      QDRANT_HOST: 127.0.0.1
+      QDRANT_PORT: "6333"
+      QDRANT_COLLECTION: rag_phase0
+      REDIS_URL: redis://127.0.0.1:6379
+      RAG_SKIP_QDRANT_BOOTSTRAP: "1"
+      SESSION_COOKIE_SECURE: "false"
+      RERANKING_ENABLED: "false"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.2.2
+
+      - name: Report historical evidence state
+        run: |
+          classification="docs/baselines/phase-0.6-legacy-test-classification.md"
+          if [[ ! -f "$classification" ]]; then
+            {
+              echo "### Legacy/historical lane: NOT AVAILABLE (explicit waiver)"
+              echo
+              echo "The required per-test classification artifact is absent from this checkout."
+              echo "The frozen Phase 0.6 plan records the historical baseline as 364 passed, 19 failed, 14 skipped, and 6 errors."
+              echo "No historical test is skipped or marked as passing by this lane; PH06-LEGACY remains open."
+              echo "Unblock: add the authorized classification artifact, then this lane will install the pinned requirements and run the full suite without continue-on-error."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::warning::Legacy/historical evidence is unavailable; this is a documented waiver, not a passing legacy result."
+            exit 0
+          fi
+
+          echo "Historical classification found; executing the full legacy suite."
+
+      - name: Setup pinned Python for available historical evidence
+        if: ${{ hashFiles('docs/baselines/phase-0.6-legacy-test-classification.md') != '' }}
+        uses: actions/setup-python@v5.6.0
+        with:
+          python-version: "3.12.3"
+          cache: pip
+          cache-dependency-path: cvg-master-rag-v2/src/requirements.txt
+
+      - name: Install pinned CVG requirements for available historical evidence
+        if: ${{ hashFiles('docs/baselines/phase-0.6-legacy-test-classification.md') != '' }}
+        run: python -m pip install --disable-pip-version-check --no-cache-dir -r cvg-master-rag-v2/src/requirements.txt
+
+      - name: Wait for historical-lane services
+        if: ${{ hashFiles('docs/baselines/phase-0.6-legacy-test-classification.md') != '' }}
+        run: |
+          python - <<'PY'
+          import socket
+          import time
+          import urllib.request
+
+          for _ in range(60):
+              try:
+                  with urllib.request.urlopen("http://127.0.0.1:6333/readyz", timeout=1) as response:
+                      if response.status == 200:
+                          break
+              except Exception:
+                  time.sleep(1)
+          else:
+              raise SystemExit("Qdrant did not become ready")
+
+          for _ in range(60):
+              try:
+                  with socket.create_connection(("127.0.0.1", 6379), timeout=1) as connection:
+                      connection.sendall(b"*1\r\n$4\r\nPING\r\n")
+                      if b"PONG" in connection.recv(64):
+                          break
+              except OSError:
+                  time.sleep(1)
+          else:
+              raise SystemExit("Redis did not become ready")
+          PY
+
+      - name: Run full historical CVG suite without masking
+        if: ${{ hashFiles('docs/baselines/phase-0.6-legacy-test-classification.md') != '' }}
+        run: python -m pytest -q cvg-master-rag-v2/src/tests cvg-master-rag-v2/tests/test_phase0.py
+
+  live-provider-evidence:
+    name: evidence / live provider (unavailable)
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Record honest provider limitation
+        run: |
+          {
+            echo "### Live provider evidence: NOT RUN"
+            echo
+            echo "No approved provider endpoint or credential is available to this CI workflow."
+            echo "No live provider request is made and no secret is injected."
+            echo "Deterministic contract fixtures prove local plumbing only; they do not satisfy PH06-PROVIDER."
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "::warning::Live provider evidence is unavailable; deterministic CI coverage must not be reported as provider quality evidence."

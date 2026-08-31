@@ -3,13 +3,15 @@ services:
     image: redis:7-alpine
     container_name: redis
     restart: unless-stopped
-    ports:
-      - "6379:6379"
+    networks:
+      - private-app
 
   qdrant:
     image: qdrant/qdrant:v1.15.4
     container_name: qdrant
     restart: unless-stopped
+    networks:
+      - private-app
     ports:
       - "6333:6333"
       - "6334:6334"
@@ -18,17 +20,19 @@ services:
 
   redis-locker:
     build:
-      context: ../../modulo_redis_locker
+      context: ../../modulo-redis-locker
       dockerfile: Dockerfile
     container_name: redis-locker
     restart: unless-stopped
+    networks:
+      - private-app
     environment:
       PORT: 3000
-      REDIS_URL: ${REDIS_URL}
+      REDIS_URL: redis://redis:6379
     depends_on:
       - redis
-    ports:
-      - "3001:3000"
+    expose:
+      - "3000"
 
   rick-professor:
     build:
@@ -36,6 +40,8 @@ services:
       dockerfile: Dockerfile
     container_name: rick-professor
     restart: unless-stopped
+    networks:
+      - private-app
     environment:
       NODE_ENV: production
       PORT: 3000
@@ -50,7 +56,7 @@ services:
       QDRANT_WORKSPACE_ID: ${QDRANT_WORKSPACE_ID}
       QDRANT_ALLOWED_COLLECTION_IDS: ${QDRANT_ALLOWED_COLLECTION_IDS}
       REDIS_URL: ${REDIS_URL}
-      REDIS_LOCKER_URL: ${REDIS_LOCKER_URL}
+      REDIS_LOCKER_URL: http://redis-locker:3000
       MODEL_PREPROCESSOR: ${MODEL_PREPROCESSOR}
       MODEL_PLANNER: ${MODEL_PLANNER}
       MODEL_AGENT: ${MODEL_AGENT}
@@ -68,6 +74,8 @@ services:
       dockerfile: Dockerfile
     container_name: rag-indexer
     restart: unless-stopped
+    networks:
+      - private-app
     environment:
       MODE: server
       PORT: 3000
@@ -91,3 +99,7 @@ services:
 
 volumes:
   qdrant_data:
+
+networks:
+  private-app:
+    internal: true

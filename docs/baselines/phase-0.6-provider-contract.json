@@ -1,0 +1,63 @@
+{
+  "schema_version": "phase-0.6-provider-contract.v1",
+  "task": "PH06-PROVIDER",
+  "classification": "REAL_PROTOCOL_LOCAL_SERVER",
+  "status": "PASS_LOCAL_PROTOCOL_ONLY",
+  "observed_at": "2026-08-31T05:44:14Z",
+  "command": "npm test -- --test-force-exit",
+  "working_directory": "rick-professor",
+  "environment": {
+    "node": "v22.19.0",
+    "server_bind": "127.0.0.1",
+    "server_protocol": "OpenAI-compatible HTTP",
+    "live_provider_called": false,
+    "synthetic_data": true,
+    "max_attempts": 3,
+    "credential_source": "test-only environment value"
+  },
+  "cases": [
+    { "name": "success", "result": "success", "attempts": 1, "http_requests": 1 },
+    { "name": "timeout", "result": "timeout", "attempts": 3, "http_requests": 3 },
+    { "name": "unavailable", "result": "unavailable", "attempts": 3, "http_requests": 3 },
+    { "name": "429 rate limit", "result": "rate_limit", "attempts": 3, "http_requests": 3 },
+    { "name": "500 server error", "result": "server_error", "attempts": 3, "http_requests": 3 },
+    { "name": "malformed response", "result": "malformed_response", "attempts": 1, "http_requests": 1 },
+    { "name": "missing field", "result": "missing_field", "attempts": 1, "http_requests": 1 },
+    { "name": "invalid JSON", "result": "invalid_json", "attempts": 1, "http_requests": 1 },
+    { "name": "empty model", "result": "invalid_model", "attempts": 0, "http_requests": 0 },
+    { "name": "embedding dimension mismatch", "result": "embedding_dimension_mismatch", "attempts": 1, "http_requests": 1 },
+    { "name": "model not found", "result": "model_not_found", "attempts": 1, "http_requests": 1 },
+    {
+      "name": "document to cited answer flow",
+      "result": "success_and_safe_failure_cleanup",
+      "attempts": 3,
+      "http_requests": 5,
+      "assertions": [
+        "document_embedding_index",
+        "query_embedding_retrieval",
+        "grounded_citation",
+        "no_fake_citation",
+        "lock_release_success",
+        "lock_release_failure",
+        "state_integrity",
+        "safe_error_no_leak"
+      ]
+    }
+  ],
+  "security_observations": {
+    "total_http_requests_observed": 26,
+    "correlation_id_per_operation": true,
+    "same_correlation_id_across_retries": true,
+    "bounded_retry_cases": ["timeout", "unavailable", "429 rate limit", "500 server error"],
+    "raw_response_or_stack_serialized": false,
+    "authorization_header_sent_to_local_server": true,
+    "locks_released_on_success_and_failure": true,
+    "fake_citations_accepted": false
+  },
+  "evidence_source": "rick-professor/test/artifacts/phase-0.6-provider-contract.json",
+  "limitations": [
+    "This is real local HTTP protocol evidence, not live provider quality, quota, or availability evidence.",
+    "No production credential or external provider endpoint was used.",
+    "The vertical flow uses faithful in-memory retrieval and lock dependencies; it does not replace Qdrant/Redis production evidence."
+  ]
+}

@@ -21,7 +21,11 @@ from services.admin_service import (
     user_has_permission,
     verify_password,
 )
-from services.authorization import allowed_collection_ids_for_user, canonical_role
+from services.authorization import (
+    allowed_collection_ids_for_user,
+    canonical_role,
+    normalize_permissions,
+)
 from services.enterprise_store import (
     load_recovery_state,
     load_session_state,
@@ -32,6 +36,7 @@ from services.enterprise_store import (
 from core.config import SESSION_TTL_HOURS
 
 _RATE_LIMIT_BUCKETS: dict[str, list[float]] = {}
+_MISSING = object()
 
 
 def reset_rate_limit_state() -> None:
@@ -46,6 +51,19 @@ def _utc_now() -> datetime:
 
 def _to_iso(value: datetime) -> str:
     return value.isoformat().replace("+00:00", "Z")
+
+
+def _parse_lifecycle_timestamp(value: object) -> datetime | None:
+    """Parse lifecycle markers as aware UTC values, failing closed on junk."""
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
 
 
 def _default_tenant() -> dict:
@@ -90,10 +108,40 @@ def _active_tenant_for_user(user: dict, tenant_id: str | None = None) -> dict:
     return accessible[0]
 
 
-def _build_authenticated_session(user: dict, tenant_id: str, session_token: str, expires_at: str) -> dict:
-    normalized_role = normalize_role(user.get("role"))
-    permissions = resolve_permissions_for_role(normalized_role, user.get("permission_overrides"))
-    active_tenant = _active_tenant_for_user(user, tenant_id)
+def _build_authenticated_session(
+    user: dict,
+    tenant_id: str,
+    session_token: str,
+    expires_at: str,
+    *,
+    role_snapshot: str | None = None,
+    permissions_snapshot: object = _MISSING,
+    authorized_collection_ids_snapshot: object = _MISSING,
+) -> dict:
+    normalized_role = normalize_role(role_snapshot if role_snapshot is not None else user.get("role"))
+    if permissions_snapshot is _MISSING:
+        permissions = resolve_permissions_for_role(normalized_role, user.get("permission_overrides"))
+    else:
+        permissions = normalize_permissions(permissions_snapshot if isinstance(permissions_snapshot, list) else [])
+    if authorized_collection_ids_snapshot is _MISSING:
+        authorized_collection_ids = allowed_collection_ids_for_user(user)
+    else:
+        authorized_collection_ids = allowed_collection_ids_for_user(
+            {
+                "role": normalized_role,
+                "authorized_collection_ids": (
+                    authorized_collection_ids_snapshot
+                    if isinstance(authorized_collection_ids_snapshot, list)
+                    else []
+                ),
+            }
+        )
+    session_user = {
+        **user,
+        "role": normalized_role,
+        "authorized_collection_ids": authorized_collection_ids,
+    }
+    active_tenant = _active_tenant_for_user(session_user, tenant_id)
     return {
         "authenticated": True,
         "session_state": "active",
@@ -106,12 +154,30 @@ def _build_authenticated_session(user: dict, tenant_id: str, session_token: str,
             "role": normalized_role,
             "permissions": permissions,
             "canonical_role": canonical_role(normalized_role),
-            "authorized_collection_ids": allowed_collection_ids_for_user(user),
+            "authorized_collection_ids": authorized_collection_ids,
         },
         "active_tenant": active_tenant,
-        "available_tenants": get_accessible_tenants(user),
+        "available_tenants": get_accessible_tenants(session_user),
         "message": "Sessão enterprise carregada com sucesso",
     }
+
+
+def _session_role_snapshot(record: dict, user: dict) -> str:
+    raw_role = record.get("role_snapshot")
+    return normalize_role(raw_role if isinstance(raw_role, str) and raw_role.strip() else user.get("role"))
+
+
+def _session_permissions_snapshot(record: dict, user: dict) -> tuple[list[str], bool]:
+    """Return permissions and whether the persisted list is authoritative."""
+    raw_permissions = record.get("permissions_snapshot", _MISSING)
+    if isinstance(raw_permissions, list):
+        return normalize_permissions(raw_permissions), True
+    # Records written before snapshots existed retain the compatibility role
+    # fallback. A present list, including [], is never treated as omitted.
+    return resolve_permissions_for_role(
+        _session_role_snapshot(record, user),
+        user.get("permission_overrides"),
+    ), False
 
 
 def bootstrap_session() -> dict:
@@ -337,65 +403,63 @@ def get_session(session_token: str | None) -> dict:
             }
             return state
 
-        password_changed_at = user.get("password_changed_at")
-        if password_changed_at:
-            try:
-                session_created = datetime.fromisoformat(record.get("created_at", "").replace("Z", "+00:00"))
-                pw_changed = datetime.fromisoformat(password_changed_at.replace("Z", "+00:00"))
-                if session_created < pw_changed:
-                    sessions.pop(session_token, None)
-                    outcome["payload"] = {
-                        **bootstrap_session(),
-                        "session_state": "expired",
-                        "message": "Sessão revogada. Credenciais alteradas. Faça login novamente.",
-                    }
-                    return state
-            except (ValueError, TypeError):
-                pass
+        def expire(message: str) -> dict:
+            sessions.pop(session_token, None)
+            outcome["payload"] = {
+                **bootstrap_session(),
+                "session_state": "expired",
+                "message": message,
+            }
+            return state
 
-        status_changed_at = user.get("status_changed_at")
-        if status_changed_at:
-            try:
-                session_created = datetime.fromisoformat(record.get("created_at", "").replace("Z", "+00:00"))
-                status_changed = datetime.fromisoformat(status_changed_at.replace("Z", "+00:00"))
-                if session_created < status_changed:
-                    sessions.pop(session_token, None)
-                    outcome["payload"] = {
-                        **bootstrap_session(),
-                        "session_state": "expired",
-                        "message": "Sessão revogada. Status alterado. Faça login novamente.",
-                    }
-                    return state
-            except (ValueError, TypeError):
-                pass
-
-        role_changed_at = user.get("role_changed_at")
-        if role_changed_at:
-            try:
-                session_created = datetime.fromisoformat(record.get("created_at", "").replace("Z", "+00:00"))
-                role_changed = datetime.fromisoformat(role_changed_at.replace("Z", "+00:00"))
-                if session_created < role_changed:
-                    sessions.pop(session_token, None)
-                    outcome["payload"] = {
-                        **bootstrap_session(),
-                        "session_state": "expired",
-                        "message": "Sessão revogada. Permissões alteradas. Faça login novamente.",
-                    }
-                    return state
-            except (ValueError, TypeError):
-                pass
+        session_created: datetime | None = None
+        lifecycle_markers = (
+            ("password_changed_at", "Sessão revogada. Credenciais alteradas. Faça login novamente."),
+            ("status_changed_at", "Sessão revogada. Status alterado. Faça login novamente."),
+            ("role_changed_at", "Sessão revogada. Permissões alteradas. Faça login novamente."),
+        )
+        for marker, message in lifecycle_markers:
+            raw_marker = user.get(marker)
+            if raw_marker is None:
+                continue
+            if session_created is None:
+                session_created = _parse_lifecycle_timestamp(record.get("created_at"))
+            changed_at = _parse_lifecycle_timestamp(raw_marker)
+            if session_created is None or changed_at is None:
+                return expire("Sessão inválida. Faça login novamente.")
+            if session_created < changed_at:
+                return expire(message)
 
         tenant_id = record.get("tenant_id") or user["tenant_id"]
         if not can_access_tenant(user, tenant_id):
             tenant_id = user["tenant_id"]
+        role_snapshot = _session_role_snapshot(record, user)
+        permissions_snapshot, has_persisted_snapshot = _session_permissions_snapshot(record, user)
+        authorized_collection_ids_snapshot = record.get("authorized_collection_ids_snapshot", _MISSING)
+        # Older records do not have immutable authorization fields. Migrate
+        # them exactly once at first successful access; subsequent refreshes
+        # use the persisted snapshot and cannot follow later user edits.
+        if not has_persisted_snapshot:
+            record["role_snapshot"] = role_snapshot
+            record["permissions_snapshot"] = permissions_snapshot
+            record["canonical_role_snapshot"] = canonical_role(role_snapshot)
+        if authorized_collection_ids_snapshot is _MISSING:
+            authorized_collection_ids_snapshot = allowed_collection_ids_for_user(
+                {**user, "role": role_snapshot}
+            )
+            record["authorized_collection_ids_snapshot"] = authorized_collection_ids_snapshot
         record["last_seen_at"] = _to_iso(_utc_now())
         record["expires_at"] = _to_iso(_utc_now() + timedelta(hours=SESSION_TTL_HOURS))
-        record["role_snapshot"] = normalize_role(user.get("role"))
-        record["permissions_snapshot"] = resolve_permissions_for_role(user.get("role"), user.get("permission_overrides"))
-        record["canonical_role_snapshot"] = canonical_role(user.get("role"))
-        record["authorized_collection_ids_snapshot"] = allowed_collection_ids_for_user(user)
         sessions[session_token] = record
-        outcome["payload"] = _build_authenticated_session(user, tenant_id, session_token, record["expires_at"])
+        outcome["payload"] = _build_authenticated_session(
+            user,
+            tenant_id,
+            session_token,
+            record["expires_at"],
+            role_snapshot=role_snapshot,
+            permissions_snapshot=permissions_snapshot,
+            authorized_collection_ids_snapshot=authorized_collection_ids_snapshot,
+        )
         return state
 
     update_session_state(mutate)
@@ -462,15 +526,22 @@ def switch_tenant(session_token: str | None, tenant_id: str) -> dict:
         user = get_user(record["user_id"])
         if not user or user.get("status") != "active" or not can_access_tenant(user, tenant_id):
             raise PermissionError(f"tenant_forbidden:{tenant_id}")
+        role_snapshot = _session_role_snapshot(record, user)
+        permissions_snapshot, _has_persisted_snapshot = _session_permissions_snapshot(record, user)
+        authorized_collection_ids_snapshot = record.get("authorized_collection_ids_snapshot", _MISSING)
         record["tenant_id"] = tenant_id
         record["last_seen_at"] = _to_iso(_utc_now())
         record["expires_at"] = _to_iso(_utc_now() + timedelta(hours=SESSION_TTL_HOURS))
-        record["role_snapshot"] = normalize_role(user.get("role"))
-        record["permissions_snapshot"] = resolve_permissions_for_role(user.get("role"), user.get("permission_overrides"))
-        record["canonical_role_snapshot"] = canonical_role(user.get("role"))
-        record["authorized_collection_ids_snapshot"] = allowed_collection_ids_for_user(user)
         sessions[session_token] = record
-        outcome["payload"] = _build_authenticated_session(user, tenant_id, session_token, record["expires_at"])
+        outcome["payload"] = _build_authenticated_session(
+            user,
+            tenant_id,
+            session_token,
+            record["expires_at"],
+            role_snapshot=role_snapshot,
+            permissions_snapshot=permissions_snapshot,
+            authorized_collection_ids_snapshot=authorized_collection_ids_snapshot,
+        )
         return state
 
     update_session_state(mutate)
@@ -607,7 +678,9 @@ def list_sessions_for_user(user_id: str, *, current_session_token: str | None = 
             continue
         role = normalize_role(record.get("role_snapshot"))
         permissions = record.get("permissions_snapshot")
-        if not isinstance(permissions, list):
+        if isinstance(permissions, list):
+            permissions = normalize_permissions(permissions)
+        else:
             target_user = get_user(user_id) or {"role": role}
             permissions = resolve_permissions_for_role(target_user.get("role"), target_user.get("permission_overrides"))
         items.append(

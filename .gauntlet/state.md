@@ -39,3 +39,39 @@ No score can override a failed mandatory security, correctness, data-integrity, 
 ## Stop conditions
 
 Stop at `BLOCKED` or `INCOMPLETE` when required external/runtime evidence cannot be obtained safely; otherwise continue until all material P0/HIGH gaps are closed or a marginal-gain stop is justified. The current stop is justified by the full legacy CVG regression blocker, unavailable live provider evidence, and deployment-bound residual controls. No P0/HIGH issue remains in the corrected paths, but these findings are not silently promoted. Never start Phase 1 from this phase.
+
+## Phase 0.6 Gauntlet State
+
+Phase 0.6 was executed as a bounded promotion-closure loop over the three
+preserved component boundaries. The published Phase 0.5 commit remains
+7925beb972cd7d3a85c883506254bad98a43cbee on main and origin/main.
+
+- Round 0 DISCOVER/DEFINE: complete; the required Phase 0.6 attachment was
+  read, the frozen quality bar was recorded, and no Phase 1 work was opened.
+- Round 1 BUILD: complete; RBAC overrides, wildcard deny handling, legacy
+  session migration, fail-closed lifecycle parsing, sources.read enforcement,
+  provider protocol handling, safe lock failures, Locker boundary, CI,
+  dependency and security documentation were implemented.
+- Round 2 RUN/INSPECT: complete; CVG focused security returned 26 passed,
+  Professor returned 37 passed, the provider artifact validator observed 12
+  cases and 26 HTTP requests, Node audits were clean, and Locker/frontend
+  checks passed.
+- Round 3 CRITIQUE: complete; a fresh independent read-only review found the
+  missing corpus P0 and initially identified session, source-permission,
+  provider-artifact and lock-cleanup gaps.
+- Round 4 FIX/RETEST: complete; the identified code and evidence gaps were
+  corrected, the provider artifact was regenerated, the CI probe and
+  artifact validator were added, and affected tests passed.
+- Round 5 FINAL REVIEW: complete; the final independent review answered all
+  twelve questions and recommended BLOCKED. The current full CVG observation
+  is 383 passed, 13 failed, 15 skipped and 4 errors across 415 tests; every
+  red item is classified as a missing-corpus fixture surface.
+
+## Phase 0.6 Final Decision
+
+Final classification: BLOCKED — NOT PROMOTED. The approved default/Fluxpay/
+tenant corpus is absent and no owner-authorized permanent waiver exists.
+Live-provider quality, GitHub branch protection, Python dependency audit, and
+production network evidence are also unavailable. The red surface is visible,
+the corrected security paths were retested, and no Phase 1 plan or
+implementation was created.

@@ -6,7 +6,7 @@ logic should call these helpers instead of comparing role strings directly.
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 
 from services.rag_contract import CANONICAL_COLLECTION_ID, normalize_collection_id
 
@@ -25,11 +25,39 @@ LEGACY_TO_CANONICAL = {
 }
 
 # Canonical permission identifiers. Legacy route identifiers are accepted by
-# permission_granted() through LEGACY_PERMISSION_ALIASES.
+# permission_granted() through LEGACY_PERMISSION_ALIASES. A bare wildcard means
+# every permission identifier. Once a wildcard role has removals, the effective
+# result is materialized from this registry plus explicit additions, then the
+# removals are applied so a removal remains visible to request-time checks.
+CANONICAL_PERMISSION_IDS = (
+    "audit.read",
+    "chat.query",
+    "collections.manage",
+    "collections.read",
+    "corpus.audit",
+    "corpus.repair",
+    "documents.manage",
+    "documents.read",
+    "documents.upload",
+    "history.read",
+    "ingestion.run",
+    "library.browse",
+    "observability.read",
+    "reindex.run",
+    "runtime.manage",
+    "sessions.revoke",
+    "sources.read",
+    "tenants.read",
+    "tenants.manage",
+    "users.manage",
+)
+
 ROLE_PERMISSIONS: dict[str, tuple[str, ...]] = {
     "PLATFORM_ADMIN": ("*",),
     "KNOWLEDGE_MANAGER": (
         "chat.query",
+        "history.read",
+        "library.browse",
         "documents.read",
         "documents.upload",
         "documents.manage",
@@ -45,7 +73,7 @@ ROLE_PERMISSIONS: dict[str, tuple[str, ...]] = {
     ),
     "VETERINARIAN": (
         "chat.query",
-        "documents.read",
+        "history.read",
         "sources.read",
         "collections.read",
     ),
@@ -56,9 +84,9 @@ LEGACY_PERMISSION_ALIASES = {
     "query.execute": "chat.query",
     "documents.search": "chat.query",
     "documents.query": "chat.query",
-    "sources.read": "sources.read",
-    "documents.read": "documents.read",
-    "documents.upload": "documents.upload",
+    "chat.history.read": "history.read",
+    "queries.history.read": "history.read",
+    "library.read": "library.browse",
 }
 
 
@@ -77,21 +105,83 @@ def legacy_role_for_canonical(role: str | None) -> str:
 
 
 def permission_alias(permission: str) -> str:
-    return LEGACY_PERMISSION_ALIASES.get(str(permission).strip(), str(permission).strip())
+    candidate = str(permission or "").strip().lower()
+    return LEGACY_PERMISSION_ALIASES.get(candidate, candidate)
+
+
+def normalize_permissions(permissions: Iterable[str] | None) -> list[str]:
+    """Return a deterministic, canonical permission list.
+
+    Persisted sessions may contain legacy route names. Normalizing the
+    snapshot at the boundary keeps the authorization check independent of the
+    spelling used by an older record.
+    """
+    if permissions is None:
+        return []
+    if isinstance(permissions, str):
+        permissions = (permissions,)
+    return sorted(
+        {
+            normalized
+            for item in permissions
+            if isinstance(item, str)
+            for normalized in (permission_alias(item),)
+            if normalized
+        }
+    )
+
+
+def normalize_permission_overrides(overrides: object | None) -> dict[str, list[str]]:
+    """Normalize add/remove overrides and make removal win on conflicts."""
+    if hasattr(overrides, "model_dump"):
+        payload = overrides.model_dump(exclude_none=True)
+    elif isinstance(overrides, Mapping):
+        payload = overrides
+    else:
+        payload = {}
+
+    def values(key: str) -> list[str]:
+        raw = payload.get(key)
+        if isinstance(raw, str):
+            raw = [raw]
+        if not isinstance(raw, (list, tuple, set)):
+            return []
+        return normalize_permissions(raw)
+
+    additions = set(values("add"))
+    removals = set(values("remove"))
+    additions.difference_update(removals)
+    return {"add": sorted(additions), "remove": sorted(removals)}
 
 
 def permissions_for_role(role: str | None, overrides: dict | None = None) -> list[str]:
-    base = list(ROLE_PERMISSIONS[canonical_role(role)])
-    if "*" in base:
-        return ["*"]
-    resolved = set(base)
-    payload = overrides if isinstance(overrides, dict) else {}
-    for permission in payload.get("add", []) if isinstance(payload.get("add"), list) else []:
-        if isinstance(permission, str) and permission.strip():
-            resolved.add(permission_alias(permission))
-    for permission in payload.get("remove", []) if isinstance(payload.get("remove"), list) else []:
-        if isinstance(permission, str) and permission.strip():
-            resolved.discard(permission_alias(permission))
+    base = set(normalize_permissions(ROLE_PERMISSIONS[canonical_role(role)]))
+    normalized_overrides = normalize_permission_overrides(overrides)
+    additions = set(normalized_overrides["add"])
+    removals = set(normalized_overrides["remove"])
+
+    # Removing the wildcard grant means that no inherited permission remains.
+    # Explicit additions can still opt individual permissions back in, while
+    # any explicit removal continues to win over those additions.
+    if "*" in removals:
+        resolved = (base | additions) - {"*"}
+        resolved.difference_update(removals - {"*"})
+        return sorted(resolved)
+
+    wildcard_source = "*" in base or "*" in additions
+    wildcard_granted = wildcard_source
+    if wildcard_granted:
+        explicit_removals = removals - {"*"}
+        if not explicit_removals:
+            return ["*"]
+        resolved = set(CANONICAL_PERMISSION_IDS)
+        resolved.update(additions - {"*"})
+        resolved.difference_update(explicit_removals)
+        return sorted(resolved)
+
+    resolved = base - {"*"}
+    resolved.update(additions - {"*"})
+    resolved.difference_update(removals)
     return sorted(resolved)
 
 
@@ -100,17 +190,23 @@ def permission_granted(
     role: str | None = None,
     permissions: Iterable[str] = (),
     required: str,
+    authoritative: bool = False,
 ) -> bool:
     required_canonical = permission_alias(required)
-    resolved = {permission_alias(item) for item in permissions if isinstance(item, str)}
+    resolved = set(normalize_permissions(permissions))
     if "*" in resolved:
         return True
     if required_canonical in resolved:
         return True
-    # A session assembled from an older persisted record may omit permissions;
-    # derive them from its role without weakening explicit removals.
-    if role is not None:
-        return required_canonical in set(permissions_for_role(role))
+    if authoritative:
+        return False
+    # Keep the Phase 0.5 direct helper contract for legacy callers that pass
+    # an empty permission list as an omitted snapshot. All session/user
+    # enforcement paths pass authoritative=True, so an explicit empty or
+    # reduced snapshot cannot fall back to its role.
+    if role is not None and not resolved:
+        fallback = set(permissions_for_role(role))
+        return "*" in fallback or required_canonical in fallback
     return False
 
 

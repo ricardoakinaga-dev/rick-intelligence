@@ -35,6 +35,15 @@ password/status/role change predates the session. Password changes and user
 deletion revoke the affected sessions. A session-targeted revoke verifies the
 target token's owner before acting for a non-admin identity.
 
+The role, effective permissions, canonical role, and authorized collection IDs
+persisted at login are the authorization snapshot for that session. User
+permission overrides are resolved as explicit additions/removals with removal
+winning; wildcard expansion is materialized when a wildcard has removals. A
+present `permissions_snapshot`, including an empty list, is authoritative and
+is never replaced with current-role permissions during session refresh or tenant
+switch. Override changes take effect on a new login. Password, status, or role
+changes invalidate older sessions before a request is authorized.
+
 The session administration list returns an opaque SHA-256 `session_id` and does
 not return the bearer token. A revoke request resolves that identifier only on
 the server; the raw token remains limited to the server-side session store and

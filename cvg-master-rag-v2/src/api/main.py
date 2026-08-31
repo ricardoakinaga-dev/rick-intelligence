@@ -1949,6 +1949,7 @@ def search(request: SearchRequest, _session: EnterpriseSession = Depends(_enterp
         _session,
         workspace_id=request.workspace_id,
         collection_id=request.collection_id,
+        require_sources=True,
     )
     with traced_span(
         "search.execute",
@@ -1983,6 +1984,7 @@ def query(request: QueryRequest, _session: EnterpriseSession = Depends(_enterpri
         _session,
         workspace_id=request.workspace_id,
         collection_id=request.collection_id,
+        require_sources=True,
     )
     with traced_span(
         "query.execute",

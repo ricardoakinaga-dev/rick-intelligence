@@ -78,6 +78,7 @@ def session_has_permission(session: EnterpriseSession, permission: str) -> bool:
         role=session.user.role,
         permissions=session.user.permissions,
         required=permission,
+        authoritative=True,
     )
 
 
@@ -142,9 +143,18 @@ def build_retrieval_context(
     *,
     workspace_id: str,
     collection_id: str | None = None,
+    require_sources: bool = False,
 ) -> RetrievalContext:
     """Build the server-side retrieval scope; request bodies cannot widen it."""
     session = require_workspace_access(workspace_id, require_authenticated_session(coerce_session(session)))
+    if require_sources:
+        require_permission(
+            session,
+            "sources.read",
+            workspace_id=workspace_id,
+            target_type="permission",
+            target_id="sources.read",
+        )
     allowed = allowed_collection_ids_for_user(session.user)
     requested_collection = normalize_collection_id(collection_id) if collection_id else None
     if requested_collection and "*" not in allowed and requested_collection not in allowed:

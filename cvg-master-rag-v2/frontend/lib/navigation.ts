@@ -2,12 +2,12 @@ import type { EnterpriseRole } from "@/types";
 
 export const NAV_ITEMS = [
   { href: "/", label: "Início", description: "Visão geral", allowedRoles: ["viewer", "operator", "auditor", "admin_rag", "super_admin", "admin"] as EnterpriseRole[] },
-  { href: "/documents", label: "Documentos", description: "Upload e catálogo", allowedRoles: ["viewer", "operator", "auditor", "admin_rag", "super_admin", "admin"] as EnterpriseRole[] },
-  { href: "/search", label: "Busca", description: "Retrieval e filtros", allowedRoles: ["viewer", "operator", "auditor", "admin_rag", "super_admin", "admin"] as EnterpriseRole[] },
+  { href: "/documents", label: "Documentos", description: "Upload e catálogo", allowedRoles: ["operator", "admin_rag", "super_admin", "admin"] as EnterpriseRole[] },
+  { href: "/search", label: "Busca", description: "Retrieval e filtros", allowedRoles: ["operator", "admin_rag", "super_admin", "admin"] as EnterpriseRole[] },
   { href: "/chat", label: "Chat", description: "Perguntas e respostas", allowedRoles: ["viewer", "operator", "auditor", "admin_rag", "super_admin", "admin"] as EnterpriseRole[] },
   { href: "/admin", label: "Admin", description: "Governança e runtime", allowedRoles: ["admin_rag", "super_admin", "admin"] as EnterpriseRole[] },
-  { href: "/dashboard", label: "Dashboard", description: "Métricas e KPIs", allowedRoles: ["operator", "auditor", "admin_rag", "super_admin", "admin"] as EnterpriseRole[] },
-  { href: "/audit", label: "Auditoria", description: "Qualidade e revisão", allowedRoles: ["auditor", "admin_rag", "super_admin", "admin"] as EnterpriseRole[] },
+  { href: "/dashboard", label: "Dashboard", description: "Métricas e KPIs", allowedRoles: ["operator", "admin_rag", "super_admin", "admin"] as EnterpriseRole[] },
+  { href: "/audit", label: "Auditoria", description: "Qualidade e revisão", allowedRoles: ["admin_rag", "super_admin", "admin"] as EnterpriseRole[] },
 ] as const;
 
 export type AppRoute = (typeof NAV_ITEMS)[number]["href"];

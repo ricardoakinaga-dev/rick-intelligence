@@ -1,33 +1,52 @@
 {
   "schema_version": 1,
-  "project": "RICK Intelligence Phase 0.5 baseline closure",
-  "goal": "Produce a reproducible, security-aware VERIFIED_CANDIDATE assessment for the authorized Phase 0.5 runtime, contract, identity, ACL, locking, evidence, and verification scope without starting Phase 1.",
+  "project": "RICK Intelligence Phase 0.6 promotion closure",
+  "goal": "Close the explicit Phase 0.5 promotion blockers and decide an honest Phase 0.6 final gate without starting Phase 1.",
   "project_profile": "BROWNFIELD",
   "work_mode": "MIGRATION",
   "work_mode_overlays": [],
-  "lifecycle_stage": "BUILD",
-  "active_activity": "REVIEW",
+  "lifecycle_stage": "VERIFY",
+  "active_activity": "VERIFY",
   "engineering_tier": "T4_CRITICAL",
   "risk_level": "MEDIUM",
   "blast_radius": "CROSS_SYSTEM",
-  "status": "IN_PROGRESS",
-  "active_execplan": ".agent/plans/phase-0.5-baseline-closure.md",
-  "active_task": "PH05-VERIFY",
-  "verification_state": "PARTIAL",
-  "repository_state": "Root publication remains at the existing Phase 0 commit; Phase 0.5 source, test, documentation, and control-plane changes are uncommitted within the three preserved component boundaries and isolated runtime state is ignored.",
+  "status": "BLOCKED",
+  "active_execplan": ".agent/plans/phase-0.6-promotion-closure.md",
+  "active_task": "PH06-REVIEW",
+  "verification_state": "BLOCKED",
+  "repository_state": "Root HEAD and origin/main are the published Phase 0.5 commit 7925beb972cd7d3a85c883506254bad98a43cbee; Phase 0.6 plan, control checker, and subsequent bounded work are local changes across the three preserved component boundaries. Child repositories remain independent and dirty from the preserved Phase 0.5 work.",
   "instruction_scope_refs": [
     "cvg-master-rag-v2/AGENTS.md",
     ".agent/PLANS.md",
     ".agent/plans/phase-0-forensic-audit.md",
     ".agent/plans/phase-0.5-baseline-closure.md",
+    ".agent/plans/phase-0.6-promotion-closure.md",
+    "scripts/phase06/check_control_plane.py",
     ".gauntlet/state.md"
   ],
-  "last_gate_record": ".agent/gates/phase-0.5-verified-blocked-final.json",
-  "last_event_id": "EVT-PH05-VERIFIED-BLOCKED-FINAL",
-  "state_revision": 10,
-  "next_gate": "VERIFIED",
-  "next_action": "Resolve the historical fixture/policy, live-provider and deployment-control gaps, then rerun the affected evidence before reopening VERIFIED; do not start Phase 1.",
-  "blocked_by": [],
+  "last_gate_record": ".agent/gates/phase-0.6-promotion-final.json",
+  "last_event_id": "EVT-PH06-FINAL-BLOCKED",
+  "state_revision": 17,
+  "next_gate": "BLOCKED",
+  "next_action": "Restore the approved corpus or obtain an owner-authorized waiver, complete external evidence, then rerun Phase 0.6; do not start Phase 1.",
+  "blocked_by": [
+    "PH06-LEGACY: approved default/Fluxpay/tenant corpus or owner-authorized permanent waiver",
+    "External live-provider, GitHub branch-protection, Python-audit, and production-network evidence"
+  ],
   "human_approval_required": [],
-  "updated_at": "2026-08-31T04:07:13Z"
+  "published_phase_0_5_commit": {
+    "sha": "7925beb972cd7d3a85c883506254bad98a43cbee",
+    "remote_ref": "origin/main",
+    "remote_sha": "7925beb972cd7d3a85c883506254bad98a43cbee",
+    "observed_at": "2026-08-31T04:29:39Z"
+  },
+  "current_git": {
+    "head": "7925beb972cd7d3a85c883506254bad98a43cbee",
+    "branch": "main",
+    "remote_ref": "origin/main",
+    "remote_sha": "7925beb972cd7d3a85c883506254bad98a43cbee",
+    "worktree": "DIRTY_PHASE_0_6",
+    "sync": "HEAD_EQ_ORIGIN_MAIN"
+  },
+  "updated_at": "2026-08-31T05:50:12Z"
 }

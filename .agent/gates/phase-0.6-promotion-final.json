@@ -1,0 +1,57 @@
+{
+  "schema_version": "phase-0.6-promotion-final.v1",
+  "gate_id": "GATE-PH06-PROMOTION-001",
+  "phase": "0.6",
+  "decision": "BLOCKED",
+  "final_classification": "BLOCKED",
+  "promotion": "NOT_PROMOTED",
+  "candidate": false,
+  "verified_candidate": false,
+  "promoted": false,
+  "published_phase_0_5_commit": "7925beb972cd7d3a85c883506254bad98a43cbee",
+  "current_head": "7925beb972cd7d3a85c883506254bad98a43cbee",
+  "remote_sha": "7925beb972cd7d3a85c883506254bad98a43cbee",
+  "branch": "main",
+  "worktree": "DIRTY_PHASE_0_6",
+  "sync": "HEAD_EQ_ORIGIN_MAIN",
+  "blocking_reasons": [
+    "The approved default, Fluxpay, and tenant evaluation corpus is absent.",
+    "No owner-authorized permanent waiver exists for the missing corpus.",
+    "Live provider, GitHub Actions/branch protection, Python dependency audit, and production network evidence are unavailable locally."
+  ],
+  "criteria": {
+    "PH06-RBAC": "PASS",
+    "PH06-LEGACY": "BLOCKED",
+    "PH06-PROVIDER": "PASS_LOCAL_PROTOCOL_ONLY",
+    "PH06-CONTROL": "PASS_STRUCTURAL_LOCAL",
+    "PH06-CI": "IMPLEMENTED_NOT_RUN_GITHUB",
+    "PH06-LOCKER": "PASS_STATIC_LOCAL_WITH_PRODUCTION_GAP",
+    "PH06-VET": "PASS_CANONICAL_ROUTES",
+    "PH06-PASSWORD": "DEFERRED_PHASE_1",
+    "PH06-REVIEW": "COMPLETE_BLOCKED",
+    "CURRENT_CVG_REGRESSION": "383_PASSED_13_FAILED_15_SKIPPED_4_ERRORS"
+  },
+  "evidence": [
+    "docs/progress/phase-0.6-report.md",
+    "docs/progress/phase-0.6-independent-review.md",
+    "docs/baselines/phase-0.6-legacy-test-classification.md",
+    "docs/baselines/phase-0.6-provider-contract.json",
+    "rick-professor/test/artifacts/phase-0.6-provider-contract.json",
+    "scripts/phase06/check_provider_artifact.py",
+    "scripts/phase06/check_control_plane.py",
+    "docs/ci/check_control_plane.py",
+    "scripts/phase06/check_locker_boundary.py",
+    ".agent/state.json",
+    ".agent/backlog.json"
+  ],
+  "review": {
+    "reviewer": "Descartes",
+    "mode": "fresh_read_only",
+    "questions_answered": 12,
+    "recommendation": "BLOCKED_NOT_PROMOTED",
+    "no_files_edited": true
+  },
+  "phase_1_started": false,
+  "phase_1_plan_created": false,
+  "decided_at": "2026-08-31T05:45:19Z"
+}

@@ -2,7 +2,9 @@
 
 This workspace coordinates three existing repositories. The active plan is the
 single source for the narrative, milestones, discoveries, decisions, recovery,
-and outcome of the current cross-boundary audit. The JSON state, backlog, and
+and outcome of the current cross-boundary audit. The current active plan is
+`.agent/plans/phase-0.6-promotion-closure.md`; the Phase 0.5 plan remains
+historical context. The JSON state, backlog, and
 append-only ledgers under `.agent/` own their respective machine-readable
 concerns; do not duplicate or silently contradict them.
 

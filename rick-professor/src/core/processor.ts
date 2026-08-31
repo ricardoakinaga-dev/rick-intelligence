@@ -1,5 +1,9 @@
 import { PROMPTS } from './prompts';
-import { chatCompletion as defaultChat, getEmbedding as defaultEmbed } from '../lib/openai';
+import {
+    chatCompletion as defaultChat,
+    getEmbedding as defaultEmbed,
+    summarizeProviderError,
+} from '../lib/openai';
 import {
     searchQdrant as defaultSearch,
     filterTrustedQdrantResults,
@@ -90,7 +94,25 @@ export const processMessage = async (
     const lockValue = randomUUID();
 
     const lockTtlMs = config.LOCK_TTL_MS;
-    const lockRes = await deps.acquireLock(lockKey, lockValue, lockTtlMs);
+    let lockRes: { acquired: boolean };
+    try {
+        lockRes = await deps.acquireLock(lockKey, lockValue, lockTtlMs);
+    } catch (error) {
+        logger('error', '[Processor] Falha ao adquirir lock', { error: 'lock_acquisition_failure' });
+        const errMessage = '🚨 Erro interno. Tente novamente em breve.';
+        try {
+            await deps.sendMessage(chatId, errMessage);
+        } catch {
+            logger('error', '[Processor] Falha ao enviar erro seguro', { error: 'error_notification_failure' });
+        }
+        return {
+            ok: false,
+            conversationId,
+            mode: 'error',
+            replyText: errMessage,
+            metadata: { error: 'lock_acquisition_failure' },
+        };
+    }
 
     if (!lockRes.acquired) {
         logger('warn', `[Processor] Lock rejeitado`, { conversationId, lockKey });
@@ -106,7 +128,9 @@ export const processMessage = async (
 
     // Keep older injected dependency objects usable in tests and integrations.
     // Production callers use the owner-aware default release client above.
-    const release = deps.releaseLock ?? (async () => ({ deleted: false }));
+    // A caller may omit the injectable override, but an acquired lock must
+    // still have a real owner-bound release attempt; never silently no-op.
+    const release = deps.releaseLock ?? defaultRelease;
     const renew = deps.renewLock;
     const renewalTimer = renew
         ? setInterval(() => {
@@ -461,15 +485,34 @@ export const processMessage = async (
             },
         };
     } catch (error) {
-        logger('error', '[Processor] Erro Crítico', { error: 'processor_failure' });
+        const providerFailure = summarizeProviderError(error);
+        logger('error', '[Processor] Erro Crítico', providerFailure
+            ? {
+                error: 'provider_failure',
+                providerCode: providerFailure.code,
+                correlationId: providerFailure.correlationId,
+                attempts: providerFailure.attempts,
+            }
+            : { error: 'processor_failure' });
         const errMessage = '🚨 Erro interno. Tente novamente em breve.';
-        await deps.sendMessage(chatId, errMessage);
+        try {
+            await deps.sendMessage(chatId, errMessage);
+        } catch {
+            logger('error', '[Processor] Falha ao enviar erro seguro', { error: 'error_notification_failure' });
+        }
         return {
             ok: false,
             conversationId,
             mode: 'error',
             replyText: errMessage,
-            metadata: { error: 'processor_failure' },
+            metadata: providerFailure
+                ? {
+                    error: 'provider_failure',
+                    providerCode: providerFailure.code,
+                    correlationId: providerFailure.correlationId,
+                    attempts: providerFailure.attempts,
+                }
+                : { error: 'processor_failure' },
         };
     } finally {
         if (renewalTimer) clearInterval(renewalTimer);

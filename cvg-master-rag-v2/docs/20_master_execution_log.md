@@ -5942,3 +5942,54 @@ publicação Git e Phase 1 permanece fora do escopo.
 
 ### STATUS
 BLOCKED — revalidar após resolver os gaps explícitos e repetir os checks afetados.
+
+---
+
+## ENTRY: PHASE 0.6 RBAC SESSION CLOSURE
+
+### TIMESTAMP
+2026-08-31 04:50 UTC
+
+### ENGINE
+BUILD / CONTRACT VALIDATION
+
+### PHASE
+PHASE_0.6
+
+### TASK
+PH06-RBAC — fechar o blocker de permissões explícitas, wildcard, snapshots de
+sessão legados e separação de acesso VETERINARIAN/KM.
+
+### ACTION
+Centralizar a resolução canônica de permissões; fazer remoções vencerem role
+fallback, definir wildcard com remoções, preservar snapshots presentes no
+`get_session`/troca de tenant, normalizar aliases legados, expor
+`permission_overrides` nos contratos de usuário e adicionar testes focados de
+matriz/ACL.
+
+### RESULT
+Implementação concluída no escopo autorizado. A política estática e o probe
+determinístico passaram. A validação pytest não pôde iniciar: `pytest` não está
+disponível no ambiente (exit `127`) e `python3 -m pytest` retornou exit `1` por
+módulo ausente.
+
+### DECISION
+`PH06-RBAC` permanece implementado, sem veredito `PASS` e sem promoção implícita.
+O resultado de testes de runtime deve ser obtido em ambiente com dependências
+instaladas.
+
+### EVIDENCE
+
+- `src/services/authorization.py`
+- `src/services/admin_service.py`
+- `src/services/enterprise_service.py`
+- `src/services/api_security.py`
+- `src/models/schemas.py`
+- `src/tests/test_phase06_rbac.py`
+- `python3 -m py_compile ...`: exit `0`
+- `PYTHONPATH=src python3` authorization probe: exit `0`
+- focused/Phase 0.5 pytest attempts: exits `127`/`1` por executor ausente
+
+### STATUS
+IN_PROGRESS — implementação encerrada; aguardando validação automatizada e
+registro dos resultados antes da próxima decisão de gate.

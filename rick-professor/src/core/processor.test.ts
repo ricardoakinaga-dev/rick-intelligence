@@ -80,6 +80,30 @@ test('Processor Logic', async (t) => {
         assert.equal(released.length, 0, 'rejected acquisition must not release');
     });
 
+    await t.test('Lock acquisition failure returns a safe error without releasing', async () => {
+        let sentMessage = '';
+        released = [];
+        const deps: ProcessorDependencies = {
+            ...mockDeps,
+            acquireLock: async () => {
+                throw new Error('RAW_LOCK_PROVIDER_SECRET');
+            },
+            sendMessage: async (_chatId: string, text: string) => { sentMessage = text; },
+            logger: (_level, _message, metadata) => {
+                assert.equal(JSON.stringify(metadata).includes('RAW_LOCK_PROVIDER_SECRET'), false);
+            },
+        };
+
+        const result = await processMessage({ text: 'teste', chatId: '123' }, deps);
+
+        assert.equal(result.ok, false);
+        assert.equal(result.mode, 'error');
+        assert.equal(result.replyText, '🚨 Erro interno. Tente novamente em breve.');
+        assert.equal(result.metadata?.error, 'lock_acquisition_failure');
+        assert.equal(sentMessage, result.replyText);
+        assert.equal(released.length, 0);
+    });
+
     await t.test('Fallback: Should trigger fallback when gate fails', async () => {
         let sentMessage = '';
         released = [];

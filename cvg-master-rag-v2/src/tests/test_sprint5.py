@@ -11,6 +11,7 @@ import os
 import sys
 from pathlib import Path
 import importlib.util
+from datetime import datetime, timedelta, timezone
 
 # Ensure src/ is on path when running from project root
 SRC_DIR = Path(__file__).parent.parent
@@ -4000,17 +4001,20 @@ class TestMultiDocumentSearch:
         assert resp.low_confidence
         qf = captured.get("query_filter")
         assert qf is not None
-        assert len(qf.must) == 3
+        assert len(qf.must) == 4
 
         workspace_filter = qf.must[0]
         assert workspace_filter.key == "workspace_id"
         assert workspace_filter.match.value == "tenant-b"
 
-        document_filter = qf.must[1]
+        collection_filter = qf.must[1]
+        assert collection_filter.key == "collection_id"
+
+        document_filter = qf.must[2]
         assert document_filter.key == "document_id"
         assert document_filter.match.value == "doc-123"
 
-        page_range_filter = qf.must[2]
+        page_range_filter = qf.must[3]
         assert page_range_filter.key == "page_hint"
         assert page_range_filter.range.gte == 2
         assert page_range_filter.range.lte == 4
@@ -4749,6 +4753,8 @@ class TestHealthEndpoint:
 
     def test_health_reports_corpus_and_qdrant(self, monkeypatch):
         from api.health_routes import health_check
+        from models.schemas import EnterpriseSession
+        from services.enterprise_service import login
 
         class FakeCount:
             count = 7
@@ -4790,7 +4796,8 @@ class TestHealthEndpoint:
             )(),
         )
 
-        data = health_check()
+        session = EnterpriseSession(**login("admin@demo.local", "demo1234", "default"))
+        data = health_check(session=session)
         assert data["status"] == "healthy"
         assert data["qdrant"]["status"] == "ok"
         assert data["qdrant"]["collection"] == "rag_phase0"
@@ -4806,6 +4813,8 @@ class TestHealthEndpoint:
 
     def test_light_health_skips_inventory_counts_and_telemetry(self, monkeypatch):
         from api.health_routes import health_check
+        from models.schemas import EnterpriseSession
+        from services.enterprise_service import login
 
         class FakeClient:
             def get_collections(self):
@@ -4824,7 +4833,8 @@ class TestHealthEndpoint:
             lambda: (_ for _ in ()).throw(AssertionError("light health must not read telemetry")),
         )
 
-        data = health_check(light=True)
+        session = EnterpriseSession(**login("admin@demo.local", "demo1234", "default"))
+        data = health_check(light=True, session=session)
 
         assert data["status"] == "healthy"
         assert data["mode"] == "light"
@@ -8350,6 +8360,7 @@ class TestSemanticChunking:
         doc_dir = workspace_root / "keep-all"
         doc_dir.mkdir(parents=True, exist_ok=True)
         old_document_id = "old-upload-doc"
+        retention_timestamp = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat().replace("+00:00", "Z")
         (doc_dir / f"{old_document_id}_raw.json").write_text(
             json.dumps(
                 {
@@ -8357,7 +8368,7 @@ class TestSemanticChunking:
                     "source_type": "txt",
                     "filename": "upload-smoke.txt",
                     "workspace_id": "keep-all",
-                    "created_at": "2026-04-19T10:00:00Z",
+                    "created_at": retention_timestamp,
                     "pages": [{"page_number": 1, "text": "versão antiga"}],
                     "sections": [],
                     "metadata": {"catalog_scope": "operational", "ingestion_status": "parsed"},
@@ -8381,7 +8392,7 @@ class TestSemanticChunking:
                         "page_hint": 1,
                         "strategy": "recursive",
                         "chunk_size_chars": 12,
-                        "created_at": "2026-04-19T10:00:00Z",
+                        "created_at": retention_timestamp,
                     }
                 ],
                 ensure_ascii=False,
@@ -9399,11 +9410,12 @@ class TestReindexTelemetry:
 
             tel = FakeTelemetry()
             reindex_log.parent.mkdir(parents=True, exist_ok=True)
+            event_base = datetime.now(timezone.utc) - timedelta(minutes=5)
 
             # Write 3 reindex events: 2 recursive, 1 semantic
             events = [
                 {
-                    "timestamp": "2026-04-18T10:00:00+00:00",
+                    "timestamp": event_base.isoformat(),
                     "type": "reindex",
                     "document_id": "d1", "workspace_id": "ws1",
                     "chunking_strategy": "recursive", "chunk_count": 5,
@@ -9411,7 +9423,7 @@ class TestReindexTelemetry:
                     "source": "reindex",
                 },
                 {
-                    "timestamp": "2026-04-18T10:01:00+00:00",
+                    "timestamp": (event_base + timedelta(minutes=1)).isoformat(),
                     "type": "reindex",
                     "document_id": "d2", "workspace_id": "ws1",
                     "chunking_strategy": "recursive", "chunk_count": 10,
@@ -9419,7 +9431,7 @@ class TestReindexTelemetry:
                     "source": "chunking_ab_baseline",
                 },
                 {
-                    "timestamp": "2026-04-18T10:02:00+00:00",
+                    "timestamp": (event_base + timedelta(minutes=2)).isoformat(),
                     "type": "reindex",
                     "document_id": "d3", "workspace_id": "ws1",
                     "chunking_strategy": "semantic", "chunk_count": 7,
@@ -9459,10 +9471,11 @@ class TestReindexTelemetry:
 
             tel = FakeTelemetry()
             reindex_log.parent.mkdir(parents=True, exist_ok=True)
+            event_base = datetime.now(timezone.utc) - timedelta(minutes=5)
 
             events = [
                 {
-                    "timestamp": "2026-04-18T10:00:00+00:00",
+                    "timestamp": event_base.isoformat(),
                     "type": "reindex",
                     "document_id": "d1", "workspace_id": "ws1",
                     "chunking_strategy": "recursive", "chunk_count": 5,
@@ -9470,7 +9483,7 @@ class TestReindexTelemetry:
                     "source": "reindex",
                 },
                 {
-                    "timestamp": "2026-04-18T10:01:00+00:00",
+                    "timestamp": (event_base + timedelta(minutes=1)).isoformat(),
                     "type": "reindex",
                     "document_id": "d2", "workspace_id": "ws1",
                     "chunking_strategy": "recursive", "chunk_count": 5,
@@ -9478,7 +9491,7 @@ class TestReindexTelemetry:
                     "source": "reindex",
                 },
                 {
-                    "timestamp": "2026-04-18T10:02:00+00:00",
+                    "timestamp": (event_base + timedelta(minutes=2)).isoformat(),
                     "type": "reindex",
                     "document_id": "d3", "workspace_id": "ws1",
                     "chunking_strategy": "semantic", "chunk_count": 5,
@@ -9535,10 +9548,11 @@ class TestReindexTelemetry:
 
             tel = FakeTelemetry()
             reindex_log.parent.mkdir(parents=True, exist_ok=True)
+            event_base = datetime.now(timezone.utc) - timedelta(minutes=5)
 
             # Write event missing embedding_status and source (backward compat)
             old_event = {
-                "timestamp": "2026-04-18T10:00:00+00:00",
+                "timestamp": event_base.isoformat(),
                 "type": "reindex",
                 "document_id": "d1", "workspace_id": "ws1",
                 "chunking_strategy": "recursive", "chunk_count": 5,
@@ -9629,11 +9643,12 @@ class TestReindexTelemetry:
 
             tel = FakeTelemetry()
             reindex_log.parent.mkdir(parents=True, exist_ok=True)
+            event_base = datetime.now(timezone.utc) - timedelta(minutes=5)
 
             # Same document "d1" appears in 3 events (A/B: baseline, variant, restore)
             events = [
                 {
-                    "timestamp": "2026-04-18T10:00:00+00:00",
+                    "timestamp": event_base.isoformat(),
                     "type": "reindex",
                     "document_id": "d1", "workspace_id": "ws1",
                     "chunking_strategy": "recursive", "chunk_count": 5,
@@ -9641,7 +9656,7 @@ class TestReindexTelemetry:
                     "source": "chunking_ab_baseline",
                 },
                 {
-                    "timestamp": "2026-04-18T10:01:00+00:00",
+                    "timestamp": (event_base + timedelta(minutes=1)).isoformat(),
                     "type": "reindex",
                     "document_id": "d1", "workspace_id": "ws1",
                     "chunking_strategy": "semantic", "chunk_count": 8,
@@ -9649,7 +9664,7 @@ class TestReindexTelemetry:
                     "source": "chunking_ab_variant",
                 },
                 {
-                    "timestamp": "2026-04-18T10:02:00+00:00",
+                    "timestamp": (event_base + timedelta(minutes=2)).isoformat(),
                     "type": "reindex",
                     "document_id": "d1", "workspace_id": "ws1",
                     "chunking_strategy": "recursive", "chunk_count": 5,
@@ -9657,7 +9672,7 @@ class TestReindexTelemetry:
                     "source": "chunking_ab_restore",
                 },
                 {
-                    "timestamp": "2026-04-18T10:03:00+00:00",
+                    "timestamp": (event_base + timedelta(minutes=3)).isoformat(),
                     "type": "reindex",
                     "document_id": "d2", "workspace_id": "ws1",
                     "chunking_strategy": "semantic", "chunk_count": 7,

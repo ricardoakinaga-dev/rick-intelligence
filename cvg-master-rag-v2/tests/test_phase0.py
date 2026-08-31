@@ -78,7 +78,7 @@ def test_query_request():
     )
 
     assert req.top_k == 5
-    assert req.threshold == 0.70
+    assert req.threshold == 0.25
 
 
 def test_evaluation_question():

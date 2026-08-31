@@ -22,7 +22,9 @@ from services.enterprise_store import (
 from services.authorization import (
     ROLE_PERMISSIONS as CANONICAL_ROLE_PERMISSIONS,
     canonical_role as resolve_canonical_role,
+    normalize_permission_overrides,
     permission_granted,
+    permissions_for_role,
 )
 from services.rag_contract import CANONICAL_COLLECTION_ID, normalize_collection_id
 
@@ -41,42 +43,11 @@ ROLE_ALIASES = {
 }
 
 ROLE_PERMISSIONS: dict[str, list[str]] = {
-    "super_admin": [
-        "*",
-    ],
-    "admin_rag": list(CANONICAL_ROLE_PERMISSIONS["KNOWLEDGE_MANAGER"]) + [
-        "documents.read",
-        "documents.upload",
-        "search.execute",
-        "query.execute",
-        "observability.read",
-        "audit.read",
-        "ingestion.run",
-        "reindex.run",
-        "corpus.audit",
-        "corpus.repair",
-    ],
-    "auditor": list(CANONICAL_ROLE_PERMISSIONS["VETERINARIAN"]) + [
-        "documents.read",
-        "search.execute",
-        "query.execute",
-        "observability.read",
-        "audit.read",
-        "corpus.audit",
-    ],
-    "operator": list(CANONICAL_ROLE_PERMISSIONS["KNOWLEDGE_MANAGER"]) + [
-        "documents.read",
-        "documents.upload",
-        "search.execute",
-        "query.execute",
-        "observability.read",
-        "ingestion.run",
-    ],
-    "viewer": list(CANONICAL_ROLE_PERMISSIONS["VETERINARIAN"]) + [
-        "documents.read",
-        "search.execute",
-        "query.execute",
-    ],
+    "super_admin": list(CANONICAL_ROLE_PERMISSIONS["PLATFORM_ADMIN"]),
+    "admin_rag": list(CANONICAL_ROLE_PERMISSIONS["KNOWLEDGE_MANAGER"]),
+    "auditor": list(CANONICAL_ROLE_PERMISSIONS["VETERINARIAN"]),
+    "operator": list(CANONICAL_ROLE_PERMISSIONS["KNOWLEDGE_MANAGER"]),
+    "viewer": list(CANONICAL_ROLE_PERMISSIONS["VETERINARIAN"]),
 }
 
 DEFAULT_ROLE = "viewer"
@@ -267,25 +238,17 @@ def normalize_role(role: str | None) -> str:
 
 
 def resolve_permissions_for_role(role: str | None, overrides: dict | None = None) -> list[str]:
-    normalized_role = normalize_role(role)
-    base = list(ROLE_PERMISSIONS.get(normalized_role, ROLE_PERMISSIONS[DEFAULT_ROLE]))
-    if "*" in base:
-        return ["*"]
-
-    resolved = set(base)
-    payload = overrides if isinstance(overrides, dict) else {}
-    for permission in payload.get("add", []) if isinstance(payload.get("add"), list) else []:
-        if isinstance(permission, str) and permission.strip():
-            resolved.add(permission.strip())
-    for permission in payload.get("remove", []) if isinstance(payload.get("remove"), list) else []:
-        if isinstance(permission, str) and permission.strip():
-            resolved.discard(permission.strip())
-    return sorted(resolved)
+    return permissions_for_role(normalize_role(role), overrides)
 
 
 def user_has_permission(user: dict, permission: str) -> bool:
     permissions = resolve_permissions_for_role(user.get("role"), user.get("permission_overrides"))
-    return permission_granted(role=user.get("role"), permissions=permissions, required=permission)
+    return permission_granted(
+        role=user.get("role"),
+        permissions=permissions,
+        required=permission,
+        authoritative=True,
+    )
 
 
 def _normalize_user(user: dict) -> dict:
@@ -301,7 +264,7 @@ def _normalize_user(user: dict) -> dict:
         for item in raw_collections
         if isinstance(item, str) and item.strip()
     ]
-    normalized["permission_overrides"] = normalized.get("permission_overrides") if isinstance(normalized.get("permission_overrides"), dict) else {}
+    normalized["permission_overrides"] = normalize_permission_overrides(normalized.get("permission_overrides"))
     normalized["created_at"] = normalized.get("created_at") or normalized.get("password_changed_at") or "2026-01-01T00:00:00Z"
     normalized["updated_at"] = normalized.get("updated_at") or normalized["created_at"]
     normalized["permissions"] = resolve_permissions_for_role(normalized["role"], normalized["permission_overrides"])
@@ -495,7 +458,7 @@ def create_user(payload: dict) -> dict:
         "created_at": now,
         "updated_at": now,
         "must_change_password": bool(payload.get("status", "invited") != "active"),
-        "permission_overrides": {},
+        "permission_overrides": normalize_permission_overrides(payload.get("permission_overrides")),
         "authorized_collection_ids": list(payload.get("authorized_collection_ids") or []),
     }
     if password:
@@ -555,6 +518,8 @@ def update_user(user_id: str, payload: dict) -> dict:
         user["must_change_password"] = False
     if payload.get("must_change_password") is not None:
         user["must_change_password"] = bool(payload["must_change_password"])
+    if payload.get("permission_overrides") is not None:
+        user["permission_overrides"] = normalize_permission_overrides(payload["permission_overrides"])
     if payload.get("authorized_collection_ids") is not None:
         try:
             user["authorized_collection_ids"] = [

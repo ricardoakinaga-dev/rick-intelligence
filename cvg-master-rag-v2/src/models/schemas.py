@@ -16,6 +16,13 @@ EnterpriseRole = Literal[
 ]
 
 
+class PermissionOverrides(BaseModel):
+    """Explicit per-user permission additions and removals."""
+
+    add: list[str] = Field(default_factory=list)
+    remove: list[str] = Field(default_factory=list)
+
+
 # ─── Document ───────────────────────────────────────────────
 
 
@@ -463,6 +470,7 @@ class EnterpriseUserRecord(BaseModel):
     must_change_password: bool = False
     canonical_role: Optional[Literal["PLATFORM_ADMIN", "KNOWLEDGE_MANAGER", "VETERINARIAN"]] = None
     authorized_collection_ids: list[str] = Field(default_factory=list)
+    permission_overrides: PermissionOverrides = Field(default_factory=PermissionOverrides)
 
 
 class EnterpriseUserCreate(BaseModel):
@@ -474,6 +482,7 @@ class EnterpriseUserCreate(BaseModel):
     tenant_id: str = "default"
     status: Literal["active", "invited", "disabled"] = "invited"
     authorized_collection_ids: list[str] = Field(default_factory=list)
+    permission_overrides: Optional[PermissionOverrides] = None
 
 
 class EnterpriseUserUpdate(BaseModel):
@@ -487,6 +496,7 @@ class EnterpriseUserUpdate(BaseModel):
     approval_ticket: Optional[str] = None
     must_change_password: Optional[bool] = None
     authorized_collection_ids: Optional[list[str]] = None
+    permission_overrides: Optional[PermissionOverrides] = None
 
 
 class NormalizedDocument(BaseModel):

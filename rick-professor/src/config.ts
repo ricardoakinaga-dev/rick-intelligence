@@ -10,6 +10,9 @@ const envSchema = z.object({
     LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
 
     OPENAI_API_KEY: z.string().trim().min(1, 'A chave da OpenAI é obrigatória'),
+    OPENAI_BASE_URL: z.string().url().default('https://api.openai.com/v1'),
+    OPENAI_TIMEOUT_MS: z.coerce.number().int().positive().max(120_000).default(5_000),
+    OPENAI_RETRY_DELAY_MS: z.coerce.number().int().nonnegative().max(10_000).default(1_000),
     TELEGRAM_BOT_TOKEN: z.string().optional(),
     TELEGRAM_WEBHOOK_SECRET_TOKEN: z.string().trim().min(1).max(256).optional(),
     TELEGRAM_UPDATE_TTL_SECONDS: z.coerce.number().int().positive().max(7 * 24 * 60 * 60).default(24 * 60 * 60),
@@ -34,11 +37,12 @@ const envSchema = z.object({
     REDIS_URL: z.string().default('redis://rick-professor-redis:6379'),
     REDIS_LOCKER_URL: z.string().default('http://n8n-redis-locker:3000'),
 
-    MODEL_PREPROCESSOR: z.string().default('gpt-4o-mini'),
-    MODEL_PLANNER: z.string().default('gpt-4o'),
-    MODEL_AGENT: z.string().default('gpt-4o'),
-    MODEL_FALLBACK: z.string().default('gpt-4o-mini'),
-    EMBEDDING_MODEL: z.string().default('text-embedding-3-small'),
+    MODEL_PREPROCESSOR: z.string().trim().min(1).default('gpt-4o-mini'),
+    MODEL_PLANNER: z.string().trim().min(1).default('gpt-4o'),
+    MODEL_AGENT: z.string().trim().min(1).default('gpt-4o'),
+    MODEL_FALLBACK: z.string().trim().min(1).default('gpt-4o-mini'),
+    EMBEDDING_MODEL: z.string().trim().min(1).default('text-embedding-3-small'),
+    EMBEDDING_DIMENSION: z.coerce.number().int().positive().max(16_384).default(1_536),
 });
 
 const parseEnv = () => {
