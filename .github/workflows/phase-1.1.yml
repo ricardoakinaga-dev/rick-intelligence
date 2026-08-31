@@ -1,0 +1,68 @@
+name: Phase 1.1 Root Foundation
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: phase-1.1-root-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.12.3"
+  NODE_VERSION: "22.19.0"
+  NODE_INSTALL_MODE: "npm ci --ignore-scripts --no-audit --no-fund"
+
+jobs:
+  root-foundation:
+    name: root / Phase 1.1 foundation
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v4.2.2
+        with:
+          fetch-depth: 0
+
+      - name: Setup pinned Python
+        uses: actions/setup-python@v5.6.0
+        with:
+          python-version: "3.12.3"
+          cache: pip
+          cache-dependency-path: cvg-master-rag-v2/src/requirements.txt
+
+      - name: Setup pinned Node.js
+        uses: actions/setup-node@v4.4.0
+        with:
+          node-version: "22.19.0"
+          cache: npm
+          cache-dependency-path: |
+            cvg-master-rag-v2/frontend/package-lock.json
+            rick-professor/package-lock.json
+            modulo-redis-locker/package-lock.json
+
+      - name: Install preserved Python dependencies
+        run: python -m pip install --disable-pip-version-check --no-cache-dir -r cvg-master-rag-v2/src/requirements.txt
+
+      - name: Install preserved Node dependencies
+        run: |
+          npm --prefix cvg-master-rag-v2/frontend ci --ignore-scripts --no-audit --no-fund
+          npm --prefix rick-professor ci --ignore-scripts --no-audit --no-fund
+          npm --prefix modulo-redis-locker ci --ignore-scripts --no-audit --no-fund
+
+      - name: Run root Phase 1.1 CI contract
+        run: make ci
+
+      - name: Recheck control-plane pointers
+        run: |
+          args=(--require-clean --require-remote)
+          if [[ "${GITHUB_EVENT_NAME}" == "push" && "${GITHUB_REF_NAME}" == "main" ]]; then
+            args+=(--require-main-sync)
+          fi
+          python docs/ci/check_control_plane.py "${args[@]}"
+          git diff --check

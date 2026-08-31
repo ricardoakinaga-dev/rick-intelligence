@@ -1,0 +1,29 @@
+{
+  "schema_version": "phase-1.1-preserved-components.v1",
+  "policy": {
+    "root_snapshot_required": true,
+    "independent_git_metadata": "validated_when_present",
+    "clean_checkout_behavior": "A clean root checkout validates the tracked child snapshot; a workspace with nested Git metadata also validates each independent child HEAD.",
+    "runtime_mutation": false
+  },
+  "components": [
+    {
+      "id": "cvg",
+      "path": "cvg-master-rag-v2",
+      "role": "preserved CVG runtime",
+      "root_snapshot_required": true
+    },
+    {
+      "id": "professor",
+      "path": "rick-professor",
+      "role": "preserved Professor provider service",
+      "root_snapshot_required": true
+    },
+    {
+      "id": "locker",
+      "path": "modulo-redis-locker",
+      "role": "preserved Redis locking service",
+      "root_snapshot_required": true
+    }
+  ]
+}

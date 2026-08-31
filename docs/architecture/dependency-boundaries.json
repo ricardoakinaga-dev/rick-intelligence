@@ -1,0 +1,44 @@
+{
+  "schema_version": "phase-1.1-dependency-boundaries.v1",
+  "source_of_truth": "docs/architecture/dependency-boundaries.json",
+  "direction": {
+    "apps": ["packages", "contracts", "shared"],
+    "packages": ["contracts", "shared", "declared_package_dependencies"],
+    "tests": ["apps", "packages", "legacy_adapters"],
+    "infrastructure": ["apps", "packages"]
+  },
+  "forbidden_imports": [
+    {
+      "rule_id": "PKG-NO-APP",
+      "scope": "packages/**",
+      "patterns": ["apps/", "apps.", "cvg-master-rag-v2/", "rick-professor/", "modulo-redis-locker/"]
+    },
+    {
+      "rule_id": "APP-NO-APP-CROSSING",
+      "scope": "apps/**",
+      "patterns": ["apps/", "apps."]
+    },
+    {
+      "rule_id": "NEW-NO-LEGACY-DIRECT",
+      "scope": "apps/**,packages/**",
+      "patterns": ["cvg-master-rag-v2/", "rick-professor/", "modulo-redis-locker/"]
+    }
+  ],
+  "protected_legacy_paths": [
+    "cvg-master-rag-v2/",
+    "rick-professor/",
+    "modulo-redis-locker/"
+  ],
+  "skeleton_only_paths": [
+    "apps/",
+    "packages/",
+    "infrastructure/",
+    "tests/"
+  ],
+  "phase_1_1_policy": {
+    "move_runtime_code": false,
+    "duplicate_runtime_code": false,
+    "delete_legacy_paths": false,
+    "allow_root_orchestration": true
+  }
+}

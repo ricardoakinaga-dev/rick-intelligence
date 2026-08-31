@@ -57,7 +57,7 @@
       "title": "Publish Phase 0 report, status, risks, and proposed Phase 1 layout",
       "stage": "AUDIT",
       "priority": "P0",
-      "status": "VERIFY",
+      "status": "IN_PROGRESS",
       "origin": "User Phase 0 report and handoff requirements",
       "dependencies": ["PH0-INV", "PH0-CHAR", "PH0-BASE"],
       "owner": "Codex lead",
@@ -269,6 +269,45 @@
       "acceptance_summary": "All twelve required review questions are answered against the integrated artifact; no P0/HIGH blocker is hidden or left unexplained.",
       "evidence_refs": ["docs/progress/phase-0.6-independent-review.md"],
       "next_action": "Twelve-question fresh read-only review completed; final classification is BLOCKED and no Phase 1 plan is authorized."
+    },
+    {
+      "id": "PH11-SKELETON",
+      "title": "Build the additive Phase 1.1 monorepo skeleton and migration-safety contract",
+      "stage": "BUILD",
+      "priority": "P0",
+      "status": "DONE",
+      "origin": "User-authorized Phase 1.1 scope from pasted-text attachment",
+      "dependencies": [],
+      "owner": "Codex lead",
+      "acceptance_summary": "Root apps/packages/infrastructure/test boundaries, pinned toolchain, canonical environment template, root commands, dependency rules, migration map, and preservation validator exist without moving runtime code or editing child histories.",
+      "evidence_refs": [".agent/gates/phase-1.1-implementation-ready.json", "docs/plans/phase-1.1-monorepo-skeleton.md", ".agent/plans/phase-1.1-monorepo-skeleton.md", ".agent/verification.jsonl#VER-PH11-ROOT-CURRENT", ".agent/verification.jsonl#VER-PH11-BOUNDARY-CURRENT", ".agent/verification.jsonl#VER-PH11-FAST-CURRENT", ".agent/verification.jsonl#VER-PH11-INTEGRATION-CURRENT", ".agent/verification.jsonl#VER-PH11-CI-CURRENT", ".agent/verification.jsonl#VER-PH11-FULL-REGRESSION-CURRENT"],
+      "next_action": "Skeleton implementation and root command verification are complete; preserve the candidate while the independent review runs."
+    },
+    {
+      "id": "PH11-REVIEW",
+      "title": "Obtain a fresh independent Phase 1.1 skeleton review",
+      "stage": "AUDIT",
+      "priority": "P0",
+      "status": "DONE",
+      "origin": "Phase 1.1 independent review requirement",
+      "dependencies": ["PH11-SKELETON"],
+      "owner": "Fresh read-only reviewer",
+      "acceptance_summary": "A reviewer without builder context checks every frozen Phase 1.1 quality-bar item, reruns the root structural command, identifies the largest remaining gap, and records a decision with limitations.",
+      "evidence_refs": [".agent/verification.jsonl#VER-PH11-CI-CURRENT", ".agent/verification.jsonl#VER-PH11-CI-RECHECK-CURRENT", ".agent/verification.jsonl#VER-PH11-DUAL-SNAPSHOT-RECHECK-CURRENT", ".agent/verification.jsonl#VER-PH11-CLEAN-CHECKOUT-CURRENT", ".agent/verification.jsonl#VER-PH11-FULL-REGRESSION-CURRENT", "docs/progress/phase-1.1-independent-review.md", ".agent/verification.jsonl#VER-PH11-INDEPENDENT-REVIEW-CURRENT", ".agent/verification.jsonl#VER-PH11-INDEPENDENT-REVIEW-ROUND2-CURRENT", ".agent/verification.jsonl#VER-PH11-INDEPENDENT-REVIEW-ROUND3-CURRENT", ".agent/verification.jsonl#VER-PH11-INDEPENDENT-REVIEW-REVALIDATED-CURRENT", ".agent/verification.jsonl#VER-PH11-INDEPENDENT-REVIEW-ROUND2-REVALIDATED-CURRENT"],
+      "next_action": "Independent Round 3 and exact-scope append-only revalidation passed with no remaining material Phase 1.1 gap; final gate remains bound."
+    },
+    {
+      "id": "PH11-FINAL",
+      "title": "Integrate Phase 1.1 evidence and record the verification gate",
+      "stage": "AUDIT",
+      "priority": "P0",
+      "status": "DONE",
+      "origin": "Phase 1.1 final gate and handoff requirement",
+      "dependencies": ["PH11-SKELETON", "PH11-REVIEW"],
+      "owner": "Codex lead",
+      "acceptance_summary": "Fresh command evidence, independent review, final report, append-only control-plane records, and a truthful VERIFIED gate are bound; Phase 1.2 remains locked until a later authorized scope.",
+      "evidence_refs": [".agent/gates/phase-1.1-verified.json", "docs/progress/phase-1.1-independent-review.md", ".agent/verification.jsonl#VER-PH11-INDEPENDENT-REVIEW-ROUND3-CURRENT", ".agent/verification.jsonl#VER-PH11-INTEGRATION-FINAL-CURRENT", ".agent/verification.jsonl#VER-PH11-EVAL-FINAL-CURRENT", ".agent/verification.jsonl#VER-PH11-FULL-REGRESSION-FINAL-CURRENT", ".agent/verification.jsonl#VER-PH11-GUARDS-FINAL-CURRENT", ".agent/verification.jsonl#VER-PH11-FINAL-CURRENT"],
+      "next_action": "Phase 1.1 VERIFIED gate is bound; keep Phase 1.2/runtime extraction closed until a separately authorized implementation-ready scope exists."
     }
   ]
 }

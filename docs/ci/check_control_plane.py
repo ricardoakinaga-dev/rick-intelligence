@@ -21,11 +21,12 @@ from typing import Any
 
 
 ROOT = Path(__file__).resolve().parents[2]
-ACTIVE_PLAN = ".agent/plans/phase-0.6-promotion-closure.md"
+PHASE06_ACTIVE_PLAN = ".agent/plans/phase-0.6-promotion-closure.md"
+PHASE11_ACTIVE_PLAN = ".agent/plans/phase-1.1-monorepo-skeleton.md"
 PUBLISHED_SHA_RE = re.compile(r"Published root commit:\s*`?([0-9a-f]{40})", re.IGNORECASE)
 
 REQUIRED_FILES = (
-    ACTIVE_PLAN,
+    PHASE06_ACTIVE_PLAN,
     ".agent/PLANS.md",
     ".agent/state.json",
     ".agent/backlog.json",
@@ -42,6 +43,33 @@ REQUIRED_FILES = (
     "docs/progress/phase-0.6-independent-review.md",
     "scripts/phase06/check_locker_boundary.py",
     "scripts/phase06/check_provider_artifact.py",
+)
+
+PHASE11_REQUIRED_FILES = (
+    PHASE11_ACTIVE_PLAN,
+    ".agent/PLANS.md",
+    ".agent/state.json",
+    ".agent/backlog.json",
+    ".agent/execution-log.jsonl",
+    ".agent/verification.jsonl",
+    ".agent/gates/phase-0.6-promotion-final.json",
+    ".agent/gates/phase-1.1-implementation-ready.json",
+    ".gauntlet/state.md",
+    ".github/workflows/phase-1.1.yml",
+    "Makefile",
+    "README.md",
+    ".env.example",
+    "toolchain.json",
+    "docs/architecture/dependency-boundaries.json",
+    "docs/architecture/dependency-boundaries.md",
+    "docs/architecture/preserved-components.json",
+    "docs/architecture/migration-map.md",
+    "docs/architecture/target-system.md",
+    "docs/architecture/toolchain.md",
+    "docs/plans/phase-1.1-monorepo-skeleton.md",
+    "docs/progress/phase-1.1-report.md",
+    "scripts/phase11/check_skeleton.py",
+    "scripts/phase11/runner.py",
 )
 
 
@@ -90,25 +118,25 @@ def _check_jsonl(relative: str, errors: list[str]) -> int:
     return records
 
 
-def _check_structure(errors: list[str], warnings: list[str]) -> None:
+def _check_phase06_structure(errors: list[str], warnings: list[str]) -> None:
     missing = [relative for relative in REQUIRED_FILES if not (ROOT / relative).is_file()]
     errors.extend(f"missing required control artifact: {relative}" for relative in missing)
     if missing:
         return
 
-    plan = _read(ACTIVE_PLAN)
+    plan = _read(PHASE06_ACTIVE_PLAN)
     if not PUBLISHED_SHA_RE.search(plan):
-        errors.append(f"{ACTIVE_PLAN}: published root commit marker is missing or malformed")
+        errors.append(f"{PHASE06_ACTIVE_PLAN}: published root commit marker is missing or malformed")
     for marker in ("PH06-CI", "PH06-LOCKER", "PH06-CONTROL"):
         if marker not in plan:
-            errors.append(f"{ACTIVE_PLAN}: required marker {marker} is missing")
+            errors.append(f"{PHASE06_ACTIVE_PLAN}: required marker {marker} is missing")
 
     state = _load_json(".agent/state.json", errors)
     backlog = _load_json(".agent/backlog.json", errors)
     gate = _load_json(".agent/gates/phase-0.5-verified-blocked-final.json", errors)
     final_gate = _load_json(".agent/gates/phase-0.6-promotion-final.json", errors)
     if isinstance(state, dict):
-        if state.get("active_execplan") != ACTIVE_PLAN:
+        if state.get("active_execplan") != PHASE06_ACTIVE_PLAN:
             errors.append(".agent/state.json: active_execplan does not point to the Phase 0.6 plan")
         published = state.get("published_phase_0_5_commit")
         if not isinstance(published, dict) or not re.fullmatch(r"[0-9a-f]{40}", str(published.get("sha", "")), re.IGNORECASE):
@@ -137,6 +165,105 @@ def _check_structure(errors: list[str], warnings: list[str]) -> None:
     verification_records = _check_jsonl(".agent/verification.jsonl", errors)
     if execution_records and verification_records:
         print(f"Ledger records: execution={execution_records}, verification={verification_records}")
+
+
+def _check_phase11_structure(
+    errors: list[str],
+    warnings: list[str],
+    state: dict[str, Any],
+) -> None:
+    required_files = list(PHASE11_REQUIRED_FILES)
+    final_gate_ref = state.get("last_gate_record")
+    if final_gate_ref == ".agent/gates/phase-1.1-verified.json":
+        required_files.extend(
+            [
+                ".agent/gates/phase-1.1-verified.json",
+                "docs/progress/phase-1.1-independent-review.md",
+            ]
+        )
+    missing = [relative for relative in required_files if not (ROOT / relative).is_file()]
+    errors.extend(f"missing required Phase 1.1 control artifact: {relative}" for relative in missing)
+    if missing:
+        return
+
+    plan = _read(PHASE11_ACTIVE_PLAN)
+    for marker in (
+        "PH11-REPO",
+        "PH11-TOOLCHAIN",
+        "PH11-COMMANDS",
+        "PH11-BOUNDARIES",
+        "PH11-REGRESSION",
+        "PH11-DOCS",
+        "PH11-REVIEW",
+    ):
+        if marker not in plan:
+            errors.append(f"{PHASE11_ACTIVE_PLAN}: required marker {marker} is missing")
+
+    if state.get("active_execplan") != PHASE11_ACTIVE_PLAN:
+        errors.append(".agent/state.json: active_execplan does not point to the Phase 1.1 plan")
+    if state.get("status") != "DONE" and not str(state.get("active_task", "")).startswith("PH11-"):
+        errors.append(".agent/state.json: active_task does not belong to Phase 1.1")
+    if state.get("status") not in {
+        "IN_PROGRESS",
+        "READY_FOR_NEXT_STEP",
+        "COMPLETED",
+        "DONE",
+        "BLOCKED",
+    }:
+        errors.append(".agent/state.json: status is not a recognized control-plane state")
+
+    implementation_gate = _load_json(".agent/gates/phase-1.1-implementation-ready.json", errors)
+    if isinstance(implementation_gate, dict) and (
+        implementation_gate.get("gate_id") != "IMPLEMENTATION_READY"
+        or implementation_gate.get("decision") != "PASS"
+    ):
+        errors.append(".agent/gates/phase-1.1-implementation-ready.json: gate_id/decision is not IMPLEMENTATION_READY/PASS")
+
+    historical_gate = _load_json(".agent/gates/phase-0.6-promotion-final.json", errors)
+    if isinstance(historical_gate, dict) and historical_gate.get("decision") != "BLOCKED":
+        errors.append(".agent/gates/phase-0.6-promotion-final.json: historical Phase 0.6 decision changed")
+
+    toolchain = _load_json("toolchain.json", errors)
+    if isinstance(toolchain, dict) and toolchain.get("schema_version") != "phase-1.1-toolchain.v1":
+        errors.append("toolchain.json: schema_version is not phase-1.1-toolchain.v1")
+    boundaries = _load_json("docs/architecture/dependency-boundaries.json", errors)
+    if isinstance(boundaries, dict) and boundaries.get("schema_version") != "phase-1.1-dependency-boundaries.v1":
+        errors.append("docs/architecture/dependency-boundaries.json: schema_version is not phase-1.1-dependency-boundaries.v1")
+
+    backlog = _load_json(".agent/backlog.json", errors)
+    if isinstance(backlog, dict):
+        items = backlog.get("items")
+        ids = {
+            item.get("id")
+            for item in items
+            if isinstance(item, dict) and isinstance(item.get("id"), str)
+        } if isinstance(items, list) else set()
+        for task_id in ("PH11-SKELETON", "PH11-REVIEW", "PH11-FINAL"):
+            if task_id not in ids:
+                errors.append(f".agent/backlog.json: {task_id} item is missing")
+
+    if final_gate_ref == ".agent/gates/phase-1.1-verified.json":
+        final_gate = _load_json(final_gate_ref, errors)
+        if isinstance(final_gate, dict) and (
+            final_gate.get("gate_id") != "VERIFIED"
+            or final_gate.get("decision") != "PASS"
+        ):
+            errors.append(f"{final_gate_ref}: gate_id/decision is not VERIFIED/PASS")
+    else:
+        warnings.append("Phase 1.1 final gate is not recorded yet; control-plane check is pre-final")
+
+    execution_records = _check_jsonl(".agent/execution-log.jsonl", errors)
+    verification_records = _check_jsonl(".agent/verification.jsonl", errors)
+    if execution_records and verification_records:
+        print(f"Ledger records: execution={execution_records}, verification={verification_records}")
+
+
+def _check_structure(errors: list[str], warnings: list[str]) -> None:
+    state = _load_json(".agent/state.json", errors) if (ROOT / ".agent/state.json").is_file() else None
+    if isinstance(state, dict) and state.get("active_execplan") == PHASE11_ACTIVE_PLAN:
+        _check_phase11_structure(errors, warnings, state)
+        return
+    _check_phase06_structure(errors, warnings)
 
 
 def _check_git(args: argparse.Namespace, errors: list[str], warnings: list[str]) -> None:

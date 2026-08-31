@@ -1,9 +1,17 @@
-# Phase 0.6 CI contract
+# CI contracts
 
-The root workflow is
+The historical root workflow is
 [`phase-0.6.yml`](../../.github/workflows/phase-0.6.yml). It preserves the
 three component boundaries and separates quick pull-request checks from checks
 that need disposable Qdrant/Redis services or a browser.
+
+The current additive foundation workflow is
+[`phase-1.1.yml`](../../.github/workflows/phase-1.1.yml). It installs the
+preserved lockfiles, runs the root `make ci` contract, and then rechecks the
+control-plane pointers. It does not start a root compose stack or move runtime
+code. `docs/ci/check_control_plane.py` accepts either the historical Phase 0.6
+plan or the active Phase 1.1 plan and always keeps the Phase 0.6 final gate
+present and `BLOCKED` while Phase 1.1 is active.
 
 ## Pinned execution contract
 

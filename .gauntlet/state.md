@@ -75,3 +75,46 @@ Live-provider quality, GitHub branch protection, Python dependency audit, and
 production network evidence are also unavailable. The red surface is visible,
 the corrected security paths were retested, and no Phase 1 plan or
 implementation was created.
+
+## Phase 1.1 Gauntlet State
+
+### Goal and quality bar
+
+Build and verify only the additive root monorepo skeleton and migration-safety
+foundation: documented `apps/`/`packages/`/`infrastructure/`/`tests/`
+boundaries, pinned root toolchain, canonical environment contract, root
+commands, dependency/preservation rules, migration map, regression visibility,
+and independent review. Do not move runtime code, edit child histories, or open
+Phase 1.2.
+
+### Rounds
+
+- Round 0 RECOVER/DISCOVER: complete; the attachment, root state, three child
+  repositories, historical Phase 0.6 gate, toolchains and constraints were
+  read and recorded.
+- Round 1 BUILD/RUN: complete; root skeleton, runner, validator, contracts,
+  docs, workflow and placeholders were added; bootstrap, focused tests,
+  integration, eval, lint, typecheck and build evidence was collected.
+- Round 2 CRITIQUE: complete; Newton found the clean-checkout nested-`.git`
+  identity gap.
+- Round 3 FIX/RETEST: complete; root snapshot-only mode, manifest and
+  boundary authority were added; local `make ci` and a snapshot-only fixture
+  passed.
+- Round 4 CRITIQUE/FIX: complete; Newton found that local nested-Git mode
+  skipped the mandatory root snapshot assertion; the validator and unit test
+  were corrected, and `make ci` plus both preservation modes passed.
+- Round 5 FINAL REVIEW: complete; Newton confirmed no material Phase 1.1 gap,
+  and the exact earlier review streams were revalidated append-only.
+- Round 6 FINAL GATE: complete; `GATE-PH11-VERIFIED-001` is bound to the final
+  reconciliation and classifies this bounded slice as `VERIFIED_CANDIDATE`.
+
+### Final limitations and stop
+
+The full preserved CVG suite remains explicitly `BLOCKED` at 382 passed, 12
+failed, 17 skipped and 4 errors because the approved historical corpus is
+absent; this was not hidden or relabeled. Docker-backed root lifecycle,
+remote GitHub Actions/branch protection, live-provider and production-network
+evidence are unavailable. The generic framework checker still reports
+pre-existing Phase 0/0.5/0.6 ledger debt, while the phase-aware Phase 1.1
+control check passes. Stop here: Phase 1.2/runtime extraction requires a new
+authorized plan and implementation-ready gate.
