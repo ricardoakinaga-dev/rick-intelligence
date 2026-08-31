@@ -1,0 +1,7 @@
+interface:
+  display_name: "PRD Engine"
+  short_description: "Transforma problema descoberto em produto definido com casos de uso e requisitos"
+  brand_color: "#2563EB"
+
+policy:
+  allow_implicit_invocation: true

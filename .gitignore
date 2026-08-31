@@ -1,0 +1,42 @@
+# Repository metadata
+**/.git/
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+!**/.env.example
+*.pem
+*.key
+id_rsa*
+
+# Dependencies and generated build output
+**/node_modules/
+**/.venv/
+**/venv/
+**/dist/
+**/.next/
+**/coverage/
+**/.pytest_cache/
+**/.mypy_cache/
+**/__pycache__/
+**/test-results/
+**/.playwright/
+**/*.tsbuildinfo
+
+# Runtime data, logs, and local tool state
+**/data/
+**/src/data/
+**/src/logs/*.jsonl
+**/src/logs/*.log
+**/.claude/
+**/.codex/
+**/.runtime/
+*.log
+*.sqlite
+*.sqlite3
+*.db
+*.zip
+
+# OS noise
+.DS_Store

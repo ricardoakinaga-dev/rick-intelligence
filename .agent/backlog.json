@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "items": [
+    {
+      "id": "PH0-INV",
+      "title": "Inventory current cross-system architecture and contracts",
+      "stage": "AUDIT",
+      "priority": "P0",
+      "status": "DONE",
+      "origin": "User Phase 0 checklist and forensic discovery",
+      "dependencies": [],
+      "owner": "Codex lead",
+      "acceptance_summary": "All three repositories, runtime boundaries, stores, APIs, UI, deployment, integrations, data lifecycle, and stale evidence are mapped with citations.",
+      "evidence_refs": [
+        "docs/architecture/current-system.md",
+        "cvg-master-rag-v2/AGENTS.md",
+        ".agent/verification.jsonl#VER-PH0-INV-FINAL"
+      ],
+      "next_action": "Inventory complete; preserve this baseline and defer runtime contract changes to the gated Phase 1."
+    },
+    {
+      "id": "PH0-CHAR",
+      "title": "Characterize critical RAG, provenance, failure, concurrency, and recovery behavior",
+      "stage": "AUDIT",
+      "priority": "P0",
+      "status": "DONE",
+      "origin": "User Phase 0 characterization requirements",
+      "dependencies": ["PH0-INV"],
+      "owner": "Codex lead",
+      "acceptance_summary": "Representative document, chunk, embedding, persistence/index, known-query evidence, grounded answer, provenance, malformed/provider/vector failures, duplicate, restart, and concurrency behavior are recorded as pass/fail/not-run.",
+      "evidence_refs": [
+        "docs/baselines/characterization-results.json",
+        "tests/phase0/redis-locker-characterization.mjs",
+        ".agent/verification.jsonl#VER-PH0-CHAR-MATRIX"
+      ],
+      "next_action": "Characterization matrix complete; run NOT_RUN paths only after the listed environment prerequisites are provisioned."
+    },
+    {
+      "id": "PH0-BASE",
+      "title": "Capture executable performance and reproducibility baseline",
+      "stage": "AUDIT",
+      "priority": "P0",
+      "status": "DONE",
+      "origin": "User Phase 0 performance baseline requirements",
+      "dependencies": ["PH0-CHAR"],
+      "owner": "Codex lead",
+      "acceptance_summary": "Environment, commands, ingestion/embedding/query/retrieval/generation latency, TTFT where applicable, memory, index size, duplicate, and concurrency measurements are saved or explicitly marked NOT_RUN.",
+      "evidence_refs": [
+        "docs/baselines/phase-0-performance.json",
+        "docs/baselines/phase-0-command-log.md",
+        ".agent/verification.jsonl#VER-PH0-BASE-ARTIFACT"
+      ],
+      "next_action": "Baseline artifact complete; rerun the conditional live measurements after environment provisioning."
+    },
+    {
+      "id": "PH0-REPORT",
+      "title": "Publish Phase 0 report, status, risks, and proposed Phase 1 layout",
+      "stage": "AUDIT",
+      "priority": "P0",
+      "status": "VERIFY",
+      "origin": "User Phase 0 report and handoff requirements",
+      "dependencies": ["PH0-INV", "PH0-CHAR", "PH0-BASE"],
+      "owner": "Codex lead",
+      "acceptance_summary": "The required phase report sections, PHASE 0 STATUS table, VERIFIED_CANDIDATE recommendation decision, limitations, and evidence-backed Phase 1 implementation plan are complete.",
+      "evidence_refs": [
+        "docs/progress/phase-0-report.md",
+        "docs/architecture/current-system.md",
+        ".agent/verification.jsonl#VER-PH0-REPORT-REVIEW"
+      ],
+      "next_action": "Await human acceptance of the partial/non-promoted report and resolution of its open environment gates; do not start Phase 1."
+    }
+  ]
+}

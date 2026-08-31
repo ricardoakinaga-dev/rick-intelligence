@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "observed_at": "2026-08-31T00:15:00Z",
+  "fixture_policy": "No real documents, API keys, deployed OpenWebUI, production Qdrant, or default Redis data were used.",
+  "runtime_characterization": {
+    "redis_locker_black_box": {
+      "procedure": "LOCKER_URL=http://127.0.0.1:3317 node tests/phase0/redis-locker-characterization.mjs",
+      "result": "PASS",
+      "observations": [
+        "GET /healthz returned 200/{ok:true}",
+        "same-key contention returned exactly one acquired and one rejected request",
+        "a 250ms lease became acquirable after 450ms",
+        "two concurrent same-key requests produced exactly one acquisition",
+        "malformed lock body returned 400",
+        "an active lock was deleted by /unlock with lock_key only and no owner value"
+      ],
+      "security_note": "The ownerless unlock result is a confirmed current behavior and a P0 concurrency/security finding, not a desired assertion."
+    },
+    "professor_processor_injected": {
+      "procedure": "OPENAI_API_KEY=phase0-test-key REDIS_URL=redis://127.0.0.1:6397 node <inline injected processMessage benchmark>",
+      "result": "PARTIAL",
+      "observations": [
+        "12 injected normal-hit calls returned ok=true and mode=answer",
+        "provider, Qdrant, lock, memory, and Telegram dependencies were mocks",
+        "no real HTTP route or external provider contract was exercised"
+      ],
+      "limitation": "The Professor package test command itself fails before tests under Node 22; an alternate CommonJS ts-node invocation reached four passing assertions but left imported Redis handles open until interrupted."
+    }
+  },
+  "required_phase0_paths": {
+    "A_representative_document_ingest": "NOT_RUN; CVG Python dependencies and Qdrant unavailable",
+    "B_parse_and_chunks": "STATIC_ONLY; existing CVG parser/chunker tests identified but not executable",
+    "C_embeddings_offline": "NOT_RUN; CVG Python dependencies unavailable",
+    "D_persistence_and_vector_index": "NOT_RUN; Qdrant unavailable",
+    "E_known_query_and_evidence": "NOT_RUN; Qdrant unavailable",
+    "F_grounded_answer": "STATIC_ONLY; CVG tests and grounding service identified",
+    "G_source_provenance": "STATIC_ONLY; payload/schema paths inspected; no live point sample",
+    "H_concurrent_requests": "PARTIAL; Redis Locker same-key race passed; CVG/Professor end-to-end race not run",
+    "I_redis_lock": "PASS_WITH_FINDING; acquisition/TTL/contention passed, owner-safe release is absent",
+    "J_restart_and_recovery": "NOT_RUN; CVG/Professor runtimes unavailable",
+    "K_malformed_document": "NOT_RUN; CVG Python dependencies unavailable",
+    "L_provider_unavailable": "STATIC_ONLY; Professor retries/fallback paths inspected, no fault-injected HTTP run",
+    "M_vector_db_unavailable": "STATIC_ONLY; CVG disk fallback and Professor empty-result fallback inspected",
+    "N_duplicate_ingestion": "NOT_RUN; no isolated CVG corpus runtime",
+    "O_metrics_and_observability": "PARTIAL; isolated Node/locker measurements captured; CVG live metrics unavailable"
+  },
+  "source_coverage": [
+    "cvg-master-rag-v2/src/tests/test_sprint5.py",
+    "cvg-master-rag-v2/src/tests/test_controlled_pdf_ingestion.py",
+    "cvg-master-rag-v2/src/tests/test_ingestion_transaction_cleanup.py",
+    "cvg-master-rag-v2/src/tests/test_ingestion_jobs.py",
+    "rick-professor/src/core/processor.test.ts",
+    "tests/phase0/redis-locker-characterization.mjs",
+    "tests/phase0/professor-injected-benchmark.mjs",
+    "tests/phase0/locker-http-benchmark.mjs"
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "project": "RICK Intelligence Phase 0 cross-system audit",
+  "goal": "Produce a current-system inventory, characterization baseline, risk register, and Phase 1 proposal without implementing Phase 1.",
+  "project_profile": "BROWNFIELD",
+  "work_mode": "MIGRATION",
+  "work_mode_overlays": [],
+  "lifecycle_stage": "AUDIT",
+  "active_activity": "VERIFY",
+  "engineering_tier": "T4_CRITICAL",
+  "risk_level": "MEDIUM",
+  "blast_radius": "CROSS_SYSTEM",
+  "status": "VERIFY",
+  "active_execplan": ".agent/plans/phase-0-forensic-audit.md",
+  "active_task": "PH0-REPORT",
+  "verification_state": "PARTIAL",
+  "repository_state": "NO_GIT_ROOT; three child Git repositories were clean at discovery; CVG has only the required docs overlay and Professor/Locker remain clean",
+  "instruction_scope_refs": [
+    "cvg-master-rag-v2/AGENTS.md",
+    ".agent/PLANS.md",
+    ".agent/plans/phase-0-forensic-audit.md"
+  ],
+  "last_gate_record": null,
+  "last_event_id": "EVT-PH0-CRITIC-REVIEW",
+  "state_revision": 3,
+  "next_gate": "AUDIT_RESOLVED",
+  "next_action": "Human review the partial Phase 0 package and provision the open Python/Qdrant/frontend/integration gates before any VERIFIED_CANDIDATE or Phase 1 decision.",
+  "blocked_by": [],
+  "human_approval_required": [],
+  "updated_at": "2026-08-31T00:34:00Z"
+}

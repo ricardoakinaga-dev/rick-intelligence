@@ -1,0 +1,25 @@
+# Requirements - Phase 0 Foundation RAG
+
+fastapi==0.109.2
+uvicorn[standard]==0.27.1
+python-multipart==0.0.9
+pydantic==2.6.1
+
+# Parsing
+pdfplumber==0.10.3
+python-docx==1.1.0
+
+# Vector DB
+qdrant-client==1.7.4
+
+# OpenAI
+openai==1.12.0
+
+# Utilities
+python-dotenv==1.0.1
+uuid6==2024.1.12
+
+# Testing
+pytest==8.0.2
+pytest-asyncio==0.23.5
+httpx==0.27.0

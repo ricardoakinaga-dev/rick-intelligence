@@ -1,0 +1,7 @@
+interface:
+  display_name: "Discovery Engine"
+  short_description: "Investiga e documenta problemas, dores e oportunidades antes de definir solução"
+  brand_color: "#9333EA"
+
+policy:
+  allow_implicit_invocation: true

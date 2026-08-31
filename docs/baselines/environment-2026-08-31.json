@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "observed_at": "2026-08-31T00:15:00Z",
+  "workspace": "/home/ricardo/Área de trabalho/rick-intelligence",
+  "repository_state": {
+    "root": "NO_GIT",
+    "children": [
+      {
+        "path": "cvg-master-rag-v2",
+        "branch": "main",
+        "head": "b78221793372552761c13febe36208172cf4586e",
+        "tracked_files": 391,
+        "approx_lines": 99802,
+        "status": "CLEAN"
+      },
+      {
+        "path": "rick-professor",
+        "branch": "main",
+        "head": "692290da8eb4a10fcec83dc19f358ab9643aa3a3",
+        "tracked_files": 25,
+        "approx_lines": 4103,
+        "status": "CLEAN"
+      },
+      {
+        "path": "modulo-redis-locker",
+        "branch": "main",
+        "head": "69e7896cf783f196cf32f56b05607643811ada43",
+        "tracked_files": 7,
+        "approx_lines": 1183,
+        "status": "CLEAN"
+      }
+    ]
+  },
+  "toolchain": {
+    "python": "3.12.3",
+    "python_pip": "NOT_AVAILABLE",
+    "python_venv_ensurepip": "NOT_AVAILABLE",
+    "node": "v22.19.0",
+    "npm": "10.9.3",
+    "redis_cli": "7.0.15",
+    "redis_server": "7.0.15",
+    "docker": "NOT_AVAILABLE",
+    "qdrant_binary": "NOT_FOUND"
+  },
+  "runtime_reachability": {
+    "redis_127_0_0_1_6379": "PONG; pre-existing instance not used by Phase 0",
+    "qdrant_127_0_0_1_6333": "CONNECTION_REFUSED",
+    "isolated_redis_127_0_0_1_6397": "STARTED_AND_STOPPED_BY_PHASE_0",
+    "isolated_locker_127_0_0_1_3317": "STARTED_AND_STOPPED_BY_PHASE_0"
+  },
+  "dependency_installation": {
+    "rick-professor/npm_ci": "PASS",
+    "rick-professor/npm_run_build": "PASS",
+    "rick-professor/npm_test": "FAIL_ERR_REQUIRE_CYCLE_MODULE",
+    "modulo-redis-locker/npm_ci": "PASS",
+    "cvg-master-rag-v2/frontend/npm_ci": "BLOCKED_LOCKFILE_OUT_OF_SYNC",
+    "cvg-master-rag-v2/src/requirements": "BLOCKED_NO_PIP_OR_ENSUREPIP"
+  },
+  "static_checks": {
+    "cvg-master-rag-v2/src/scripts/scan_secrets.py": "PASS",
+    "modulo-redis-locker/node_check": "PASS",
+    "child_git_status_after_setup": "CLEAN_BEFORE_REQUIRED_CVG_DOC_OVERLAY; PROFESSOR_AND_LOCKER_CURRENTLY_CLEAN"
+  },
+  "historical_evidence_policy": "Existing CVG and Professor reports with prior pass counts are retained as STALE/HISTORICAL until reproduced in this checkout."
+}

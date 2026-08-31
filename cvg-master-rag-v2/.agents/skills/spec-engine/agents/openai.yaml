@@ -1,0 +1,7 @@
+interface:
+  display_name: "SPEC Engine"
+  short_description: "Transforma produto em engenharia — define arquitetura, contratos e especificações técnicas"
+  brand_color: "#059669"
+
+policy:
+  allow_implicit_invocation: true

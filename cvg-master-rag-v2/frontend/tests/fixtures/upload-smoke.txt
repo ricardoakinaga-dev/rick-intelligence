@@ -1,0 +1,3 @@
+Documento de smoke test da Fase 2.
+Prazo de reembolso: 30 dias corridos.
+Este arquivo existe apenas para validar upload web via interface.

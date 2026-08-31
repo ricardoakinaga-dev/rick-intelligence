@@ -1,0 +1,45 @@
+# Environment and secrets
+.env
+.env.*
+!.env.example
+!**/.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.coverage
+
+# Virtual environments
+venv/
+.venv/
+src/.venv/
+src/venv/
+src/venv-py312-incomplete-20260419/
+
+# Node / Next.js
+frontend/node_modules/
+frontend/.next/
+frontend/.next-playwright/
+frontend/test-results/
+frontend/tsconfig.tsbuildinfo
+
+# Local tool state
+.claude/
+.codex
+.runtime/
+
+# Runtime logs and generated data
+data/
+data/logs/*.jsonl
+src/logs/*.jsonl
+src/logs/*.log
+!src/logs/.gitkeep
+src/data/
+src/data/documents/
+BRIEFING/
+transcricao-yt/
+
+# OS noise
+.DS_Store

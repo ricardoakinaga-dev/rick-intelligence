@@ -1,0 +1,7 @@
+interface:
+  display_name: "Build Engine"
+  short_description: "Executa construção faseada do sistema conforme SPEC aprovada"
+  brand_color: "#DC2626"
+
+policy:
+  allow_implicit_invocation: true

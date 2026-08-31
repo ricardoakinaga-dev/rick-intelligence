@@ -1,0 +1,7 @@
+interface:
+  display_name: "Audit Engine"
+  short_description: "Audita sistema em runtime contra PRD e SPEC, identificando GAPs e criando plano de remediação"
+  brand_color: "#F59E0B"
+
+policy:
+  allow_implicit_invocation: true

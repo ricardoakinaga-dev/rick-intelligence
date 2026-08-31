@@ -1,0 +1,18 @@
+[Unit]
+Description=CVG Master RAG backend
+After=network-online.target docker.service
+Wants=network-online.target docker.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/.openclaw/workspace/cvg-master-rag/src
+EnvironmentFile=/root/.openclaw/workspace/cvg-master-rag/src/.env
+ExecStart=/root/.openclaw/workspace/cvg-master-rag/src/.venv/bin/python -m uvicorn api.main:app --host 127.0.0.1 --port 8000
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

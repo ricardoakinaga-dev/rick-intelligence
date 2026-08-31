@@ -1,0 +1,28 @@
+ Use outra, por exemplo 8010:
+
+  uvicorn api.main:app --reload --host 0.0.0.0 --port
+  8010 --app-dir src
+
+
+  cd /home/ricardo/.openclaw/workspace/cvg-master-rag/
+  frontend
+  NEXT_PUBLIC_API_BASE_URL=http://localhost:8010 pnpm
+  Depois abra:
+
+  - frontend: http://localhost:3000
+  - backend/docs: http://localhost:8010/docs
+  processo ou deixar outra porta.
+
+   Use exatamente assim:
+
+  cd /home/ricardo/.openclaw/workspace/cvg-master-rag/
+  src
+  source venv/bin/activate
+  uvicorn api.main:app --reload --host 0.0.0.0 --port
+  8000
+
+  Para o frontend web, em outro terminal:
+
+  cd /home/ricardo/.openclaw/workspace/cvg-master-rag/
+  frontend
+  pnpm dev

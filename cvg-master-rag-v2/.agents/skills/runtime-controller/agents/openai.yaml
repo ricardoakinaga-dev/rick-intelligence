@@ -1,0 +1,7 @@
+interface:
+  display_name: "Runtime Controller"
+  short_description: "Mantém continuidade operacional — atualiza estado, log e evita perda de contexto"
+  brand_color: "#6B7280"
+
+policy:
+  allow_implicit_invocation: false

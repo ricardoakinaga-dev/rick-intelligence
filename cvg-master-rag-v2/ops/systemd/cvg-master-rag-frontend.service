@@ -1,0 +1,20 @@
+[Unit]
+Description=CVG Master RAG frontend
+After=network-online.target cvg-master-rag-backend.service
+Wants=network-online.target cvg-master-rag-backend.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/.openclaw/workspace/cvg-master-rag/frontend
+EnvironmentFile=/root/.openclaw/workspace/cvg-master-rag/frontend/.env.local
+Environment=NODE_ENV=production
+ExecStartPre=/usr/bin/test -f /root/.openclaw/workspace/cvg-master-rag/frontend/.next/server/middleware-manifest.json
+ExecStart=/usr/bin/npm run start -- --hostname 127.0.0.1 --port 3004
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

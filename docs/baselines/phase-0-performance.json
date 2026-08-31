@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "observed_at": "2026-08-31T00:30:38Z",
+  "method": "Wall-clock timings from isolated local processes. Percentiles use the nearest observed sample; Professor timings start after module import and use no warm-up; Locker timings use a warmed local HTTP process and 20 concurrent unique-key requests. Mocked workloads are not production performance claims.",
+  "environment": {
+    "node": "v22.19.0",
+    "redis": "7.0.15",
+    "network": "loopback only",
+    "qdrant": "unavailable",
+    "openai": "not contacted",
+    "python_cvg": "not executable; pip/ensurepip unavailable"
+  },
+  "measurements": [
+    {
+      "id": "professor-injected-normal-hit",
+      "component": "rick-professor/src/core/processor.ts",
+      "n": 12,
+      "inputs": "deterministic injected preprocessor/planner/agent, embedding, Qdrant hit, lock, memory, and send functions",
+      "status": "PARTIAL",
+      "unit": "ms",
+      "p50": 0.342,
+      "p95": 5.386,
+      "min": 0.098,
+      "max": 5.386,
+      "samples_ms": [2.564, 2.678, 0.294, 0.359, 0.369, 0.226, 0.433, 0.342, 5.386, 0.191, 0.098, 0.142],
+      "interpretation": "Pure orchestration overhead under mocks; excludes OpenAI, Qdrant, locker HTTP, Redis memory, Telegram, serialization, and actual route overhead."
+    },
+    {
+      "id": "redis-locker-http-acquire-unique-keys",
+      "component": "modulo-redis-locker/server.js",
+      "n": 20,
+      "inputs": "unique keys, ttl_ms=10000, local Redis and HTTP loopback",
+      "status": "PASS",
+      "unit": "ms",
+      "p50": 119.423,
+      "p95": 124.649,
+      "min": 102.649,
+      "max": 147.532,
+      "samples_ms": [147.532, 102.649, 103.435, 103.415, 112.987, 114.266, 115.044, 116.634, 119.423, 119.179, 117.103, 119.904, 121.216, 121.646, 122.043, 122.884, 123.316, 123.719, 124.268, 124.649],
+      "interpretation": "Observed local HTTP+Redis acquisition latency, not a capacity or production SLO."
+    },
+    {
+      "id": "cvg-ingestion",
+      "component": "cvg-master-rag-v2",
+      "status": "NOT_RUN",
+      "reason": "Python requirements cannot be installed because pip/ensurepip are unavailable; Qdrant is also unavailable."
+    },
+    {
+      "id": "cvg-embedding",
+      "component": "cvg-master-rag-v2/src/services/embedding_service.py",
+      "status": "NOT_RUN",
+      "reason": "No Python dependency environment and no OpenAI key; only static offline fallback code was inspected."
+    },
+    {
+      "id": "cvg-query-retrieval-generation",
+      "component": "cvg-master-rag-v2/src/services/search_service.py",
+      "status": "NOT_RUN",
+      "reason": "No Python runtime dependencies, Qdrant, or OpenAI provider."
+    },
+    {
+      "id": "cvg-memory-rss",
+      "component": "cvg-master-rag-v2 controlled ingestion",
+      "status": "NOT_RUN",
+      "reason": "The runtime and large-document fixture were not available."
+    },
+    {
+      "id": "qdrant-index-size",
+      "component": "Qdrant",
+      "status": "NOT_RUN",
+      "reason": "Docker/Qdrant unavailable and no live collection was accessed."
+    },
+    {
+      "id": "ttft",
+      "component": "rick-professor OpenAI-compatible SSE",
+      "status": "NOT_RUN",
+      "reason": "The route emits a synthetic whole-answer SSE only after processMessage; no external generation stream was available."
+    },
+    {
+      "id": "duplicate-ingestion-and-rag-concurrency",
+      "component": "CVG ingestion/Qdrant",
+      "status": "NOT_RUN",
+      "reason": "No isolated Python/Qdrant runtime. Redis Locker same-key concurrency was characterized separately."
+    }
+  ],
+  "reproduction": [
+    "From the workspace root after npm --prefix rick-professor run build: OPENAI_API_KEY=phase0-test-key node tests/phase0/professor-injected-benchmark.mjs",
+    "Start an isolated redis-server on 127.0.0.1:6397 and Locker with REDIS_URL=redis://127.0.0.1:6397 PORT=3317 npm --prefix modulo-redis-locker start; then run LOCKER_URL=http://127.0.0.1:3317 node tests/phase0/locker-http-benchmark.mjs",
+    "The isolated Locker process recipe and cleanup are recorded in docs/baselines/phase-0-command-log.md; do not use the pre-existing Redis on port 6379."
+  ],
+  "reproduction_artifacts": [
+    "tests/phase0/professor-injected-benchmark.mjs",
+    "tests/phase0/locker-http-benchmark.mjs",
+    "docs/baselines/phase-0-command-log.md"
+  ]
+}
