@@ -40,6 +40,6 @@ export const sendMessage = async (chatId: string, text: string) => {
         }
 
     } catch (error) {
-        console.error('Telegram Send Error:', error);
+        console.error('Telegram Send Error');
     }
 };

@@ -177,6 +177,27 @@ def _job_operational_status(job: dict, alerts: list[dict]) -> str:
     return "pending"
 
 
+def _sanitize_operator_error(job: dict) -> tuple[str | None, str | None]:
+    """Keep exception details in server logs, not in operator-facing API data."""
+    if job.get("status") not in {"failed", "aborted"}:
+        return job.get("error_code"), job.get("error_message")
+    code = job.get("error_code")
+    public_codes = {
+        "memory_limit_reached",
+        "worker_spawn_failed",
+        "parse_failed",
+        "preflight_failed",
+    }
+    safe_code = code if code in public_codes else "ingestion_failed"
+    message = {
+        "memory_limit_reached": "O processamento excedeu o limite de memória.",
+        "worker_spawn_failed": "Não foi possível iniciar o processamento isolado.",
+        "parse_failed": "Não foi possível processar o documento.",
+        "preflight_failed": "O documento não passou na validação preliminar.",
+    }.get(safe_code, "Não foi possível concluir o processamento do documento.")
+    return safe_code, message
+
+
 def summarize_ingestion_job(job: dict) -> dict:
     """Return a lightweight operator-facing job snapshot."""
     snapshot = dict(job)
@@ -193,6 +214,9 @@ def summarize_ingestion_job(job: dict) -> dict:
     else:
         snapshot["seconds_since_last_batch"] = None
 
+    safe_error_code, safe_error_message = _sanitize_operator_error(snapshot)
+    snapshot["error_code"] = safe_error_code
+    snapshot["error_message"] = safe_error_message
     alerts = _job_operational_alerts(snapshot, now=now)
     snapshot["operational_alerts"] = alerts
     snapshot["operational_status"] = _job_operational_status(snapshot, alerts)
@@ -296,7 +320,10 @@ def preflight_large_ingestion(
             "qdrant_unavailable",
             "Qdrant indisponivel para iniciar indexacao grande.",
             status_code=503,
-            details={**preflight, "qdrant_error": str(exc)},
+            # Preserve the provider exception through the server-side chain
+            # for logs/debugging, but never place it in operator-facing
+            # exception details returned by the API.
+            details=preflight,
         ) from exc
 
     return preflight
@@ -422,6 +449,36 @@ def _cleanup_upload_source(source_path: Path) -> None:
         pass
 
 
+def _delete_ingestion_points_compat(
+    ingestion_id: str,
+    *,
+    workspace_id: str,
+    collection_name: str | None = None,
+) -> None:
+    """Preserve the scoped production call for older test doubles."""
+    try:
+        signature = inspect.signature(delete_ingestion_points)
+    except (TypeError, ValueError):
+        delete_ingestion_points(
+            ingestion_id,
+            workspace_id=workspace_id,
+            collection_name=collection_name,
+        )
+        return
+
+    accepts_var_kwargs = any(
+        parameter.kind == inspect.Parameter.VAR_KEYWORD
+        for parameter in signature.parameters.values()
+    )
+    kwargs = {
+        "workspace_id": workspace_id,
+        "collection_name": collection_name,
+    }
+    if not accepts_var_kwargs:
+        kwargs = {name: value for name, value in kwargs.items() if name in signature.parameters}
+    delete_ingestion_points(ingestion_id, **kwargs)
+
+
 def cleanup_ingestion_artifacts(
     *,
     ingestion_id: str,
@@ -433,7 +490,7 @@ def cleanup_ingestion_artifacts(
     """Remove temporary disk artifacts and Qdrant staging points for a failed job."""
     doc_dir = DOCUMENTS_DIR / workspace_id
     try:
-        delete_ingestion_points(
+        _delete_ingestion_points_compat(
             ingestion_id,
             workspace_id=workspace_id,
             collection_name=qdrant_collection,

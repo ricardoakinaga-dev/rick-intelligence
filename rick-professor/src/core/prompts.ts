@@ -64,6 +64,10 @@ OBJETIVO:
 - NÃO gere checklist genérico.
 - Use a EVIDÊNCIA recebida (RAG_RESULT) para planejar a resposta.
 - Você deve PRODUZIR um “plano de resposta” + “gate_mode” + “resumo de evidências”.
+- resumo_evidencias deve conter SOMENTE referências por id aos resultados recebidos.
+- Nunca copie, crie ou altere payload, texto, fonte, doc_key ou score na referência.
+- Os únicos campos permitidos na saída são gate_mode, resumo_evidencias e response_sections.
+- response_sections só pode usar: direct_answer, therapeutics, exams, monitoring, warnings.
 - Se houver evidência suficiente, marque approved e NÃO faça perguntas de clarificação desnecessárias.
 
 DADOS DO CASO:
@@ -82,14 +86,23 @@ EXIGE_NÚMEROS (expects_numeric):
 EVIDÊNCIA (RAG_RESULT) — lista de chunks com doc_key/páginas/texto:
 {{EVIDENCES}}
 
+STATUS DO GATE CALCULADO PELO SISTEMA:
+{{EVIDENCE_STATUS}}
+
 REGRAS DE GATE (você decide):
-1) Se RAG_RESULT tiver pelo menos 1 chunk relevante (doc_key + texto clínico) → gate_mode = "approved".
-2) Se INTENT envolver dose/CRI E expects_numeric=true:
+1) O STATUS DO GATE calculado pelo sistema é autoritativo; não o substitua.
+2) Se o status for APPROVED_EVIDENCE, use gate_mode = "approved".
+3) Se RAG_RESULT tiver pelo menos 1 chunk relevante (doc_key + texto clínico) → gate_mode = "approved".
+4) Se INTENT envolver dose/CRI E expects_numeric=true:
    - Se existir no texto algum número + unidade (ex: mg/kg, mcg/kg/min, mL/kg/min) → approved
    - Se NÃO existir → gate_mode="block" e faça no máximo 2 perguntas objetivas.
-3) Se RAG_RESULT estiver vazio ou irrelevante → gate_mode="fallback_general" (não block).
+5) Se RAG_RESULT estiver vazio ou irrelevante → gate_mode="fallback_general" (não block).
 
 SAÍDA:
+- gate_mode: "approved", "fallback_general" ou "block".
+- resumo_evidencias: array de objetos no formato { "id": "<id de um resultado recebido>" }.
+- response_sections: array com uma ou mais seções entre direct_answer, therapeutics, exams, monitoring e warnings.
+- Não inclua nenhum outro campo, texto livre, instrução ou cópia da evidência.
 - Responda SOMENTE com JSON válido no formato especificado (sem explicações fora do JSON).
 
 Retorne somente JSON.`,

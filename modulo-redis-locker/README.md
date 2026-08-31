@@ -8,6 +8,12 @@ Microserviço HTTP simples para lock distribuído em Redis usando `SET NX PX`.
 - expõe healthcheck para orquestradores
 - serve como dependência leve para o `rick-professor`
 
+Security boundary: this service does not implement an application-level HTTP
+credential. Deploy it only on a private service network or behind an
+authenticated gateway; Redis credentials and the endpoint must not be exposed
+to untrusted clients. The lock value is still mandatory and owner-checked for
+every release/renew operation.
+
 ## Requisitos
 - Docker 24+
 - Redis acessível pela aplicação
@@ -48,8 +54,20 @@ Body:
 ### `POST /unlock`
 Body:
 ```json
-{"lock_key":"k"}
+{"lock_key":"k","lock_value":"v"}
 ```
+
+The lock is deleted only when `lock_value` still belongs to the caller. A
+wrong owner receives `deleted: false` and cannot remove the active lock.
+
+### `POST /renew`
+Body:
+```json
+{"lock_key":"k","lock_value":"v","ttl_ms":45000}
+```
+
+The TTL is extended only for the current owner and returns `renewed: true` on
+success.
 
 ## Exemplo com Docker Compose
 ```yaml

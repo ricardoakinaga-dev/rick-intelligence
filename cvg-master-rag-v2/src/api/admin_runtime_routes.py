@@ -10,7 +10,11 @@ from models.schemas import (
     EnterpriseSession,
 )
 from services.admin_service import list_tenants as list_admin_tenants, log_admin_event
-from services.api_security import enterprise_session_from_authorization, require_permission
+from services.api_security import (
+    enterprise_session_from_authorization,
+    resolve_admin_workspace_scope,
+)
+from services.authorization import canonical_role
 from services.document_registry import get_workspace_inventory
 from services.integrity_service import summarize_workspace_index_drift
 from services.operational_retention_service import summarize_operational_retention
@@ -106,10 +110,23 @@ def _compute_readiness_summary(
 def admin_get_runtime(
     _session: EnterpriseSession = Depends(enterprise_session_from_authorization),
 ):
-    """Return a consolidated operational view for every tenant/workspace."""
-    _session = require_permission(_session, "runtime.manage", workspace_id=_session.active_tenant.workspace_id)
+    """Return an operational view limited to the caller's admin scope."""
+    resolve_admin_workspace_scope(
+        _session.active_tenant.workspace_id,
+        _session,
+        required_permission="runtime.manage",
+    )
     telemetry = get_telemetry()
     tenants = list_admin_tenants()
+
+    # Platform administrators may inspect all tenants. A future role with
+    # runtime.manage remains bound to its active workspace by policy.
+    if canonical_role(_session.user.role) != "PLATFORM_ADMIN":
+        tenants = [
+            tenant
+            for tenant in tenants
+            if tenant.get("workspace_id") == _session.active_tenant.workspace_id
+        ]
 
     client = None
     qdrant_ok = False
@@ -213,7 +230,11 @@ def admin_prune_workspace_index(
     _session: EnterpriseSession = Depends(enterprise_session_from_authorization),
 ):
     """Delete non-canonical Qdrant points for a workspace."""
-    _session = require_permission(_session, "runtime.manage", workspace_id=workspace_id)
+    workspace_id = resolve_admin_workspace_scope(
+        workspace_id,
+        _session,
+        required_permission="runtime.manage",
+    )
     from services.integrity_service import prune_workspace_index_to_registry
 
     try:
@@ -237,7 +258,7 @@ def admin_prune_workspace_index(
         )
         return result
     except Exception as e:
-        raise HTTPException(status_code=500, detail={"error": "admin_prune_index_error", "message": str(e)})
+        raise HTTPException(status_code=500, detail={"error": "admin_prune_index_error", "message": "Internal server error"})
 
 
 @router.post("/admin/runtime/cleanup-operational", response_model=AdminOperationalCleanupResponse)
@@ -246,7 +267,11 @@ def admin_cleanup_operational_uploads(
     _session: EnterpriseSession = Depends(enterprise_session_from_authorization),
 ):
     """Delete operational uploads that are older than the tenant TTL."""
-    _session = require_permission(_session, "runtime.manage", workspace_id=workspace_id)
+    workspace_id = resolve_admin_workspace_scope(
+        workspace_id,
+        _session,
+        required_permission="runtime.manage",
+    )
     from services.operational_retention_service import cleanup_operational_uploads
 
     try:
@@ -272,4 +297,4 @@ def admin_cleanup_operational_uploads(
         )
         return result
     except Exception as e:
-        raise HTTPException(status_code=500, detail={"error": "admin_cleanup_operational_error", "message": str(e)})
+        raise HTTPException(status_code=500, detail={"error": "admin_cleanup_operational_error", "message": "Internal server error"})

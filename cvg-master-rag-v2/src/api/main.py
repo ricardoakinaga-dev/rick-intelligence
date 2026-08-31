@@ -22,6 +22,7 @@ from models.schemas import (
     DocumentListResponse, QdrantCollectionListResponse, QueryLogResponse,
     SearchRequest, SearchResponse,
     QueryRequest, QueryResponse,
+    RetrievalContext,
     ExternalChatRequest, ExternalChatResponse,
     EvaluationQuestion, Dataset,
     EnterpriseSession, EnterpriseTenant, EnterpriseTenantCreate, EnterpriseTenantUpdate,
@@ -67,6 +68,8 @@ from services.enterprise_service import (
     request_password_reset,
     revoke_session as revoke_enterprise_session,
     revoke_user_sessions,
+    session_token_for_identifier,
+    session_owner,
     switch_tenant as switch_enterprise_tenant,
 )
 from core.config import (
@@ -93,8 +96,12 @@ from services.api_security import (
     require_admin,
     require_operator,
     require_workspace_access,
+    build_retrieval_context,
     resolve_workspace_scope,
+    resolve_admin_workspace_scope,
 )
+from services.authorization import allowed_collection_ids_for_user, canonical_role
+from services.rag_contract import CANONICAL_COLLECTION_ID, normalize_collection_id
 from telemetry.slo import SLI_DEFINITIONS, get_all_slos, get_slo_status
 from telemetry.tracing import SpanKind, SpanStatus, list_recent_spans, record_exception, start_span, traced_span
 from api.admin_runtime_routes import router as admin_runtime_router
@@ -291,6 +298,73 @@ def _require_admin(session: EnterpriseSession = Depends(_enterprise_session_from
     return require_admin(session)
 
 
+def _require_platform_admin(session: EnterpriseSession = Depends(_enterprise_session_from_authorization)) -> EnterpriseSession:
+    """Governance boundary: user/role/tenant administration is platform-only."""
+    return _require_permission(session, "users.manage", target_type="permission", target_id="users.manage")
+
+
+def _external_retrieval_context(request: ExternalChatRequest) -> RetrievalContext:
+    """Bind the server-to-server key to configured workspaces/collections."""
+    allowed_workspaces = {
+        item.strip()
+        for item in os.getenv("EXTERNAL_CHAT_ALLOWED_WORKSPACES", "default").split(",")
+        if item.strip()
+    }
+    if request.workspace_id not in allowed_workspaces:
+        raise HTTPException(
+            status_code=403,
+            detail={"error": "workspace_forbidden", "message": "Workspace is not authorized for this integration"},
+        )
+    configured_collections = [
+        item.strip()
+        for item in os.getenv("EXTERNAL_CHAT_ALLOWED_COLLECTIONS", "*").split(",")
+        if item.strip()
+    ]
+    allowed_collections = (
+        ["*"]
+        if "*" in configured_collections
+        else [normalize_collection_id(item) for item in configured_collections]
+    ) or [CANONICAL_COLLECTION_ID]
+    if request.collection_id:
+        requested = normalize_collection_id(request.collection_id)
+        if "*" not in allowed_collections and requested not in allowed_collections:
+            raise HTTPException(
+                status_code=403,
+                detail={"error": "collection_forbidden", "message": "Collection is not authorized for this integration"},
+            )
+        allowed_collections = [requested]
+    return RetrievalContext(
+        user_id="external-api",
+        workspace_id=request.workspace_id,
+        allowed_collection_ids=allowed_collections,
+        permissions=["chat.query", "sources.read"],
+    )
+
+
+def _collection_allowed(context: RetrievalContext, collection_id: str | None) -> bool:
+    """Apply the same collection ACL to source/document response paths."""
+    try:
+        resolved = normalize_collection_id(collection_id)
+    except ValueError:
+        return False
+    allowed = set(context.allowed_collection_ids)
+    return "*" in allowed or resolved in allowed
+
+
+def _filter_document_response_items(payload: dict, context: RetrievalContext, *, limit: int, offset: int) -> dict:
+    items = [
+        item for item in payload.get("items", [])
+        if _collection_allowed(context, item.get("collection_id") or item.get("qdrant_collection"))
+    ]
+    return {
+        **payload,
+        "items": items[offset : offset + limit],
+        "total": len(items),
+        "limit": limit,
+        "offset": offset,
+    }
+
+
 def _require_operator(session: EnterpriseSession = Depends(_enterprise_session_from_authorization)) -> EnterpriseSession:
     return require_operator(session)
 
@@ -314,6 +388,24 @@ def _resolve_workspace_scope(
         required_role=required_role,
         required_permission=required_permission,
     )
+
+
+def _resolve_admin_workspace_scope(
+    workspace_id: str | None,
+    session: object,
+    *,
+    required_permission: str,
+) -> str:
+    return resolve_admin_workspace_scope(
+        workspace_id,
+        session,
+        required_permission=required_permission,
+    )
+
+
+def _public_session_payload(session: dict) -> dict:
+    """Return the browser-safe session view; the bearer remains cookie-only."""
+    return {**session, "session_token": None}
 
 
 def _current_disk_usage_percent() -> float:
@@ -385,19 +477,20 @@ def _build_slo_snapshot(metrics: dict, *, workspace_id: str | None, qdrant_ok: b
 @app.get("/session", response_model=EnterpriseSession)
 def get_session(session: EnterpriseSession = Depends(_enterprise_session_from_authorization)):
     """Bootstrap the current enterprise session."""
-    return session
+    return session.model_copy(update={"session_token": None})
 
 
 @app.get("/auth/me", response_model=EnterpriseSession)
 def auth_me(session: EnterpriseSession = Depends(_enterprise_session_from_authorization)):
     """Return the current enterprise session snapshot."""
-    return session
+    return session.model_copy(update={"session_token": None})
 
 
 @app.get("/tenants", response_model=list[EnterpriseTenant])
-def get_tenants():
+def get_tenants(_session: EnterpriseSession = Depends(_enterprise_session_from_authorization)):
     """List available tenants for the enterprise shell."""
-    return list_tenants()
+    _session = _require_authenticated_session(_session)
+    return _session.available_tenants
 
 
 def _coerce_login_request(request: LoginRequest | str | None, password: str | None = None, tenant_id: str | None = None, email: str | None = None) -> LoginRequest:
@@ -452,7 +545,7 @@ def login(
     with traced_span(
         "auth.login",
         kind=SpanKind.INTERNAL,
-        attributes={"tenant_id": login_request.tenant_id, "email": login_request.email},
+        attributes={"tenant_id": login_request.tenant_id, "email_present": bool(login_request.email.strip())},
         workspace_id=login_request.tenant_id,
     ):
         try:
@@ -471,11 +564,11 @@ def login(
                 actor_role=session["user"]["role"],
                 action="auth.login",
                 target_type="session",
-                target_id=session["session_token"],
+                target_id="session",
                 tenant_id=session["active_tenant"]["tenant_id"],
                 metadata={"workspace_id": session["active_tenant"]["workspace_id"], "result": "success"},
             )
-            return session
+            return _public_session_payload(session) if response_obj is not None else session
         except ValueError as exc:
             log_admin_event(
                 actor_user_id="anonymous",
@@ -483,7 +576,7 @@ def login(
                 actor_role="anonymous",
                 action="auth.login_failed",
                 target_type="user",
-                target_id=login_request.email,
+                target_id="credential",
                 tenant_id=login_request.tenant_id,
                 metadata={"workspace_id": login_request.tenant_id, "result": str(exc)},
             )
@@ -495,11 +588,11 @@ def login(
                 actor_role="anonymous",
                 action="auth.login_failed",
                 target_type="user",
-                target_id=login_request.email,
+                target_id="credential",
                 tenant_id=login_request.tenant_id,
                 metadata={"workspace_id": login_request.tenant_id, "result": str(exc)},
             )
-            raise HTTPException(status_code=403, detail={"error": "tenant_forbidden", "message": str(exc)})
+            raise HTTPException(status_code=403, detail={"error": "tenant_forbidden", "message": "Tenant não autorizado"})
 
 
 @app.post("/auth/logout", response_model=LogoutResponse)
@@ -514,7 +607,7 @@ def logout(
     with traced_span(
         "auth.logout",
         kind=SpanKind.INTERNAL,
-        attributes={"session_token": session_token or ""},
+        attributes={"session_token_present": bool(session_token)},
         workspace_id=current.get("active_tenant", {}).get("workspace_id"),
     ):
         logout_enterprise_session(session_token)
@@ -527,7 +620,7 @@ def logout(
                 actor_role=current["user"]["role"],
                 action="auth.logout",
                 target_type="session",
-                target_id=current.get("session_token") or "unknown",
+                target_id="session",
                 tenant_id=current["active_tenant"]["tenant_id"],
                 metadata={"workspace_id": current["active_tenant"]["workspace_id"]},
             )
@@ -539,6 +632,7 @@ def auth_switch_tenant(
     request: TenantSwitchRequest,
     authorization: str | None = Header(default=None, alias="Authorization"),
     session_cookie: str | None = Cookie(default=None, alias=SESSION_COOKIE_NAME),
+    response: Response = None,
     _session: EnterpriseSession = Depends(_enterprise_session_from_authorization),
 ):
     """Switch the active tenant inside the current server-side session."""
@@ -551,6 +645,8 @@ def auth_switch_tenant(
     ):
         try:
             switched = switch_enterprise_tenant(_resolve_session_token(authorization, session_cookie), request.tenant_id)
+            if response is not None:
+                _set_session_cookie(response, switched.get("session_token"))
             log_admin_event(
                 actor_user_id=_session.user.user_id,
                 actor_email=_session.user.email,
@@ -561,9 +657,9 @@ def auth_switch_tenant(
                 tenant_id=request.tenant_id,
                 metadata={"workspace_id": switched["active_tenant"]["workspace_id"]},
             )
-            return switched
+            return _public_session_payload(switched) if response is not None else switched
         except PermissionError as exc:
-            raise HTTPException(status_code=403, detail={"error": "tenant_forbidden", "message": str(exc)})
+            raise HTTPException(status_code=403, detail={"error": "tenant_forbidden", "message": "Tenant não autorizado"})
 
 
 @app.post("/auth/recovery", response_model=RecoveryResponse)
@@ -655,7 +751,10 @@ def auth_change_password(
         )
         return {"status": "queued", "message": "Senha alterada. Faça login novamente."}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail={"error": str(exc), "message": str(exc)})
+        raise HTTPException(
+            status_code=400,
+            detail={"error": "password_change_rejected", "message": "Não foi possível alterar a senha"},
+        )
 
 
 @app.get("/auth/sessions", response_model=UserSessionListResponse)
@@ -682,16 +781,38 @@ def auth_revoke_sessions(
 ):
     """Revoke one or more sessions for the current user or, with permission, for a target user."""
     session = _require_authenticated_session(_session)
+    if request.session_token and request.session_id:
+        raise HTTPException(
+            status_code=400,
+            detail={"error": "ambiguous_session_target", "message": "Use session_id or session_token, not both"},
+        )
     current_token = _resolve_session_token(authorization, session_cookie)
     target_user_id = request.user_id or session.user.user_id
     acting_on_other_user = target_user_id != session.user.user_id
     if acting_on_other_user:
         _require_permission(session, "sessions.revoke", workspace_id=session.active_tenant.workspace_id)
+    requested_session_token = request.session_token
+    if request.session_id:
+        requested_session_token = session_token_for_identifier(request.session_id)
+        if requested_session_token is None:
+            raise HTTPException(
+                status_code=403,
+                detail={"error": "forbidden", "message": "Session is not owned by this identity"},
+            )
+    if requested_session_token:
+        owner = session_owner(requested_session_token)
+        if owner is None or owner != target_user_id:
+            if not acting_on_other_user:
+                raise HTTPException(
+                    status_code=403,
+                    detail={"error": "forbidden", "message": "Session is not owned by this identity"},
+                )
+            _require_permission(session, "sessions.revoke", workspace_id=session.active_tenant.workspace_id)
     reason = (request.reason or "manual_revoke").strip() or "manual_revoke"
     if request.revoke_all:
         revoked = revoke_user_sessions(target_user_id, reason=reason, exclude_session_token=None if acting_on_other_user else current_token)
-    elif request.session_token:
-        revoked = revoke_enterprise_session(request.session_token, reason=reason)
+    elif requested_session_token:
+        revoked = revoke_enterprise_session(requested_session_token, reason=reason)
     else:
         revoked = revoke_enterprise_session(current_token or "", reason=reason)
     log_admin_event(
@@ -700,7 +821,7 @@ def auth_revoke_sessions(
         actor_role=session.user.role,
         action="auth.session_revoked",
         target_type="user" if request.revoke_all or request.user_id else "session",
-        target_id=target_user_id if request.revoke_all or request.user_id else (request.session_token or current_token or "unknown"),
+        target_id=target_user_id if request.revoke_all or request.user_id else "session",
         tenant_id=session.active_tenant.tenant_id,
         metadata={"workspace_id": session.active_tenant.workspace_id, "reason": reason, "revoked": revoked},
     )
@@ -708,14 +829,14 @@ def auth_revoke_sessions(
 
 
 @app.get("/admin/tenants", response_model=list[EnterpriseTenant])
-def admin_list_tenants(_session: EnterpriseSession = Depends(_enterprise_session_from_authorization)):
+def admin_list_tenants(_session: EnterpriseSession = Depends(_require_platform_admin)):
     """List tenants for admin workflows."""
-    _session = _require_permission(_session, "runtime.manage", workspace_id=_session.active_tenant.workspace_id)
+    _session = _require_permission(_session, "tenants.read", workspace_id=_session.active_tenant.workspace_id)
     return list_admin_tenants()
 
 
 @app.post("/admin/tenants", response_model=EnterpriseTenant, status_code=201)
-def admin_create_tenant(request: EnterpriseTenantCreate, _session: EnterpriseSession = Depends(_require_admin)):
+def admin_create_tenant(request: EnterpriseTenantCreate, _session: EnterpriseSession = Depends(_require_platform_admin)):
     """Create or replace a tenant record."""
     with traced_span("admin.tenant.create", kind=SpanKind.INTERNAL, workspace_id=request.workspace_id):
         try:
@@ -739,7 +860,7 @@ def admin_create_tenant(request: EnterpriseTenantCreate, _session: EnterpriseSes
 def admin_update_tenant(
     tenant_id: str,
     request: EnterpriseTenantUpdate,
-    _session: EnterpriseSession = Depends(_require_admin),
+    _session: EnterpriseSession = Depends(_require_platform_admin),
 ):
     """Update a tenant record."""
     with traced_span("admin.tenant.update", kind=SpanKind.INTERNAL, workspace_id=request.workspace_id):
@@ -763,7 +884,7 @@ def admin_update_tenant(
 
 
 @app.delete("/admin/tenants/{tenant_id}")
-def admin_delete_tenant(tenant_id: str, _session: EnterpriseSession = Depends(_require_admin)):
+def admin_delete_tenant(tenant_id: str, _session: EnterpriseSession = Depends(_require_platform_admin)):
     """Delete a tenant record."""
     with traced_span("admin.tenant.delete", kind=SpanKind.INTERNAL):
         try:
@@ -785,13 +906,13 @@ def admin_delete_tenant(tenant_id: str, _session: EnterpriseSession = Depends(_r
 
 
 @app.get("/admin/users", response_model=list[EnterpriseUserRecord])
-def admin_list_users(_session: EnterpriseSession = Depends(_require_admin)):
+def admin_list_users(_session: EnterpriseSession = Depends(_require_platform_admin)):
     """List users for admin workflows."""
     return list_users()
 
 
 @app.post("/admin/users", response_model=EnterpriseUserRecord, status_code=201)
-def admin_create_user(request: EnterpriseUserCreate, _session: EnterpriseSession = Depends(_require_admin)):
+def admin_create_user(request: EnterpriseUserCreate, _session: EnterpriseSession = Depends(_require_platform_admin)):
     """Create or replace a user record."""
     with traced_span("admin.user.create", kind=SpanKind.INTERNAL, workspace_id=request.tenant_id):
         try:
@@ -810,7 +931,7 @@ def admin_create_user(request: EnterpriseUserCreate, _session: EnterpriseSession
             tenant_id=user["tenant_id"],
             metadata={"role": user["role"], "status": user["status"]},
         )
-        if user["role"] == "admin":
+        if user.get("canonical_role") == "PLATFORM_ADMIN":
             log_admin_event(
                 actor_user_id=_session.user.user_id,
                 actor_email=_session.user.email,
@@ -828,7 +949,7 @@ def admin_create_user(request: EnterpriseUserCreate, _session: EnterpriseSession
 def admin_update_user(
     user_id: str,
     request: EnterpriseUserUpdate,
-    _session: EnterpriseSession = Depends(_require_admin),
+    _session: EnterpriseSession = Depends(_require_platform_admin),
 ):
     """Update a user record."""
     previous = get_user(user_id)
@@ -872,11 +993,12 @@ def admin_update_user(
 
 
 @app.delete("/admin/users/{user_id}")
-def admin_delete_user(user_id: str, _session: EnterpriseSession = Depends(_require_admin)):
+def admin_delete_user(user_id: str, _session: EnterpriseSession = Depends(_require_platform_admin)):
     """Delete a user record."""
     deleted = delete_user(user_id)
     if not deleted:
         raise HTTPException(status_code=404, detail={"error": "user_not_found", "user_id": user_id})
+    revoked_sessions = revoke_user_sessions(user_id, reason="user_deleted")
     log_admin_event(
         actor_user_id=_session.user.user_id,
         actor_email=_session.user.email,
@@ -884,6 +1006,7 @@ def admin_delete_user(user_id: str, _session: EnterpriseSession = Depends(_requi
         action="user.delete",
         target_type="user",
         target_id=user_id,
+        metadata={"revoked_sessions": revoked_sessions},
     )
     return {"status": "deleted", "user_id": user_id}
 
@@ -892,7 +1015,7 @@ def admin_delete_user(user_id: str, _session: EnterpriseSession = Depends(_requi
 def admin_reset_user_password(
     user_id: str,
     request: PasswordResetAdminRequest,
-    _session: EnterpriseSession = Depends(_require_admin),
+    _session: EnterpriseSession = Depends(_require_platform_admin),
 ):
     """Issue a manual password reset token for a target user."""
     try:
@@ -936,7 +1059,26 @@ def admin_get_events(
     _session: EnterpriseSession = Depends(_require_admin),
 ):
     """List recent administrative events with sanitized metadata."""
-    return list_admin_events(limit=limit, offset=offset, action=action, tenant_id=tenant_id, workspace_id=workspace_id)
+    if canonical_role(_session.user.role) == "PLATFORM_ADMIN":
+        target_workspace = workspace_id
+    else:
+        target_workspace = _resolve_admin_workspace_scope(
+            workspace_id,
+            _session,
+            required_permission="observability.read",
+        )
+        if tenant_id is not None and tenant_id != _session.active_tenant.tenant_id:
+            raise HTTPException(
+                status_code=403,
+                detail={"error": "tenant_forbidden", "message": "Tenant is outside the active administrative scope"},
+            )
+    return list_admin_events(
+        limit=limit,
+        offset=offset,
+        action=action,
+        tenant_id=tenant_id,
+        workspace_id=target_workspace,
+    )
 
 
 @app.get("/admin/alerts", response_model=ObservabilityAlertsResponse)
@@ -945,14 +1087,19 @@ def admin_get_observability_alerts(
     workspace_id: str | None = Query(default=None),
     _session: EnterpriseSession = Depends(_require_admin),
 ):
-    """Expose operational alerts for any workspace to admins."""
+    """Expose operational alerts within the caller's administrative scope."""
     try:
+        target_workspace = _resolve_admin_workspace_scope(
+            workspace_id,
+            _session,
+            required_permission="observability.read",
+        )
         tel = get_telemetry()
-        return tel.get_alerts(days=days, workspace_id=workspace_id)
+        return tel.get_alerts(days=days, workspace_id=target_workspace)
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail={"error": "admin_observability_alerts_error", "message": str(e)})
+            raise HTTPException(status_code=500, detail={"error": "admin_observability_alerts_error", "message": "Internal server error"})
 
 
 @app.get("/admin/slo", response_model=ObservabilitySLOResponse)
@@ -961,21 +1108,26 @@ def admin_get_observability_slo(
     workspace_id: str | None = Query(default=None),
     _session: EnterpriseSession = Depends(_require_admin),
 ):
-    """Expose SLI/SLO status for any workspace to admins."""
+    """Expose SLI/SLO status within the caller's administrative scope."""
     try:
+        target_workspace = _resolve_admin_workspace_scope(
+            workspace_id,
+            _session,
+            required_permission="observability.read",
+        )
         tel = get_telemetry()
-        metrics = tel.get_metrics(days=days, workspace_id=workspace_id)
+        metrics = tel.get_metrics(days=days, workspace_id=target_workspace)
         try:
             client = get_client()
             client.get_collections()
             qdrant_ok = True
         except Exception:
             qdrant_ok = False
-        return _build_slo_snapshot(metrics, workspace_id=workspace_id, qdrant_ok=qdrant_ok)
+        return _build_slo_snapshot(metrics, workspace_id=target_workspace, qdrant_ok=qdrant_ok)
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail={"error": "admin_observability_slo_error", "message": str(e)})
+            raise HTTPException(status_code=500, detail={"error": "admin_observability_slo_error", "message": "Internal server error"})
 
 
 @app.get("/admin/traces", response_model=ObservabilityTraceResponse)
@@ -984,19 +1136,24 @@ def admin_get_observability_traces(
     limit: int = Query(default=20, ge=1, le=100),
     _session: EnterpriseSession = Depends(_require_admin),
 ):
-    """Expose recent traces for any workspace to admins."""
+    """Expose recent traces within the caller's administrative scope."""
     try:
-        items = list_recent_spans(limit=limit, workspace_id=workspace_id)
+        target_workspace = _resolve_admin_workspace_scope(
+            workspace_id,
+            _session,
+            required_permission="observability.read",
+        )
+        items = list_recent_spans(limit=limit, workspace_id=target_workspace)
         return {
             "items": items,
             "total": len(items),
-            "workspace_id": workspace_id,
+            "workspace_id": target_workspace,
             "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         }
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail={"error": "admin_observability_traces_error", "message": str(e)})
+            raise HTTPException(status_code=500, detail={"error": "admin_observability_traces_error", "message": "Internal server error"})
 
 
 @app.get("/admin/audits", response_model=AuditLogListResponse)
@@ -1007,12 +1164,16 @@ def admin_list_observability_audits(
     workspace_id: str | None = Query(default=None),
     _session: EnterpriseSession = Depends(_require_admin),
 ):
-    """List recent corpus audits for any workspace to admins."""
-    _session = _require_permission(_session, "audit.read", workspace_id=workspace_id or _session.active_tenant.workspace_id)
+    """List recent corpus audits within the caller's administrative scope."""
     try:
+        target_workspace = _resolve_admin_workspace_scope(
+            workspace_id,
+            _session,
+            required_permission="audit.read",
+        )
         tel = get_telemetry()
         return tel.list_audit_events(
-            workspace_id=workspace_id,
+            workspace_id=target_workspace,
             days=days,
             limit=limit,
             offset=offset,
@@ -1020,7 +1181,7 @@ def admin_list_observability_audits(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail={"error": "admin_observability_audits_error", "message": str(e)})
+            raise HTTPException(status_code=500, detail={"error": "admin_observability_audits_error", "message": "Internal server error"})
 
 
 @app.get("/admin/repairs", response_model=RepairLogListResponse)
@@ -1031,12 +1192,16 @@ def admin_list_observability_repairs(
     workspace_id: str | None = Query(default=None),
     _session: EnterpriseSession = Depends(_require_admin),
 ):
-    """List recent corpus repairs for any workspace to admins."""
-    _session = _require_permission(_session, "audit.read", workspace_id=workspace_id or _session.active_tenant.workspace_id)
+    """List recent corpus repairs within the caller's administrative scope."""
     try:
+        target_workspace = _resolve_admin_workspace_scope(
+            workspace_id,
+            _session,
+            required_permission="audit.read",
+        )
         tel = get_telemetry()
         return tel.list_repair_events(
-            workspace_id=workspace_id,
+            workspace_id=target_workspace,
             days=days,
             limit=limit,
             offset=offset,
@@ -1044,7 +1209,7 @@ def admin_list_observability_repairs(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail={"error": "admin_observability_repairs_error", "message": str(e)})
+            raise HTTPException(status_code=500, detail={"error": "admin_observability_repairs_error", "message": "Internal server error"})
 
 
 @app.post("/admin/evaluation/run")
@@ -1056,8 +1221,12 @@ def admin_run_evaluation(
     query_expansion: bool = Query(default=False, description="Enable HyDE-like query expansion"),
     _session: EnterpriseSession = Depends(_enterprise_session_from_authorization),
 ):
-    """Allow admins to run evaluation for any workspace without switching active tenant."""
-    _session = _require_permission(_session, "runtime.manage", workspace_id=workspace_id)
+    """Run evaluation only inside the caller's administrative scope."""
+    workspace_id = _resolve_admin_workspace_scope(
+        workspace_id,
+        _session,
+        required_permission="runtime.manage",
+    )
     from services.evaluation_service import EvaluationService
 
     dataset_path = DATA_DIR / workspace_id / "dataset.json"
@@ -1101,9 +1270,9 @@ def admin_run_evaluation(
             )
             return result
         except FileNotFoundError as e:
-            raise HTTPException(status_code=404, detail={"error": "dataset_not_found", "message": str(e)})
+            raise HTTPException(status_code=404, detail={"error": "dataset_not_found", "message": "Dataset não encontrado"})
         except Exception as e:
-            raise HTTPException(status_code=500, detail={"error": "evaluation_error", "message": str(e)})
+            raise HTTPException(status_code=500, detail={"error": "evaluation_error", "message": "Internal server error"})
 
 
 @app.post("/admin/corpus/audit")
@@ -1112,8 +1281,12 @@ def admin_run_corpus_audit(
     check_embeddings: bool = Query(default=False, description="If true, validates dense vectors in Qdrant"),
     _session: EnterpriseSession = Depends(_enterprise_session_from_authorization),
 ):
-    """Allow admins to run a corpus integrity audit for any workspace."""
-    _session = _require_permission(_session, "corpus.audit", workspace_id=workspace_id)
+    """Run a corpus integrity audit only inside the caller's administrative scope."""
+    workspace_id = _resolve_admin_workspace_scope(
+        workspace_id,
+        _session,
+        required_permission="corpus.audit",
+    )
     from services.integrity_service import audit_corpus_integrity
 
     with traced_span(
@@ -1157,7 +1330,7 @@ def admin_run_corpus_audit(
             )
             return report
         except Exception as e:
-            raise HTTPException(status_code=500, detail={"error": "admin_audit_error", "message": str(e)})
+            raise HTTPException(status_code=500, detail={"error": "admin_audit_error", "message": "Internal server error"})
 
 
 @app.post("/admin/corpus/repair/{document_id}")
@@ -1166,8 +1339,12 @@ def admin_repair_corpus_document(
     workspace_id: str = Query(default="default"),
     _session: EnterpriseSession = Depends(_enterprise_session_from_authorization),
 ):
-    """Allow admins to repair a corpus document in any workspace."""
-    _session = _require_permission(_session, "corpus.repair", workspace_id=workspace_id)
+    """Repair a corpus document only inside the caller's administrative scope."""
+    workspace_id = _resolve_admin_workspace_scope(
+        workspace_id,
+        _session,
+        required_permission="corpus.repair",
+    )
     from services.integrity_service import repair_document
 
     with traced_span("corpus.repair.admin", kind=SpanKind.INTERNAL, workspace_id=workspace_id):
@@ -1214,7 +1391,7 @@ def admin_repair_corpus_document(
         except HTTPException:
             raise
         except Exception as e:
-            raise HTTPException(status_code=500, detail={"error": "admin_repair_error", "message": str(e)})
+            raise HTTPException(status_code=500, detail={"error": "admin_repair_error", "message": "Internal server error"})
 
 
 @app.post("/admin/corpus/repair-batch")
@@ -1225,7 +1402,11 @@ def admin_repair_corpus_batch(
     _session: EnterpriseSession = Depends(_enterprise_session_from_authorization),
 ):
     """Repair every non-ok document found by a fresh corpus audit, up to the provided limit."""
-    _session = _require_permission(_session, "corpus.repair", workspace_id=workspace_id)
+    workspace_id = _resolve_admin_workspace_scope(
+        workspace_id,
+        _session,
+        required_permission="corpus.repair",
+    )
     from services.integrity_service import audit_corpus_integrity, repair_document
 
     try:
@@ -1300,7 +1481,7 @@ def admin_repair_corpus_batch(
         )
         return payload
     except Exception as e:
-        raise HTTPException(status_code=500, detail={"error": "admin_repair_batch_error", "message": str(e)})
+        raise HTTPException(status_code=500, detail={"error": "admin_repair_batch_error", "message": "Internal server error"})
 
 
 # ─── Document Upload ──────────────────────────────────────────
@@ -1311,7 +1492,7 @@ async def upload_document(
     file: UploadFile = File(...),
     workspace_id: str = Form(default="default"),
     chunking_strategy: str = Form(default="recursive", description="Chunking strategy: 'recursive' or 'semantic'"),
-    qdrant_collection: str = Form(default="cvg_master_rag"),
+    qdrant_collection: str = Form(default=CANONICAL_COLLECTION_ID),
     _session: EnterpriseSession = Depends(_enterprise_session_from_authorization),
 ):
     """
@@ -1332,6 +1513,7 @@ async def upload_document(
                 "received": qdrant_collection,
             },
         )
+    build_retrieval_context(_session, workspace_id=workspace_id, collection_id=qdrant_collection)
     if chunking_strategy not in VALID_CHUNKING_STRATEGIES:
         raise HTTPException(
             status_code=400,
@@ -1348,18 +1530,35 @@ async def upload_document(
         "documents.upload",
         kind=SpanKind.INTERNAL,
         attributes={
-            "filename": file.filename or "unknown",
+            "filename": "upload",
             "chunking_strategy": chunking_strategy,
             "qdrant_collection": qdrant_collection,
         },
         workspace_id=workspace_id,
     ):
-        # Check file extension
-        suffix = Path(file.filename or "").suffix.lower()
+        from services.upload_security import prepare_upload_filename
+
+        try:
+            display_filename, storage_filename = prepare_upload_filename(file.filename)
+        except ValueError as exc:
+            _log_ingestion_failure(
+                workspace_id=workspace_id,
+                filename="[invalid-filename]",
+                source_type="unknown",
+                error=f"invalid_filename:{exc}",
+            )
+            raise HTTPException(
+                status_code=400,
+                detail={"error": "invalid_filename", "message": "Nome de arquivo inválido."},
+            )
+
+        # Check file extension after path validation; never log or persist a
+        # caller-controlled path.
+        suffix = Path(display_filename).suffix.lower()
         if suffix not in SUPPORTED_EXTENSIONS:
             _log_ingestion_failure(
                 workspace_id=workspace_id,
-                filename=file.filename or "unknown",
+                filename=display_filename,
                 source_type=suffix.lstrip(".") or "unknown",
                 error=f"unsupported_format:{suffix}",
             )
@@ -1377,7 +1576,7 @@ async def upload_document(
         upload_dir = DOCUMENTS_DIR / workspace_id / "uploads"
         upload_dir.mkdir(parents=True, exist_ok=True)
 
-        file_path = upload_dir / file.filename
+        file_path = upload_dir / storage_filename
         try:
             received_bytes = 0
             with open(file_path, "wb") as output:
@@ -1395,7 +1594,7 @@ async def upload_document(
                         received_mb = round(received_bytes / 1024 / 1024, 1)
                         _log_ingestion_failure(
                             workspace_id=workspace_id,
-                            filename=file.filename or "unknown",
+                            filename=display_filename,
                             source_type=suffix.lstrip(".") or "unknown",
                             error="file_too_large",
                         )
@@ -1413,7 +1612,7 @@ async def upload_document(
             if received_bytes == 0:
                 _log_ingestion_failure(
                     workspace_id=workspace_id,
-                    filename=file.filename or "unknown",
+                    filename=display_filename,
                     source_type=suffix.lstrip(".") or "unknown",
                     error="empty_file",
                 )
@@ -1429,11 +1628,11 @@ async def upload_document(
         except Exception as e:
             _log_ingestion_failure(
                 workspace_id=workspace_id,
-                filename=file.filename or "unknown",
+                filename=display_filename,
                 source_type=suffix.lstrip(".") or "unknown",
                 error=f"upload_failed:{e}",
             )
-            raise HTTPException(status_code=500, detail={"error": "upload_failed", "message": str(e)})
+            raise HTTPException(status_code=500, detail={"error": "upload_failed", "message": "Não foi possível salvar o upload"})
 
         # Ingest or queue heavy PDF work for an isolated worker.
         queued_for_worker = False
@@ -1456,7 +1655,7 @@ async def upload_document(
                 job = create_ingestion_job(
                     source_path=file_path,
                     workspace_id=workspace_id,
-                    filename=file.filename or file_path.name,
+                    filename=display_filename,
                     source_type=suffix.lstrip(".") or "unknown",
                     chunking_strategy=chunking_strategy,
                     file_size_bytes=received_bytes,
@@ -1494,7 +1693,7 @@ async def upload_document(
             sync_job = create_ingestion_job(
                 source_path=file_path,
                 workspace_id=workspace_id,
-                filename=file.filename or file_path.name,
+                filename=display_filename,
                 source_type=suffix.lstrip(".") or "unknown",
                 chunking_strategy=chunking_strategy,
                 file_size_bytes=received_bytes,
@@ -1509,7 +1708,7 @@ async def upload_document(
                 operational_status="running",
             )
             result = ingest_document(
-                file_path, workspace_id, file.filename,
+                file_path, workspace_id, display_filename,
                 chunking_strategy=chunking_strategy,
                 ingestion_id=sync_job["ingestion_id"],
                 qdrant_collection=qdrant_collection,
@@ -1551,15 +1750,15 @@ async def upload_document(
                 )
             _log_ingestion_failure(
                 workspace_id=workspace_id,
-                filename=file.filename or "unknown",
+                filename=display_filename,
                 source_type=suffix.lstrip(".") or "unknown",
                 error=f"parse_failed:{e}",
             )
-            raise HTTPException(status_code=413, detail={"error": "parse_failed", "message": str(e)})
+            raise HTTPException(status_code=413, detail={"error": "parse_failed", "message": "Não foi possível processar o documento"})
         except IngestionPreflightError as e:
             _log_ingestion_failure(
                 workspace_id=workspace_id,
-                filename=file.filename or "unknown",
+                filename=display_filename,
                 source_type=suffix.lstrip(".") or "unknown",
                 error=f"preflight_failed:{e.error_code}",
             )
@@ -1581,11 +1780,11 @@ async def upload_document(
                 )
             _log_ingestion_failure(
                 workspace_id=workspace_id,
-                filename=file.filename or "unknown",
+                filename=display_filename,
                 source_type=suffix.lstrip(".") or "unknown",
                 error=f"internal_error:{e}",
             )
-            raise HTTPException(status_code=500, detail={"error": "internal_error", "message": str(e)})
+            raise HTTPException(status_code=500, detail={"error": "internal_error", "message": "Internal server error"})
         finally:
             # Clean up uploaded file
             if not queued_for_worker:
@@ -1608,8 +1807,12 @@ def list_ingestion_job_statuses(
     from services.ingestion_job_service import list_ingestion_jobs
 
     _require_permission(_session, "documents.read", workspace_id=workspace_id, target_type="workspace", target_id=workspace_id)
-    _require_workspace_access(workspace_id, _session)
+    retrieval_context = build_retrieval_context(_session, workspace_id=workspace_id)
     jobs = list_ingestion_jobs(workspace_id=workspace_id, limit=limit)
+    jobs = [
+        job for job in jobs
+        if _collection_allowed(retrieval_context, job.get("qdrant_collection"))
+    ]
     return DocumentIngestionJobListResponse(
         items=jobs,
         total=len(jobs),
@@ -1635,6 +1838,11 @@ def get_ingestion_job_status(
             status_code=404,
             detail={"error": "ingestion_job_not_found", "message": "Job de indexacao nao encontrado."},
         )
+    retrieval_context = build_retrieval_context(
+        _session,
+        workspace_id=workspace_id,
+        collection_id=job.get("qdrant_collection"),
+    )
     return job
 
 
@@ -1645,7 +1853,7 @@ def get_qdrant_collections(
 ):
     """List Qdrant collections available as upload targets."""
     _require_permission(_session, "documents.read", workspace_id=workspace_id, target_type="workspace", target_id=workspace_id)
-    _require_workspace_access(workspace_id, _session)
+    retrieval_context = build_retrieval_context(_session, workspace_id=workspace_id)
     from core.config import QDRANT_COLLECTION
     from services.vector_service import list_qdrant_collections
 
@@ -1654,12 +1862,23 @@ def get_qdrant_collections(
     except Exception as e:
         raise HTTPException(
             status_code=503,
-            detail={"error": "qdrant_unavailable", "message": str(e)},
+            detail={"error": "qdrant_unavailable", "message": "Vector store unavailable"},
         )
-    active = QDRANT_COLLECTION
-    if active not in collections:
-        collections = sorted([*collections, active])
-    return QdrantCollectionListResponse(active_collection=active, collections=collections)
+    active = normalize_collection_id(QDRANT_COLLECTION)
+    visible_collections = []
+    for collection in collections:
+        try:
+            resolved = normalize_collection_id(collection)
+        except ValueError:
+            continue
+        if _collection_allowed(retrieval_context, resolved):
+            visible_collections.append(resolved)
+    if _collection_allowed(retrieval_context, active) and active not in visible_collections:
+        visible_collections.append(active)
+    return QdrantCollectionListResponse(
+        active_collection=active,
+        collections=sorted(set(visible_collections)),
+    )
 
 
 @app.get("/documents/{document_id}", response_model=DocumentMetadata)
@@ -1675,7 +1894,7 @@ def get_document(
     from services.document_registry import get_document_metadata
 
     _require_permission(_session, "documents.read", workspace_id=workspace_id, target_type="workspace", target_id=workspace_id)
-    _require_workspace_access(workspace_id, _session)
+    retrieval_context = build_retrieval_context(_session, workspace_id=workspace_id)
     metadata = get_document_metadata(document_id, workspace_id)
     if not metadata:
         raise HTTPException(status_code=404, detail={
@@ -1683,6 +1902,11 @@ def get_document(
             "document_id": document_id
         })
 
+    if not _collection_allowed(retrieval_context, metadata.get("collection_id") or metadata.get("qdrant_collection")):
+        raise HTTPException(status_code=404, detail={
+            "error": "document_not_found",
+            "document_id": document_id,
+        })
     return metadata
 
 
@@ -1698,15 +1922,18 @@ def get_documents(
 ):
     """List canonical documents for the workspace."""
     _require_permission(_session, "documents.read", workspace_id=workspace_id, target_type="workspace", target_id=workspace_id)
-    _require_workspace_access(workspace_id, _session)
-    return list_document_items(
+    retrieval_context = build_retrieval_context(_session, workspace_id=workspace_id)
+    payload = list_document_items(
         workspace_id=workspace_id,
-        limit=limit,
-        offset=offset,
+        # Filter before applying pagination so total/counts do not reveal
+        # documents from collections outside the identity's ACL.
+        limit=max(10000, offset + limit),
+        offset=0,
         source_type=source_type,
         status=status,
         query=query,
     )
+    return _filter_document_response_items(payload, retrieval_context, limit=limit, offset=offset)
 
 
 # ─── Search ───────────────────────────────────────────────────
@@ -1718,7 +1945,11 @@ def search(request: SearchRequest, _session: EnterpriseSession = Depends(_enterp
     Hybrid search (dense + sparse + RRF) in knowledge base.
     """
     _require_permission(_session, "search.execute", workspace_id=request.workspace_id, target_type="workspace", target_id=request.workspace_id)
-    _require_workspace_access(request.workspace_id, _session)
+    retrieval_context = build_retrieval_context(
+        _session,
+        workspace_id=request.workspace_id,
+        collection_id=request.collection_id,
+    )
     with traced_span(
         "search.execute",
         kind=SpanKind.INTERNAL,
@@ -1727,10 +1958,14 @@ def search(request: SearchRequest, _session: EnterpriseSession = Depends(_enterp
     ):
         try:
             from services.search_service import execute_search
-            result = execute_search(request, default_query_expansion_mode="off")
+            result = execute_search(
+                request,
+                default_query_expansion_mode="off",
+                retrieval_context=retrieval_context,
+            )
             return result
         except Exception as e:
-            raise HTTPException(status_code=500, detail={"error": "retrieval_error", "message": str(e)})
+            raise HTTPException(status_code=500, detail={"error": "retrieval_error", "message": "Internal server error"})
 
 
 # ─── Query (Search + Answer) ────────────────────────────────
@@ -1744,7 +1979,11 @@ def query(request: QueryRequest, _session: EnterpriseSession = Depends(_enterpri
     from services.search_service import search_and_answer
 
     _require_permission(_session, "query.execute", workspace_id=request.workspace_id, target_type="workspace", target_id=request.workspace_id)
-    _require_workspace_access(request.workspace_id, _session)
+    retrieval_context = build_retrieval_context(
+        _session,
+        workspace_id=request.workspace_id,
+        collection_id=request.collection_id,
+    )
     with traced_span(
         "query.execute",
         kind=SpanKind.INTERNAL,
@@ -1757,10 +1996,10 @@ def query(request: QueryRequest, _session: EnterpriseSession = Depends(_enterpri
         workspace_id=request.workspace_id,
     ):
         try:
-            result = search_and_answer(request)
+            result = search_and_answer(request, retrieval_context=retrieval_context)
             return result
         except Exception as e:
-            raise HTTPException(status_code=500, detail={"error": "query_error", "message": str(e)})
+            raise HTTPException(status_code=500, detail={"error": "query_error", "message": "Internal server error"})
 
 
 @app.post("/external/chat", response_model=ExternalChatResponse)
@@ -1775,12 +2014,14 @@ def external_chat(
     validated clinical_v2 chat pipeline and does not expose retrieval debug.
     """
     from services.search_service import search_and_answer
+    retrieval_context = _external_retrieval_context(request)
 
     query_request = QueryRequest(
         query=request.question,
         workspace_id=request.workspace_id,
         top_k=request.top_k,
         threshold=request.threshold,
+        collection_id=request.collection_id,
         retrieval_profile="clinical_v2",
         query_expansion_mode="off",
         query_expansion=False,
@@ -1799,9 +2040,16 @@ def external_chat(
         workspace_id=request.workspace_id,
     ):
         try:
-            result = search_and_answer(query_request)
+            # Keep compatibility with read-only test doubles that predate the
+            # context parameter; production always receives the bound context.
+            try:
+                result = search_and_answer(query_request, retrieval_context=retrieval_context)
+            except TypeError as exc:
+                if "retrieval_context" not in str(exc):
+                    raise
+                result = search_and_answer(query_request)
         except Exception as e:
-            raise HTTPException(status_code=500, detail={"error": "external_chat_error", "message": str(e)})
+            raise HTTPException(status_code=500, detail={"error": "external_chat_error", "message": "Internal server error"})
 
     return ExternalChatResponse(
         answer=result.answer_markdown or result.answer,
@@ -1920,8 +2168,10 @@ def get_metrics(
         tel = get_telemetry()
         target_workspace = _resolve_workspace_scope(workspace_id, _session, required_permission="observability.read")
         return tel.get_metrics(days=days, workspace_id=target_workspace)
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail={"error": "metrics_error", "message": str(e)})
+        raise HTTPException(status_code=500, detail={"error": "metrics_error", "message": "Internal server error"})
 
 
 
@@ -1962,7 +2212,7 @@ def run_evaluation(
         )
         return result
     except Exception as e:
-        raise HTTPException(status_code=500, detail={"error": "evaluation_error", "message": str(e)})
+        raise HTTPException(status_code=500, detail={"error": "evaluation_error", "message": "Internal server error"})
 
 
 @app.post("/evaluation/ab")
@@ -2000,7 +2250,7 @@ def run_ab_evaluation(
         )
         return result
     except Exception as e:
-        raise HTTPException(status_code=500, detail={"error": "ab_evaluation_error", "message": str(e)})
+        raise HTTPException(status_code=500, detail={"error": "ab_evaluation_error", "message": "Internal server error"})
 
 
 @app.post("/evaluation/query-expansion-ab")
@@ -2031,7 +2281,7 @@ def run_query_expansion_ab_evaluation(
         )
         return result
     except Exception as e:
-        raise HTTPException(status_code=500, detail={"error": "query_expansion_ab_error", "message": str(e)})
+        raise HTTPException(status_code=500, detail={"error": "query_expansion_ab_error", "message": "Internal server error"})
 
 
 @app.post("/evaluation/chunking-ab")
@@ -2088,12 +2338,12 @@ def run_chunking_ab_evaluation(
     except RuntimeError as e:
         raise HTTPException(status_code=500, detail={
             "error": "chunking_ab_error",
-            "message": str(e),
+            "message": "Internal server error",
         })
     except Exception as e:
         raise HTTPException(status_code=500, detail={
             "error": "chunking_ab_error",
-            "message": str(e),
+            "message": "Internal server error",
         })
 
 
@@ -2142,7 +2392,7 @@ def get_corpus_audit(
             pass
         return report
     except Exception as e:
-        raise HTTPException(status_code=500, detail={"error": "audit_error", "message": str(e)})
+        raise HTTPException(status_code=500, detail={"error": "audit_error", "message": "Internal server error"})
 
 
 @app.post("/corpus/repair/{document_id}")
@@ -2189,7 +2439,7 @@ def repair_corpus_document(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail={"error": "repair_error", "message": str(e)})
+        raise HTTPException(status_code=500, detail={"error": "repair_error", "message": "Internal server error"})
 
 
 # ─── Error Handlers ───────────────────────────────────────────
@@ -2197,7 +2447,7 @@ def repair_corpus_document(
 
 @app.exception_handler(ValidationError)
 def validation_exception_handler(_request, e):
-    return JSONResponse(status_code=422, content={"error": "validation_error", "message": str(e)})
+    return JSONResponse(status_code=422, content={"error": "validation_error", "message": "Request validation failed"})
 
 
 def _log_ingestion_failure(

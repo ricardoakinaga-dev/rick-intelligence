@@ -95,7 +95,7 @@ def get_observability_alerts(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail={"error": "observability_alerts_error", "message": str(e)})
+        raise HTTPException(status_code=500, detail={"error": "observability_alerts_error", "message": "Internal server error"})
 
 
 @router.get("/observability/slo", response_model=ObservabilitySLOResponse)
@@ -118,7 +118,7 @@ def get_observability_slo(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail={"error": "observability_slo_error", "message": str(e)})
+        raise HTTPException(status_code=500, detail={"error": "observability_slo_error", "message": "Internal server error"})
 
 
 @router.get("/observability/traces", response_model=ObservabilityTraceResponse)
@@ -139,7 +139,7 @@ def get_observability_traces(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail={"error": "observability_traces_error", "message": str(e)})
+        raise HTTPException(status_code=500, detail={"error": "observability_traces_error", "message": "Internal server error"})
 
 
 @router.get("/observability/audits", response_model=AuditLogListResponse)
@@ -158,7 +158,7 @@ def list_observability_audits(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail={"error": "observability_audits_error", "message": str(e)})
+        raise HTTPException(status_code=500, detail={"error": "observability_audits_error", "message": "Internal server error"})
 
 
 @router.get("/observability/repairs", response_model=RepairLogListResponse)
@@ -177,4 +177,4 @@ def list_observability_repairs(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail={"error": "observability_repairs_error", "message": str(e)})
+        raise HTTPException(status_code=500, detail={"error": "observability_repairs_error", "message": "Internal server error"})

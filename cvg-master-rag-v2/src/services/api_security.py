@@ -2,7 +2,13 @@ from __future__ import annotations
 
 from fastapi import Cookie, Depends, Header, HTTPException
 
-from models.schemas import EnterpriseSession
+from models.schemas import EnterpriseSession, RetrievalContext
+from services.authorization import (
+    allowed_collection_ids_for_user,
+    canonical_role,
+    permission_granted,
+)
+from services.rag_contract import normalize_collection_id
 from services.admin_service import log_admin_event
 from services.enterprise_service import (
     SESSION_COOKIE_NAME,
@@ -11,7 +17,7 @@ from services.enterprise_service import (
     get_session as get_enterprise_session,
 )
 
-ROLE_ORDER = {"viewer": 0, "operator": 1, "auditor": 2, "admin_rag": 3, "super_admin": 4, "admin": 4}
+ROLE_ORDER = {"VETERINARIAN": 0, "KNOWLEDGE_MANAGER": 1, "PLATFORM_ADMIN": 2}
 
 
 def enterprise_session_from_authorization(
@@ -36,7 +42,7 @@ def require_authenticated_session(session: EnterpriseSession) -> EnterpriseSessi
 
 def require_min_role(session: EnterpriseSession, role: str) -> EnterpriseSession:
     session = require_authenticated_session(session)
-    if ROLE_ORDER.get(session.user.role, 0) < ROLE_ORDER.get(role, 0):
+    if ROLE_ORDER.get(canonical_role(session.user.role), 0) < ROLE_ORDER.get(canonical_role(role), 0):
         raise HTTPException(status_code=403, detail={"error": "forbidden", "message": f"{role} role required"})
     return session
 
@@ -68,7 +74,11 @@ def audit_access_denied(
 
 
 def session_has_permission(session: EnterpriseSession, permission: str) -> bool:
-    return "*" in session.user.permissions or permission in session.user.permissions
+    return permission_granted(
+        role=session.user.role,
+        permissions=session.user.permissions,
+        required=permission,
+    )
 
 
 def require_permission(
@@ -97,7 +107,7 @@ def require_permission(
 
 
 def require_admin(session: EnterpriseSession = Depends(enterprise_session_from_authorization)) -> EnterpriseSession:
-    return require_permission(session, "runtime.manage", target_type="permission", target_id="runtime.manage")
+    return require_permission(session, "observability.read", target_type="permission", target_id="observability.read")
 
 
 def require_operator(session: EnterpriseSession = Depends(enterprise_session_from_authorization)) -> EnterpriseSession:
@@ -127,6 +137,37 @@ def require_workspace_access(
     return session
 
 
+def build_retrieval_context(
+    session: EnterpriseSession,
+    *,
+    workspace_id: str,
+    collection_id: str | None = None,
+) -> RetrievalContext:
+    """Build the server-side retrieval scope; request bodies cannot widen it."""
+    session = require_workspace_access(workspace_id, require_authenticated_session(coerce_session(session)))
+    allowed = allowed_collection_ids_for_user(session.user)
+    requested_collection = normalize_collection_id(collection_id) if collection_id else None
+    if requested_collection and "*" not in allowed and requested_collection not in allowed:
+        audit_access_denied(
+            session,
+            reason="collection_forbidden",
+            required_permission="collections.read",
+            target_type="collection",
+            target_id=requested_collection,
+            workspace_id=workspace_id,
+        )
+        raise HTTPException(
+            status_code=403,
+            detail={"error": "collection_forbidden", "message": "Collection is not authorized for this identity"},
+        )
+    return RetrievalContext(
+        user_id=session.user.user_id,
+        workspace_id=workspace_id,
+        allowed_collection_ids=[requested_collection] if requested_collection else allowed,
+        permissions=session.user.permissions,
+    )
+
+
 def resolve_workspace_scope(
     workspace_id: str | None,
     session: object,
@@ -135,15 +176,31 @@ def resolve_workspace_scope(
 ) -> str | None:
     if not isinstance(workspace_id, str):
         workspace_id = None
-    coerced = coerce_session(session)
-    if isinstance(session, EnterpriseSession):
-        if not coerced.authenticated or coerced.session_state != "active":
-            return workspace_id or "default"
-        if required_role:
-            require_min_role(coerced, required_role)
-        if required_permission:
-            require_permission(coerced, required_permission, workspace_id=workspace_id or coerced.active_tenant.workspace_id)
-        target_workspace = workspace_id or coerced.active_tenant.workspace_id
+    coerced = require_authenticated_session(coerce_session(session))
+    if required_role:
+        require_min_role(coerced, required_role)
+    if required_permission:
+        require_permission(coerced, required_permission, workspace_id=workspace_id or coerced.active_tenant.workspace_id)
+    target_workspace = workspace_id or coerced.active_tenant.workspace_id
+    require_workspace_access(target_workspace, coerced)
+    return target_workspace
+
+
+def resolve_admin_workspace_scope(
+    workspace_id: str | None,
+    session: object,
+    *,
+    required_permission: str,
+) -> str:
+    """Resolve an admin target without allowing a manager to cross workspaces.
+
+    Platform administrators may inspect an explicitly requested workspace. All
+    other administrators remain bound to their active tenant/workspace, even
+    when their role has the requested operational permission.
+    """
+    coerced = require_authenticated_session(coerce_session(session))
+    target_workspace = workspace_id or coerced.active_tenant.workspace_id
+    require_permission(coerced, required_permission, workspace_id=target_workspace)
+    if canonical_role(coerced.user.role) != "PLATFORM_ADMIN":
         require_workspace_access(target_workspace, coerced)
-        return target_workspace
-    return workspace_id or "default"
+    return target_workspace

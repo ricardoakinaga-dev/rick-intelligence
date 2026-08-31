@@ -10,7 +10,9 @@ pdfplumber==0.10.3
 python-docx==1.1.0
 
 # Vector DB
-qdrant-client==1.7.4
+# 1.7.4 was never published to PyPI; 1.7.3 is the nearest compatible client
+# for the pinned Qdrant 1.7.4 local server used by the Phase 0.5 baseline.
+qdrant-client==1.7.3
 
 # OpenAI
 openai==1.12.0

@@ -7,7 +7,7 @@
         "build": "tsc",
         "start": "node dist/server.js",
         "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
-        "test": "node --test --loader ts-node/esm src/**/*.test.ts"
+        "test": "NODE_ENV=test OPENAI_API_KEY=test-key API_KEY=test-only-openai-key TELEGRAM_WEBHOOK_SECRET_TOKEN=test-only-telegram-secret node -r ts-node/register --test src/**/*.test.ts"
     },
     "dependencies": {
         "axios": "^1.6.7",

@@ -58,42 +58,10 @@ export class ApiError extends Error {
 }
 
 const DEFAULT_API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
-const SESSION_TOKEN_STORAGE_KEY = "cvg_master_rag_session_token";
-
-let inMemorySessionToken: string | null = null;
-
-function readStoredSessionToken(): string | null {
-  if (inMemorySessionToken) return inMemorySessionToken;
-  if (typeof window === "undefined") return null;
-  try {
-    inMemorySessionToken = window.sessionStorage.getItem(SESSION_TOKEN_STORAGE_KEY);
-  } catch {
-    inMemorySessionToken = null;
-  }
-  return inMemorySessionToken;
-}
-
-export function setApiSessionToken(token: string | null | undefined) {
-  inMemorySessionToken = token || null;
-  if (typeof window === "undefined") return;
-  try {
-    if (token) {
-      window.sessionStorage.setItem(SESSION_TOKEN_STORAGE_KEY, token);
-    } else {
-      window.sessionStorage.removeItem(SESSION_TOKEN_STORAGE_KEY);
-    }
-  } catch {
-    // Best effort only. The HttpOnly cookie remains the primary session path.
-  }
-}
 
 async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers);
   headers.set("Accept", "application/json");
-  const sessionToken = readStoredSessionToken();
-  if (sessionToken && !headers.has("Authorization")) {
-    headers.set("Authorization", `Bearer ${sessionToken}`);
-  }
 
   const response = await fetch(`${DEFAULT_API_BASE}${path}`, {
     ...init,

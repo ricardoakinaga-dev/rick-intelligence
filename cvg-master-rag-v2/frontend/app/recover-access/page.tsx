@@ -5,13 +5,12 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import { ArrowLeft, Mail } from "lucide-react";
 import { useEnterpriseSession } from "@/components/layout/enterprise-session-provider";
-import { Badge, Button, Card, Input, Select, Textarea, useToast } from "@/components/ui";
+import { Badge, Button, Card, Input, Textarea, useToast } from "@/components/ui";
 
 function RecoveryContent() {
   const router = useRouter();
   const { pushToast } = useToast();
   const { session, requestRecovery, confirmPasswordReset } = useEnterpriseSession();
-  const tenants = session?.available_tenants ?? [];
   const [email, setEmail] = useState("");
   const [tenantId, setTenantId] = useState(session?.active_tenant.tenant_id ?? "default");
   const [reason, setReason] = useState("Sessão expirada ou acesso negado");
@@ -84,13 +83,14 @@ function RecoveryContent() {
             </label>
             <label className="ui-label">
               Tenant
-              <Select value={tenantId} onChange={(event) => setTenantId(event.target.value)} disabled={!tenants.length}>
-                {tenants.map((tenant) => (
-                  <option key={tenant.tenant_id} value={tenant.tenant_id}>
-                    {tenant.name} · {tenant.workspace_id}
-                  </option>
-                ))}
-              </Select>
+              <Input
+                value={tenantId}
+                onChange={(event) => setTenantId(event.target.value)}
+                placeholder="Digite o tenant autorizado"
+                autoComplete="off"
+                autoCapitalize="none"
+                spellCheck={false}
+              />
             </label>
             <label className="ui-label">
               Motivo

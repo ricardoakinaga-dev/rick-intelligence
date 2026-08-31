@@ -19,6 +19,12 @@ from services.enterprise_store import (
     reset_session_state,
     save_admin_state,
 )
+from services.authorization import (
+    ROLE_PERMISSIONS as CANONICAL_ROLE_PERMISSIONS,
+    canonical_role as resolve_canonical_role,
+    permission_granted,
+)
+from services.rag_contract import CANONICAL_COLLECTION_ID, normalize_collection_id
 
 # ─── Password hashing ────────────────────────────────────────────────────────
 # PBKDF2-SHA256 per-user salt.
@@ -29,13 +35,16 @@ _DEMO_SALT = "fluxpay2024_rag_salt_v1"
 
 ROLE_ALIASES = {
     "admin": "super_admin",
+    "platform_admin": "super_admin",
+    "knowledge_manager": "admin_rag",
+    "veterinarian": "viewer",
 }
 
 ROLE_PERMISSIONS: dict[str, list[str]] = {
     "super_admin": [
         "*",
     ],
-    "admin_rag": [
+    "admin_rag": list(CANONICAL_ROLE_PERMISSIONS["KNOWLEDGE_MANAGER"]) + [
         "documents.read",
         "documents.upload",
         "search.execute",
@@ -46,9 +55,8 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         "reindex.run",
         "corpus.audit",
         "corpus.repair",
-        "runtime.manage",
     ],
-    "auditor": [
+    "auditor": list(CANONICAL_ROLE_PERMISSIONS["VETERINARIAN"]) + [
         "documents.read",
         "search.execute",
         "query.execute",
@@ -56,7 +64,7 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         "audit.read",
         "corpus.audit",
     ],
-    "operator": [
+    "operator": list(CANONICAL_ROLE_PERMISSIONS["KNOWLEDGE_MANAGER"]) + [
         "documents.read",
         "documents.upload",
         "search.execute",
@@ -64,7 +72,7 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         "observability.read",
         "ingestion.run",
     ],
-    "viewer": [
+    "viewer": list(CANONICAL_ROLE_PERMISSIONS["VETERINARIAN"]) + [
         "documents.read",
         "search.execute",
         "query.execute",
@@ -277,7 +285,7 @@ def resolve_permissions_for_role(role: str | None, overrides: dict | None = None
 
 def user_has_permission(user: dict, permission: str) -> bool:
     permissions = resolve_permissions_for_role(user.get("role"), user.get("permission_overrides"))
-    return "*" in permissions or permission in permissions
+    return permission_granted(role=user.get("role"), permissions=permissions, required=permission)
 
 
 def _normalize_user(user: dict) -> dict:
@@ -287,10 +295,17 @@ def _normalize_user(user: dict) -> dict:
     normalized["status"] = normalized.get("status") or "invited"
     normalized["tenant_id"] = normalized.get("tenant_id") or "default"
     normalized["must_change_password"] = bool(normalized.get("must_change_password", False))
+    raw_collections = normalized.get("authorized_collection_ids", [])
+    normalized["authorized_collection_ids"] = [
+        "*" if item.strip() == "*" else normalize_collection_id(item)
+        for item in raw_collections
+        if isinstance(item, str) and item.strip()
+    ]
     normalized["permission_overrides"] = normalized.get("permission_overrides") if isinstance(normalized.get("permission_overrides"), dict) else {}
     normalized["created_at"] = normalized.get("created_at") or normalized.get("password_changed_at") or "2026-01-01T00:00:00Z"
     normalized["updated_at"] = normalized.get("updated_at") or normalized["created_at"]
     normalized["permissions"] = resolve_permissions_for_role(normalized["role"], normalized["permission_overrides"])
+    normalized["canonical_role"] = resolve_canonical_role(normalized["role"])
     return normalized
 
 
@@ -481,6 +496,7 @@ def create_user(payload: dict) -> dict:
         "updated_at": now,
         "must_change_password": bool(payload.get("status", "invited") != "active"),
         "permission_overrides": {},
+        "authorized_collection_ids": list(payload.get("authorized_collection_ids") or []),
     }
     if password:
         salt_hex = secrets.token_hex(16)
@@ -539,6 +555,15 @@ def update_user(user_id: str, payload: dict) -> dict:
         user["must_change_password"] = False
     if payload.get("must_change_password") is not None:
         user["must_change_password"] = bool(payload["must_change_password"])
+    if payload.get("authorized_collection_ids") is not None:
+        try:
+            user["authorized_collection_ids"] = [
+                "*" if item.strip() == "*" else normalize_collection_id(item)
+                for item in payload["authorized_collection_ids"]
+                if isinstance(item, str) and item.strip()
+            ]
+        except ValueError as exc:
+            raise ValueError(f"invalid_collection_grant:{exc}")
     user["role"] = normalize_role(user.get("role"))
     user["updated_at"] = _now_iso()
     _save_state(state)
@@ -596,7 +621,7 @@ def set_user_password(user_id: str, new_password: str, *, must_change_password: 
 
 
 def get_accessible_tenants(user: dict) -> list[dict]:
-    if normalize_role(user.get("role")) == "super_admin":
+    if resolve_canonical_role(user.get("role")) == "PLATFORM_ADMIN":
         return [tenant for tenant in list_tenants() if tenant["status"] == "active"]
     tenant = get_tenant(user["tenant_id"])
     if not tenant or tenant["status"] != "active":
@@ -609,15 +634,28 @@ def can_access_tenant(user: dict, tenant_id: str) -> bool:
 
 
 def _sanitize_admin_metadata(metadata: dict | None) -> dict:
-    payload = deepcopy(metadata or {})
-    for key, value in list(payload.items()):
-        if "password" in key.lower():
-            payload[key] = "[redacted]"
-        elif "token" in key.lower():
-            payload[key] = "[redacted]"
-        elif isinstance(value, dict):
-            payload[key] = _sanitize_admin_metadata(value)
-    return payload
+    sensitive_fragments = (
+        "password",
+        "token",
+        "authorization",
+        "api_key",
+        "secret",
+        "private_key",
+        "connection_url",
+        "redis_url",
+    )
+
+    def sanitize(value: object, key: str = "") -> object:
+        lowered = key.lower()
+        if any(fragment in lowered for fragment in sensitive_fragments):
+            return "[redacted]"
+        if isinstance(value, dict):
+            return {str(child_key): sanitize(child_value, str(child_key)) for child_key, child_value in value.items()}
+        if isinstance(value, list):
+            return [sanitize(item, key) for item in value]
+        return value
+
+    return sanitize(deepcopy(metadata or {}))
 
 
 def list_admin_events(
@@ -682,6 +720,6 @@ def log_admin_event(
             "target_type": target_type,
             "target_id": target_id,
             "tenant_id": tenant_id,
-            "metadata": metadata or {},
+            "metadata": _sanitize_admin_metadata(metadata),
         }
     )

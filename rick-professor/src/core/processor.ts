@@ -1,12 +1,18 @@
 import { PROMPTS } from './prompts';
 import { chatCompletion as defaultChat, getEmbedding as defaultEmbed } from '../lib/openai';
-import { searchQdrant as defaultSearch } from '../lib/qdrant';
-import { acquireLock as defaultLock } from '../lib/redis-lock';
+import {
+    searchQdrant as defaultSearch,
+    filterTrustedQdrantResults,
+    QdrantSearchOptions,
+} from '../lib/qdrant';
+import { acquireLock as defaultLock, releaseLock as defaultRelease, renewLock as defaultRenew } from '../lib/redis-lock';
 import { sendMessage as defaultSend } from '../lib/telegram';
 import { getChatHistory as defaultGetHistory, addChatMessage as defaultAddMsg } from '../lib/memory';
 import { config } from '../config';
 import { randomUUID } from 'crypto';
 import { log } from '../lib/logging';
+import { evaluateEvidence } from './evidence';
+import { defaultPlannerOutput, parsePlannerOutput } from './planner-contract';
 
 interface ProcessorInput {
     text: string;
@@ -14,6 +20,8 @@ interface ProcessorInput {
     messageId?: number;
     fromId?: number;
     raw?: any;
+    /** Trusted context assembled by an authenticated gateway/route. */
+    retrievalContext?: QdrantSearchOptions;
 }
 
 export interface ProcessorDependencies {
@@ -21,6 +29,8 @@ export interface ProcessorDependencies {
     getEmbedding: typeof defaultEmbed;
     searchQdrant: typeof defaultSearch;
     acquireLock: typeof defaultLock;
+    releaseLock?: typeof defaultRelease;
+    renewLock?: typeof defaultRenew;
     sendMessage: typeof defaultSend;
     getChatHistory: typeof defaultGetHistory;
     addChatMessage: typeof defaultAddMsg;
@@ -40,6 +50,8 @@ const defaultDeps: ProcessorDependencies = {
     getEmbedding: defaultEmbed,
     searchQdrant: defaultSearch,
     acquireLock: defaultLock,
+    releaseLock: defaultRelease,
+    renewLock: defaultRenew,
     sendMessage: defaultSend,
     getChatHistory: defaultGetHistory,
     addChatMessage: defaultAddMsg,
@@ -77,7 +89,8 @@ export const processMessage = async (
     const lockKey = `professor:lock:${conversationId}:${hashStr}`;
     const lockValue = randomUUID();
 
-    const lockRes = await deps.acquireLock(lockKey, lockValue, 45000);
+    const lockTtlMs = config.LOCK_TTL_MS;
+    const lockRes = await deps.acquireLock(lockKey, lockValue, lockTtlMs);
 
     if (!lockRes.acquired) {
         logger('warn', `[Processor] Lock rejeitado`, { conversationId, lockKey });
@@ -90,6 +103,19 @@ export const processMessage = async (
             replyText: lockedMessage,
         };
     }
+
+    // Keep older injected dependency objects usable in tests and integrations.
+    // Production callers use the owner-aware default release client above.
+    const release = deps.releaseLock ?? (async () => ({ deleted: false }));
+    const renew = deps.renewLock;
+    const renewalTimer = renew
+        ? setInterval(() => {
+            renew(lockKey, lockValue, lockTtlMs).catch(() => {
+                logger('warn', '[Processor] Falha ao renovar lock', { conversationId, error: 'renew_failure' });
+            });
+        }, config.LOCK_RENEW_INTERVAL_MS)
+        : undefined;
+    renewalTimer?.unref?.();
 
     try {
         const preprocessorOutputRaw = await deps.chatCompletion(
@@ -111,15 +137,20 @@ export const processMessage = async (
         try {
             if (preprocessorOutputRaw) preprocessorData = JSON.parse(preprocessorOutputRaw);
         } catch (e) {
-            logger('error', '[Processor] Erro no parse do Preprocessor', { error: String(e) });
+            logger('error', '[Processor] Erro no parse do Preprocessor', { error: 'invalid_json' });
         }
 
         const embedding = await deps.getEmbedding(preprocessorData.input || originalQuestion);
-        const results = await deps.searchQdrant(embedding, 12);
+        const rawResults = input.retrievalContext
+            ? await deps.searchQdrant(embedding, 12, input.retrievalContext)
+            : await deps.searchQdrant(embedding, 12);
+        // Keep this check at the processor boundary as well as inside the
+        // default Qdrant adapter: injected adapters and future integrations
+        // must not be able to bypass tenant/collection validation.
+        const results = filterTrustedQdrantResults(rawResults, input.retrievalContext);
 
         logger('info', '[Processor] Qdrant search summary', {
             conversationId,
-            qdrantUrl: config.QDRANT_URL,
             qdrantCollection: (config as any).QDRANT_COLLECTION,
             qdrantScoreThreshold: (config as any).QDRANT_SCORE_THRESHOLD,
             hits: Array.isArray(results) ? results.length : -1,
@@ -127,37 +158,31 @@ export const processMessage = async (
             topPayloadKeys: Array.isArray(results) && results[0]?.payload ? Object.keys(results[0].payload) : null,
         });
 
-        const hasHits = Array.isArray(results) && results.length > 0;
-        const topScore = hasHits ? (results[0]?.score ?? 0) : 0;
-
-        const ctxText = results.map((r: any) => r?.payload?.text || '').join('\n\n');
-        const ctxNorm = ctxText.toLowerCase();
-
         const mustHave = (preprocessorData.must_include_terms || [])
             .map((t: string) => t.trim())
             .filter(Boolean);
 
-        let hitCount = 0;
-        for (const t of mustHave) {
-            if (ctxNorm.includes(t.toLowerCase())) hitCount++;
-        }
-        const mustCoverage = mustHave.length ? hitCount / mustHave.length : 0;
-
-        const approvedStrong = mustCoverage >= 0.125 || topScore >= 0.62;
-        const approvedSoft = hasHits && topScore >= 0.55;
-        const approved = approvedStrong || approvedSoft;
+        const gate = evaluateEvidence(results, mustHave, {
+            approvedScoreThreshold: config.EVIDENCE_APPROVED_SCORE_THRESHOLD,
+            weakScoreThreshold: config.EVIDENCE_WEAK_SCORE_THRESHOLD,
+            minMustCoverage: config.EVIDENCE_MIN_MUST_COVERAGE,
+            minApprovedHits: config.EVIDENCE_MIN_APPROVED_HITS,
+        });
+        const hasHits = gate.usableResults.length > 0;
+        const { topScore, mustCoverage } = gate;
 
         logger('info', `[Processor] Resultado do Gate`, {
-            approved,
-            approvedStrong,
-            approvedSoft,
+            status: gate.status,
+            reason: gate.reason,
             hasHits,
             topScore,
             mustCoverage,
         });
 
-        if (!hasHits) {
-            logger('warn', '[Processor] Sem evidências (hits=0). Acionando Fallback');
+        if (gate.status !== 'APPROVED_EVIDENCE') {
+            logger('warn', '[Processor] Evidência não aprovada. Acionando Fallback', {
+                status: gate.status,
+            });
 
             const fallbackOutput = await deps.chatCompletion(
                 config.MODEL_FALLBACK,
@@ -179,18 +204,46 @@ export const processMessage = async (
                 conversationId,
                 mode: 'fallback',
                 replyText: fallbackOutput || 'Não foi possível gerar resposta.',
-                metadata: { hits: 0, topScore },
+                metadata: {
+                    hits: gate.usableResults.length,
+                    topScore,
+                    evidenceStatus: gate.status,
+                },
             };
         }
 
-        preprocessorData._evidence_level = approvedStrong ? 'strong' : 'moderate';
+        preprocessorData._evidence_level = gate.status;
+
+        const plannerEvidenceInput = gate.usableResults.map((result) => {
+            const payload = result.payload || {};
+            const safePayload: Record<string, unknown> = {};
+            for (const key of [
+                'text',
+                'source',
+                'doc_key',
+                'filename',
+                'title',
+                'section',
+                'page_start',
+                'page_end',
+                'workspace_id',
+                'collection_id',
+            ]) {
+                const value = payload[key];
+                if (typeof value === 'string' || (typeof value === 'number' && Number.isFinite(value))) {
+                    safePayload[key] = value;
+                }
+            }
+            return { id: result.id, score: result.score, payload: safePayload };
+        });
 
         const plannerUser = PROMPTS.PLANNER
             .replace('{{QUESTION}}', preprocessorData.canonical_question_ptbr)
             .replace('{{PRIMARY_FOCUS}}', preprocessorData.primary_focus)
             .replace('{{INTENT}}', preprocessorData.intent || 'outros')
             .replace('{{EXPECTS_NUMERIC}}', String(preprocessorData.expects_numeric || false))
-            .replace('{{EVIDENCES}}', JSON.stringify(results, null, 2));
+            .replace('{{EVIDENCE_STATUS}}', gate.status)
+            .replace('{{EVIDENCES}}', JSON.stringify(plannerEvidenceInput, null, 2));
 
         const plannerOutputRaw = await deps.chatCompletion(
             config.MODEL_PLANNER,
@@ -202,16 +255,47 @@ export const processMessage = async (
             { type: 'json_object' }
         );
 
-        let planReal: any = {};
-        try {
-            if (plannerOutputRaw) planReal = JSON.parse(plannerOutputRaw);
-        } catch (e) {
-            logger('error', '[Processor] Erro no parse do Planner', { error: String(e) });
+        const parsedPlannerOutput = parsePlannerOutput(plannerOutputRaw);
+        const plannerData = parsedPlannerOutput ?? defaultPlannerOutput();
+        if (plannerOutputRaw && !parsedPlannerOutput) {
+            logger('error', '[Processor] Contrato do Planner rejeitado', { error: 'invalid_planner_contract' });
         }
 
-        const evidences = Array.isArray(planReal.resumo_evidencias)
-            ? planReal.resumo_evidencias
-            : [];
+        const plannerReferences = plannerData.resumo_evidencias;
+
+        const resultById = new Map(
+            gate.usableResults.map((result) => [String(result.id), result])
+        );
+
+        const resolvePlannerReference = (item: unknown): string | null => {
+            if (!item || typeof item !== 'object' || Array.isArray(item)) return null;
+
+            // Planner output is a reference list, never an evidence payload.
+            const referenceObject = item as Record<string, unknown>;
+            const keys = Object.keys(referenceObject);
+            if (keys.length !== 1 || keys[0] !== 'id') {
+                return null;
+            }
+            const reference = referenceObject.id;
+            if (typeof reference !== 'string' && typeof reference !== 'number') return null;
+            return String(reference);
+        };
+
+        let rejectedPlannerReferences = 0;
+        const selectedPlannerEvidence = plannerReferences
+            .map((item: any) => {
+                const reference = resolvePlannerReference(item);
+                const result = reference === null ? undefined : resultById.get(reference);
+                if (!result) rejectedPlannerReferences++;
+                return result;
+            })
+            .filter((result: any): result is any => Boolean(result));
+
+        if (rejectedPlannerReferences > 0) {
+            logger('warn', '[Processor] Referências do planner rejeitadas', {
+                rejectedPlannerReferences,
+            });
+        }
 
         const resolveSourceKey = (payload: any) => {
             const rawDocKey = String(payload?.doc_key || '').trim();
@@ -225,7 +309,7 @@ export const processMessage = async (
             return String(payload?.source || 'fonte_desconhecida');
         };
 
-        const rankedResults = results
+        const rankedResults = gate.usableResults
             .map((r: any) => {
                 const text = String(r?.payload?.text || '');
                 const textNorm = text.toLowerCase();
@@ -302,11 +386,10 @@ export const processMessage = async (
             return deduped;
         };
 
-        const plannerEvidence = dedupeEvidence(evidences);
         const fallbackEvidence = dedupeEvidence(rankedResults);
 
         const selectedEvidence = diversifyEvidence(
-            [...plannerEvidence, ...fallbackEvidence],
+            [...selectedPlannerEvidence, ...fallbackEvidence],
             6,
             2,
             3
@@ -335,13 +418,19 @@ export const processMessage = async (
         const ragContext = selectedEvidence.map(formatEvidence).join('\n\n---\n\n');
 
         const chatHistory = await deps.getChatHistory(conversationId);
+        const planForAgent = {
+            // The evidence gate is calculated by the service, not by the
+            // planner. Only finite enums cross into the final model prompt.
+            gate_mode: gate.status === 'APPROVED_EVIDENCE' ? 'approved' : 'fallback_general',
+            response_sections: plannerData.response_sections,
+        };
 
         const agentUser = PROMPTS.CLINICAL_AGENT_USER_PROMPT
             .replace('{{QUESTION}}', preprocessorData.canonical_question_ptbr)
             .replace('{{CHAT_HISTORY}}', chatHistory || 'Sem histórico recente.')
-            .replace('{{PLAN}}', JSON.stringify(planReal, null, 2))
+            .replace('{{PLAN}}', JSON.stringify(planForAgent, null, 2))
             .replace('{{RAG_CONTEXT}}', ragContext)
-            .replace('{{EVIDENCES_COUNT}}', String(results.length));
+            .replace('{{EVIDENCES_COUNT}}', String(gate.usableResults.length));
 
         const agentOutput = await deps.chatCompletion(
             config.MODEL_AGENT,
@@ -364,13 +453,15 @@ export const processMessage = async (
             mode: 'answer',
             replyText: agentOutput || 'Não foi possível gerar resposta.',
             metadata: {
-                hits: results.length,
+                hits: gate.usableResults.length,
                 topScore,
                 evidenceLevel: preprocessorData._evidence_level,
+                evidenceStatus: gate.status,
+                rejectedPlannerReferences,
             },
         };
     } catch (error) {
-        logger('error', '[Processor] Erro Crítico', { error: String(error) });
+        logger('error', '[Processor] Erro Crítico', { error: 'processor_failure' });
         const errMessage = '🚨 Erro interno. Tente novamente em breve.';
         await deps.sendMessage(chatId, errMessage);
         return {
@@ -378,9 +469,15 @@ export const processMessage = async (
             conversationId,
             mode: 'error',
             replyText: errMessage,
-            metadata: { error: String(error) },
+            metadata: { error: 'processor_failure' },
         };
     } finally {
+        if (renewalTimer) clearInterval(renewalTimer);
+        try {
+            await release(lockKey, lockValue);
+        } catch (error) {
+            logger('error', '[Processor] Falha ao liberar lock', { error: 'release_failure' });
+        }
         logger('info', `[Processor] Finalizado`, { durationMs: Date.now() - startTime });
     }
 };

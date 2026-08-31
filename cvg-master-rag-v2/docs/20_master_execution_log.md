@@ -5846,3 +5846,99 @@ Inspecionar documentos e chunks reais do corpus canônico, identificar achatamen
 
 ### STATUS
 COMPLETED
+
+---
+
+## ENTRY: PHASE 0.5 BASELINE CLOSURE
+
+### TIMESTAMP
+2026-08-31 03:20 UTC
+
+### ENGINE
+BUILD / RUNTIME_VALIDATION / AUDIT
+
+### PHASE
+PHASE_0.5
+
+### SPRINT
+BASELINE_CONTRACT_SECURITY_CLOSURE
+
+### TASK
+Fechar o runtime isolado e verificar contrato RAG, identidade, ACL,
+proveniência, uploads, locking, Professor, frontend e recuperação sem iniciar
+a Fase 1.
+
+### ACTION
+Fixar versões e portas isoladas, implementar IDs/payloads/escopo canônicos,
+aplicar autorização server-side, tornar Locker/Professor owner-safe, executar
+E2E/restart/fallback/idempotência, testes de segurança, smoke visual e
+benchmarks locais, e registrar os artefatos cross-system exigidos.
+
+### RESULT
+E2E local, locking black-box, Professor, frontend e checks focados passaram.
+O relatório `docs/progress/phase-0.5-report.md` registra o resultado como
+`INCOMPLETE — NOT PROMOTED` porque a suíte CVG completa ainda tem
+`357 passed, 22 failed, 15 skipped, 4 errors` por fixtures/corpus legados
+ausentes e porque o provider real não foi exercitado.
+
+### EVIDENCE
+
+- `docs/baselines/phase-0.5-characterization.json`
+- `docs/baselines/phase-0.5-performance.json`
+- `docs/architecture/contracts/rag-contract-v1.md`
+- `docs/architecture/security/identity-model.md`
+- `docs/architecture/security/permission-model.md`
+- `docs/architecture/security/collection-acl.md`
+- `docs/architecture/security/ui-access-matrix.md`
+- `docs/progress/phase-0.5-report.md`
+- `.agent/gates/phase-0.5-implementation-ready.json`
+
+### STATUS
+IN_PROGRESS — aguardando revisão independente e decisão final sem promoção
+implícita para Phase 1.
+
+---
+
+## ENTRY: PHASE 0.5 FINAL GAUNTLET DECISION
+
+### TIMESTAMP
+2026-08-31 04:07 UTC
+
+### ENGINE
+AUDIT / REVIEW / RUNTIME_VALIDATION
+
+### PHASE
+PHASE_0.5
+
+### TASK
+Consolidar a crítica independente, corrigir o maior gap material e decidir o
+gate VERIFIED sem iniciar a Phase 1.
+
+### ACTION
+Reexecutar o recorte focado, a suíte CVG completa, Professor, Locker, frontend,
+E2E/restart/fallback e performance; registrar a crítica independente; remover o
+erro bruto do preflight Qdrant dos detalhes operacionais; e atualizar os
+artefatos append-only.
+
+### RESULT
+O recorte focado passou `40` testes; Professor passou `23/23`, Locker `2/2`,
+frontend smoke `7/7`, E2E/restart/fallback PASS. A suíte CVG completa terminou
+com `364 passed, 19 failed, 14 skipped, 6 errors`. A revisão independente não
+encontrou P0/HIGH nos seis caminhos técnicos corrigidos, mas manteve riscos
+MEDIUM de provider/corpus, autenticação de deployment do Locker e compatibilidade
+Bearer não-browser.
+
+### DECISION
+`GATE-PH05-VERIFIED-002` permanece `BLOCKED`; resultado
+`INCOMPLETE — NOT PROMOTED`. Phase 0 continua `PARTIAL — NOT PROMOTED`, não há
+publicação Git e Phase 1 permanece fora do escopo.
+
+### EVIDENCE
+
+- `.agent/gates/phase-0.5-verified-blocked-final.json`
+- `docs/progress/phase-0.5-independent-review.md`
+- `docs/progress/phase-0.5-report.md`
+- `.agent/verification.jsonl#VER-PH05-FINAL-CURRENT`
+
+### STATUS
+BLOCKED — revalidar após resolver os gaps explícitos e repetir os checks afetados.

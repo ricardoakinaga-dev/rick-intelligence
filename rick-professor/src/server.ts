@@ -4,7 +4,7 @@ import formbody from '@fastify/formbody';
 import { config } from './config';
 import webhookRoutes from './routes/webhook';
 import openAiRoutes from './routes/openai';
-import { redis } from './lib/redis';
+import { closeRedis } from './lib/redis';
 import { checkQdrantHealth } from './lib/qdrant';
 
 const server = Fastify({
@@ -34,10 +34,8 @@ const gracefulShutdown = async (signal: string) => {
 
     try {
         await server.close();
-        if (redis) {
-            await redis.quit();
-            server.log.info('Conexão Redis encerrada.');
-        }
+        await closeRedis();
+        server.log.info('Conexão Redis encerrada.');
         server.log.info('Processo finalizado com sucesso.');
         process.exit(0);
     } catch (err) {

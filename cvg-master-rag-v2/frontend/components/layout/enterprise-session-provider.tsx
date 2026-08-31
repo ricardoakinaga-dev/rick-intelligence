@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { api, setApiSessionToken } from "@/lib/api";
+import { api } from "@/lib/api";
 import type {
   EnterpriseSession,
   LoginRequest,
@@ -21,39 +21,15 @@ const ANONYMOUS_USER: EnterpriseSession["user"] = {
 };
 
 const EMPTY_TENANT: EnterpriseSession["active_tenant"] = {
-  tenant_id: "default",
-  name: "Workspace Principal",
-  workspace_id: "default",
-  plan: "enterprise",
-  status: "active",
+  tenant_id: "",
+  name: "Nenhum tenant selecionado",
+  workspace_id: "",
+  plan: "starter",
+  status: "suspended",
   operational_retention_mode: "keep_latest",
   operational_retention_hours: 24,
   document_count: 0,
 };
-
-const LOCAL_TENANTS: EnterpriseSession["available_tenants"] = [
-  EMPTY_TENANT,
-  {
-    tenant_id: "acme-lab",
-    name: "Acme Lab",
-    workspace_id: "acme-lab",
-    plan: "business",
-    status: "active",
-    operational_retention_mode: "keep_latest",
-    operational_retention_hours: 24,
-    document_count: 0,
-  },
-  {
-    tenant_id: "northwind",
-    name: "Northwind Pilot",
-    workspace_id: "northwind",
-    plan: "starter",
-    status: "active",
-    operational_retention_mode: "keep_latest",
-    operational_retention_hours: 24,
-    document_count: 0,
-  },
-];
 
 function isExpired(expiresAt?: string | null) {
   if (!expiresAt) return false;
@@ -61,15 +37,15 @@ function isExpired(expiresAt?: string | null) {
   return Number.isFinite(parsed) && parsed <= Date.now();
 }
 
-function asAnonymousSession(source: EnterpriseSession | null): EnterpriseSession {
+function asAnonymousSession(_source: EnterpriseSession | null): EnterpriseSession {
   return {
     authenticated: false,
     session_state: "anonymous",
     expires_at: null,
     session_token: null,
     user: ANONYMOUS_USER,
-    active_tenant: source?.active_tenant ?? EMPTY_TENANT,
-    available_tenants: source?.available_tenants ?? LOCAL_TENANTS,
+    active_tenant: EMPTY_TENANT,
+    available_tenants: [],
     message: "Sessão expirada. Faça login para continuar.",
   };
 }
@@ -117,12 +93,10 @@ export function EnterpriseSessionProvider({ children }: { children: ReactNode })
       .then((response) => {
         if (!active || bootstrapRequestRef.current !== requestId) return;
         const normalized = normalizeSession(response);
-        setApiSessionToken(normalized.authenticated ? normalized.session_token : null);
         setSession(normalized);
       })
       .catch(() => {
         if (!active || bootstrapRequestRef.current !== requestId) return;
-        setApiSessionToken(null);
         setSession(asAnonymousSession(null));
       })
       .finally(() => {
@@ -142,7 +116,6 @@ export function EnterpriseSessionProvider({ children }: { children: ReactNode })
         bootstrapRequestRef.current += 1;
         const response = await api.session.login(request);
         const normalized = normalizeSession(response);
-        setApiSessionToken(normalized.authenticated ? normalized.session_token : null);
         setSession(normalized);
         return normalized;
       },
@@ -153,14 +126,12 @@ export function EnterpriseSessionProvider({ children }: { children: ReactNode })
         } catch {
           // Best effort only.
         }
-        setApiSessionToken(null);
         setSession((current) => asAnonymousSession(current));
       },
       switchTenant: async (tenantId: string) => {
         bootstrapRequestRef.current += 1;
         const response = await api.session.switchTenant(tenantId);
         const normalized = normalizeSession(response);
-        setApiSessionToken(normalized.authenticated ? normalized.session_token : null);
         setSession(normalized);
       },
       requestRecovery: async (request: RecoveryRequest) => {
@@ -173,7 +144,6 @@ export function EnterpriseSessionProvider({ children }: { children: ReactNode })
       },
       changePassword: async (request: PasswordChangeRequest) => {
         const response = await api.session.changePassword(request);
-        setApiSessionToken(null);
         setSession((current) => asAnonymousSession(current));
         return response.message;
       },
@@ -189,7 +159,6 @@ export function EnterpriseSessionProvider({ children }: { children: ReactNode })
         bootstrapRequestRef.current += 1;
         const response = await api.session.current();
         const normalized = normalizeSession(response);
-        setApiSessionToken(normalized.authenticated ? normalized.session_token : null);
         setSession(normalized);
       },
     };

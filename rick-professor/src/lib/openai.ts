@@ -21,12 +21,12 @@ async function withRetry<T>(fn: () => Promise<T>, operationName: string): Promis
             const isServerError = error?.status >= 500;
 
             if (!isRateLimit && !isServerError) {
-                console.error(`[OpenAI] Fatal error in ${operationName}:`, error);
+                console.error(`[OpenAI] Fatal error in ${operationName}`);
                 return null; // Don't retry client errors
             }
 
             if (attempt >= MAX_RETRIES) {
-                console.error(`[OpenAI] Max retries reached for ${operationName}:`, error);
+                console.error(`[OpenAI] Max retries reached for ${operationName}`);
                 return null;
             }
 

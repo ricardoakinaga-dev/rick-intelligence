@@ -4,6 +4,7 @@ Enterprise session and tenancy contracts for the Phase 3 foundation.
 from __future__ import annotations
 
 import hashlib
+import hmac
 import secrets
 from datetime import datetime, timedelta, timezone
 
@@ -20,6 +21,7 @@ from services.admin_service import (
     user_has_permission,
     verify_password,
 )
+from services.authorization import allowed_collection_ids_for_user, canonical_role
 from services.enterprise_store import (
     load_recovery_state,
     load_session_state,
@@ -63,6 +65,20 @@ def _default_tenant() -> dict:
     }
 
 
+def _anonymous_tenant() -> dict:
+    """Neutral tenant placeholder used before authentication."""
+    return {
+        "tenant_id": "",
+        "name": "Nenhum tenant selecionado",
+        "workspace_id": "",
+        "plan": "starter",
+        "status": "suspended",
+        "document_count": 0,
+        "operational_retention_mode": "keep_latest",
+        "operational_retention_hours": 24,
+    }
+
+
 def _active_tenant_for_user(user: dict, tenant_id: str | None = None) -> dict:
     accessible = get_accessible_tenants(user)
     if not accessible:
@@ -89,6 +105,8 @@ def _build_authenticated_session(user: dict, tenant_id: str, session_token: str,
             "email": user["email"],
             "role": normalized_role,
             "permissions": permissions,
+            "canonical_role": canonical_role(normalized_role),
+            "authorized_collection_ids": allowed_collection_ids_for_user(user),
         },
         "active_tenant": active_tenant,
         "available_tenants": get_accessible_tenants(user),
@@ -97,7 +115,7 @@ def _build_authenticated_session(user: dict, tenant_id: str, session_token: str,
 
 
 def bootstrap_session() -> dict:
-    tenant = _default_tenant()
+    tenant = _anonymous_tenant()
     return {
         "authenticated": False,
         "session_state": "anonymous",
@@ -109,9 +127,13 @@ def bootstrap_session() -> dict:
             "email": "",
             "role": "viewer",
             "permissions": [],
+            "canonical_role": "VETERINARIAN",
+            "authorized_collection_ids": [],
         },
         "active_tenant": tenant,
-        "available_tenants": list_tenants(),
+        # Anonymous bootstrap must not enumerate tenant names or document
+        # counts from the control-plane registry.
+        "available_tenants": [],
         "message": "Sessão enterprise pronta para login.",
     }
 
@@ -122,6 +144,25 @@ def _load_sessions() -> dict[str, dict]:
 
 def _save_sessions(sessions: dict[str, dict]) -> None:
     save_session_state({"sessions": sessions})
+
+
+def session_identifier(session_token: str) -> str:
+    """Return a non-bearer identifier suitable for session administration UI."""
+    return hashlib.sha256(f"cvg-session:{session_token}".encode("utf-8")).hexdigest()
+
+
+def session_token_for_identifier(identifier: str | None) -> str | None:
+    """Resolve an opaque session identifier server-side without exposing tokens."""
+    if not isinstance(identifier, str) or len(identifier) != 64:
+        return None
+    sessions = _load_sessions()
+    for token, record in sessions.items():
+        if not isinstance(record, dict):
+            continue
+        stored_token = record.get("session_token") or token
+        if hmac.compare_digest(session_identifier(stored_token), identifier):
+            return token
+    return None
 
 
 def _load_recovery_requests() -> list[dict]:
@@ -222,6 +263,8 @@ def _persist_session(user: dict, tenant_id: str, *, ip: str | None = None, user_
             "user_agent": user_agent,
             "role_snapshot": normalized_role,
             "permissions_snapshot": permissions,
+            "canonical_role_snapshot": canonical_role(normalized_role),
+            "authorized_collection_ids_snapshot": allowed_collection_ids_for_user(user),
         }
         state["sessions"] = sessions
         return state
@@ -349,6 +392,8 @@ def get_session(session_token: str | None) -> dict:
         record["expires_at"] = _to_iso(_utc_now() + timedelta(hours=SESSION_TTL_HOURS))
         record["role_snapshot"] = normalize_role(user.get("role"))
         record["permissions_snapshot"] = resolve_permissions_for_role(user.get("role"), user.get("permission_overrides"))
+        record["canonical_role_snapshot"] = canonical_role(user.get("role"))
+        record["authorized_collection_ids_snapshot"] = allowed_collection_ids_for_user(user)
         sessions[session_token] = record
         outcome["payload"] = _build_authenticated_session(user, tenant_id, session_token, record["expires_at"])
         return state
@@ -375,6 +420,9 @@ def login(
     if user.get("status") != "active":
         _record_rate_limit_attempt("login", rate_limit_key)
         raise ValueError("inactive_user")
+    if user.get("must_change_password"):
+        _record_rate_limit_attempt("login", rate_limit_key)
+        raise ValueError("password_change_required")
     if not verify_password(user, password):
         _record_rate_limit_attempt("login", rate_limit_key)
         raise ValueError("invalid_credentials")
@@ -419,6 +467,8 @@ def switch_tenant(session_token: str | None, tenant_id: str) -> dict:
         record["expires_at"] = _to_iso(_utc_now() + timedelta(hours=SESSION_TTL_HOURS))
         record["role_snapshot"] = normalize_role(user.get("role"))
         record["permissions_snapshot"] = resolve_permissions_for_role(user.get("role"), user.get("permission_overrides"))
+        record["canonical_role_snapshot"] = canonical_role(user.get("role"))
+        record["authorized_collection_ids_snapshot"] = allowed_collection_ids_for_user(user)
         sessions[session_token] = record
         outcome["payload"] = _build_authenticated_session(user, tenant_id, session_token, record["expires_at"])
         return state
@@ -562,7 +612,12 @@ def list_sessions_for_user(user_id: str, *, current_session_token: str | None = 
             permissions = resolve_permissions_for_role(target_user.get("role"), target_user.get("permission_overrides"))
         items.append(
             {
-                "session_token": record.get("session_token"),
+                # A session listing must never turn a bearer into an
+                # administrative data field. The revoke endpoint resolves the
+                # opaque identifier below server-side; the login response and
+                # active cookie remain the only compatibility token surfaces.
+                "session_token": None,
+                "session_id": session_identifier(record.get("session_token") or ""),
                 "user_id": user_id,
                 "tenant_id": record.get("tenant_id") or "default",
                 "role": role,
@@ -598,6 +653,14 @@ def revoke_session(session_token: str, *, reason: str = "manual_revoke") -> int:
 
     update_session_state(mutate)
     return outcome["revoked"]
+
+
+def session_owner(session_token: str | None) -> str | None:
+    """Return a session owner without exposing the bearer token."""
+    if not session_token:
+        return None
+    record = _load_sessions().get(session_token)
+    return record.get("user_id") if isinstance(record, dict) else None
 
 
 def revoke_user_sessions(user_id: str, *, reason: str = "manual_revoke", exclude_session_token: str | None = None) -> int:

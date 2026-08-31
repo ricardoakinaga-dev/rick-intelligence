@@ -12,6 +12,7 @@ if str(SRC_DIR) not in sys.path:
 from api.main import app, admin_create_tenant
 from models.schemas import EnterpriseSession, EnterpriseTenantCreate, LoginRequest
 from services.admin_service import reset_admin_state
+from services.enterprise_service import SESSION_COOKIE_NAME
 from telemetry.tracing import init_tracing
 
 
@@ -31,7 +32,10 @@ def enterprise_headers(
         json={"email": email, "password": "demo1234", "tenant_id": tenant_id},
     )
     assert response.status_code == 200, response.text
-    return {"Authorization": f"Bearer {response.json()['session_token']}"}
+    token = response.cookies.get(SESSION_COOKIE_NAME)
+    assert token
+    assert response.json()["session_token"] is None
+    return {"Authorization": f"Bearer {token}"}
 
 
 @pytest.fixture(autouse=True)
@@ -219,7 +223,7 @@ def test_admin_password_reset_token_can_rotate_credentials_and_revoke_old_sessio
     assert refreshed["authenticated"] is True
 
 
-def test_admin_rag_has_runtime_permission_without_user_governance():
+def test_admin_rag_has_observability_without_runtime_or_user_governance():
     from api.main import _require_permission
     from fastapi import HTTPException
     from models.schemas import EnterpriseSession
@@ -228,7 +232,12 @@ def test_admin_rag_has_runtime_permission_without_user_governance():
     payload = login(email="adminrag@demo.local", password="demo1234", tenant_id="default")
     session = EnterpriseSession(**payload)
 
-    assert _require_permission(session, "runtime.manage", workspace_id="default").user.role == "admin_rag"
+    assert _require_permission(session, "observability.read", workspace_id="default").user.role == "admin_rag"
 
-    with pytest.raises(HTTPException):
+    with pytest.raises(HTTPException) as runtime_error:
+        _require_permission(session, "runtime.manage", workspace_id="default")
+    assert runtime_error.value.status_code == 403
+
+    with pytest.raises(HTTPException) as governance_error:
         _require_permission(session, "users.manage", workspace_id="default")
+    assert governance_error.value.status_code == 403

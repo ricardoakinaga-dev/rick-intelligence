@@ -10,6 +10,7 @@ from typing import Optional
 
 from core.config import DOCUMENTS_DIR, EMBEDDING_MODEL
 from scripts.corpus_utils import canonical_document_ids
+from services.rag_contract import CANONICAL_COLLECTION_ID, normalize_collection_id
 
 
 def _clean_source_title(filename: str) -> str:
@@ -93,6 +94,18 @@ def _load_workspace_items(workspace_id: str = "default") -> list[dict]:
             or _extract_publication_year(metadata, filename, first_chunk_text)
         )
         ingestion_status = metadata.get("ingestion_status")
+        raw_collection_id = (
+            raw_data.get("collection_id")
+            or metadata.get("collection_id")
+            or metadata.get("qdrant_collection")
+            or CANONICAL_COLLECTION_ID
+        )
+        try:
+            collection_id = normalize_collection_id(raw_collection_id)
+        except ValueError:
+            collection_id = CANONICAL_COLLECTION_ID
+        checksum = raw_data.get("checksum") or metadata.get("checksum")
+        document_version = raw_data.get("document_version") or metadata.get("document_version")
         indexed_at = None
         if chunks and ingestion_status != "partial":
             indexed_at = max(
@@ -124,6 +137,9 @@ def _load_workspace_items(workspace_id: str = "default") -> list[dict]:
                 "tags": tags if isinstance(tags, list) else [],
                 "embeddings_model": EMBEDDING_MODEL,
                 "qdrant_collection": metadata.get("qdrant_collection"),
+                "collection_id": collection_id,
+                "document_version": document_version,
+                "checksum": checksum,
                 "indexed_at": indexed_at,
             }
         )

@@ -11,7 +11,6 @@ function LoginContent() {
   const router = useRouter();
   const { pushToast } = useToast();
   const { session, signIn } = useEnterpriseSession();
-  const tenants = session?.available_tenants ?? [];
   const [role, setRole] = useState<"super_admin" | "admin_rag" | "auditor" | "operator" | "viewer">("super_admin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -118,22 +117,14 @@ function LoginContent() {
 
               <label className="ui-label">
                 Tenant
-                <Select
+                <Input
                   value={tenantId}
                   onChange={(event) => setTenantId(event.target.value)}
-                  disabled={!tenants.length}
+                  placeholder="Digite o tenant autorizado"
                   autoComplete="off"
-                >
-                  {tenants.length ? (
-                    tenants.map((tenant) => (
-                      <option key={tenant.tenant_id} value={tenant.tenant_id}>
-                        {tenant.name} · {tenant.workspace_id}
-                      </option>
-                    ))
-                  ) : (
-                    <option value={tenantId}>Carregando tenants...</option>
-                  )}
-                </Select>
+                  autoCapitalize="none"
+                  spellCheck={false}
+                />
               </label>
             </div>
 

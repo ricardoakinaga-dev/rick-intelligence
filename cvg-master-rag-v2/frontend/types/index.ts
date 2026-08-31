@@ -409,7 +409,8 @@ export type PasswordResetConfirmRequest = {
 };
 
 export type UserSessionRecord = {
-  session_token: string;
+  session_token?: null;
+  session_id: string;
   user_id: string;
   tenant_id: string;
   role: EnterpriseRole;
@@ -431,6 +432,7 @@ export type UserSessionListResponse = {
 
 export type SessionRevokeRequest = {
   session_token?: string;
+  session_id?: string;
   user_id?: string;
   revoke_all?: boolean;
   reason?: string;
@@ -694,7 +696,8 @@ export type EnterpriseSession = {
   authenticated: boolean;
   session_state: "active" | "expired" | "anonymous";
   expires_at?: string | null;
-  session_token?: string | null;
+  /** Browser responses never contain the server-side bearer; it is HttpOnly. */
+  session_token?: null;
   user: EnterpriseUser;
   active_tenant: EnterpriseTenant;
   available_tenants: EnterpriseTenant[];

@@ -3,7 +3,17 @@ from typing import Optional, Literal
 from datetime import datetime
 from uuid import uuid4
 
-EnterpriseRole = Literal["super_admin", "admin_rag", "auditor", "operator", "viewer", "admin"]
+EnterpriseRole = Literal[
+    "PLATFORM_ADMIN",
+    "KNOWLEDGE_MANAGER",
+    "VETERINARIAN",
+    "super_admin",
+    "admin_rag",
+    "auditor",
+    "operator",
+    "viewer",
+    "admin",
+]
 
 
 # ─── Document ───────────────────────────────────────────────
@@ -82,6 +92,9 @@ class DocumentMetadata(BaseModel):
     embeddings_model: Optional[str] = None
     qdrant_collection: Optional[str] = None
     indexed_at: Optional[str] = None
+    collection_id: str = "rag_phase0"
+    document_version: Optional[str] = None
+    checksum: Optional[str] = None
 
 
 class DocumentListItem(DocumentMetadata):
@@ -121,6 +134,8 @@ class EnterpriseUser(BaseModel):
     email: str
     role: EnterpriseRole
     permissions: list[str] = Field(default_factory=list)
+    canonical_role: Optional[Literal["PLATFORM_ADMIN", "KNOWLEDGE_MANAGER", "VETERINARIAN"]] = None
+    authorized_collection_ids: list[str] = Field(default_factory=list)
 
 
 class EnterpriseSession(BaseModel):
@@ -132,6 +147,15 @@ class EnterpriseSession(BaseModel):
     active_tenant: EnterpriseTenant
     available_tenants: list[EnterpriseTenant] = Field(default_factory=list)
     message: Optional[str] = None
+
+
+class RetrievalContext(BaseModel):
+    """Server-created authorization context passed into every retrieval."""
+
+    user_id: str = "system"
+    workspace_id: str
+    allowed_collection_ids: list[str] = Field(default_factory=list)
+    permissions: list[str] = Field(default_factory=list)
 
 
 class LoginRequest(BaseModel):
@@ -180,7 +204,8 @@ class PasswordResetAdminRequest(BaseModel):
 
 
 class UserSessionRecord(BaseModel):
-    session_token: str
+    session_token: Optional[str] = None
+    session_id: str
     user_id: str
     tenant_id: str
     role: EnterpriseRole
@@ -202,6 +227,7 @@ class UserSessionListResponse(BaseModel):
 
 class SessionRevokeRequest(BaseModel):
     session_token: Optional[str] = None
+    session_id: Optional[str] = None
     user_id: Optional[str] = None
     revoke_all: bool = False
     reason: Optional[str] = None
@@ -435,6 +461,8 @@ class EnterpriseUserRecord(BaseModel):
     status: Literal["active", "invited", "disabled"] = "active"
     permissions: list[str] = Field(default_factory=list)
     must_change_password: bool = False
+    canonical_role: Optional[Literal["PLATFORM_ADMIN", "KNOWLEDGE_MANAGER", "VETERINARIAN"]] = None
+    authorized_collection_ids: list[str] = Field(default_factory=list)
 
 
 class EnterpriseUserCreate(BaseModel):
@@ -445,6 +473,7 @@ class EnterpriseUserCreate(BaseModel):
     role: EnterpriseRole = "viewer"
     tenant_id: str = "default"
     status: Literal["active", "invited", "disabled"] = "invited"
+    authorized_collection_ids: list[str] = Field(default_factory=list)
 
 
 class EnterpriseUserUpdate(BaseModel):
@@ -457,6 +486,7 @@ class EnterpriseUserUpdate(BaseModel):
     approve_sensitive_change: Optional[bool] = None
     approval_ticket: Optional[str] = None
     must_change_password: Optional[bool] = None
+    authorized_collection_ids: Optional[list[str]] = None
 
 
 class NormalizedDocument(BaseModel):
@@ -471,6 +501,9 @@ class NormalizedDocument(BaseModel):
     sections: list[dict] = Field(default_factory=list)
     metadata: dict = Field(default_factory=dict)
     raw_json_path: str = ""
+    document_version: Optional[str] = None
+    checksum: Optional[str] = None
+    collection_id: str = "rag_phase0"
 
 
 # ─── Chunk ───────────────────────────────────────────────────
@@ -488,6 +521,18 @@ class Chunk(BaseModel):
     strategy: str = "recursive"
     chunk_size_chars: int = 0
     created_at: str
+    parent_chunk_id: Optional[str] = None
+    source: Optional[str] = None
+    title: Optional[str] = None
+    page_start: Optional[int] = None
+    page_end: Optional[int] = None
+    section: Optional[str] = None
+    checksum: Optional[str] = None
+    parser_version: str = "document-parser-v1"
+    chunker_version: str = "chunker-v1"
+    embedding_model: Optional[str] = None
+    embedding_version: str = "embedding-v1"
+    metadata: dict = Field(default_factory=dict)
 
 
 # ─── Retrieval ───────────────────────────────────────────────
@@ -518,6 +563,7 @@ class SearchRequest(BaseModel):
     # None = use global QUERY_EXPANSION_ENABLED config
     query_expansion_mode: Optional[Literal["off", "always", "adaptive"]] = None
     retrieval_profile: Optional[RetrievalProfile] = None
+    collection_id: Optional[str] = None
 
 
 class SearchResultItem(BaseModel):
@@ -536,6 +582,9 @@ class SearchResultItem(BaseModel):
     clinical_categories: list[str] = Field(default_factory=list)
     primary_clinical_category: Optional[str] = None
     clinical_category_matches: dict = Field(default_factory=dict)
+    collection_id: Optional[str] = None
+    section: Optional[str] = None
+    checksum: Optional[str] = None
 
 
 class SearchResponse(BaseModel):
@@ -576,6 +625,7 @@ class QueryRequest(BaseModel):
     query_expansion_mode: Optional[Literal["off", "always", "adaptive"]] = None
     query_expansion: Optional[bool] = None  # Deprecated: use query_expansion_mode instead
     retrieval_profile: Optional[RetrievalProfile] = None
+    collection_id: Optional[str] = None
 
 
 class GroundingReport(BaseModel):
@@ -595,6 +645,8 @@ class Citation(BaseModel):
     score: float
     section: Optional[str] = None
     sections: list[str] = Field(default_factory=list)
+    collection_id: Optional[str] = None
+    checksum: Optional[str] = None
 
 
 ClinicalSectionKey = Literal[
@@ -726,6 +778,7 @@ class ExternalChatRequest(BaseModel):
     workspace_id: str = "default"
     top_k: int = Field(default=8, ge=1, le=20)
     threshold: float = Field(default=0.25, ge=0.0, le=1.0)
+    collection_id: Optional[str] = None
 
 
 class ExternalChatResponse(BaseModel):

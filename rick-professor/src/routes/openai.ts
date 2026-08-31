@@ -4,9 +4,11 @@ import { processMessage } from '../core/processor';
 import { config } from '../config';
 import { chatCompletion, getEmbedding } from '../lib/openai';
 import { searchQdrant } from '../lib/qdrant';
-import { acquireLock } from '../lib/redis-lock';
+import { QdrantSearchOptions } from '../lib/qdrant';
+import { acquireLock, releaseLock } from '../lib/redis-lock';
 import { getChatHistory, addChatMessage } from '../lib/memory';
 import { log } from '../lib/logging';
+import { timingSafeEqual } from 'crypto';
 
 const ChatMessageSchema = z.object({
     role: z.enum(['system', 'user', 'assistant']).catch('user'),
@@ -51,10 +53,28 @@ function buildPrompt(messages: Array<{ role: string; content?: unknown }>): stri
     return `INSTRUÇÕES DE CONTEXTO:\n${systemParts.join('\n\n')}\n\nCONVERSA:\n${userParts.join('\n\n')}`;
 }
 
+export function isApiKeyAuthorized(authHeader: string | undefined, expectedApiKey: string | undefined): boolean {
+    // No implicit development bypass: a missing configured key is always deny.
+    if (!expectedApiKey || !authHeader || !authHeader.startsWith('Bearer ')) return false;
+
+    const presented = Buffer.from(authHeader.slice('Bearer '.length), 'utf8');
+    const expected = Buffer.from(expectedApiKey, 'utf8');
+    return presented.length === expected.length && timingSafeEqual(presented, expected);
+}
+
 function authOk(authHeader?: string): boolean {
-    if (!config.API_KEY) return true;
-    if (!authHeader) return false;
-    return authHeader === `Bearer ${config.API_KEY}`;
+    return isApiKeyAuthorized(authHeader, config.API_KEY);
+}
+
+function trustedRetrievalContext(): QdrantSearchOptions {
+    const rawAllowed = config.QDRANT_ALLOWED_COLLECTION_IDS
+        .split(',')
+        .map((value) => value.trim())
+        .filter(Boolean);
+    return {
+        workspaceId: config.QDRANT_WORKSPACE_ID,
+        allowedCollectionIds: rawAllowed.length > 0 ? rawAllowed : ['rag_phase0'],
+    };
 }
 
 export default async function openAiRoutes(fastify: FastifyInstance) {
@@ -97,12 +117,14 @@ export default async function openAiRoutes(fastify: FastifyInstance) {
                 text: prompt,
                 chatId: conversationId,
                 raw: body,
+                retrievalContext: trustedRetrievalContext(),
             },
             {
                 chatCompletion,
                 getEmbedding,
                 searchQdrant,
                 acquireLock,
+                releaseLock,
                 sendMessage: async (_chatId: string, message: string) => {
                     captured.push(message);
                 },

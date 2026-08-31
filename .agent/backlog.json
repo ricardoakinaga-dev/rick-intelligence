@@ -68,6 +68,116 @@
         ".agent/verification.jsonl#VER-PH0-REPORT-REVIEW"
       ],
       "next_action": "Await human acceptance of the partial/non-promoted report and resolution of its open environment gates; do not start Phase 1."
+    },
+    {
+      "id": "PH05-ENV",
+      "title": "Provision and characterize the reproducible Phase 0.5 runtime baseline",
+      "stage": "BUILD",
+      "priority": "P0",
+      "status": "DONE",
+      "origin": "User Phase 0.5 runtime baseline and control task requirements",
+      "dependencies": [],
+      "owner": "Codex lead",
+      "acceptance_summary": "Pinned Python/uv/Qdrant/Redis/Node/npm versions, isolated services, repaired frontend lockfile, reproducible commands, and honest A–O status evidence are captured without host-state mutation.",
+      "evidence_refs": [
+        ".agent/plans/phase-0.5-baseline-closure.md",
+        ".gauntlet/state.md",
+        "docs/baselines/phase-0.5-characterization.json",
+        "docs/baselines/phase-0.5-performance.json",
+        ".agent/verification.jsonl#VER-PH05-ENV-CURRENT"
+      ],
+      "next_action": "Capture the versioned environment artifact and run the isolated CVG, Professor, Locker, frontend, and Qdrant checks; mark unavailable provider paths explicitly."
+    },
+    {
+      "id": "PH05-RAG-CONTRACT",
+      "title": "Freeze and implement the canonical versioned RAG contract",
+      "stage": "BUILD",
+      "priority": "P0",
+      "status": "DONE",
+      "origin": "User Phase 0.5 canonical RAG contract requirements",
+      "dependencies": ["PH05-ENV"],
+      "owner": "Codex lead",
+      "acceptance_summary": "Canonical collection resolution, named vectors, complete payload, deterministic IDs, RetrievalContext, compatibility adapters, schema fixtures, and idempotent document identity are implemented and tested.",
+      "evidence_refs": ["docs/architecture/contracts/rag-contract-v1.md", "scripts/phase05/phase05_e2e.py", ".agent/verification.jsonl#VER-PH05-RAG-CURRENT"],
+      "next_action": "Add the contract document and focused model/vector/ingestion tests after the runtime baseline is recorded."
+    },
+    {
+      "id": "PH05-LOCK",
+      "title": "Make distributed Redis locking owner-safe and failure-clean",
+      "stage": "BUILD",
+      "priority": "P0",
+      "status": "DONE",
+      "origin": "User Phase 0.5 Redis lock ownership and cleanup requirements",
+      "dependencies": ["PH05-ENV"],
+      "owner": "Codex lead",
+      "acceptance_summary": "Acquire, owner-bound compare-delete unlock, optional renewal, expiry, contention, wrong-owner, and Professor finally-release behavior are proven with isolated Redis evidence.",
+      "evidence_refs": ["docs/progress/phase-0.5-report.md", "scripts/phase05/locker_e2e.mjs", ".agent/verification.jsonl#VER-PH05-LOCK-CURRENT"],
+      "next_action": "Implement the Locker contract and Professor release path once the canonical context interface is stable."
+    },
+    {
+      "id": "PH05-EVIDENCE",
+      "title": "Close Professor evidence-gate and citation integrity defects",
+      "stage": "BUILD",
+      "priority": "P0",
+      "status": "DONE",
+      "origin": "User Phase 0.5 evidence and provenance requirements",
+      "dependencies": ["PH05-RAG-CONTRACT"],
+      "owner": "Codex lead",
+      "acceptance_summary": "No/weak/approved evidence states are explicit; weak single hits fall back; planner IDs are validated against authorized retrieved chunks; fabricated, wrong, inaccessible, and nonretrieved citations are rejected.",
+      "evidence_refs": ["docs/architecture/contracts/rag-contract-v1.md", "rick-professor/src/core/evidence.ts", ".agent/verification.jsonl#VER-PH05-EVIDENCE-CURRENT"],
+      "next_action": "Add the evidence resolver and negative tests in Professor after RetrievalContext is available."
+    },
+    {
+      "id": "PH05-UPLOAD",
+      "title": "Harden upload paths, filenames, collisions, and diagnostic hygiene",
+      "stage": "BUILD",
+      "priority": "P0",
+      "status": "DONE",
+      "origin": "User Phase 0.5 upload and secret/log hygiene requirements",
+      "dependencies": ["PH05-RAG-CONTRACT"],
+      "owner": "Codex lead",
+      "acceptance_summary": "Traversal, absolute paths, NULs, unsupported extensions, size limits, and collisions are handled safely; storage names are generated; logs and errors do not expose secrets or raw connection URLs.",
+      "evidence_refs": ["docs/progress/phase-0.5-report.md", "cvg-master-rag-v2/src/services/upload_security.py", ".agent/verification.jsonl#VER-PH05-UPLOAD-CURRENT"],
+      "next_action": "Implement safe filename/storage helpers and focused API tests."
+    },
+    {
+      "id": "PH05-IDENTITY",
+      "title": "Implement canonical identity, RBAC, session lifecycle, and audit events",
+      "stage": "BUILD",
+      "priority": "P0",
+      "status": "DONE",
+      "origin": "User Phase 0.5 identity and role model requirements",
+      "dependencies": ["PH05-RAG-CONTRACT"],
+      "owner": "Codex lead",
+      "acceptance_summary": "Canonical roles and permissions with legacy aliases, strong password hashing, disabled/logout/session invalidation, rate limits, generic failures, explicit route authorization, and audit events are implemented.",
+      "evidence_refs": ["docs/architecture/security/identity-model.md", "docs/architecture/security/permission-model.md", ".agent/verification.jsonl#VER-PH05-IDENTITY-CURRENT"],
+      "next_action": "Add canonical authorization helpers and route-level negative tests while preserving legacy API compatibility."
+    },
+    {
+      "id": "PH05-ACL",
+      "title": "Enforce workspace and collection ACLs at retrieval and source boundaries",
+      "stage": "BUILD",
+      "priority": "P0",
+      "status": "DONE",
+      "origin": "User Phase 0.5 collection ownership and non-leak requirements",
+      "dependencies": ["PH05-RAG-CONTRACT", "PH05-IDENTITY"],
+      "owner": "Codex lead",
+      "acceptance_summary": "RetrievalContext is required at server-side filters; veterinarians see only granted collections; managers/admins receive the documented scope; documents, sources, and citations cannot cross ACLs.",
+      "evidence_refs": ["docs/architecture/security/collection-acl.md", "docs/architecture/security/ui-access-matrix.md", ".agent/verification.jsonl#VER-PH05-ACL-CURRENT"],
+      "next_action": "Wire authorized collection IDs through CVG retrieval, Professor requests, and source/citation responses."
+    },
+    {
+      "id": "PH05-VERIFY",
+      "title": "Run integrated Phase 0.5 verification, independent critique, and promotion decision",
+      "stage": "BUILD",
+      "priority": "P0",
+      "status": "IN_PROGRESS",
+      "origin": "User Phase 0.5 promotion gate and gauntlet requirements",
+      "dependencies": ["PH05-LOCK", "PH05-EVIDENCE", "PH05-UPLOAD", "PH05-ACL"],
+      "owner": "Codex lead",
+      "acceptance_summary": "All required runtime, contract, security, E2E, regression, concurrency, performance, and independent-review evidence is current and the final status is one of the allowed honest outcomes.",
+      "evidence_refs": ["docs/progress/phase-0.5-report.md", "docs/progress/phase-0.5-independent-review.md", ".agent/gates/phase-0.5-verified-blocked-final.json", ".agent/verification.jsonl#VER-PH05-FULL-REGRESSION-CURRENT", ".agent/verification.jsonl#VER-PH05-FRONTEND-CURRENT", ".agent/verification.jsonl#VER-PH05-PERFORMANCE-CURRENT", ".agent/verification.jsonl#VER-PH05-REVIEW-CURRENT", ".agent/verification.jsonl#VER-PH05-FINAL-CURRENT"],
+      "next_action": "Resolve the explicit provider, historical fixture/policy, and deployment-control gaps before reopening VERIFIED; keep Phase 1 deferred."
     }
   ]
 }

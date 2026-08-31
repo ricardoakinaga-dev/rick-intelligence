@@ -161,6 +161,41 @@ def test_large_ingestion_preflight_rejects_insufficient_disk(tmp_path, monkeypat
         raise AssertionError("expected insufficient disk preflight failure")
 
 
+def test_large_ingestion_preflight_does_not_expose_qdrant_exception(tmp_path, monkeypatch):
+    from services import ingestion_job_service as jobs
+
+    documents_dir = tmp_path / "documents"
+    upload_path = documents_dir / "default" / "uploads" / "large.pdf"
+    upload_path.parent.mkdir(parents=True)
+    upload_path.write_bytes(b"%PDF")
+    disk_usage = namedtuple("usage", "total used free")
+
+    monkeypatch.setattr(jobs, "DOCUMENTS_DIR", documents_dir)
+    monkeypatch.setattr(jobs, "LARGE_INGESTION_MIN_BYTES", 50)
+    monkeypatch.setattr(jobs, "LARGE_INGESTION_DISK_FREE_MIN_BYTES", 100)
+    monkeypatch.setattr(jobs.shutil, "disk_usage", lambda _path: disk_usage(10_000, 1_000, 9_000))
+
+    class ExplodingClient:
+        def get_collections(self):
+            raise RuntimeError("secret-qdrant-host:6333")
+
+    monkeypatch.setattr(jobs, "active_large_ingestion_jobs", lambda: [])
+    monkeypatch.setattr("services.vector_service.get_client", lambda: ExplodingClient())
+
+    try:
+        jobs.preflight_large_ingestion(
+            source_path=upload_path,
+            workspace_id="default",
+            received_bytes=100,
+        )
+    except jobs.IngestionPreflightError as exc:
+        assert exc.error_code == "qdrant_unavailable"
+        assert exc.details.get("qdrant_error") is None
+        assert "secret-qdrant-host" not in repr(exc.details)
+    else:
+        raise AssertionError("expected qdrant preflight failure")
+
+
 def test_large_ingestion_preflight_rejects_active_large_job(tmp_path, monkeypatch):
     from services import ingestion_job_service as jobs
 

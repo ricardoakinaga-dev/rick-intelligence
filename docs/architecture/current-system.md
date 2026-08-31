@@ -19,6 +19,36 @@ já estivesse implementada.
 Fontes de requisitos: o texto anexado ao pedido desta auditoria. Fontes de
 execução: os três repositórios abaixo e os artefatos em `docs/baselines/`.
 
+## Overlay atual da Phase 0.5
+
+Este bloco é a fonte de verdade para as áreas alteradas desde o inventário
+forense da Phase 0. As descrições conflitantes mais abaixo preservam o retrato
+histórico que motivou a correção e devem ser lidas como `HISTORICAL`, não como
+estado atual.
+
+- O root já tinha uma publicação Phase 0 preservada; a Phase 0.5 mantém os três
+  limites de componente e adiciona apenas mudanças locais ainda não promovidas.
+- CVG e Professor compartilham o contrato lógico `rag-contract-v1`, coleção
+  `rag_phase0`, vetores nomeados `dense`/`sparse`, IDs estáveis, checksum,
+  versão e provenance canônica. Retries usam escopo de `workspace_id` e
+  `collection_id`; o fallback em disco aplica o mesmo escopo.
+- Uploads do CVG armazenam um nome gerado seguro por workspace e preservam o
+  nome exibido somente como metadado. Sessões, roles canônicas, permissões
+  explícitas, invalidação e ACL de coleção são aplicados no servidor.
+- Respostas HTTP de sessão não devolvem bearer ao browser; o frontend usa
+  cookie `HttpOnly`, enquanto o backend conserva Bearer somente para clientes
+  não-browser compatíveis. Rotas administrativas não-platform ficam limitadas
+  ao workspace ativo e resultados Qdrant são revalidados após a busca.
+- Locker valida o owner em unlock/renew atômicos; Professor valida evidência,
+  usa vetor nomeado/escopo confiável e libera/renova locks no ciclo da tarefa.
+- O preflight de ingestão mantém exceções Qdrant apenas no encadeamento de
+  diagnóstico do servidor; detalhes operacionais expostos ao cliente são
+  estáveis e redigidos. O Locker ainda depende de isolamento/autenticação da
+  rede de deployment.
+- O runtime de evidência usa Python 3.12.3, Node 22.19.0, Qdrant isolado em
+  `127.0.0.1:6337` e Redis isolado em `6380`; o Redis do host em `6379` não foi
+  tocado. O provider real e a implantação de produção permanecem `NOT_RUN`.
+
 ## 1. Topologia real do workspace
 
 | Componente | Git/commit observado | Stack | Papel atual | Evidência |
@@ -27,10 +57,11 @@ execução: os três repositórios abaixo e os artefatos em `docs/baselines/`.
 | `rick-professor` | repo independente, `main`, `692290da8eb4a10fcec83dc19f358ab9643aa3a3` | Node 22/Fastify/TypeScript, OpenAI SDK, Axios, Qdrant HTTP, Redis | adapter OpenAI-compatible/Telegram com fluxo professoral | `src/server.ts`, `src/core/processor.ts`, `src/routes/` |
 | `modulo-redis-locker` | repo independente, `main`, `69e7896cf783f196cf32f56b05607643811ada43` | Node 20/Express/JavaScript, ioredis, Zod | serviço HTTP de lease distribuído | `server.js`, `Dockerfile` |
 
-O diretório raiz não tem `.git`, `package.json`, `pyproject.toml`, compose,
-CI ou instrução própria. Os três worktrees estavam limpos antes e depois das
-instalações locais; posteriormente o CVG recebeu somente o overlay documental
-exigido por `AGENTS.md`. O inventário aproximado é de 391 arquivos/99.802 linhas no
+O diretório raiz não tem `package.json`, `pyproject.toml`, compose, CI ou
+instrução própria. O snapshot forense inicial registrou os três worktrees
+limpos; a execução atual mantém alterações locais deliberadamente não
+promovidas, incluindo código, testes e artefatos de controle. O inventário
+aproximado é de 391 arquivos/99.802 linhas no
 CVG, 25/4.103 no Professor e 7/1.183 no Locker; os números incluem documentação
 versionada e servem apenas para dimensionar a superfície.
 

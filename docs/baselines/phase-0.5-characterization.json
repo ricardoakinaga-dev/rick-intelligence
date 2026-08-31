@@ -1,0 +1,123 @@
+{
+  "artifact": "phase-0.5-characterization",
+  "schema_version": "phase-0.5-baseline-v1",
+  "captured_at": "2026-08-31T03:04:16Z",
+  "scope": "isolated local CVG/Qdrant/Redis plus Professor/Locker/frontend verification",
+  "phase_0_status_preserved": "PARTIAL — NOT PROMOTED",
+  "promotion_target": "VERIFIED_CANDIDATE",
+  "runtime": {
+    "python": "3.12.3",
+    "uv": "0.8.14",
+    "fastapi": "0.109.2",
+    "uvicorn": "0.27.1",
+    "pydantic": "2.6.1",
+    "qdrant_client": "1.7.3",
+    "qdrant_server": "1.7.4",
+    "redis_server": "7.0.15",
+    "node": "22.19.0",
+    "npm": "10.9.3",
+    "next": "15.5.24",
+    "qdrant_http": "http://127.0.0.1:6337",
+    "redis_port": 6380,
+    "host_redis_port_touched": false
+  },
+  "commands": {
+    "runtime_bootstrap": "scripts/phase05/bootstrap-runtime.sh",
+    "services_start": "scripts/phase05/start-local-services.sh",
+    "services_stop": "scripts/phase05/stop-local-services.sh",
+    "cvg_tests": "PYTHONPATH=src QDRANT_HOST=127.0.0.1 QDRANT_PORT=6337 QDRANT_COLLECTION=rag_phase0 OPENAI_API_KEY='' RERANKING_ENABLED=false ../.runtime/venvs/cvg/bin/python -m pytest -q",
+    "cvg_e2e": "PYTHONPATH='cvg-master-rag-v2/src' QDRANT_HOST=127.0.0.1 QDRANT_PORT=6337 QDRANT_COLLECTION=rag_phase0 OPENAI_API_KEY='' RERANKING_ENABLED=false .runtime/venvs/cvg/bin/python scripts/phase05/phase05_e2e.py --mode full",
+    "cvg_restart_check": "... scripts/phase05/phase05_e2e.py --mode restart",
+    "professor_build": "npm run build (rick-professor)",
+    "professor_tests": "npm test (rick-professor)",
+    "locker_tests": "npm test (modulo-redis-locker)",
+    "locker_black_box": "node scripts/phase05/locker_e2e.mjs",
+    "frontend_install": "npm ci --ignore-scripts (cvg-master-rag-v2/frontend)",
+    "frontend_build": "npm run build (cvg-master-rag-v2/frontend)",
+    "frontend_lint": "npm run lint (cvg-master-rag-v2/frontend)",
+    "frontend_smoke": "npm run test:smoke (cvg-master-rag-v2/frontend)",
+    "production_dependency_audit": "npm audit --omit=dev --audit-level=high (cvg-master-rag-v2/frontend)"
+  },
+  "checks": {
+    "A_representative_ingestion": {
+      "status": "PASS",
+      "evidence": "scripts/phase05/phase05_e2e.py --mode full",
+      "observation": "TXT document parsed, persisted, and indexed in the isolated workspace."
+    },
+    "B_parsing_and_chunks": {
+      "status": "PASS",
+      "evidence": "scripts/phase05/phase05_e2e.py --mode full",
+      "observation": "One deterministic source produced one persisted chunk with canonical provenance."
+    },
+    "C_embeddings_offline": {
+      "status": "PASS_WITH_FINDING",
+      "evidence": "scripts/phase05/phase05_e2e.py --mode full",
+      "observation": "The embedding seam works with a deterministic 1536-dimensional test double; live provider quality was not run."
+    },
+    "D_persistence_and_vector_index": {
+      "status": "PASS",
+      "evidence": "scripts/phase05/phase05_e2e.py --mode full",
+      "observation": "Canonical rag_phase0 named dense/sparse point was available after upsert."
+    },
+    "E_known_query_retrieval": {
+      "status": "PASS",
+      "evidence": "scripts/phase05/phase05_e2e.py --mode full",
+      "observation": "Scoped query returned one result from the authorized collection."
+    },
+    "F_grounded_answer": {
+      "status": "PASS_WITH_FINDING",
+      "evidence": "scripts/phase05/phase05_e2e.py --mode full",
+      "observation": "Grounding and citation plumbing passed with a deterministic answer generator; live LLM quality was not run."
+    },
+    "G_provenance": {
+      "status": "PASS",
+      "evidence": "scripts/phase05/phase05_e2e.py --mode full",
+      "observation": "Search and citation exposed collection_id and checksum for the retrieved chunk."
+    },
+    "H_concurrent_requests": {
+      "status": "PASS",
+      "evidence": "scripts/phase05/locker_e2e.mjs",
+      "observation": "Sixteen same-key lock attempts produced exactly one winner."
+    },
+    "I_redis_lock": {
+      "status": "PASS",
+      "evidence": "scripts/phase05/locker_e2e.mjs",
+      "observation": "Acquire, contention, wrong-owner unlock/renew, owner release, expiry, and malformed request checks passed."
+    },
+    "J_restart_and_recovery": {
+      "status": "PASS",
+      "evidence": "scripts/phase05/stop-local-services.sh; scripts/phase05/start-local-services.sh; scripts/phase05/phase05_e2e.py --mode restart",
+      "observation": "The same Qdrant point and provenance were readable after an isolated service restart."
+    },
+    "K_malformed_document": {
+      "status": "PASS",
+      "evidence": "scripts/phase05/phase05_e2e.py --mode full",
+      "observation": "Unsupported .exe input was rejected at the ingestion boundary."
+    },
+    "L_provider_unavailable": {
+      "status": "PASS_WITH_FINDING",
+      "evidence": "phase-0.5-characterization.json; phase-0.5-report.md",
+      "observation": "No OpenAI credential was present; deterministic plumbing ran, but live provider outage/quality behavior remains unverified."
+    },
+    "M_vector_database_unavailable": {
+      "status": "PASS_WITH_FINDING",
+      "evidence": "scripts/phase05/stop-local-services.sh; scripts/phase05/phase05_e2e.py --mode restart",
+      "observation": "With isolated Qdrant stopped, CVG returned the persisted disk_fallback result; recovery was then verified after restart."
+    },
+    "N_duplicate_ingestion": {
+      "status": "PASS",
+      "evidence": "scripts/phase05/phase05_e2e.py --mode full",
+      "observation": "Two identical ingestions produced the same document ID and one Qdrant point."
+    },
+    "O_metrics_and_observability": {
+      "status": "PASS_WITH_FINDING",
+      "evidence": "cvg-master-rag-v2/src/services/telemetry_service.py; scripts/phase05/phase05_performance.py",
+      "observation": "Structured CVG query/ingestion telemetry and Locker responses were observed; provider and production exporter behavior remain outside the local run."
+    }
+  },
+  "limitations": [
+    "The deterministic embedding and answer doubles prove plumbing, not provider quality.",
+    "The full legacy CVG suite still has data-dependent failures/errors because src/data/default/dataset.json and the historical Fluxpay corpus are absent from this clean checkout; no synthetic dataset was added.",
+    "No production deployment, external OpenWebUI, real OpenAI credential, or host Redis state was accessed."
+  ]
+}

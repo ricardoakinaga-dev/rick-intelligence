@@ -64,6 +64,7 @@ LOGS_DIR.mkdir(parents=True, exist_ok=True)
 QDRANT_HOST = os.getenv("QDRANT_HOST", "localhost")
 QDRANT_PORT = int(os.getenv("QDRANT_PORT", "6333"))
 QDRANT_COLLECTION = os.getenv("QDRANT_COLLECTION", "rag_phase0")
+QDRANT_TIMEOUT_SECONDS = float(os.getenv("QDRANT_TIMEOUT_SECONDS", "5"))
 QDRANT_CHECK_COMPATIBILITY = _env_bool("QDRANT_CHECK_COMPATIBILITY", False)
 
 # OpenAI config

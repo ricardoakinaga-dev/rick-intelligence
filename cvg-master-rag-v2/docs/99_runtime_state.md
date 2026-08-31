@@ -219,3 +219,73 @@ O agente DEVE:
 3. Para qualquer limite acima de `500MiB`, iniciar novo ciclo CVG com shards JSONL.
 4. Usar rotas publicas de API sempre sob `https://www.master.rag.centroveterinarioguarapiranga.com/api/*` para evitar colisao com paginas do frontend.
 5. Testar consultas reais no chat/busca e registrar exemplos ruins restantes para ajuste fino de ranking/evaluation.
+
+---
+
+## PHASE 0.5 BASELINE CLOSURE — 2026-08-31
+
+### Estado atual
+
+`IN_PROGRESS / NOT PROMOTED`: a Fase 0.5 possui runtime isolado, contrato RAG
+canônico, correções de identidade/ACL/upload, Locker/Professor e evidências
+locais reproduzíveis. A Fase 0 continua `PARTIAL — NOT PROMOTED`. Nenhuma
+consolidação de Fase 1 foi iniciada.
+
+### Evidência executada
+
+- Python 3.12.3, Node 22.19.0, npm 10.9.3, Qdrant 1.7.4 em `6337` e Redis
+  7.0.15 em `6380` foram usados em runtime isolado.
+- E2E CVG passou por ingestão, chunk, embedding determinístico, Qdrant,
+  retrieval, resposta/citação, restart, fallback em disco e reingestão sem
+  duplicata.
+- Locker black-box passou ownership, contenção, renew/release, expiry,
+  malformed request e contenção concorrente de 16 tentativas.
+- Professor build/testes, CVG testes focados, frontend build/lint/smoke e audit
+  de dependências de produção passaram.
+- A suíte legada CVG terminou em `357 passed, 22 failed, 15 skipped, 4 errors`;
+  os findings estão relacionados a fixtures/corpus ausentes, relógio de
+  telemetria legado e expectativas de compatibilidade documentadas no relatório
+  da Fase 0.5.
+
+### Limitações e próxima ação
+
+Embedding/LLM real, outage real do provider, capacidade de produção, OpenWebUI
+externo e rate limit distribuído não foram executados. O próximo gate é a
+revisão independente e a decisão honesta de promoção; resolver ou aceitar
+explicitamente os findings do legado antes de escrever uma decisão
+`VERIFIED_CANDIDATE`.
+
+---
+
+## PHASE 0.5 FINAL INTEGRATION UPDATE — 2026-08-31
+
+### Estado atual
+
+`BLOCKED / NOT PROMOTED`: o gate superseding é
+`.agent/gates/phase-0.5-verified-blocked-final.json`. A revisão independente
+não encontrou P0/HIGH nos caminhos técnicos corrigidos, mas a Phase 0.5 não é
+promovida a `VERIFIED_CANDIDATE`. A Phase 0 permanece `PARTIAL — NOT PROMOTED`
+e a Phase 1 não foi iniciada.
+
+### Evidência atualizada
+
+- CVG recorte de segurança/contrato/integração: `40 passed`.
+- Suíte CVG completa: `364 passed, 19 failed, 14 skipped, 6 errors`; os casos
+  restantes são fixtures/corpus históricos, expectativas de política/relógio e
+  ausência de provider real, sem dataset sintético adicionado.
+- Professor: `23 passed`, build TypeScript PASS; sem `API_KEY`, `/v1/models`
+  retornou `401`, e sem segredo Telegram o webhook retornou `503`.
+- Locker: `2 passed` e black-box PASS com um vencedor em 16 tentativas
+  concorrentes; frontend smoke `7 passed`.
+- E2E completo, restart do Qdrant e fallback em disco: `PASS`.
+- O erro bruto do preflight Qdrant foi removido dos detalhes operacionais e a
+  regressão correspondente passou.
+
+### Limitações e próxima ação
+
+Provider real, corpus histórico default/Fluxpay, autenticação própria do
+Locker e validação de isolamento de rede em deployment ainda requerem
+evidência. O resultado final e o parecer independente estão em
+`docs/progress/phase-0.5-report.md` e
+`docs/progress/phase-0.5-independent-review.md`; nenhum publish ou trabalho de
+Phase 1 é autorizado por este estado.

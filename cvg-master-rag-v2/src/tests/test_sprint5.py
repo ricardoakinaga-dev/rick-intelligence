@@ -35,6 +35,7 @@ from core.config import (
 from services.vector_service import create_qdrant_client
 from services.telemetry_service import TelemetryService
 from services.admin_service import reset_admin_state
+from services.enterprise_service import SESSION_COOKIE_NAME
 
 
 # ── Deterministic mock embedding ─────────────────────────────────────────────
@@ -82,9 +83,10 @@ def enterprise_headers(
         },
     )
     assert response.status_code == 200, response.text
-    payload = response.json()
-    assert payload["session_token"]
-    return {"Authorization": f"Bearer {payload['session_token']}"}
+    token = response.cookies.get(SESSION_COOKIE_NAME)
+    assert token
+    assert response.json()["session_token"] is None
+    return {"Authorization": f"Bearer {token}"}
 
 
 @pytest.fixture(autouse=True)
@@ -3922,6 +3924,8 @@ class TestMultiDocumentSearch:
                             payload={
                                 "chunk_id": "chunk-test",
                                 "document_id": "doc-test",
+                                "workspace_id": "tenant-a",
+                                "collection_id": "rag_phase0",
                                 "text": "texto de teste",
                                 "page_hint": 0,
                             },
@@ -4399,6 +4403,8 @@ class TestMultiDocumentSearch:
                                 payload={
                                     "chunk_id": "chunk-dense",
                                     "document_id": "doc-1",
+                                    "workspace_id": "default",
+                                    "collection_id": "rag_phase0",
                                     "text": "texto denso",
                                     "page_hint": 1,
                                 },
@@ -4467,6 +4473,8 @@ class TestMultiDocumentSearch:
                                 payload={
                                     "chunk_id": "pix-1",
                                     "document_id": "doc-pix",
+                                    "workspace_id": "default",
+                                    "collection_id": "rag_phase0",
                                     "text": repetitive_text,
                                     "page_hint": 1,
                                 },
@@ -4476,6 +4484,8 @@ class TestMultiDocumentSearch:
                                 payload={
                                     "chunk_id": "pix-2",
                                     "document_id": "doc-pix",
+                                    "workspace_id": "default",
+                                    "collection_id": "rag_phase0",
                                     "text": repetitive_text,
                                     "page_hint": 1,
                                 },
@@ -4485,6 +4495,8 @@ class TestMultiDocumentSearch:
                                 payload={
                                     "chunk_id": "med-1",
                                     "document_id": "doc-med",
+                                    "workspace_id": "default",
+                                    "collection_id": "rag_phase0",
                                     "text": medical_text,
                                     "page_hint": 163,
                                 },
@@ -4593,8 +4605,9 @@ class TestMetricsEndpoint:
     """Verify /metrics exposes the minimum operational contract."""
 
     def test_metrics_returns_retrieval_answer_and_evaluation(self, tmp_path, monkeypatch):
-        from api.main import get_metrics as get_metrics_route
+        from api.main import get_metrics as get_metrics_route, login
         import services.telemetry_service as telemetry_module
+        from models.schemas import EnterpriseSession, LoginRequest
 
         class FakeTelemetry(TelemetryService):
             QUERIES_LOG = tmp_path / "queries.jsonl"
@@ -4651,7 +4664,8 @@ class TestMetricsEndpoint:
 
         monkeypatch.setattr(telemetry_module, "_telemetry", fake, raising=False)
 
-        data = get_metrics_route(days=1)
+        payload = login(LoginRequest(email="operator@demo.local", password="demo1234", tenant_id="default"))
+        data = get_metrics_route(days=1, _session=EnterpriseSession(**payload))
         assert "retrieval" in data
         assert "answer" in data
         assert "evaluation" in data
@@ -6637,8 +6651,10 @@ class TestEnterpriseSessionContracts:
         assert payload["authenticated"] is False
         assert payload["session_state"] == "anonymous"
         assert payload["user"]["role"] == "viewer"
-        assert payload["active_tenant"]["workspace_id"] == "default"
-        assert len(payload["available_tenants"]) >= 3
+        assert payload["active_tenant"]["workspace_id"] == ""
+        assert payload["active_tenant"]["tenant_id"] == ""
+        # Anonymous bootstrap must not enumerate tenant/workspace identifiers.
+        assert payload["available_tenants"] == []
 
     def test_login_contract_allows_role_and_tenant_selection(self):
         from api.main import login

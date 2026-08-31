@@ -8,6 +8,7 @@ import json
 import time
 import re
 import socket
+import inspect
 from typing import Optional
 from pathlib import Path
 
@@ -15,16 +16,27 @@ from qdrant_client import QdrantClient
 from qdrant_client.models import (
     Distance, VectorParams, PointStruct,
     NamedSparseVector, SparseVector, Batch,
-    Filter, FieldCondition, MatchValue,
+    Filter, FieldCondition, MatchValue, MatchAny,
     SparseIndexParams, SparseVectorParams,
     NamedVector, Range
 )
 from core.config import (
-    QDRANT_HOST, QDRANT_PORT, QDRANT_COLLECTION,
+    QDRANT_HOST, QDRANT_PORT, QDRANT_COLLECTION, QDRANT_TIMEOUT_SECONDS,
     EMBEDDING_DIM, RRF_K, DEFAULT_TOP_K, QDRANT_CHECK_COMPATIBILITY,
     DOCUMENTS_DIR, EMBEDDING_MODEL, RERANKING_ENABLED, RERANKING_METHOD,
 )
-from models.schemas import Chunk, SearchRequest, SearchResponse, SearchResultItem
+from models.schemas import Chunk, RetrievalContext, SearchRequest, SearchResponse, SearchResultItem
+from services.rag_contract import (
+    CANONICAL_COLLECTION_ID,
+    CANONICAL_EMBEDDING_MODEL,
+    RAG_SCHEMA_VERSION,
+    DENSE_VECTOR_NAME,
+    SPARSE_VECTOR_NAME,
+    content_checksum,
+    document_version,
+    normalize_collection_id,
+    point_id_for_chunk,
+)
 from services.document_registry import (
     get_document_registry as _registry_get_document_registry,
     get_document_metadata as _registry_get_document_metadata,
@@ -82,7 +94,7 @@ def validate_qdrant_collection_name(collection_name: str | None) -> str:
     """Return a safe Qdrant collection name or raise ValueError."""
     if not isinstance(collection_name, str):
         collection_name = None
-    normalized = (collection_name or QDRANT_COLLECTION).strip()
+    normalized = normalize_collection_id((collection_name or QDRANT_COLLECTION).strip())
     if not QDRANT_COLLECTION_NAME_PATTERN.fullmatch(normalized):
         raise ValueError("qdrant_collection must use 1-64 letters, numbers, '_' or '-'")
     return normalized
@@ -218,7 +230,7 @@ def _qdrant_host_reachable(timeout: float = 0.25) -> bool:
         return False
 
 
-def create_qdrant_client(timeout: float | None = 1.0) -> QdrantClient:
+def create_qdrant_client(timeout: float | None = QDRANT_TIMEOUT_SECONDS) -> QdrantClient:
     """Create a Qdrant client compatible with both older and newer local clients."""
     client_kwargs = {
         "host": QDRANT_HOST,
@@ -242,8 +254,76 @@ def get_client() -> QdrantClient:
     if _client is None:
         if not _qdrant_host_reachable():
             raise RuntimeError(f"Qdrant host {QDRANT_HOST}:{QDRANT_PORT} not reachable")
-        _client = create_qdrant_client(timeout=1.0)
+        _client = create_qdrant_client(timeout=QDRANT_TIMEOUT_SECONDS)
     return _client
+
+
+def _query_qdrant_points(
+    client: QdrantClient,
+    *,
+    collection_name: str,
+    query: list[float] | SparseVector,
+    using: str,
+    limit: int,
+    query_filter: Optional[Filter],
+):
+    """Query both the current and legacy qdrant-client APIs."""
+    if hasattr(client, "query_points"):
+        return client.query_points(
+            collection_name=collection_name,
+            query=query,
+            using=using,
+            limit=limit,
+            query_filter=query_filter,
+        ).points
+
+    query_vector = (using, query) if using == DENSE_VECTOR_NAME else NamedSparseVector(name=using, vector=query)
+    return client.search(
+        collection_name=collection_name,
+        query_vector=query_vector,
+        limit=limit,
+        query_filter=query_filter,
+        with_payload=True,
+        with_vectors=False,
+    )
+
+
+def _filter_trusted_qdrant_points(
+    points: list,
+    *,
+    workspace_id: str,
+    allowed_collection_ids: Optional[list[str]] = None,
+) -> list:
+    """Revalidate ownership and the canonical payload after Qdrant returns.
+
+    The server-side filter is necessary but not sufficient: adapters, stale
+    indexes, and test doubles can return an adulterated payload. Points that
+    do not carry explicit ownership and logical collection fields are rejected
+    before fusion.
+    """
+    allowed = {
+        normalize_collection_id(item)
+        for item in (allowed_collection_ids or [])
+        if item and item != "*"
+    }
+    trusted = []
+    for point in points or []:
+        payload = getattr(point, "payload", None)
+        if not isinstance(payload, dict):
+            continue
+        if payload.get("workspace_id") != workspace_id:
+            continue
+        try:
+            raw_collection_id = payload.get("collection_id")
+            if not isinstance(raw_collection_id, str) or not raw_collection_id.strip():
+                continue
+            collection_id = normalize_collection_id(raw_collection_id)
+        except ValueError:
+            continue
+        if allowed and collection_id not in allowed:
+            continue
+        trusted.append(point)
+    return trusted
 
 
 def _collection_exists(client: QdrantClient, collection_name: str | None = None) -> bool:
@@ -272,16 +352,45 @@ def _get_cached_document_metadata(document_id: str, workspace_id: str = "default
 def _build_citation_payload(chunk: Chunk, workspace_id: str) -> dict:
     """Build source metadata stored with each Qdrant point for citations."""
     doc_meta = _get_cached_document_metadata(chunk.document_id, workspace_id)
-    filename = doc_meta.get("filename")
-    source_title = doc_meta.get("source_title") or filename
-    page_hint = chunk.page_hint
+    filename = doc_meta.get("filename") or chunk.title or "unknown-source"
+    source_title = doc_meta.get("source_title") or chunk.source or filename
+    checksum = str(doc_meta.get("checksum") or chunk.checksum or content_checksum(chunk.text))
+    collection_id = normalize_collection_id(
+        doc_meta.get("collection_id")
+        or chunk.metadata.get("collection_id")
+        or CANONICAL_COLLECTION_ID
+    )
+    metadata = dict(chunk.metadata or {})
+    metadata.setdefault("tags", doc_meta.get("tags") or [])
 
-    payload = {
+    # Keep every contract field present in the payload, even when a source does
+    # not have page/section metadata. This prevents adapter-specific schemas.
+    return {
+        "schema_version": RAG_SCHEMA_VERSION,
+        "workspace_id": workspace_id,
+        "collection_id": collection_id,
+        "document_id": chunk.document_id,
+        "document_version": doc_meta.get("document_version") or document_version(checksum),
+        "chunk_id": chunk.chunk_id,
+        "parent_chunk_id": chunk.parent_chunk_id,
+        "chunk_index": chunk.chunk_index,
+        "text": chunk.text,
+        "source": source_title,
+        "title": doc_meta.get("title") or source_title,
+        "page_start": chunk.page_start if chunk.page_start is not None else chunk.page_hint,
+        "page_end": chunk.page_end if chunk.page_end is not None else chunk.page_hint,
+        "section": chunk.section,
+        "checksum": checksum,
+        "parser_version": chunk.parser_version,
+        "chunker_version": chunk.chunker_version,
+        "embedding_model": chunk.embedding_model or CANONICAL_EMBEDDING_MODEL,
+        "embedding_version": chunk.embedding_version,
+        "metadata": metadata,
+        # Compatibility citation fields retained for the current API response.
         "document_filename": filename,
         "source_title": source_title,
-        "source": source_title or filename,
         "source_type": doc_meta.get("source_type"),
-        "catalog_scope": doc_meta.get("catalog_scope"),
+        "catalog_scope": doc_meta.get("catalog_scope", "canonical"),
         "document_page_count": doc_meta.get("page_count"),
         "publication_year": doc_meta.get("publication_year"),
         "edition": doc_meta.get("edition"),
@@ -290,12 +399,6 @@ def _build_citation_payload(chunk: Chunk, workspace_id: str) -> dict:
         "isbn": doc_meta.get("isbn"),
         "tags": doc_meta.get("tags") or [],
     }
-
-    if page_hint is not None:
-        payload["page_start"] = page_hint
-        payload["page_end"] = page_hint
-
-    return {key: value for key, value in payload.items() if value not in (None, "", [])}
 
 
 def list_document_items(
@@ -350,13 +453,13 @@ def ensure_collection(
         client.create_collection(
             collection_name=collection,
             vectors_config={
-                "dense": VectorParams(
+                DENSE_VECTOR_NAME: VectorParams(
                     size=vector_size,
                     distance=Distance.COSINE
                 )
             },
             sparse_vectors_config={
-                "sparse": SparseVectorParams(
+                SPARSE_VECTOR_NAME: SparseVectorParams(
                     index=SparseIndexParams(
                         on_disk=False
                     )
@@ -378,35 +481,44 @@ def index_chunks(
     """
     client = get_client()
     collection = validate_qdrant_collection_name(collection_name)
-    ensure_collection(collection_name=collection)
+    try:
+        ensure_collection(collection_name=collection)
+    except TypeError as exc:
+        # Preserve compatibility with focused tests and older adapters that
+        # monkeypatch the historical no-argument helper.
+        if "collection_name" not in str(exc):
+            raise
+        ensure_collection()
+
+    if len(chunks) != len(embeddings):
+        raise ValueError("chunks and embeddings must have the same length")
 
     points = []
     for chunk, embedding in zip(chunks, embeddings):
+        if len(embedding) != EMBEDDING_DIM:
+            raise ValueError(f"embedding dimension must be {EMBEDDING_DIM}")
         # BM25 sparse vector — tokenize and create sparse
         sparse_vec = _create_bm25_sparse(chunk.text)
 
-        # Use hash of chunk_id as point ID to avoid collision across documents
-        # Qdrant requires unsigned integer; chunk_index alone causes overwrite when
-        # multiple documents have chunks 0-N with same indices
         payload = {
+            **_build_citation_payload(chunk, workspace_id),
+            "workspace_id": workspace_id,
             "chunk_id": chunk.chunk_id,
             "document_id": chunk.document_id,
-            "workspace_id": chunk.workspace_id,
-            "text": chunk.text[:2000],  # truncate for payload
+            "text": chunk.text[:2000],  # retain bounded payload size for compatibility
             "page_hint": chunk.page_hint,
             "chunk_index": chunk.chunk_index,
             "strategy": chunk.strategy,
             "qdrant_collection": collection,
-            **_build_citation_payload(chunk, workspace_id),
         }
         if ingestion_id:
             payload["ingestion_id"] = ingestion_id
 
         point = PointStruct(
-            id=abs(hash(chunk.chunk_id)) % (2**63),
+            id=point_id_for_chunk(chunk.chunk_id),
             vector={
-                "dense": embedding,
-                "sparse": sparse_vec
+                DENSE_VECTOR_NAME: embedding,
+                SPARSE_VECTOR_NAME: sparse_vec
             },
             payload=payload,
         )
@@ -455,9 +567,70 @@ def _create_bm25_sparse(text: str) -> SparseVector:
     )
 
 
+def _retrieval_collection_scope(
+    request: SearchRequest,
+    retrieval_context: RetrievalContext | None,
+) -> list[str]:
+    """Resolve the logical collection scope before touching Qdrant or disk."""
+    requested = normalize_collection_id(request.collection_id) if request.collection_id else None
+    if retrieval_context is None:
+        allowed = [requested or CANONICAL_COLLECTION_ID]
+    else:
+        if retrieval_context.workspace_id != request.workspace_id:
+            raise PermissionError("retrieval workspace does not match authorization context")
+        allowed = [
+            "*" if item.strip() == "*" else normalize_collection_id(item)
+            for item in retrieval_context.allowed_collection_ids
+            if isinstance(item, str) and item.strip()
+        ]
+        if not allowed:
+            allowed = [CANONICAL_COLLECTION_ID]
+
+    if "*" in allowed:
+        return [requested] if requested else ["*"]
+    if requested and requested not in allowed:
+        # An impossible sentinel produces no Qdrant/disk matches while keeping
+        # the response shape stable for callers that handle authorization at a
+        # higher route boundary.
+        return ["__forbidden_collection__"]
+    return [requested] if requested else allowed
+
+
+def _call_bm25_search_compat(
+    query: str,
+    workspace_id: str,
+    *,
+    limit: int,
+    filters: Optional[dict],
+    allowed_collection_ids: list[str],
+):
+    """Keep the sparse-search extension seam compatible with older callers."""
+    optional_kwargs = {
+        "filters": filters,
+        "allowed_collection_ids": allowed_collection_ids,
+    }
+    try:
+        signature = inspect.signature(_bm25_search)
+    except (TypeError, ValueError):
+        return _bm25_search(query, workspace_id, limit=limit, **optional_kwargs)
+
+    accepts_var_kwargs = any(
+        parameter.kind == inspect.Parameter.VAR_KEYWORD
+        for parameter in signature.parameters.values()
+    )
+    if not accepts_var_kwargs:
+        optional_kwargs = {
+            name: value
+            for name, value in optional_kwargs.items()
+            if name in signature.parameters
+        }
+    return _bm25_search(query, workspace_id, limit=limit, **optional_kwargs)
+
+
 def search_hybrid(
     request: SearchRequest,
-    workspace_filter: str = "default"
+    workspace_filter: str = "default",
+    retrieval_context: RetrievalContext | None = None,
 ) -> SearchResponse:
     """
     Perform hybrid search: dense + sparse with RRF fusion.
@@ -471,36 +644,49 @@ def search_hybrid(
         },
         **get_document_registry(request.workspace_id),
     }
-    query_filter = _build_qdrant_filter(request.workspace_id, request.filters)
+    allowed_collection_ids = _retrieval_collection_scope(request, retrieval_context)
+    query_filter = _build_qdrant_filter(
+        request.workspace_id,
+        request.filters,
+        allowed_collection_ids=allowed_collection_ids,
+    )
     candidate_limit = max(request.top_k * 10, 20)
     canonical_only = bool(request.filters and request.filters.get("catalog_scope") == "canonical")
 
     # 1. Dense search (embedding query)
     dense_results = []
     qdrant_available = True
+    disk_fallback_used = False
     client = None
     try:
         client = get_client()
         ensure_collection()
         query_embedding = _embed_query(request.query)
-        dense_results = client.query_points(
-            collection_name=QDRANT_COLLECTION,
+        dense_results = _query_qdrant_points(
+            client,
+            collection_name=validate_qdrant_collection_name(QDRANT_COLLECTION),
             query=query_embedding,
-            using="dense",
+            using=DENSE_VECTOR_NAME,
             limit=candidate_limit,
-            query_filter=query_filter
-        ).points
+            query_filter=query_filter,
+        )
+        dense_results = _filter_trusted_qdrant_points(
+            dense_results,
+            workspace_id=request.workspace_id,
+            allowed_collection_ids=allowed_collection_ids,
+        )
     except Exception:
         qdrant_available = False
 
     # 2. Sparse search (BM25 on query terms)
     sparse_results = []
     try:
-        sparse_results = _bm25_search(
+        sparse_results = _call_bm25_search_compat(
             request.query,
             request.workspace_id,
             limit=candidate_limit,
             filters=request.filters,
+            allowed_collection_ids=allowed_collection_ids,
         )
     except Exception:
         sparse_results = []
@@ -515,11 +701,19 @@ def search_hybrid(
             filters=request.filters,
             metadata_map=metadata_map,
             canonical_only=canonical_only,
+            allowed_collection_ids=allowed_collection_ids,
         )
+        disk_fallback_used = bool(sparse_results)
 
     # 4. RRF Fusion
     fused = _rrf_fusion(dense_results, sparse_results, k=RRF_K)
-    fused = _apply_post_filters(fused, request.filters, metadata_map)
+    fused = _apply_post_filters(
+        fused,
+        request.filters,
+        metadata_map,
+        allowed_collection_ids,
+        workspace_id=request.workspace_id,
+    )
     for item in fused:
         item["confidence_score"] = _compute_confidence_score(item, request.query)
         doc_meta = metadata_map.get(item.get("document_id"), {})
@@ -580,6 +774,9 @@ def search_hybrid(
             workspace_id=request.workspace_id,
             source_type=doc_meta.get("source_type"),
             tags=doc_meta.get("tags") or [],
+            collection_id=item.get("collection_id") or doc_meta.get("collection_id") or CANONICAL_COLLECTION_ID,
+            section=item.get("section"),
+            checksum=item.get("checksum"),
         ))
 
     # RRF scores are rank-based, not probabilities.
@@ -630,7 +827,7 @@ def search_hybrid(
         total_candidates=len(fused),
         low_confidence=low_confidence,
         retrieval_time_ms=retrieval_time,
-        method="híbrida",
+        method="disk_fallback" if disk_fallback_used else "híbrida",
         scores_breakdown=scores_breakdown,
         reranking_applied=reranking_applied,
         reranking_method=reranking_method,
@@ -654,6 +851,7 @@ def _search_chunks_on_disk(
     filters: Optional[dict] = None,
     metadata_map: Optional[dict[str, dict]] = None,
     canonical_only: bool = False,
+    allowed_collection_ids: Optional[list[str]] = None,
 ) -> list[dict]:
     """Simple local keyword fallback when Qdrant is unreachable."""
     base_dir = DOCUMENTS_DIR / workspace_id
@@ -690,12 +888,19 @@ def _search_chunks_on_disk(
             candidate = {
                 "chunk_id": chunk.get("chunk_id"),
                 "document_id": chunk.get("document_id"),
+                "workspace_id": workspace_id,
                 "text": chunk_text[:2000],
                 "score": len(overlap) / len(query_tokens),
                 "page_hint": chunk.get("page_hint"),
                 "strategy": chunk.get("strategy"),
+                "collection_id": chunk.get("collection_id")
+                or (metadata_map or {}).get(chunk.get("document_id"), {}).get("collection_id")
+                or CANONICAL_COLLECTION_ID,
+                "checksum": chunk.get("checksum"),
+                "section": chunk.get("section"),
+                "qdrant_collection": chunk.get("qdrant_collection", CANONICAL_COLLECTION_ID),
             }
-            if not _matches_filters(candidate, filters, metadata_map or {}):
+            if not _matches_filters(candidate, filters, metadata_map or {}, allowed_collection_ids):
                 continue
 
             scored.append({
@@ -713,6 +918,7 @@ def _bm25_search(
     workspace_id: str,
     limit: int = 20,
     filters: Optional[dict] = None,
+    allowed_collection_ids: Optional[list[str]] = None,
 ):
     """Simple BM25 search using sparse vector."""
     try:
@@ -738,13 +944,23 @@ def _bm25_search(
     sparse_query = SparseVector(indices=indices, values=values)
 
     try:
-        results = client.query_points(
-            collection_name=QDRANT_COLLECTION,
+        results = _query_qdrant_points(
+            client,
+            collection_name=validate_qdrant_collection_name(QDRANT_COLLECTION),
             query=sparse_query,
-            using="sparse",
+            using=SPARSE_VECTOR_NAME,
             limit=limit,
-            query_filter=_build_qdrant_filter(workspace_id, filters)
-        ).points
+                query_filter=_build_qdrant_filter(
+                workspace_id,
+                filters,
+                allowed_collection_ids=allowed_collection_ids,
+                ),
+            )
+        results = _filter_trusted_qdrant_points(
+            results,
+            workspace_id=workspace_id,
+            allowed_collection_ids=allowed_collection_ids,
+        )
         filtered = []
         for r in results:
             score = float(r.score or 0.0)
@@ -756,6 +972,7 @@ def _bm25_search(
             filtered.append({
                 "chunk_id": r.payload["chunk_id"],
                 "document_id": r.payload["document_id"],
+                "workspace_id": r.payload["workspace_id"],
                 "text": text,
                 "score": score,
                 "page_hint": r.payload.get("page_hint"),
@@ -764,6 +981,11 @@ def _bm25_search(
                 "sparse_score": score,
                 "document_filename": r.payload.get("document_filename"),
                 "tags": r.payload.get("tags") or [],
+                "collection_id": r.payload.get("collection_id") or CANONICAL_COLLECTION_ID,
+                "section": r.payload.get("section"),
+                "checksum": r.payload.get("checksum"),
+                "qdrant_collection": r.payload.get("qdrant_collection"),
+                "schema_version": r.payload.get("schema_version"),
             })
         return filtered
     except Exception:
@@ -789,11 +1011,16 @@ def _rrf_fusion(
             scores[chunk_id] = {
                 "chunk_id": chunk_id,
                 "document_id": payload.get("document_id"),
+                "workspace_id": payload.get("workspace_id"),
                 "text": payload.get("text", ""),
                 "page_hint": payload.get("page_hint"),
                 "strategy": payload.get("strategy"),
                 "document_filename": payload.get("document_filename"),
                 "tags": payload.get("tags") or [],
+                "collection_id": payload.get("collection_id") or CANONICAL_COLLECTION_ID,
+                "section": payload.get("section"),
+                "checksum": payload.get("checksum"),
+                "qdrant_collection": payload.get("qdrant_collection"),
                 "score": 0.0,
                 "dense_score": 0.0,
                 "sparse_score": 0.0,
@@ -814,11 +1041,16 @@ def _rrf_fusion(
             scores[chunk_id] = {
                 "chunk_id": chunk_id,
                 "document_id": result.get("document_id"),
+                "workspace_id": result.get("workspace_id"),
                 "text": result.get("text", ""),
                 "page_hint": result.get("page_hint"),
                 "strategy": result.get("strategy"),
                 "document_filename": result.get("document_filename"),
                 "tags": result.get("tags") or [],
+                "collection_id": result.get("collection_id") or CANONICAL_COLLECTION_ID,
+                "section": result.get("section"),
+                "checksum": result.get("checksum"),
+                "qdrant_collection": result.get("qdrant_collection"),
                 "score": score,
                 "dense_score": 0.0,
                 "sparse_score": 0.0,
@@ -1179,7 +1411,12 @@ def delete_workspace_chunks(workspace_id: str, collection_name: str | None = Non
         pass
 
 
-def _build_qdrant_filter(workspace_id: str, filters: Optional[dict] = None) -> Optional[Filter]:
+def _build_qdrant_filter(
+    workspace_id: str,
+    filters: Optional[dict] = None,
+    *,
+    allowed_collection_ids: Optional[list[str]] = None,
+) -> Optional[Filter]:
     """Build Qdrant filter for fields that are actually indexed in payload."""
     must = []
     if workspace_id:
@@ -1189,6 +1426,30 @@ def _build_qdrant_filter(workspace_id: str, filters: Optional[dict] = None) -> O
                 match=MatchValue(value=workspace_id),
             )
         )
+
+    if allowed_collection_ids and "*" not in allowed_collection_ids:
+        logical_ids = [
+            normalize_collection_id(item)
+            for item in allowed_collection_ids
+            if item and item != "*"
+        ]
+        if logical_ids:
+            # rag-contract-v1 makes collection_id mandatory. A plain must
+            # condition is also compatible with Qdrant 1.7, which rejects
+            # nested should/min_should conditions.
+            must.append(
+                FieldCondition(
+                    key="collection_id",
+                    match=MatchAny(any=logical_ids),
+                )
+            )
+        else:
+            must.append(
+                FieldCondition(
+                    key="collection_id",
+                    match=MatchValue(value="__forbidden_collection__"),
+                )
+            )
 
     filters = filters or {}
     if filters.get("document_id"):
@@ -1223,23 +1484,59 @@ def _build_qdrant_filter(workspace_id: str, filters: Optional[dict] = None) -> O
     return Filter(must=must) if must else None
 
 
-def _apply_post_filters(candidates: list[dict], filters: Optional[dict], metadata_map: dict[str, dict]) -> list[dict]:
+def _apply_post_filters(
+    candidates: list[dict],
+    filters: Optional[dict],
+    metadata_map: dict[str, dict],
+    allowed_collection_ids: Optional[list[str]] = None,
+    *,
+    workspace_id: str | None = None,
+) -> list[dict]:
     if not candidates:
         return []
 
     normalized_filters = dict(filters or {})
-    return [item for item in candidates if _matches_filters(item, normalized_filters, metadata_map)]
+    return [
+        item
+        for item in candidates
+        if _matches_filters(item, normalized_filters, metadata_map, allowed_collection_ids, workspace_id=workspace_id)
+    ]
 
 
-def _matches_filters(item: dict, filters: Optional[dict], metadata_map: dict[str, dict]) -> bool:
+def _matches_filters(
+    item: dict,
+    filters: Optional[dict],
+    metadata_map: dict[str, dict],
+    allowed_collection_ids: Optional[list[str]] = None,
+    *,
+    workspace_id: str | None = None,
+) -> bool:
     """Return True when the item matches the supported retrieval filters."""
-    if not filters:
-        return True
-
     document_id = item.get("document_id")
     page_hint = item.get("page_hint")
+    if workspace_id and item.get("workspace_id") is not None and item.get("workspace_id") != workspace_id:
+        return False
     metadata = metadata_map.get(document_id, {})
     catalog_scope = metadata.get("catalog_scope", "canonical")
+
+    if allowed_collection_ids and "*" not in allowed_collection_ids:
+        item_collection = (
+            item.get("collection_id")
+            or metadata.get("collection_id")
+            or item.get("qdrant_collection")
+            or CANONICAL_COLLECTION_ID
+        )
+        resolved_item_collection = normalize_collection_id(item_collection)
+        resolved_allowed = {
+            normalize_collection_id(value)
+            for value in allowed_collection_ids
+            if value and value != "*"
+        }
+        if resolved_item_collection not in resolved_allowed:
+            return False
+
+    if not filters:
+        return True
 
     if filters.get("document_id") and document_id != filters["document_id"]:
         return False

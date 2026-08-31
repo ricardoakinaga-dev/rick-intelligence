@@ -1,0 +1,81 @@
+{
+  "artifact": "phase-0.5-performance",
+  "schema_version": "phase-0.5-baseline-v1",
+  "captured_at": "2026-08-31T03:04:16Z",
+  "scope": "isolated loopback runtime; deterministic provider seams",
+  "status": "PASS_WITH_FINDING",
+  "commands": [
+    "PYTHONPATH='cvg-master-rag-v2/src:scripts/phase05' QDRANT_HOST=127.0.0.1 QDRANT_PORT=6337 QDRANT_COLLECTION=rag_phase0 OPENAI_API_KEY='' RERANKING_ENABLED=false .runtime/venvs/cvg/bin/python scripts/phase05/phase05_performance.py",
+    "LOCKER_URL=http://127.0.0.1:3317 SAMPLES=20 node tests/phase0/locker-http-benchmark.mjs",
+    "OPENAI_API_KEY=phase05-test-key node tests/phase0/professor-injected-benchmark.mjs"
+  ],
+  "measurements": {
+    "cvg_ingestion_ms": {
+      "n": 5,
+      "p50": 27.059,
+      "p95": 32.339,
+      "min": 21.618,
+      "max": 32.339
+    },
+    "cvg_retrieval_ms": {
+      "n": 10,
+      "p50": 12.313,
+      "p95": 34.33,
+      "min": 9.358,
+      "max": 34.33
+    },
+    "cvg_answer_plumbing_ms": {
+      "n": 5,
+      "p50": 0.884,
+      "p95": 1.335,
+      "min": 0.816,
+      "max": 1.335
+    },
+    "professor_injected_orchestration_ms": {
+      "n": 12,
+      "p50": 0.296,
+      "p95": 2.875,
+      "min": 0.142,
+      "max": 2.875
+    },
+    "locker_http_unique_key_ms": {
+      "n": 20,
+      "p50": 133.201,
+      "p95": 144.544,
+      "min": 119.523,
+      "max": 180.738
+    }
+  },
+  "latest_cvg_refresh": {
+    "captured_at": "2026-08-31T03:54:41Z",
+    "status": "PASS",
+    "workloads": {
+      "ingestion_ms": {"n": 5, "p50": 54.778, "p95": 56.375, "min": 39.901, "max": 56.375},
+      "retrieval_ms": {"n": 10, "p50": 54.523, "p95": 78.786, "min": 34.465, "max": 78.786},
+      "answer_plumbing_ms": {"n": 5, "p50": 7.037, "p95": 9.547, "min": 0.773, "max": 9.547}
+    },
+    "observations": {
+      "retrieval_results": 1,
+      "answer_grounded": true,
+      "point_count_for_document": 1,
+      "qdrant_storage_bytes_observed": 135596892,
+      "process_max_rss_kb": 340764
+    },
+    "note": "Current CVG deterministic harness refresh after the Phase 0.5 security fixes; prior Professor and Locker benchmark samples remain preserved above."
+  },
+  "observations": {
+    "cvg_retrieval_results": 1,
+    "cvg_answer_grounded": true,
+    "cvg_points_for_document": 1,
+    "qdrant_storage_bytes_observed": 135537888,
+    "cvg_process_max_rss_kb": 217344,
+    "duplicate_points_observed": 0
+  },
+  "interpretation": "These are reproducibility and regression observations on local loopback services, not production SLOs, capacity limits, or live provider latency.",
+  "not_run": [
+    "OpenAI live embedding latency and quality",
+    "OpenAI live answer latency and TTFT",
+    "production multi-process capacity",
+    "external OpenWebUI route latency"
+  ]
+}

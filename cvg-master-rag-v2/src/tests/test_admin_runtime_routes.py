@@ -16,6 +16,7 @@ from api.admin_runtime_routes import (
 )
 from api.main import app
 from services.admin_service import reset_admin_state
+from services.enterprise_service import SESSION_COOKIE_NAME
 
 
 def enterprise_headers(
@@ -38,9 +39,10 @@ def enterprise_headers(
         },
     )
     assert response.status_code == 200, response.text
-    payload = response.json()
-    assert payload["session_token"]
-    return {"Authorization": f"Bearer {payload['session_token']}"}
+    token = response.cookies.get(SESSION_COOKIE_NAME)
+    assert token
+    assert response.json()["session_token"] is None
+    return {"Authorization": f"Bearer {token}"}
 
 
 @pytest.fixture(autouse=True)

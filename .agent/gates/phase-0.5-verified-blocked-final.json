@@ -1,0 +1,78 @@
+{
+  "record_id": "GATE-PH05-VERIFIED-002",
+  "timestamp": "2026-08-31T04:07:09Z",
+  "gate_id": "VERIFIED",
+  "scope": "Phase 0.5 integrated verification and promotion decision",
+  "scope_ref": "PH05-VERIFY",
+  "version": 2,
+  "criteria": [
+    {
+      "id": "V-001-ACCEPTANCE-EVIDENCE",
+      "description": "Required Phase 0.5 runtime, contract, security, E2E and component evidence is current and reproducible.",
+      "required": true,
+      "status": "BLOCKED",
+      "evidence_refs": [".agent/verification.jsonl#VER-PH05-CVG-FOCUSED-CURRENT", ".agent/verification.jsonl#VER-PH05-E2E-CURRENT", ".agent/verification.jsonl#VER-PH05-PROFESSOR-CURRENT"],
+      "confidence": "MEDIUM",
+      "limitations": "Local deterministic provider seams prove plumbing; live provider quality/outage behavior and deployment-bound Locker authentication remain unverified."
+    },
+    {
+      "id": "V-002-REGRESSION-RISK",
+      "description": "Regression, UI, concurrency and performance results have no unresolved blocking correctness or security defect.",
+      "required": true,
+      "status": "BLOCKED",
+      "evidence_refs": [".agent/verification.jsonl#VER-PH05-FULL-REGRESSION-CURRENT", ".agent/verification.jsonl#VER-PH05-FRONTEND-CURRENT", ".agent/verification.jsonl#VER-PH05-LOCKER-CURRENT", ".agent/verification.jsonl#VER-PH05-PERFORMANCE-CURRENT"],
+      "confidence": "MEDIUM",
+      "limitations": "The full CVG suite completed with 364 passed, 19 failed, 14 skipped and 6 errors; the remaining cases require historical fixture/policy reconciliation."
+    },
+    {
+      "id": "V-003-LIMITATIONS-AUTHORITY",
+      "description": "Known limitations, authority boundaries and the no-Phase-1 decision are explicit.",
+      "required": true,
+      "status": "PASS",
+      "evidence_refs": ["docs/progress/phase-0.5-report.md", "docs/progress/phase-0.5-independent-review.md", ".gauntlet/state.md", ".agent/plans/phase-0.5-baseline-closure.md"],
+      "confidence": "HIGH",
+      "limitations": "This criterion verifies documentation and scope control only; it does not close the blocked acceptance or regression criteria."
+    }
+  ],
+  "evidence": [
+    "docs/progress/phase-0.5-report.md",
+    "docs/progress/phase-0.5-independent-review.md",
+    "docs/baselines/phase-0.5-characterization.json",
+    "docs/baselines/phase-0.5-performance.json",
+    ".agent/verification.jsonl#VER-PH05-CVG-FOCUSED-CURRENT",
+    ".agent/verification.jsonl#VER-PH05-FULL-REGRESSION-CURRENT",
+    ".agent/verification.jsonl#VER-PH05-E2E-CURRENT",
+    ".agent/verification.jsonl#VER-PH05-PROFESSOR-CURRENT",
+    ".agent/verification.jsonl#VER-PH05-LOCKER-CURRENT",
+    ".agent/verification.jsonl#VER-PH05-FRONTEND-CURRENT",
+    ".agent/verification.jsonl#VER-PH05-PERFORMANCE-CURRENT",
+    ".agent/verification.jsonl#VER-PH05-REVIEW-CURRENT"
+  ],
+  "confidence": "MEDIUM",
+  "gaps": [
+    "Live provider quality and outage behavior are not verified.",
+    "The clean checkout lacks the historical default/Fluxpay fixtures used by part of the legacy suite.",
+    "The full legacy suite remains blocked pending explicit fixture/policy reconciliation.",
+    "Locker HTTP authentication is deployment/network-bound, and non-browser Bearer compatibility remains enabled by policy."
+  ],
+  "conditions": [],
+  "authority": {
+    "required": false,
+    "state": "NOT_REQUIRED",
+    "actor": "Framework policy",
+    "scope": "Phase 0.5 integrated verification and promotion decision",
+    "decision": "A blocked local verification gate cannot authorize production mutation, publication, or Phase 1 consolidation.",
+    "evidence_ref": ".agent/plans/phase-0.5-baseline-closure.md",
+    "expires_or_revalidates": "Revalidate after the legacy suite/provider/deployment gaps are resolved or explicitly accepted with current authority."
+  },
+  "residual_risk": "MEDIUM",
+  "decision": "BLOCKED",
+  "next_action": "Resolve the historical fixture and policy failures, obtain live provider evidence, and define deployment authentication for Locker before reopening VERIFIED.",
+  "revalidation_triggers": [
+    "Historical default/Fluxpay evaluation fixtures are restored or their policy is explicitly reconciled",
+    "Live provider quality and outage evidence becomes available",
+    "Locker deployment authentication and network isolation are independently verified",
+    "A new correctness, security or data-integrity finding appears"
+  ],
+  "supersedes": "GATE-PH05-VERIFIED-001"
+}

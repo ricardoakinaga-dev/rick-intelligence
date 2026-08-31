@@ -4,7 +4,8 @@
   "description": "Microservice for distributed Redis locks",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "node --test test/server.test.js"
   },
   "dependencies": {
     "express": "^4.21.2",

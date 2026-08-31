@@ -5,10 +5,11 @@ import hashlib
 import time
 import json
 import re
+import inspect
 from datetime import datetime, timezone
 from types import SimpleNamespace
 
-from models.schemas import ClinicalQueryVariant, QueryRequest, QueryResponse, SearchRequest, SearchResponse, Citation, GroundingReport
+from models.schemas import ClinicalQueryVariant, QueryRequest, QueryResponse, RetrievalContext, SearchRequest, SearchResponse, Citation, GroundingReport
 from services.vector_service import search_hybrid
 from services.llm_service import generate_answer, estimate_answer_cost, client as llm_client
 from services.grounding_service import verify_grounding, enrich_citations_with_filename
@@ -578,6 +579,7 @@ def execute_search(
     request: SearchRequest,
     *,
     default_query_expansion_mode: str = "off",
+    retrieval_context: RetrievalContext | None = None,
 ) -> SearchResponse:
     """
     Execute retrieval for both /search and /query using the same profile contract.
@@ -637,7 +639,12 @@ def execute_search(
             "filters": _merge_retrieval_filters(request.filters, semantic_only),
         }
     )
-    search_resp = search_hybrid(resolved_request)
+    if retrieval_context is not None and "retrieval_context" in inspect.signature(search_hybrid).parameters:
+        search_resp = search_hybrid(resolved_request, retrieval_context=retrieval_context)
+    else:
+        # Compatibility for unit-test doubles and legacy adapters. The real
+        # vector service always receives the server-created context.
+        search_resp = search_hybrid(resolved_request)
     search_resp.query_expansion_applied = expansion_applied
     search_resp.query_expansion_method = expansion_method
     search_resp.query_expansion_fallback = expansion_fallback
@@ -648,17 +655,31 @@ def execute_search(
     return search_resp
 
 
+def _execute_search_with_context(
+    request: SearchRequest,
+    *,
+    default_query_expansion_mode: str,
+    retrieval_context: RetrievalContext | None,
+) -> SearchResponse:
+    kwargs = {"default_query_expansion_mode": default_query_expansion_mode}
+    if retrieval_context is not None and "retrieval_context" in inspect.signature(execute_search).parameters:
+        kwargs["retrieval_context"] = retrieval_context
+    return execute_search(request, **kwargs)
+
+
 def execute_clinical_fanout_search(
     request: SearchRequest,
     *,
     use_llm: bool = True,
     per_variant_top_k: int | None = None,
+    retrieval_context: RetrievalContext | None = None,
 ) -> SearchResponse:
     """Run retrieval once per safe clinical query variant."""
     if use_llm:
         return _execute_clinical_translation_search(
             request,
             per_variant_top_k=per_variant_top_k,
+            retrieval_context=retrieval_context,
         )
 
     start = time.time()
@@ -681,7 +702,10 @@ def execute_clinical_fanout_search(
                 "reranking_method": "none",
             }
         )
-        variant_response = search_hybrid(variant_request)
+        if retrieval_context is not None and "retrieval_context" in inspect.signature(search_hybrid).parameters:
+            variant_response = search_hybrid(variant_request, retrieval_context=retrieval_context)
+        else:
+            variant_response = search_hybrid(variant_request)
         variant_snapshot = _safe_query_variant_snapshot(variant, index)
         variant_debug.append({
             **variant_snapshot,
@@ -765,6 +789,7 @@ def _execute_clinical_translation_search(
     request: SearchRequest,
     *,
     per_variant_top_k: int | None = None,
+    retrieval_context: RetrievalContext | None = None,
 ) -> SearchResponse:
     """Clinical v2 primary route: PT input becomes one EN retrieval query."""
     start = time.time()
@@ -840,7 +865,10 @@ def _execute_clinical_translation_search(
             "reranking_method": "none",
         }
     )
-    variant_response = search_hybrid(variant_request)
+    if retrieval_context is not None and "retrieval_context" in inspect.signature(search_hybrid).parameters:
+        variant_response = search_hybrid(variant_request, retrieval_context=retrieval_context)
+    else:
+        variant_response = search_hybrid(variant_request)
     must_include_terms = _rick_professor_must_include_terms(prepared)
     gate_debug = _rick_professor_evidence_gate(
         variant_response.results,
@@ -1511,7 +1539,10 @@ def _dedupe_query_variant_origins(origins: list[dict]) -> list[dict]:
     return deduped
 
 
-def search_and_answer_clinical_v2(request: QueryRequest) -> QueryResponse:
+def search_and_answer_clinical_v2(
+    request: QueryRequest,
+    retrieval_context: RetrievalContext | None = None,
+) -> QueryResponse:
     """Clinical RAG v2 pipeline: translation-gated retrieval -> evidence pack -> structured answer."""
     start_total = time.time()
     search_req = SearchRequest(
@@ -1524,8 +1555,23 @@ def search_and_answer_clinical_v2(request: QueryRequest) -> QueryResponse:
         reranking_method=request.reranking_method,
         query_expansion_mode="off",
         retrieval_profile="clinical_v2",
+        collection_id=request.collection_id,
     )
-    search_resp = execute_clinical_fanout_search(search_req)
+    try:
+        clinical_signature = inspect.signature(execute_clinical_fanout_search)
+        accepts_context = (
+            "retrieval_context" in clinical_signature.parameters
+            or any(
+                parameter.kind == inspect.Parameter.VAR_KEYWORD
+                for parameter in clinical_signature.parameters.values()
+            )
+        )
+    except (TypeError, ValueError):
+        accepts_context = True
+    search_resp = execute_clinical_fanout_search(
+        search_req,
+        **({"retrieval_context": retrieval_context} if accepts_context else {}),
+    )
     evidence_pack = build_clinical_evidence_pack(
         search_resp,
         required_sections=_clinical_desired_sections_from_search(search_resp),
@@ -1723,7 +1769,8 @@ def _clinical_confidence(*, has_results: bool, grounded: bool, completeness_stat
 
 
 def search_and_answer(
-    request: QueryRequest
+    request: QueryRequest,
+    retrieval_context: RetrievalContext | None = None,
 ) -> QueryResponse:
     """
     Full pipeline:
@@ -1735,7 +1782,7 @@ def search_and_answer(
     6. Return response
     """
     if request.retrieval_profile == "clinical_v2":
-        return search_and_answer_clinical_v2(request)
+        return search_and_answer_clinical_v2(request, retrieval_context=retrieval_context)
 
     start_total = time.time()
 
@@ -1757,10 +1804,12 @@ def search_and_answer(
         reranking_method=request.reranking_method,
         query_expansion_mode=expansion_mode_override,
         retrieval_profile=request.retrieval_profile,
+        collection_id=request.collection_id,
     )
-    search_resp = execute_search(
+    search_resp = _execute_search_with_context(
         search_req,
         default_query_expansion_mode="adaptive" if QUERY_EXPANSION_ENABLED else "off",
+        retrieval_context=retrieval_context,
     )
     if _should_try_neural_query_retry(request, search_resp):
         retry_req = search_req.model_copy(
@@ -1769,9 +1818,10 @@ def search_and_answer(
                 "reranking_method": "neural",
             }
         )
-        retry_resp = execute_search(
+        retry_resp = _execute_search_with_context(
             retry_req,
             default_query_expansion_mode="adaptive" if QUERY_EXPANSION_ENABLED else "off",
+            retrieval_context=retrieval_context,
         )
         if _should_accept_neural_retry(search_resp, retry_resp):
             search_resp = retry_resp
@@ -1783,9 +1833,10 @@ def search_and_answer(
                 recovery_updates["reranking"] = True
                 recovery_updates["reranking_method"] = "neural"
             recovery_req = search_req.model_copy(update=recovery_updates)
-            recovery_resp = execute_search(
+            recovery_resp = _execute_search_with_context(
                 recovery_req,
                 default_query_expansion_mode="adaptive" if QUERY_EXPANSION_ENABLED else "off",
+                retrieval_context=retrieval_context,
             )
             if _should_accept_neural_retry(search_resp, recovery_resp):
                 search_resp = recovery_resp
@@ -1815,7 +1866,10 @@ def search_and_answer(
             "text": result.text,
             "score": result.score,
             "page_hint": result.page_hint,
-            "source": result.source
+            "source": result.source,
+            "section": result.section,
+            "collection_id": result.collection_id,
+            "checksum": result.checksum,
         })
 
     retrieval_low_confidence = bool(search_resp.low_confidence)
@@ -1876,7 +1930,10 @@ def search_and_answer(
                 document_filename=c.get("document_filename"),
                 page=c.get("page_hint"),
                 text=c["text"],
-                score=c["score"]
+                score=c["score"],
+                section=c.get("section"),
+                collection_id=c.get("collection_id"),
+                checksum=c.get("checksum"),
             ))
 
         document_filenames = {
@@ -1926,7 +1983,11 @@ def search_and_answer(
                 document_filename=c.document_filename,
                 page=c.page,
                 text=c.text[:300] + "..." if len(c.text) > 300 else c.text,
-                score=c.score
+                score=c.score,
+                section=c.section,
+                sections=c.sections,
+                collection_id=c.collection_id,
+                checksum=c.checksum,
             )
             for c in citations
         ]

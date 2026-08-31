@@ -18,6 +18,7 @@ if str(SRC_DIR) not in sys.path:
 
 from api.main import app
 from services.admin_service import reset_admin_state
+from services.enterprise_service import SESSION_COOKIE_NAME
 
 
 def enterprise_headers(
@@ -40,8 +41,10 @@ def enterprise_headers(
         },
     )
     assert response.status_code == 200, response.text
-    payload = response.json()
-    return {"Authorization": f"Bearer {payload['session_token']}"}
+    token = response.cookies.get(SESSION_COOKIE_NAME)
+    assert token
+    assert response.json()["session_token"] is None
+    return {"Authorization": f"Bearer {token}"}
 
 
 @pytest.fixture(autouse=True)
@@ -130,7 +133,10 @@ class TestTKT010NonLeakage:
 
         switched = client.post("/auth/switch-tenant", json={"tenant_id": "acme-lab"}, headers=headers)
         assert switched.status_code == 200, switched.text
-        switched_headers = {"Authorization": f"Bearer {switched.json()['session_token']}"}
+        switched_token = switched.cookies.get(SESSION_COOKIE_NAME)
+        assert switched_token
+        assert switched.json()["session_token"] is None
+        switched_headers = {"Authorization": f"Bearer {switched_token}"}
 
         acme_docs = client.get("/documents?workspace_id=acme-lab", headers=switched_headers)
         assert acme_docs.status_code == 200, acme_docs.text
@@ -138,7 +144,10 @@ class TestTKT010NonLeakage:
 
         switched_again = client.post("/auth/switch-tenant", json={"tenant_id": "northwind"}, headers=switched_headers)
         assert switched_again.status_code == 200, switched_again.text
-        northwind_headers = {"Authorization": f"Bearer {switched_again.json()['session_token']}"}
+        northwind_token = switched_again.cookies.get(SESSION_COOKIE_NAME)
+        assert northwind_token
+        assert switched_again.json()["session_token"] is None
+        northwind_headers = {"Authorization": f"Bearer {northwind_token}"}
 
         northwind_docs = client.get("/documents?workspace_id=northwind", headers=northwind_headers)
         assert northwind_docs.status_code == 200, northwind_docs.text
