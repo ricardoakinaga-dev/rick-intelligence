@@ -7,17 +7,16 @@ knowledge-intelligence platform:
 - `rick-professor/` — the current TypeScript/Fastify Professor compatibility service;
 - `modulo-redis-locker/` — the current JavaScript/Express Redis lease service.
 
-The repository is currently at **Phase 1.1 — Monorepo Skeleton & Migration
-Safety**. This phase establishes the root boundary, reproducible commands,
-dependency rules, and migration map. It intentionally does not move or rewrite
-runtime code. The three component histories and their local worktrees remain
-independent until an explicitly verified migration slice replaces a legacy
-path.
-
-The previous Phase 0.6 promotion gate remains recorded as `BLOCKED` because
-its approved corpus and external evidence are unavailable. The current user-
-authorized Phase 1.1 work is a root-only, reversible foundation and does not
-promote or erase that decision.
+The repository is currently at **Phase 1.3 — Unified API Kernel & Runtime Adapter
+Consolidation**. `apps/api` is now the canonical executable platform HTTP boundary
+(FastAPI): versioned `/api/v1/*` routes, OpenAI-compatible `/v1/chat/completions`,
+typed config + app factory, request context/correlation, canonical errors,
+`identity`/`authorization` integration, health/readiness, centralized legacy
+adapters, audit/observability hooks, and a 44-test matrix with dual-verification
+evidence. Legacy CVG/Professor/Locker servers remain as compatibility/migration
+surfaces (see `docs/architecture/api-migration-map.md`); no legacy code is deleted
+in this phase. The previous Phase 0.6 promotion gate remains recorded as `BLOCKED`
+and Phase 1.1 as `VERIFIED` (root skeleton scope).
 
 ## Repository layout
 
@@ -58,6 +57,11 @@ Run `make help` for the complete list.
 | `make build` | Builds the existing Professor and frontend artifacts and compiles the preserved Python source. |
 | `make ci` | Runs the root foundation validation plus fast tests, lint, typecheck, and build. |
 | `make eval` | Runs the deterministic, explicitly non-live Phase 0.5 RAG plumbing evaluation. |
+| `make api-dev` | Runs the canonical `apps/api` kernel (hermetic by default; legacy opt-in). |
+| `make api-test` | Phase 1.3 API matrix (routing/auth/errors/health/compat/streaming/policy). |
+| `make api-contract` | OpenAPI generation + required-path check. |
+| `make api-security` | Route-policy + negatives + import-boundary checks. |
+| `make api-benchmark` | Kernel-overhead p50/p95 observation (stub backend, local). |
 | `make dev`, `make up`, `make logs` | Fail closed until a canonical root application/compose boundary exists; they never guess at legacy service wiring. |
 | `make down` | Reports that no canonical root stack exists yet and changes no external state. |
 

@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "project": "RICK Intelligence Phase 1.1 monorepo skeleton",
-  "goal": "Establish an additive root monorepo skeleton and migration-safety contract without moving runtime code or changing the Phase 0.6 decision.",
+  "project": "RICK Intelligence Phase 1.3 unified API kernel",
+  "goal": "Canonical apps/api HTTP boundary with versioned routes, identity/authorization integration, health/readiness, legacy adapters, chat + OpenAI compat, audit/observability hooks \u2014 DUAL with no legacy deletion.",
   "project_profile": "BROWNFIELD",
   "work_mode": "MIGRATION",
   "work_mode_overlays": [],
@@ -28,13 +28,18 @@
     "scripts/phase11/check_skeleton.py",
     "scripts/phase11/runner.py",
     "docs/ci/check_control_plane.py",
-    ".gauntlet/state.md"
+    ".gauntlet/state.md",
+    ".agent/plans/phase-1.3-unified-api-kernel.md",
+    ".agent/gates/phase-1.3-verified.json",
+    "docs/progress/phase-1.3-report.md",
+    "docs/progress/phase-1.3-independent-review.md",
+    "docs/architecture/api-migration-map.md"
   ],
-  "last_gate_record": ".agent/gates/phase-1.1-verified.json",
-  "last_event_id": "EVT-PH11-REVIEW-REVALIDATED-COMPLETE",
-  "state_revision": 34,
-  "next_gate": "IMPLEMENTATION_READY",
-  "next_action": "Phase 1.1 is verified for its bounded root-only scope; keep Phase 1.2/runtime extraction closed until a new user-authorized plan and implementation-ready gate are recorded.",
+  "last_gate_record": ".agent/gates/phase-1.3-verified.json",
+  "last_event_id": "EVT-PH13-FINAL-COMPLETE",
+  "state_revision": 35,
+  "next_gate": "PHASE_1_4_AUTHORIZATION_REQUIRED",
+  "next_action": "Phase 1.3 VERIFIED_CANDIDATE recorded; do NOT begin Phase 1.4 until a new user-authorized plan and implementation-ready gate exist. Historical Phase 0.6 remains BLOCKED/NOT_PROMOTED.",
   "blocked_by": [],
   "human_approval_required": [],
   "published_phase_0_5_commit": {
@@ -51,5 +56,5 @@
     "worktree": "DIRTY_PHASE_1_1",
     "sync": "HEAD_EQ_ORIGIN_MAIN"
   },
-  "updated_at": "2026-08-31T15:04:25Z"
+  "updated_at": "2026-09-03T03:27:12Z"
 }

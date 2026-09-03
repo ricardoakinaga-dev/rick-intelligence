@@ -1,0 +1,11 @@
+{
+  "http_adapter_ms": {
+    "p50": 5.195,
+    "p95": 9.305
+  },
+  "direct_service_ms": {
+    "p50": 0.013,
+    "p95": 0.031
+  },
+  "note": "stub backend, local, hermetic; provider/Qdrant excluded"
+}

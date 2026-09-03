@@ -25,7 +25,9 @@
       "priority": "P0",
       "status": "DONE",
       "origin": "User Phase 0 characterization requirements",
-      "dependencies": ["PH0-INV"],
+      "dependencies": [
+        "PH0-INV"
+      ],
       "owner": "Codex lead",
       "acceptance_summary": "Representative document, chunk, embedding, persistence/index, known-query evidence, grounded answer, provenance, malformed/provider/vector failures, duplicate, restart, and concurrency behavior are recorded as pass/fail/not-run.",
       "evidence_refs": [
@@ -42,7 +44,9 @@
       "priority": "P0",
       "status": "DONE",
       "origin": "User Phase 0 performance baseline requirements",
-      "dependencies": ["PH0-CHAR"],
+      "dependencies": [
+        "PH0-CHAR"
+      ],
       "owner": "Codex lead",
       "acceptance_summary": "Environment, commands, ingestion/embedding/query/retrieval/generation latency, TTFT where applicable, memory, index size, duplicate, and concurrency measurements are saved or explicitly marked NOT_RUN.",
       "evidence_refs": [
@@ -59,7 +63,11 @@
       "priority": "P0",
       "status": "IN_PROGRESS",
       "origin": "User Phase 0 report and handoff requirements",
-      "dependencies": ["PH0-INV", "PH0-CHAR", "PH0-BASE"],
+      "dependencies": [
+        "PH0-INV",
+        "PH0-CHAR",
+        "PH0-BASE"
+      ],
       "owner": "Codex lead",
       "acceptance_summary": "The required phase report sections, PHASE 0 STATUS table, VERIFIED_CANDIDATE recommendation decision, limitations, and evidence-backed Phase 1 implementation plan are complete.",
       "evidence_refs": [
@@ -78,7 +86,7 @@
       "origin": "User Phase 0.5 runtime baseline and control task requirements",
       "dependencies": [],
       "owner": "Codex lead",
-      "acceptance_summary": "Pinned Python/uv/Qdrant/Redis/Node/npm versions, isolated services, repaired frontend lockfile, reproducible commands, and honest A–O status evidence are captured without host-state mutation.",
+      "acceptance_summary": "Pinned Python/uv/Qdrant/Redis/Node/npm versions, isolated services, repaired frontend lockfile, reproducible commands, and honest A\u2013O status evidence are captured without host-state mutation.",
       "evidence_refs": [
         ".agent/plans/phase-0.5-baseline-closure.md",
         ".gauntlet/state.md",
@@ -95,10 +103,16 @@
       "priority": "P0",
       "status": "DONE",
       "origin": "User Phase 0.5 canonical RAG contract requirements",
-      "dependencies": ["PH05-ENV"],
+      "dependencies": [
+        "PH05-ENV"
+      ],
       "owner": "Codex lead",
       "acceptance_summary": "Canonical collection resolution, named vectors, complete payload, deterministic IDs, RetrievalContext, compatibility adapters, schema fixtures, and idempotent document identity are implemented and tested.",
-      "evidence_refs": ["docs/architecture/contracts/rag-contract-v1.md", "scripts/phase05/phase05_e2e.py", ".agent/verification.jsonl#VER-PH05-RAG-CURRENT"],
+      "evidence_refs": [
+        "docs/architecture/contracts/rag-contract-v1.md",
+        "scripts/phase05/phase05_e2e.py",
+        ".agent/verification.jsonl#VER-PH05-RAG-CURRENT"
+      ],
       "next_action": "Add the contract document and focused model/vector/ingestion tests after the runtime baseline is recorded."
     },
     {
@@ -108,10 +122,16 @@
       "priority": "P0",
       "status": "DONE",
       "origin": "User Phase 0.5 Redis lock ownership and cleanup requirements",
-      "dependencies": ["PH05-ENV"],
+      "dependencies": [
+        "PH05-ENV"
+      ],
       "owner": "Codex lead",
       "acceptance_summary": "Acquire, owner-bound compare-delete unlock, optional renewal, expiry, contention, wrong-owner, and Professor finally-release behavior are proven with isolated Redis evidence.",
-      "evidence_refs": ["docs/progress/phase-0.5-report.md", "scripts/phase05/locker_e2e.mjs", ".agent/verification.jsonl#VER-PH05-LOCK-CURRENT"],
+      "evidence_refs": [
+        "docs/progress/phase-0.5-report.md",
+        "scripts/phase05/locker_e2e.mjs",
+        ".agent/verification.jsonl#VER-PH05-LOCK-CURRENT"
+      ],
       "next_action": "Implement the Locker contract and Professor release path once the canonical context interface is stable."
     },
     {
@@ -121,10 +141,16 @@
       "priority": "P0",
       "status": "DONE",
       "origin": "User Phase 0.5 evidence and provenance requirements",
-      "dependencies": ["PH05-RAG-CONTRACT"],
+      "dependencies": [
+        "PH05-RAG-CONTRACT"
+      ],
       "owner": "Codex lead",
       "acceptance_summary": "No/weak/approved evidence states are explicit; weak single hits fall back; planner IDs are validated against authorized retrieved chunks; fabricated, wrong, inaccessible, and nonretrieved citations are rejected.",
-      "evidence_refs": ["docs/architecture/contracts/rag-contract-v1.md", "rick-professor/src/core/evidence.ts", ".agent/verification.jsonl#VER-PH05-EVIDENCE-CURRENT"],
+      "evidence_refs": [
+        "docs/architecture/contracts/rag-contract-v1.md",
+        "rick-professor/src/core/evidence.ts",
+        ".agent/verification.jsonl#VER-PH05-EVIDENCE-CURRENT"
+      ],
       "next_action": "Add the evidence resolver and negative tests in Professor after RetrievalContext is available."
     },
     {
@@ -134,10 +160,16 @@
       "priority": "P0",
       "status": "DONE",
       "origin": "User Phase 0.5 upload and secret/log hygiene requirements",
-      "dependencies": ["PH05-RAG-CONTRACT"],
+      "dependencies": [
+        "PH05-RAG-CONTRACT"
+      ],
       "owner": "Codex lead",
       "acceptance_summary": "Traversal, absolute paths, NULs, unsupported extensions, size limits, and collisions are handled safely; storage names are generated; logs and errors do not expose secrets or raw connection URLs.",
-      "evidence_refs": ["docs/progress/phase-0.5-report.md", "cvg-master-rag-v2/src/services/upload_security.py", ".agent/verification.jsonl#VER-PH05-UPLOAD-CURRENT"],
+      "evidence_refs": [
+        "docs/progress/phase-0.5-report.md",
+        "cvg-master-rag-v2/src/services/upload_security.py",
+        ".agent/verification.jsonl#VER-PH05-UPLOAD-CURRENT"
+      ],
       "next_action": "Implement safe filename/storage helpers and focused API tests."
     },
     {
@@ -147,10 +179,16 @@
       "priority": "P0",
       "status": "DONE",
       "origin": "User Phase 0.5 identity and role model requirements",
-      "dependencies": ["PH05-RAG-CONTRACT"],
+      "dependencies": [
+        "PH05-RAG-CONTRACT"
+      ],
       "owner": "Codex lead",
       "acceptance_summary": "Canonical roles and permissions with legacy aliases, strong password hashing, disabled/logout/session invalidation, rate limits, generic failures, explicit route authorization, and audit events are implemented.",
-      "evidence_refs": ["docs/architecture/security/identity-model.md", "docs/architecture/security/permission-model.md", ".agent/verification.jsonl#VER-PH05-IDENTITY-CURRENT"],
+      "evidence_refs": [
+        "docs/architecture/security/identity-model.md",
+        "docs/architecture/security/permission-model.md",
+        ".agent/verification.jsonl#VER-PH05-IDENTITY-CURRENT"
+      ],
       "next_action": "Add canonical authorization helpers and route-level negative tests while preserving legacy API compatibility."
     },
     {
@@ -160,10 +198,17 @@
       "priority": "P0",
       "status": "DONE",
       "origin": "User Phase 0.5 collection ownership and non-leak requirements",
-      "dependencies": ["PH05-RAG-CONTRACT", "PH05-IDENTITY"],
+      "dependencies": [
+        "PH05-RAG-CONTRACT",
+        "PH05-IDENTITY"
+      ],
       "owner": "Codex lead",
       "acceptance_summary": "RetrievalContext is required at server-side filters; veterinarians see only granted collections; managers/admins receive the documented scope; documents, sources, and citations cannot cross ACLs.",
-      "evidence_refs": ["docs/architecture/security/collection-acl.md", "docs/architecture/security/ui-access-matrix.md", ".agent/verification.jsonl#VER-PH05-ACL-CURRENT"],
+      "evidence_refs": [
+        "docs/architecture/security/collection-acl.md",
+        "docs/architecture/security/ui-access-matrix.md",
+        ".agent/verification.jsonl#VER-PH05-ACL-CURRENT"
+      ],
       "next_action": "Wire authorized collection IDs through CVG retrieval, Professor requests, and source/citation responses."
     },
     {
@@ -173,10 +218,24 @@
       "priority": "P0",
       "status": "DONE",
       "origin": "User Phase 0.5 promotion gate and gauntlet requirements",
-      "dependencies": ["PH05-LOCK", "PH05-EVIDENCE", "PH05-UPLOAD", "PH05-ACL"],
+      "dependencies": [
+        "PH05-LOCK",
+        "PH05-EVIDENCE",
+        "PH05-UPLOAD",
+        "PH05-ACL"
+      ],
       "owner": "Codex lead",
       "acceptance_summary": "All required runtime, contract, security, E2E, regression, concurrency, performance, and independent-review evidence is current and the final status is one of the allowed honest outcomes.",
-      "evidence_refs": ["docs/progress/phase-0.5-report.md", "docs/progress/phase-0.5-independent-review.md", ".agent/gates/phase-0.5-verified-blocked-final.json", ".agent/verification.jsonl#VER-PH05-FULL-REGRESSION-CURRENT", ".agent/verification.jsonl#VER-PH05-FRONTEND-CURRENT", ".agent/verification.jsonl#VER-PH05-PERFORMANCE-CURRENT", ".agent/verification.jsonl#VER-PH05-REVIEW-CURRENT", ".agent/verification.jsonl#VER-PH05-FINAL-CURRENT"],
+      "evidence_refs": [
+        "docs/progress/phase-0.5-report.md",
+        "docs/progress/phase-0.5-independent-review.md",
+        ".agent/gates/phase-0.5-verified-blocked-final.json",
+        ".agent/verification.jsonl#VER-PH05-FULL-REGRESSION-CURRENT",
+        ".agent/verification.jsonl#VER-PH05-FRONTEND-CURRENT",
+        ".agent/verification.jsonl#VER-PH05-PERFORMANCE-CURRENT",
+        ".agent/verification.jsonl#VER-PH05-REVIEW-CURRENT",
+        ".agent/verification.jsonl#VER-PH05-FINAL-CURRENT"
+      ],
       "next_action": "Resolve the explicit provider, historical fixture/policy, and deployment-control gaps before reopening VERIFIED; keep Phase 1 deferred."
     },
     {
@@ -186,10 +245,15 @@
       "priority": "P0",
       "status": "DONE",
       "origin": "Phase 0.6 Promotion Closure requirements",
-      "dependencies": ["PH05-VERIFY"],
+      "dependencies": [
+        "PH05-VERIFY"
+      ],
       "owner": "Codex lead",
       "acceptance_summary": "Published Phase 0.5 SHA, current Git state, active Phase 0.6 plan/task, backlog and append-only ledgers are structurally aligned and checked by an executable control-plane validator.",
-      "evidence_refs": [".agent/plans/phase-0.6-promotion-closure.md", "scripts/phase06/check_control_plane.py"],
+      "evidence_refs": [
+        ".agent/plans/phase-0.6-promotion-closure.md",
+        "scripts/phase06/check_control_plane.py"
+      ],
       "next_action": "Control-plane checker passed; Phase 0.6 implementation lanes are unlocked."
     },
     {
@@ -199,10 +263,17 @@
       "priority": "P0",
       "status": "DONE",
       "origin": "Phase 0.6 explicit RBAC and VET access requirements",
-      "dependencies": ["PH06-RECON"],
+      "dependencies": [
+        "PH06-RECON"
+      ],
       "owner": "CVG RBAC worker",
       "acceptance_summary": "Explicit additions/removals and wildcard rules are deterministic, removed permissions are never re-granted, legacy sessions retain immutable effective snapshots until invalidation, and VET source/read/browse boundaries have negative coverage.",
-      "evidence_refs": ["cvg-master-rag-v2/src/services/authorization.py", "cvg-master-rag-v2/src/services/enterprise_service.py", "cvg-master-rag-v2/src/tests/test_phase06_rbac.py", ".agent/verification.jsonl#VER-PH06-RBAC-CURRENT"],
+      "evidence_refs": [
+        "cvg-master-rag-v2/src/services/authorization.py",
+        "cvg-master-rag-v2/src/services/enterprise_service.py",
+        "cvg-master-rag-v2/src/tests/test_phase06_rbac.py",
+        ".agent/verification.jsonl#VER-PH06-RBAC-CURRENT"
+      ],
       "next_action": "RBAC, wildcard, session-snapshot, VET and route-negative checks passed; retain the canonical permission registry as the review point."
     },
     {
@@ -212,10 +283,14 @@
       "priority": "P0",
       "status": "BLOCKED",
       "origin": "Phase 0.6 explicit legacy test classification requirements",
-      "dependencies": ["PH06-RECON"],
+      "dependencies": [
+        "PH06-RECON"
+      ],
       "owner": "Codex lead with read-only scout",
       "acceptance_summary": "Every baseline failure/error has a test ID, file, failure text, root cause, allowed classification, relevance, action/evidence and final status; no unexplained red or hidden tests remain.",
-      "evidence_refs": ["docs/baselines/phase-0.6-legacy-test-classification.md"],
+      "evidence_refs": [
+        "docs/baselines/phase-0.6-legacy-test-classification.md"
+      ],
       "next_action": "Restore the approved corpus with provenance or record an owner-authorized permanent waiver, then rerun the full suite without masking."
     },
     {
@@ -225,10 +300,14 @@
       "priority": "P0",
       "status": "DONE",
       "origin": "Phase 0.6 real provider contract requirements",
-      "dependencies": ["PH06-RECON"],
+      "dependencies": [
+        "PH06-RECON"
+      ],
       "owner": "Professor provider worker",
       "acceptance_summary": "A real configured provider or real loopback OpenAI-compatible HTTP server covers success and all required provider failures with safe errors, bounded retry, correlation, state integrity, citation integrity and lock cleanup.",
-      "evidence_refs": ["docs/baselines/phase-0.6-provider-contract.json"],
+      "evidence_refs": [
+        "docs/baselines/phase-0.6-provider-contract.json"
+      ],
       "next_action": "Local real-protocol contract passed; obtain live-provider evidence only with approved endpoint and credentials."
     },
     {
@@ -238,10 +317,15 @@
       "priority": "P0",
       "status": "DONE",
       "origin": "Phase 0.6 deployment boundary and CI requirements",
-      "dependencies": ["PH06-RECON"],
+      "dependencies": [
+        "PH06-RECON"
+      ],
       "owner": "Locker/CI worker",
       "acceptance_summary": "Locker is private-network-only in deployment examples with a lint/test guard, and CI enforces pinned fast/integration checks for all relevant component, security, contract, frontend, secret, dependency and control-plane surfaces.",
-      "evidence_refs": ["docs/architecture/security/locker-boundary.md", ".github/workflows/phase-0.6.yml"],
+      "evidence_refs": [
+        "docs/architecture/security/locker-boundary.md",
+        ".github/workflows/phase-0.6.yml"
+      ],
       "next_action": "Boundary lint, component tests, dependency audits and workflow structure passed; execute GitHub lanes when published."
     },
     {
@@ -251,10 +335,18 @@
       "priority": "P0",
       "status": "DONE",
       "origin": "Phase 0.6 report and final-gate requirements",
-      "dependencies": ["PH06-RBAC", "PH06-LEGACY", "PH06-PROVIDER", "PH06-LOCKER-CI"],
+      "dependencies": [
+        "PH06-RBAC",
+        "PH06-LEGACY",
+        "PH06-PROVIDER",
+        "PH06-LOCKER-CI"
+      ],
       "owner": "Codex lead",
       "acceptance_summary": "Required report, provider/legacy baselines, control-plane reconciliation, regression/security results and final gate accurately reflect current executable evidence.",
-      "evidence_refs": ["docs/progress/phase-0.6-report.md", ".agent/gates/phase-0.6-promotion-final.json"],
+      "evidence_refs": [
+        "docs/progress/phase-0.6-report.md",
+        ".agent/gates/phase-0.6-promotion-final.json"
+      ],
       "next_action": "Integrated report, baselines, final gate and control references are complete; retain BLOCKED until corpus/waiver and external evidence are resolved."
     },
     {
@@ -264,10 +356,14 @@
       "priority": "P0",
       "status": "DONE",
       "origin": "Phase 0.6 independent review requirements",
-      "dependencies": ["PH06-INTEGRATE"],
+      "dependencies": [
+        "PH06-INTEGRATE"
+      ],
       "owner": "Fresh read-only reviewer",
       "acceptance_summary": "All twelve required review questions are answered against the integrated artifact; no P0/HIGH blocker is hidden or left unexplained.",
-      "evidence_refs": ["docs/progress/phase-0.6-independent-review.md"],
+      "evidence_refs": [
+        "docs/progress/phase-0.6-independent-review.md"
+      ],
       "next_action": "Twelve-question fresh read-only review completed; final classification is BLOCKED and no Phase 1 plan is authorized."
     },
     {
@@ -280,7 +376,17 @@
       "dependencies": [],
       "owner": "Codex lead",
       "acceptance_summary": "Root apps/packages/infrastructure/test boundaries, pinned toolchain, canonical environment template, root commands, dependency rules, migration map, and preservation validator exist without moving runtime code or editing child histories.",
-      "evidence_refs": [".agent/gates/phase-1.1-implementation-ready.json", "docs/plans/phase-1.1-monorepo-skeleton.md", ".agent/plans/phase-1.1-monorepo-skeleton.md", ".agent/verification.jsonl#VER-PH11-ROOT-CURRENT", ".agent/verification.jsonl#VER-PH11-BOUNDARY-CURRENT", ".agent/verification.jsonl#VER-PH11-FAST-CURRENT", ".agent/verification.jsonl#VER-PH11-INTEGRATION-CURRENT", ".agent/verification.jsonl#VER-PH11-CI-CURRENT", ".agent/verification.jsonl#VER-PH11-FULL-REGRESSION-CURRENT"],
+      "evidence_refs": [
+        ".agent/gates/phase-1.1-implementation-ready.json",
+        "docs/plans/phase-1.1-monorepo-skeleton.md",
+        ".agent/plans/phase-1.1-monorepo-skeleton.md",
+        ".agent/verification.jsonl#VER-PH11-ROOT-CURRENT",
+        ".agent/verification.jsonl#VER-PH11-BOUNDARY-CURRENT",
+        ".agent/verification.jsonl#VER-PH11-FAST-CURRENT",
+        ".agent/verification.jsonl#VER-PH11-INTEGRATION-CURRENT",
+        ".agent/verification.jsonl#VER-PH11-CI-CURRENT",
+        ".agent/verification.jsonl#VER-PH11-FULL-REGRESSION-CURRENT"
+      ],
       "next_action": "Skeleton implementation and root command verification are complete; preserve the candidate while the independent review runs."
     },
     {
@@ -290,10 +396,24 @@
       "priority": "P0",
       "status": "DONE",
       "origin": "Phase 1.1 independent review requirement",
-      "dependencies": ["PH11-SKELETON"],
+      "dependencies": [
+        "PH11-SKELETON"
+      ],
       "owner": "Fresh read-only reviewer",
       "acceptance_summary": "A reviewer without builder context checks every frozen Phase 1.1 quality-bar item, reruns the root structural command, identifies the largest remaining gap, and records a decision with limitations.",
-      "evidence_refs": [".agent/verification.jsonl#VER-PH11-CI-CURRENT", ".agent/verification.jsonl#VER-PH11-CI-RECHECK-CURRENT", ".agent/verification.jsonl#VER-PH11-DUAL-SNAPSHOT-RECHECK-CURRENT", ".agent/verification.jsonl#VER-PH11-CLEAN-CHECKOUT-CURRENT", ".agent/verification.jsonl#VER-PH11-FULL-REGRESSION-CURRENT", "docs/progress/phase-1.1-independent-review.md", ".agent/verification.jsonl#VER-PH11-INDEPENDENT-REVIEW-CURRENT", ".agent/verification.jsonl#VER-PH11-INDEPENDENT-REVIEW-ROUND2-CURRENT", ".agent/verification.jsonl#VER-PH11-INDEPENDENT-REVIEW-ROUND3-CURRENT", ".agent/verification.jsonl#VER-PH11-INDEPENDENT-REVIEW-REVALIDATED-CURRENT", ".agent/verification.jsonl#VER-PH11-INDEPENDENT-REVIEW-ROUND2-REVALIDATED-CURRENT"],
+      "evidence_refs": [
+        ".agent/verification.jsonl#VER-PH11-CI-CURRENT",
+        ".agent/verification.jsonl#VER-PH11-CI-RECHECK-CURRENT",
+        ".agent/verification.jsonl#VER-PH11-DUAL-SNAPSHOT-RECHECK-CURRENT",
+        ".agent/verification.jsonl#VER-PH11-CLEAN-CHECKOUT-CURRENT",
+        ".agent/verification.jsonl#VER-PH11-FULL-REGRESSION-CURRENT",
+        "docs/progress/phase-1.1-independent-review.md",
+        ".agent/verification.jsonl#VER-PH11-INDEPENDENT-REVIEW-CURRENT",
+        ".agent/verification.jsonl#VER-PH11-INDEPENDENT-REVIEW-ROUND2-CURRENT",
+        ".agent/verification.jsonl#VER-PH11-INDEPENDENT-REVIEW-ROUND3-CURRENT",
+        ".agent/verification.jsonl#VER-PH11-INDEPENDENT-REVIEW-REVALIDATED-CURRENT",
+        ".agent/verification.jsonl#VER-PH11-INDEPENDENT-REVIEW-ROUND2-REVALIDATED-CURRENT"
+      ],
       "next_action": "Independent Round 3 and exact-scope append-only revalidation passed with no remaining material Phase 1.1 gap; final gate remains bound."
     },
     {
@@ -303,11 +423,59 @@
       "priority": "P0",
       "status": "DONE",
       "origin": "Phase 1.1 final gate and handoff requirement",
-      "dependencies": ["PH11-SKELETON", "PH11-REVIEW"],
+      "dependencies": [
+        "PH11-SKELETON",
+        "PH11-REVIEW"
+      ],
       "owner": "Codex lead",
       "acceptance_summary": "Fresh command evidence, independent review, final report, append-only control-plane records, and a truthful VERIFIED gate are bound; Phase 1.2 remains locked until a later authorized scope.",
-      "evidence_refs": [".agent/gates/phase-1.1-verified.json", "docs/progress/phase-1.1-independent-review.md", ".agent/verification.jsonl#VER-PH11-INDEPENDENT-REVIEW-ROUND3-CURRENT", ".agent/verification.jsonl#VER-PH11-INTEGRATION-FINAL-CURRENT", ".agent/verification.jsonl#VER-PH11-EVAL-FINAL-CURRENT", ".agent/verification.jsonl#VER-PH11-FULL-REGRESSION-FINAL-CURRENT", ".agent/verification.jsonl#VER-PH11-GUARDS-FINAL-CURRENT", ".agent/verification.jsonl#VER-PH11-FINAL-CURRENT"],
+      "evidence_refs": [
+        ".agent/gates/phase-1.1-verified.json",
+        "docs/progress/phase-1.1-independent-review.md",
+        ".agent/verification.jsonl#VER-PH11-INDEPENDENT-REVIEW-ROUND3-CURRENT",
+        ".agent/verification.jsonl#VER-PH11-INTEGRATION-FINAL-CURRENT",
+        ".agent/verification.jsonl#VER-PH11-EVAL-FINAL-CURRENT",
+        ".agent/verification.jsonl#VER-PH11-FULL-REGRESSION-FINAL-CURRENT",
+        ".agent/verification.jsonl#VER-PH11-GUARDS-FINAL-CURRENT",
+        ".agent/verification.jsonl#VER-PH11-FINAL-CURRENT"
+      ],
       "next_action": "Phase 1.1 VERIFIED gate is bound; keep Phase 1.2/runtime extraction closed until a separately authorized implementation-ready scope exists."
+    },
+    {
+      "id": "PH13-KERNEL",
+      "title": "Build canonical apps/api kernel with versioned routes, factory, context, errors, health, adapters",
+      "stage": "BUILD",
+      "priority": "P0",
+      "status": "DONE",
+      "origin": "Phase 1.3 unified API kernel prompt",
+      "dependencies": [
+        "PH11-FINAL"
+      ],
+      "owner": "Codex lead",
+      "acceptance_summary": "Executable FastAPI boundary; 44 api tests + 22 security + OpenAPI 29 paths + benchmark pass; DUAL migration map with no deletion.",
+      "evidence_refs": [
+        "apps/api/src/app.py",
+        "docs/progress/phase-1.3-report.md",
+        ".agent/gates/phase-1.3-verified.json"
+      ],
+      "next_action": "Kernel complete; keep legacy DUAL until Phase 1.4 dual verification per route."
+    },
+    {
+      "id": "PH13-REVIEW",
+      "title": "Fresh independent Phase 1.3 review (16 questions)",
+      "stage": "VERIFY",
+      "priority": "P0",
+      "status": "DONE",
+      "origin": "Phase 1.3 review requirement",
+      "dependencies": [
+        "PH13-KERNEL"
+      ],
+      "owner": "Fresh read-only reviewer",
+      "acceptance_summary": "All 16 questions answered; no P0/HIGH; 3 MEDIUM + 2 LOW + 1 INFO carried as Phase 1.4 prerequisites.",
+      "evidence_refs": [
+        "docs/progress/phase-1.3-independent-review.md"
+      ],
+      "next_action": "No further 1.3 work; await Phase 1.4 authorization."
     }
   ]
 }
