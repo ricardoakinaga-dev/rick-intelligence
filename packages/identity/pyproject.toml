@@ -1,0 +1,6 @@
+[project]
+name = "rick-identity"
+version = "1.3.1"
+description = "Canonical identity runtime (lifecycle + snapshots; policy via rick-authorization)"
+requires-python = ">=3.12"
+dependencies = ["rick-authorization"]

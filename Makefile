@@ -5,10 +5,11 @@ PYTHON ?= python3
 PHASE11_RUNNER := $(ROOT)/scripts/phase11/runner.py
 PHASE11_CHECK := $(ROOT)/scripts/phase11/check_skeleton.py
 PHASE13_RUNNER := $(ROOT)/scripts/phase13/phase13.py
+PHASE131_RUNNER := $(ROOT)/scripts/phase13/phase131.py
 
 .DEFAULT_GOAL := help
 
-.PHONY: help bootstrap validate dev test test-fast test-integration lint typecheck build up down logs ci eval api-dev api-test api-contract api-security api-benchmark
+.PHONY: help bootstrap validate dev test test-fast test-integration lint typecheck build up down logs ci eval api-dev api-test api-contract api-security api-benchmark api131-canonical api131-differential api131-full api131-benchmark
 
 help:
 	@printf '%s\n' 'RICK Intelligence root commands:'
@@ -86,3 +87,15 @@ api-security:
 
 api-benchmark:
 	$(PYTHON) "$(PHASE13_RUNNER)" benchmark
+
+api131-canonical:
+	$(PYTHON) "$(PHASE131_RUNNER)" canonical
+
+api131-differential:
+	$(PYTHON) "$(PHASE131_RUNNER)" differential
+
+api131-full:
+	$(PYTHON) "$(PHASE131_RUNNER)" full
+
+api131-benchmark:
+	$(PYTHON) "$(PHASE131_RUNNER)" benchmark

@@ -1,0 +1,6 @@
+[project]
+name = "rick-authorization"
+version = "1.3.1"
+description = "Canonical authorization policy engine (stdlib only, no legacy imports)"
+requires-python = ">=3.12"
+dependencies = []

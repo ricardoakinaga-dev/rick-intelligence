@@ -50,7 +50,7 @@ def create_app(settings: ApiSettings | None = None, providers: Providers | None 
         from services.chat_service import StubChatBackend
         from services.identity_service import InMemoryIdentityProvider
 
-        identity = InMemoryIdentityProvider()
+        identity = InMemoryIdentityProvider(mode=settings.identity_mode)
         if settings.use_legacy_adapters:
             try:
                 from adapters.legacy.cvg import LegacyProfessorAdapter  # noqa (adapter boundary)

@@ -1,0 +1,7 @@
+{
+  "permission_check_us": {
+    "p50": 0.931,
+    "p95": 1.162
+  },
+  "note": "in-process canonical engine, authoritative snapshot path"
+}

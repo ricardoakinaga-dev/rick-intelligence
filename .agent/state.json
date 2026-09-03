@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "project": "RICK Intelligence Phase 1.3 unified API kernel",
-  "goal": "Canonical apps/api HTTP boundary with versioned routes, identity/authorization integration, health/readiness, legacy adapters, chat + OpenAI compat, audit/observability hooks \u2014 DUAL with no legacy deletion.",
+  "project": "RICK Intelligence Phase 1.3.1 identity/auth canonicalization closure",
+  "goal": "Canonical packages/identity+authorization+contracts as single source of truth; apps/api as thin facades; re-grant defect closed with differential parity; legacy preserved.",
   "project_profile": "BROWNFIELD",
   "work_mode": "MIGRATION",
   "work_mode_overlays": [],
@@ -33,13 +33,19 @@
     ".agent/gates/phase-1.3-verified.json",
     "docs/progress/phase-1.3-report.md",
     "docs/progress/phase-1.3-independent-review.md",
-    "docs/architecture/api-migration-map.md"
+    "docs/architecture/api-migration-map.md",
+    ".agent/plans/phase-1.3.1-identity-auth-canonicalization.md",
+    ".agent/gates/phase-1.3.1-verified.json",
+    "docs/progress/phase-1.3.1-report.md",
+    "docs/progress/phase-1.3.1-independent-review.md",
+    "docs/architecture/authorization.md",
+    "docs/architecture/identity.md"
   ],
-  "last_gate_record": ".agent/gates/phase-1.3-verified.json",
-  "last_event_id": "EVT-PH13-FINAL-COMPLETE",
-  "state_revision": 35,
+  "last_gate_record": ".agent/gates/phase-1.3.1-verified.json",
+  "last_event_id": "EVT-PH131-FINAL-COMPLETE",
+  "state_revision": 36,
   "next_gate": "PHASE_1_4_AUTHORIZATION_REQUIRED",
-  "next_action": "Phase 1.3 VERIFIED_CANDIDATE recorded; do NOT begin Phase 1.4 until a new user-authorized plan and implementation-ready gate exist. Historical Phase 0.6 remains BLOCKED/NOT_PROMOTED.",
+  "next_action": "Phase 1.3.1 VERIFIED_CANDIDATE recorded; do NOT begin Phase 1.4 until a new user-authorized plan and implementation-ready gate exist. Phase 0.6 remains BLOCKED/NOT_PROMOTED.",
   "blocked_by": [],
   "human_approval_required": [],
   "published_phase_0_5_commit": {
@@ -56,5 +62,5 @@
     "worktree": "DIRTY_PHASE_1_1",
     "sync": "HEAD_EQ_ORIGIN_MAIN"
   },
-  "updated_at": "2026-09-03T03:27:12Z"
+  "updated_at": "2026-09-03T03:43:58Z"
 }

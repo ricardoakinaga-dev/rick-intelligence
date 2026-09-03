@@ -29,3 +29,15 @@ available.
    documented.
 5. The root command layer may invoke old commands for evidence, but it does
    not change their behavior or claim that they are already consolidated.
+
+## Phase 1.3.1 closure (identity/auth canonicalization)
+
+- `packages/authorization` (`rick_authorization`) is the single policy engine;
+  `packages/identity` (`rick_identity`) the lifecycle source of truth;
+  `packages/contracts` owns `SessionSnapshot`/`RetrievalContext`/security DTOs.
+- `apps/api` services/dependencies are thin facades (no local registries, maps,
+  or role fallback). `models.SessionSnapshot` re-exports the canonical contract.
+- Preserved CVG `services/authorization.py` + `enterprise_service.py` remain
+  byte-identical; engine-level differential parity proven
+  (`apps/api/tests/test_differential_auth.py`); caller switch via
+  `apps/api/src/adapters/legacy/auth_facade.py` deferred per route to Phase 1.4+.

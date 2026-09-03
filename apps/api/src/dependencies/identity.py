@@ -62,7 +62,8 @@ def require_permission(permission: str, *, target_type: str = "permission"):
         if not session.authenticated or session.session_state != "active":
             raise ApiError("unauthorized")
         providers = get_providers()
-        authz = providers.identity  # identity provider also exposes has_permission via service layer
+        # Permission decision delegated to the canonical engine via the thin
+        # authorization facade (authoritative snapshot semantics, no fallback).
         from services.authorization_service import has_permission
 
         if not has_permission(session, permission):

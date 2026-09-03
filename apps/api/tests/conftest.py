@@ -6,9 +6,10 @@ from pathlib import Path
 SRC = Path(__file__).resolve().parents[1] / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
-CONTRACTS_SRC = Path(__file__).resolve().parents[3] / "packages" / "contracts" / "src"
-if str(CONTRACTS_SRC) not in sys.path:
-    sys.path.insert(0, str(CONTRACTS_SRC))
+for _pkg in ("contracts", "authorization", "identity"):
+    _p = Path(__file__).resolve().parents[3] / "packages" / _pkg / "src"
+    if str(_p) not in sys.path:
+        sys.path.insert(0, str(_p))
 
 import pytest
 from fastapi.testclient import TestClient

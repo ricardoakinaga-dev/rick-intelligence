@@ -1,22 +1,14 @@
-"""Shared typed models for the API boundary (no legacy imports here)."""
+"""Shared API-boundary models.
+
+SessionSnapshot is OWNED by packages/contracts — this module only re-exports it
+so route/dependency import paths stay stable. No policy lives here.
+"""
 
 from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
-
-class SessionSnapshot(BaseModel):
-    authenticated: bool = False
-    session_state: str = "anonymous"
-    user_id: str | None = None
-    email: str | None = None
-    role: str | None = None
-    canonical_role: str | None = None
-    permissions: list[str] = Field(default_factory=list)
-    tenant_id: str | None = None
-    workspace_id: str | None = None
-    session_id: str | None = None
-    allowed_collection_ids: list[str] = Field(default_factory=list)
+from rick_contracts.security import SessionSnapshot  # noqa: F401 (canonical re-export)
 
 
 class AuditEvent(BaseModel):

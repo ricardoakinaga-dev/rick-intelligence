@@ -476,6 +476,41 @@
         "docs/progress/phase-1.3-independent-review.md"
       ],
       "next_action": "No further 1.3 work; await Phase 1.4 authorization."
+    },
+    {
+      "id": "PH131-CANON",
+      "title": "Canonicalize identity/authorization/contracts; strip apps/api policy; prove differential parity",
+      "stage": "BUILD",
+      "priority": "P0",
+      "status": "DONE",
+      "origin": "Phase 1.3.1 closure prompt",
+      "dependencies": [
+        "PH13-KERNEL"
+      ],
+      "owner": "Codex lead",
+      "acceptance_summary": "Re-grant defect closed; 78 tests green incl. differential/property/negatives; legacy byte-identical; permission check ~1us.",
+      "evidence_refs": [
+        "docs/progress/phase-1.3.1-report.md",
+        ".agent/gates/phase-1.3.1-verified.json"
+      ],
+      "next_action": "No further 1.3.1 work; await Phase 1.4 authorization."
+    },
+    {
+      "id": "PH131-REVIEW",
+      "title": "Fresh independent Phase 1.3.1 review (18 questions)",
+      "stage": "VERIFY",
+      "priority": "P0",
+      "status": "DONE",
+      "origin": "Phase 1.3.1 review requirement",
+      "dependencies": [
+        "PH131-CANON"
+      ],
+      "owner": "Fresh read-only reviewer",
+      "acceptance_summary": "All 18 questions answered; no P0/HIGH/MEDIUM.",
+      "evidence_refs": [
+        "docs/progress/phase-1.3.1-independent-review.md"
+      ],
+      "next_action": "Closed; Phase 1.4 not begun."
     }
   ]
 }

@@ -54,6 +54,8 @@ class ApiSettings:
     use_legacy_adapters: bool = field(default_factory=lambda: _get_bool("RICK_API_USE_LEGACY", False))
     use_legacy_health_checks: bool = field(default_factory=lambda: _get_bool("RICK_API_LEGACY_HEALTH", False))
 
+    identity_mode: str = field(default_factory=lambda: (_get("RICK_IDENTITY_MODE", "dev") or "dev").strip().lower())
+
     login_rate_limit_per_min: int = field(default_factory=lambda: _get_int("LOGIN_RATE_LIMIT_PER_MIN", 10))
     chat_rate_limit_per_min: int = field(default_factory=lambda: _get_int("CHAT_RATE_LIMIT_PER_MIN", 30))
 
@@ -74,3 +76,5 @@ class ApiSettings:
             raise ValueError("SESSION_COOKIE_SAMESITE must be lax|strict|none")
         if self.cors_allow_credentials and "*" in self.cors_allowed_origins:
             raise ValueError("Wildcard CORS origin cannot be combined with credentials")
+        if self.identity_mode not in {"test", "dev", "production"}:
+            raise ValueError("RICK_IDENTITY_MODE must be test|dev|production")

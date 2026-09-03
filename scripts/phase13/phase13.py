@@ -19,7 +19,13 @@ def _env():
     import os
 
     env = os.environ.copy()
-    env["PYTHONPATH"] = f"{API_SRC}{os.pathsep}{CONTRACTS_SRC}{os.pathsep}{env.get('PYTHONPATH', '')}"
+    env["PYTHONPATH"] = os.pathsep.join([
+        str(API_SRC),
+        str(ROOT / "packages" / "contracts" / "src"),
+        str(ROOT / "packages" / "authorization" / "src"),
+        str(ROOT / "packages" / "identity" / "src"),
+        env.get("PYTHONPATH", ""),
+    ])
     env.setdefault("RAG_SKIP_QDRANT_BOOTSTRAP", "1")
     env.setdefault("SESSION_COOKIE_SECURE", "false")
     return env
@@ -72,7 +78,8 @@ def mode_benchmark() -> int:
     import os
 
     sys.path.insert(0, str(API_SRC))
-    sys.path.insert(0, str(CONTRACTS_SRC))
+    for _pkg in ("contracts", "authorization", "identity"):
+        sys.path.insert(0, str(ROOT / "packages" / _pkg / "src"))
     import asyncio
 
     from fastapi.testclient import TestClient
