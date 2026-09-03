@@ -39,10 +39,32 @@ def test_packages_have_no_legacy_imports():
         if not pkg.is_dir():
             continue
         for f in _files(pkg):
+            # Tests are allowed legacy consumers (direction: tests -> legacy_adapters).
+            if "tests" in f.parts:
+                continue
             text = f.read_text(errors="ignore")
             if any(m in text for m in LEGACY_MARKERS):
                 violations.append(str(f))
     assert not violations, f"packages import legacy: {violations}"
+
+
+def test_root_rag_packages_have_no_legacy_imports():
+    """Hard CI rule (§47): knowledge/ingestion/retrieval never import legacy or apps."""
+    import re as _re
+
+    _import_re = _re.compile(r"^\s*(import|from)\s+(\S+)")
+    violations = []
+    for pkg in ("knowledge", "ingestion", "retrieval", "identity", "authorization", "contracts", "shared"):
+        src = ROOT / "packages" / pkg / "src"
+        if not src.is_dir():
+            continue
+        for f in _files(src):
+            for match in _import_re.finditer(f.read_text(errors="ignore")):
+                module = match.group(2)
+                if ("cvg" in module or "rick-professor" in module or "locker" in module
+                        or module.startswith("apps") or module == "app" or module.startswith("app.")):
+                    violations.append(f"{f.relative_to(ROOT)}: {match.group(0).strip()[:100]}")
+    assert not violations, f"root packages breach boundary: {violations}"
 
 
 def test_only_legacy_adapters_import_legacy():

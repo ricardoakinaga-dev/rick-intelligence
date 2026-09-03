@@ -7,16 +7,15 @@ knowledge-intelligence platform:
 - `rick-professor/` — the current TypeScript/Fastify Professor compatibility service;
 - `modulo-redis-locker/` — the current JavaScript/Express Redis lease service.
 
-The repository is currently at **Phase 1.3 — Unified API Kernel & Runtime Adapter
-Consolidation**. `apps/api` is now the canonical executable platform HTTP boundary
-(FastAPI): versioned `/api/v1/*` routes, OpenAI-compatible `/v1/chat/completions`,
-typed config + app factory, request context/correlation, canonical errors,
-`identity`/`authorization` integration, health/readiness, centralized legacy
-adapters, audit/observability hooks, and a 44-test matrix with dual-verification
-evidence. Legacy CVG/Professor/Locker servers remain as compatibility/migration
-surfaces (see `docs/architecture/api-migration-map.md`); no legacy code is deleted
+The repository is currently at **Phase 1.4 — Knowledge, Ingestion & Retrieval
+Engine Extraction**. `packages/knowledge`, `packages/ingestion` and
+`packages/retrieval` are real root-owned implementations with differential
+parity to validated legacy behavior (rag-contract-v1 preserved, stable IDs,
+hybrid+RRF+rerank, ACL); low-risk API callers read through the root knowledge
+store (DUAL + flag rollback). Legacy CVG/Professor/Locker servers remain
+byte-identical compatibility/migration surfaces; no legacy code is deleted
 in this phase. The previous Phase 0.6 promotion gate remains recorded as `BLOCKED`
-and Phase 1.1 as `VERIFIED` (root skeleton scope).
+and Phases 1.1/1.3/1.3.1 as `VERIFIED_CANDIDATE` (their scopes).
 
 ## Repository layout
 
@@ -62,6 +61,11 @@ Run `make help` for the complete list.
 | `make api-contract` | OpenAPI generation + required-path check. |
 | `make api-security` | Route-policy + negatives + import-boundary checks. |
 | `make api-benchmark` | Kernel-overhead p50/p95 observation (stub backend, local). |
+| `make api14-units` | Canonical knowledge/ingestion/retrieval unit suites. |
+| `make api14-differential` | Legacy↔root parity, shadow quality, RAG E2E. |
+| `make api14-acl` | RAG ACL negative matrix. |
+| `make api14-full` | Units + differential + API matrix + legacy regression. |
+| `make api14-benchmark` | Legacy-vs-root perf budget check. |
 | `make dev`, `make up`, `make logs` | Fail closed until a canonical root application/compose boundary exists; they never guess at legacy service wiring. |
 | `make down` | Reports that no canonical root stack exists yet and changes no external state. |
 

@@ -30,12 +30,22 @@ def make_settings(**overrides):
 
 @pytest.fixture()
 def providers():
+    from services.knowledge_service import seed_demo_corpus
+
+    try:
+        from rick_knowledge import InMemoryKnowledgeStore
+
+        knowledge = InMemoryKnowledgeStore()
+        seed_demo_corpus(knowledge)
+    except ImportError:
+        knowledge = None
     return Providers(
         settings=make_settings(),
         identity=InMemoryIdentityProvider(),
         chat_backend=StubChatBackend(),
         health_checks={},
         audit_sink=InMemoryAuditSink(),
+        knowledge=knowledge,
     )
 
 

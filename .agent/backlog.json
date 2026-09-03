@@ -511,6 +511,41 @@
         "docs/progress/phase-1.3.1-independent-review.md"
       ],
       "next_action": "Closed; Phase 1.4 not begun."
+    },
+    {
+      "id": "PH14-RAG",
+      "title": "Extract knowledge/ingestion/retrieval to canonical packages with differential parity",
+      "stage": "BUILD",
+      "priority": "P0",
+      "status": "DONE",
+      "origin": "Phase 1.4 migration prompt",
+      "dependencies": [
+        "PH131-CANON"
+      ],
+      "owner": "Codex lead",
+      "acceptance_summary": "108 tests green; shadow overlap 1.0; perf within budget; DUAL switches with rollback; legacy byte-identical.",
+      "evidence_refs": [
+        "docs/progress/phase-1.4-report.md",
+        ".agent/gates/phase-1.4-verified.json"
+      ],
+      "next_action": "No further 1.4 work; await Phase 1.5 authorization."
+    },
+    {
+      "id": "PH14-REVIEW",
+      "title": "Fresh independent Phase 1.4 review (18 questions)",
+      "stage": "VERIFY",
+      "priority": "P0",
+      "status": "DONE",
+      "origin": "Phase 1.4 review requirement",
+      "dependencies": [
+        "PH14-RAG"
+      ],
+      "owner": "Fresh read-only reviewer",
+      "acceptance_summary": "All 18 questions answered; no P0/HIGH/MEDIUM.",
+      "evidence_refs": [
+        "docs/progress/phase-1.4-independent-review.md"
+      ],
+      "next_action": "Closed; Phase 1.5 not begun."
     }
   ]
 }

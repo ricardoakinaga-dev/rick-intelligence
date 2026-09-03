@@ -41,3 +41,9 @@ available.
   byte-identical; engine-level differential parity proven
   (`apps/api/tests/test_differential_auth.py`); caller switch via
   `apps/api/src/adapters/legacy/auth_facade.py` deferred per route to Phase 1.4+.
+
+## Phase 1.4 extraction (knowledge/ingestion/retrieval)
+
+Per-subsystem strangler status lives in `docs/architecture/rag-migration.md`.
+Root packages import nothing legacy (CI-enforced); legacy CVG files remain
+byte-identical; live Qdrant/OpenAI equivalence deferred for lack of credentials.

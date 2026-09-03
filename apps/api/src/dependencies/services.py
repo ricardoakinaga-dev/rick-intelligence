@@ -15,6 +15,8 @@ class Providers:
     health_checks: dict = field(default_factory=dict)
     audit_sink: object = None
     rate_limiter: object = None
+    knowledge: object = None  # rick_knowledge store (preferred read path)
+    retrieval: object = None  # RetrievalApplicationService (flag-gated)
 
 
 _global_providers: Providers | None = None

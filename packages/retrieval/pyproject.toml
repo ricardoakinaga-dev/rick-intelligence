@@ -1,0 +1,6 @@
+[project]
+name = "rick-retrieval"
+version = "1.4.0"
+description = "Canonical hybrid retrieval engine (dense+sparse+RRF+rerank+evidence)"
+requires-python = ">=3.12"
+dependencies = ["rick-knowledge"]

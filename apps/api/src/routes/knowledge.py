@@ -12,6 +12,7 @@ from services.authorization_service import build_retrieval_context, filter_colle
 
 router = APIRouter(tags=["Knowledge"])
 
+# Legacy stub path (rollback when RICK_API_ROOT_KNOWLEDGE=0 or store unavailable).
 _DEMO_COLLECTIONS = [
     {"collection_id": "rag_phase0", "title": "Canonical collection", "workspace_id": "default"},
     {"collection_id": "vet-library", "title": "Veterinary library", "workspace_id": "default"},
@@ -22,11 +23,29 @@ _DEMO_DOCUMENTS = [
 ]
 
 
+def _knowledge_service():
+    """Preferred root path; None falls back to the legacy stub lists (DUAL + rollback)."""
+    from services.knowledge_service import KnowledgeApplicationService, root_knowledge_enabled
+
+    if not root_knowledge_enabled():
+        return None
+    providers = get_providers()
+    store = getattr(providers, "knowledge", None)
+    if store is None:
+        return None
+    return KnowledgeApplicationService(store)
+
+
 @router.get("/api/v1/collections")
 def list_collections(session=Depends(require_authenticated)):
     if not has_permission(session, "collections.read"):
         raise ApiError("forbidden")
     ctx = build_retrieval_context(session, workspace_id=session.workspace_id or "default")
+    service = _knowledge_service()
+    if service is not None:
+        items = service.list_collections(workspace_id=session.workspace_id or "default",
+                                         allowed=list(ctx["allowed_collection_ids"]))
+        return {"items": items, "total": len(items)}
     return {"items": filter_collection_items(_DEMO_COLLECTIONS, ctx), "total": len(filter_collection_items(_DEMO_COLLECTIONS, ctx))}
 
 
@@ -45,6 +64,13 @@ def get_document(document_id: str, session=Depends(require_authenticated)):
     if not has_permission(session, "documents.read"):
         raise ApiError("forbidden")
     ctx = build_retrieval_context(session, workspace_id=session.workspace_id or "default")
+    service = _knowledge_service()
+    if service is not None:
+        item = service.get_document(document_id=document_id, workspace_id=session.workspace_id or "default",
+                                    allowed=list(ctx["allowed_collection_ids"]))
+        if item is None:
+            raise ApiError("not_found")
+        return item
     items = filter_collection_items(_DEMO_DOCUMENTS, ctx)
     for item in items:
         if item["document_id"] == document_id:

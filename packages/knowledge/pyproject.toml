@@ -1,0 +1,6 @@
+[project]
+name = "rick-knowledge"
+version = "1.4.0"
+description = "Canonical knowledge domain package (models, identity, lifecycle)"
+requires-python = ">=3.12"
+dependencies = []

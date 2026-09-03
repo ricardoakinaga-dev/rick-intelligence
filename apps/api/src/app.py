@@ -49,8 +49,20 @@ def create_app(settings: ApiSettings | None = None, providers: Providers | None 
         from services.audit import InMemoryAuditSink
         from services.chat_service import StubChatBackend
         from services.identity_service import InMemoryIdentityProvider
+        from services.knowledge_service import seed_demo_corpus
+        from services.retrieval_service import RetrievalApplicationService
 
         identity = InMemoryIdentityProvider(mode=settings.identity_mode)
+        knowledge = None
+        retrieval = None
+        try:
+            from rick_knowledge import InMemoryKnowledgeStore
+
+            knowledge = InMemoryKnowledgeStore()
+            seed_demo_corpus(knowledge)
+            retrieval = RetrievalApplicationService(knowledge=knowledge)
+        except ImportError:
+            knowledge, retrieval = None, None
         if settings.use_legacy_adapters:
             try:
                 from adapters.legacy.cvg import LegacyProfessorAdapter  # noqa (adapter boundary)
@@ -65,6 +77,7 @@ def create_app(settings: ApiSettings | None = None, providers: Providers | None 
         providers = Providers(
             settings=settings, identity=identity, chat_backend=backend,
             health_checks=_default_health_checks(settings), audit_sink=InMemoryAuditSink(),
+            knowledge=knowledge, retrieval=retrieval,
         )
     else:
         providers.settings = settings

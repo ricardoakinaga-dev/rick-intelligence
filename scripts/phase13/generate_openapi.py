@@ -9,7 +9,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "apps" / "api" / "src"))
-for _pkg in ("contracts", "authorization", "identity"):
+for _pkg in ("contracts", "authorization", "identity", "knowledge", "ingestion", "retrieval"):
     sys.path.insert(0, str(ROOT / "packages" / _pkg / "src"))
 
 from app import create_app

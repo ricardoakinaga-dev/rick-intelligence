@@ -1,0 +1,28 @@
+{
+  "legacy_chunk_ms": {
+    "p50_ms": 1.2,
+    "p95_ms": 1.507
+  },
+  "root_chunk_ms": {
+    "p50_ms": 0.489,
+    "p95_ms": 0.76
+  },
+  "legacy_rrf_ms": {
+    "p50_ms": 0.05,
+    "p95_ms": 749.516
+  },
+  "root_rrf_ms": {
+    "p50_ms": 0.027,
+    "p95_ms": 0.038
+  },
+  "legacy_rerank_ms": {
+    "p50_ms": 0.129,
+    "p95_ms": 0.27
+  },
+  "root_rerank_ms": {
+    "p50_ms": 0.132,
+    "p95_ms": 0.156
+  },
+  "budget": "root must stay within 2x legacy (no unjustified doubling)",
+  "note": "fixture-scoped, hermetic; live Qdrant/OpenAI excluded"
+}
