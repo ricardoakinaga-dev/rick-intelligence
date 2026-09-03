@@ -24,6 +24,9 @@ def _env():
         str(ROOT / "packages" / "contracts" / "src"),
         str(ROOT / "packages" / "authorization" / "src"),
         str(ROOT / "packages" / "identity" / "src"),
+        str(ROOT / "packages" / "knowledge" / "src"),
+        str(ROOT / "packages" / "ingestion" / "src"),
+        str(ROOT / "packages" / "retrieval" / "src"),
         env.get("PYTHONPATH", ""),
     ])
     env.setdefault("RAG_SKIP_QDRANT_BOOTSTRAP", "1")
@@ -78,7 +81,7 @@ def mode_benchmark() -> int:
     import os
 
     sys.path.insert(0, str(API_SRC))
-    for _pkg in ("contracts", "authorization", "identity"):
+    for _pkg in ("contracts", "authorization", "identity", "knowledge", "ingestion", "retrieval"):
         sys.path.insert(0, str(ROOT / "packages" / _pkg / "src"))
     import asyncio
 
