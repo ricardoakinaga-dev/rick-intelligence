@@ -29,8 +29,10 @@ def _load_legacy_authorization():
         return sys.modules[name]
     legacy_src = str(ROOT / "cvg-master-rag-v2" / "src")
     saved_path = list(sys.path)
-    saved_services = sys.modules.pop("services", None)
-    saved_rag = sys.modules.pop("services.rag_contract", None)
+    saved_services = {key: value for key, value in sys.modules.items()
+                      if key == "services" or key.startswith("services.")}
+    sys.modules.pop("services", None)
+    sys.modules.pop("services.rag_contract", None)
     try:
         sys.path.insert(0, legacy_src)
         spec = _importlib_util.spec_from_file_location(
@@ -44,15 +46,27 @@ def _load_legacy_authorization():
         for key in [k for k in sys.modules if k == "services" or k.startswith("services.")]:
             if key not in (name,):
                 sys.modules.pop(key, None)
-        if saved_services is not None:
-            sys.modules["services"] = saved_services
-        if saved_rag is not None:
-            sys.modules["services.rag_contract"] = saved_rag
+        # Restore the entire prior package cache, not just its root. Otherwise
+        # later tests import new class identities while routes keep old ones.
+        sys.modules.update(saved_services)
 
 
 legacy = _load_legacy_authorization()
 
 import rick_authorization as canonical  # noqa: E402
+
+
+def test_legacy_loader_preserves_existing_service_modules(monkeypatch):
+    from types import ModuleType
+    sentinel = ModuleType("services._preservation_probe")
+    monkeypatch.setitem(sys.modules, "services._preservation_probe", sentinel)
+    monkeypatch.delitem(sys.modules, "legacy_cvg_authorization_ro", raising=False)
+    before = {key: value for key, value in sys.modules.items()
+              if key == "services" or key.startswith("services.")}
+    _load_legacy_authorization()
+    after = {key: value for key, value in sys.modules.items()
+             if key == "services" or key.startswith("services.")}
+    assert after == before
 
 
 def test_role_alias_parity():

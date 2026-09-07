@@ -1,0 +1,115 @@
+{
+  "schema_version": "retrieval-evaluation.v1",
+  "provider": "synthetic-offline-fixture",
+  "description": "Small deterministic retrieval observations with tenant isolation cases.",
+  "k_values": [1, 3],
+  "cases": [
+    {
+      "case_id": "tenant-a-clinical",
+      "query": "mastite bovina protocolo",
+      "context": {
+        "tenant_id": "tenant-a",
+        "workspace_id": "workspace-a",
+        "allowed_collection_ids": ["clinical"]
+      },
+      "relevant_ids": ["chunk-a-1", "chunk-a-2"],
+      "denied_ids": ["chunk-b-secret"],
+      "corpus": [
+        {
+          "chunk_id": "chunk-a-1",
+          "document_id": "doc-a",
+          "tenant_id": "tenant-a",
+          "workspace_id": "workspace-a",
+          "collection_id": "clinical"
+        },
+        {
+          "chunk_id": "chunk-a-2",
+          "document_id": "doc-a",
+          "tenant_id": "tenant-a",
+          "workspace_id": "workspace-a",
+          "collection_id": "clinical"
+        },
+        {
+          "chunk_id": "chunk-b-secret",
+          "document_id": "doc-b",
+          "tenant_id": "tenant-b",
+          "workspace_id": "workspace-b",
+          "collection_id": "clinical"
+        }
+      ],
+      "results": [
+        {
+          "chunk_id": "chunk-a-1",
+          "document_id": "doc-a",
+          "tenant_id": "tenant-a",
+          "workspace_id": "workspace-a",
+          "collection_id": "clinical",
+          "rank": 0,
+          "source": "mastite-a.pdf",
+          "page_start": 2,
+          "checksum": "sha256:fixture-a-1"
+        },
+        {
+          "chunk_id": "chunk-a-2",
+          "document_id": "doc-a",
+          "tenant_id": "tenant-a",
+          "workspace_id": "workspace-a",
+          "collection_id": "clinical",
+          "rank": 1,
+          "source": "mastite-a.pdf",
+          "page_start": 3,
+          "checksum": "sha256:fixture-a-2"
+        }
+      ],
+      "citations": [
+        {"chunk_id": "chunk-a-1", "source": "mastite-a.pdf"},
+        {"chunk_id": "chunk-a-2", "source": "mastite-a.pdf"}
+      ],
+      "latency_samples_ms": [8.0, 9.0, 11.0]
+    },
+    {
+      "case_id": "tenant-b-clinical",
+      "query": "mastite bovina protocolo",
+      "context": {
+        "tenant_id": "tenant-b",
+        "workspace_id": "workspace-b",
+        "allowed_collection_ids": ["clinical"]
+      },
+      "relevant_ids": ["chunk-b-1"],
+      "denied_ids": ["chunk-a-secret"],
+      "corpus": [
+        {
+          "chunk_id": "chunk-b-1",
+          "document_id": "doc-b",
+          "tenant_id": "tenant-b",
+          "workspace_id": "workspace-b",
+          "collection_id": "clinical"
+        },
+        {
+          "chunk_id": "chunk-a-secret",
+          "document_id": "doc-a",
+          "tenant_id": "tenant-a",
+          "workspace_id": "workspace-a",
+          "collection_id": "clinical"
+        }
+      ],
+      "results": [
+        {
+          "chunk_id": "chunk-b-1",
+          "document_id": "doc-b",
+          "tenant_id": "tenant-b",
+          "workspace_id": "workspace-b",
+          "collection_id": "clinical",
+          "rank": 0,
+          "source": "mastite-b.pdf",
+          "page_start": 4,
+          "checksum": "sha256:fixture-b-1"
+        }
+      ],
+      "citations": [
+        {"chunk_id": "chunk-b-1", "source": "mastite-b.pdf"}
+      ],
+      "latency_samples_ms": [7.0, 10.0, 12.0]
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "check": "make api16-worker",
+  "result": "PASS",
+  "summary": "8 focused worker/readiness tests passed for bounded process-local execution, cooperative cancellation, safe snapshots, and health semantics.",
+  "artifact": "docs/progress/phase-1.6-implementation-evidence.json",
+  "integrity": "sha256:d5f5d9a3ba8874f0b30273f3338e69683589c27553236aa738ac32c42ccfcfa1",
+  "contracts": {
+    "ingestion": "ingestion-job-v1",
+    "readiness": "readiness-contract-v1"
+  }
+}

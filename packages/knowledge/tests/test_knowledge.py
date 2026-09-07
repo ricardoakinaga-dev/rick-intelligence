@@ -1,6 +1,7 @@
 """Knowledge unit tests: identity stability, lifecycle, payload contract."""
 
 import sys
+from dataclasses import replace
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
@@ -19,6 +20,7 @@ from rick_knowledge import (
     document_id_for_content,
     document_version,
     normalize_collection_id,
+    normalize_tenant_id,
     point_id_for_chunk,
     validate_payload,
 )
@@ -26,11 +28,17 @@ from rick_knowledge import (
 
 def test_identity_stability():
     checksum = content_checksum("same content")
-    a = document_id_for_content(workspace_id="w", collection_id="rag_phase0", checksum=checksum)
-    b = document_id_for_content(workspace_id="w", collection_id="cvg_master_rag", checksum=checksum)
+    a = document_id_for_content(workspace_id="w", collection_id="rag_phase0", checksum=checksum,
+                                tenant_id="default")
+    b = document_id_for_content(workspace_id="w", collection_id="cvg_master_rag", checksum=checksum,
+                                tenant_id="default")
     assert a == b  # alias converges
-    assert document_id_for_content(workspace_id="other", collection_id="rag_phase0", checksum=checksum) != a
-    assert document_id_for_content(workspace_id="w", collection_id="rag_phase0", checksum=content_checksum("changed")) != a
+    assert document_id_for_content(workspace_id="other", collection_id="rag_phase0", checksum=checksum,
+                                   tenant_id="default") != a
+    assert document_id_for_content(workspace_id="w", collection_id="rag_phase0",
+                                   checksum=content_checksum("changed"), tenant_id="default") != a
+    with pytest.raises(TypeError):
+        document_id_for_content(workspace_id="w", collection_id="rag_phase0", checksum=checksum)
     assert document_version(checksum) == f"sha256:{checksum[:16]}"
     assert point_id_for_chunk("chunk_x") == point_id_for_chunk("chunk_x")
     assert chunk_id_for_document("doc1", 3) == "chunk_doc1_0003"
@@ -38,16 +46,27 @@ def test_identity_stability():
 
 def test_collection_validation():
     assert normalize_collection_id(None) == "rag_phase0"
+    with pytest.raises(ValueError, match="tenant_id is required"):
+        normalize_tenant_id(None)
     with pytest.raises(ValueError):
         normalize_collection_id("has space!")
 
 
+def test_domain_models_require_explicit_tenant_identity():
+    with pytest.raises(TypeError):
+        Document(document_id="d", workspace_id="w", collection_id="c")
+    with pytest.raises(TypeError):
+        Chunk(chunk_id="c", document_id="d")
+    with pytest.raises(TypeError):
+        Collection(workspace_id="w", collection_id="c")
+
+
 def test_lifecycle_and_delete_cascade():
     store = InMemoryKnowledgeStore()
-    store.upsert_collection(Collection(workspace_id="w", collection_id="c", title="C"))
-    doc = Document(document_id="d1", workspace_id="w", collection_id="c", status="processing")
+    store.upsert_collection(Collection(workspace_id="w", collection_id="c", tenant_id="default", title="C"))
+    doc = Document(document_id="d1", workspace_id="w", collection_id="c", tenant_id="default", status="processing")
     store.upsert_document(doc)
-    store.replace_document_chunks("d1", [Chunk(chunk_id="chunk_d1_0000", document_id="d1", text="hi")])
+    store.replace_document_chunks("d1", [Chunk(chunk_id="chunk_d1_0000", document_id="d1", tenant_id="default", text="hi")])
     store.set_document_status("d1", "published")
     assert store.get_document("d1").status == "published"
     store.set_document_status("d1", "unpublished")
@@ -59,14 +78,57 @@ def test_lifecycle_and_delete_cascade():
         store.set_document_status("d1", "bogus")
 
 
+def test_collections_are_isolated_when_tenants_reuse_workspace_and_name():
+    store = InMemoryKnowledgeStore()
+    store.upsert_collection(Collection(workspace_id="w", collection_id="c", tenant_id="tenant-a", title="A"))
+    store.upsert_collection(Collection(workspace_id="w", collection_id="c", tenant_id="tenant-b", title="B"))
+
+    assert store.get_collection("w", "c", tenant_id="tenant-a").title == "A"
+    assert store.get_collection("w", "c", tenant_id="tenant-b").title == "B"
+    with pytest.raises(TypeError):
+        store.get_collection("w", "c")
+    assert [item.title for item in store.list_collections("w", tenant_id="tenant-a")] == ["A"]
+    assert [item.title for item in store.list_collections("w", tenant_id="tenant-b")] == ["B"]
+    with pytest.raises(ValueError, match="tenant_id is required"):
+        store.list_collections("w", tenant_id=None)
+    with pytest.raises(TypeError):
+        store.list_collections("w")
+
+
+def test_document_listing_is_workspace_scoped_sorted_and_hides_deleted():
+    store = InMemoryKnowledgeStore()
+    store.upsert_document(Document(document_id="b", workspace_id="w", collection_id="c1", tenant_id="default"))
+    store.upsert_document(Document(document_id="a", workspace_id="w", collection_id="c2", tenant_id="default"))
+    store.upsert_document(Document(document_id="foreign", workspace_id="other", collection_id="c1", tenant_id="default"))
+    store.upsert_document(Document(document_id="gone", workspace_id="w", collection_id="c1", tenant_id="default"))
+    store.delete_document("gone")
+
+    assert [document.document_id for document in store.list_documents("w", tenant_id="default")] == ["a", "b"]
+    assert [document.document_id for document in store.list_documents("w", "c1", tenant_id="default")] == ["b"]
+    assert store.list_documents("other", tenant_id="default")[0].document_id == "foreign"
+    with pytest.raises(TypeError):
+        store.list_documents("w")
+    with pytest.raises(ValueError, match="tenant_id is required"):
+        store.list_documents("w", tenant_id=None)
+
+
 def test_payload_contract_and_drift():
-    doc = Document(document_id="d", workspace_id="w", collection_id="c", document_version="sha256:abc",
+    doc = Document(document_id="d", workspace_id="w", collection_id="c", tenant_id="default",
+                   document_version="sha256:abc",
                    content_checksum="abc", display_filename="f.pdf", title="T",
                    embedding_model="text-embedding-3-small")
-    chunk = Chunk(chunk_id="chunk_d_0000", document_id="d", text="hello", page_start=2)
+    chunk = Chunk(chunk_id="chunk_d_0000", document_id="d", tenant_id="default", text="hello", page_start=2)
     payload = build_point_payload(chunk=chunk, document=doc)
     assert validate_payload(payload) == []
     assert payload["page_start"] == 2 and payload["schema_version"] == "rag-contract-v1"
     assert set(REQUIRED_PAYLOAD_FIELDS) >= set(payload) - {"document_filename", "qdrant_collection"}
     broken = {k: v for k, v in payload.items() if k != "checksum"}
     assert validate_payload(broken) == ["checksum"]
+
+    mismatched_chunk = replace(chunk, tenant_id="tenant-b")
+    with pytest.raises(ValueError, match="tenant_id must match"):
+        build_point_payload(chunk=mismatched_chunk, document=doc)
+
+    tenantless_document = replace(doc, tenant_id=None)
+    with pytest.raises(ValueError, match="tenant_id is required"):
+        build_point_payload(chunk=chunk, document=tenantless_document)

@@ -1,0 +1,89 @@
+{
+  "record_id": "GATE-SA-OBSERVABILITY-ROOT-REORDER-VERIFIED-001",
+  "timestamp": "2026-09-06T16:44:32Z",
+  "gate_id": "VERIFIED",
+  "scope": "Local bounded worker lifecycle event stream",
+  "scope_ref": "SA-OBSERVABILITY",
+  "version": 1,
+  "criteria": [
+    {
+      "id": "V-001-ACCEPTANCE-EVIDENCE",
+      "description": "A fresh independent I1 review accepts the exact post-rework root lifecycle candidate with explicit APPROVE, High confidence and no Critical, High or Medium finding",
+      "required": true,
+      "status": "PASS",
+      "evidence_refs": [
+        ".agent/verification.jsonl#VER-SA-OBSERVABILITY-ROOT-REORDER-REVIEW-VOLTA",
+        ".agent/verification.jsonl#VER-SA-OBSERVABILITY-ROOT-REORDER-GATE-EVIDENCE",
+        ".gauntlet-state-of-art/evidence/observability-local-current/critic-volta-raw.md"
+      ],
+      "confidence": "HIGH",
+      "limitations": "Volta accepted only the local process-bound lifecycle observation seam; exporter, collector, persistence, distributed aggregation, deployment, alert delivery and full-product claims remain outside the decision"
+    },
+    {
+      "id": "V-002-REGRESSION-RISK",
+      "description": "The exact post-rework source passes focused root ordering and finite-name tests, direct fast-worker and terminal probes, complete Phase 1.6 regression and preserved-component CI",
+      "required": true,
+      "status": "PASS",
+      "evidence_refs": [
+        ".agent/verification.jsonl#VER-SA-OBSERVABILITY-ROOT-REORDER-LOCAL",
+        ".agent/verification.jsonl#VER-SA-OBSERVABILITY-ROOT-REORDER-FULL-LOCAL",
+        ".agent/verification.jsonl#VER-SA-OBSERVABILITY-ROOT-REORDER-GATE-EVIDENCE",
+        ".gauntlet-state-of-art/evidence/observability-local-current/root-ordering-allowlist-probe.log",
+        ".gauntlet-state-of-art/evidence/observability-local-current/root-terminal-events-probe.log"
+      ],
+      "confidence": "HIGH",
+      "limitations": "Hermetic local evidence; no external telemetry delivery, distributed aggregation, production soak or deployment effect was executed"
+    },
+    {
+      "id": "V-003-LIMITATIONS-AUTHORITY",
+      "description": "The accepted boundary is frozen to bounded local worker lifecycle observation with finite event admission, opaque references, immutable snapshots and sink-failure isolation; all broader observability work remains explicitly open",
+      "required": true,
+      "status": "PASS",
+      "evidence_refs": [
+        ".agent/verification.jsonl#VER-SA-OBSERVABILITY-ROOT-REORDER-GATE-EVIDENCE",
+        ".gauntlet-state-of-art/reports/observability-local.md",
+        "docs/architecture/observability.md",
+        ".agent/verification.jsonl#VER-SA-OBSERVABILITY-WORKER-REVIEW-NOETHER-NOT-RUN",
+        ".agent/verification.jsonl#VER-SA-OBSERVABILITY-ROOT-REVIEW-FARADAY-NOT-RUN",
+        ".agent/verification.jsonl#VER-SA-EXTERNAL-LOCAL-INTEGRATION-BLOCKED"
+      ],
+      "confidence": "HIGH",
+      "limitations": "This is a scoped local gate, not full fourteen-criterion observability or product release acceptance"
+    }
+  ],
+  "evidence": [
+    ".gauntlet-state-of-art/reports/observability-local.md",
+    ".gauntlet-state-of-art/evidence/observability-local-current/critic-volta-raw.md",
+    ".gauntlet-state-of-art/evidence/observability-local-current/focused-root-reorder.log",
+    ".gauntlet-state-of-art/evidence/observability-local-current/root-ordering-allowlist-probe.log",
+    ".gauntlet-state-of-art/evidence/observability-local-current/api16-full-root-reorder.log",
+    ".gauntlet-state-of-art/evidence/observability-local-current/make-ci-root-reorder.log",
+    "apps/api/src/core/telemetry.py",
+    "apps/api/src/services/ingestion_service.py",
+    "packages/observability/src/rick_observability/events.py",
+    "apps/worker/runner.py",
+    "apps/worker/durable_queue.py"
+  ],
+  "confidence": "HIGH",
+  "gaps": [],
+  "conditions": [],
+  "authority": {
+    "required": false,
+    "state": "NOT_REQUIRED",
+    "actor": "Codex lead",
+    "scope": "Local bounded worker lifecycle event stream",
+    "decision": "Accept only the independently reviewed hermetic local lifecycle seam; no external or high-risk release acceptance",
+    "evidence_ref": ".gauntlet-state-of-art/reports/observability-local.md",
+    "expires_or_revalidates": "Revalidate on worker lifecycle, root executor, event contract, source/build changes, contrary evidence or expansion to exporter, collector, persistence, distribution or deployment"
+  },
+  "residual_risk": "MEDIUM",
+  "decision": "PASS",
+  "next_action": "Continue the separate worker-seam and external/full-product observability evidence; preserve this local scoped gate as bounded evidence",
+  "revalidation_triggers": [
+    "Worker lifecycle, root executor or public status contracts change",
+    "New event fields could contain tenant, source, content, credentials or unbounded cardinality",
+    "Exporter, collector, persistence, multi-instance coordination, alert delivery, deployment or full-product observability scope is introduced",
+    "Contrary lifecycle ordering, immutability or sink-isolation evidence emerges"
+  ],
+  "supersedes": null
+}

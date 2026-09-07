@@ -1,0 +1,71 @@
+{
+  "record_id": "GATE-SA-SECURITY-TENANT-LOCAL-VERIFIED-001",
+  "timestamp": "2026-09-06T12:35:04Z",
+  "gate_id": "VERIFIED",
+  "scope": "Bounded local tenant propagation, session-cookie precedence and audit redaction boundary",
+  "scope_ref": "SA-SECURITY-TENANT-LOCAL",
+  "version": 1,
+  "criteria": [
+    {
+      "id": "V-001-ACCEPTANCE-EVIDENCE",
+      "description": "Fresh independent read-only review accepts the current bounded tenant, cookie and audit controls",
+      "required": true,
+      "status": "PASS",
+      "evidence_refs": [
+        ".agent/verification.jsonl#VER-SA-SECURITY-TENANT-LOCAL-GATE-EVIDENCE"
+      ],
+      "confidence": "HIGH",
+      "limitations": "Socrates reviewed the local source boundary only; no external identity, distributed storage or full-product security approval"
+    },
+    {
+      "id": "V-002-REGRESSION-RISK",
+      "description": "Current API regression and preserved repository CI remain green after the corrections",
+      "required": true,
+      "status": "PASS",
+      "evidence_refs": [
+        ".agent/verification.jsonl#VER-SA-SECURITY-TENANT-LOCAL-GATE-EVIDENCE"
+      ],
+      "confidence": "HIGH",
+      "limitations": "Hermetic local execution; external integration remains unavailable"
+    },
+    {
+      "id": "V-003-LIMITATIONS-AUTHORITY",
+      "description": "The accepted scope and all residual external/full-product limitations are explicit and unchanged",
+      "required": true,
+      "status": "PASS",
+      "evidence_refs": [
+        ".agent/verification.jsonl#VER-SA-SECURITY-TENANT-LOCAL-GATE-EVIDENCE"
+      ],
+      "confidence": "HIGH",
+      "limitations": "No release, external runtime, approved corpus or fourteen-criterion completion is inferred"
+    }
+  ],
+  "evidence": [
+    ".agent/verification.jsonl#VER-SA-SECURITY-TENANT-LOCAL-REVIEW-2",
+    ".agent/verification.jsonl#VER-SA-SECURITY-TENANT-LOCAL-REWORK-REGRESSION",
+    ".agent/verification.jsonl#VER-SA-SECURITY-TENANT-LOCAL-CI",
+    ".gauntlet-state-of-art/evidence/security-tenant-local-current/critic-socrates-raw.md",
+    ".gauntlet-state-of-art/reports/security-tenant-audit-local.md"
+  ],
+  "confidence": "HIGH",
+  "gaps": [],
+  "conditions": [],
+  "authority": {
+    "required": false,
+    "state": "NOT_REQUIRED",
+    "actor": "Codex lead",
+    "scope": "Bounded local tenant propagation, session-cookie precedence and audit redaction boundary",
+    "decision": "Accept only the independently reviewed hermetic local slice; no external or high-risk release acceptance",
+    "evidence_ref": ".gauntlet-state-of-art/reports/security-tenant-audit-local.md",
+    "expires_or_revalidates": "Revalidate on tenant/identity/admin/audit source changes, external runtime scope or contrary evidence"
+  },
+  "residual_risk": "MEDIUM",
+  "decision": "PASS",
+  "next_action": "Continue full security evidence with authorized external identity/storage and cross-process runtime",
+  "revalidation_triggers": [
+    "Tenant, identity, role, cookie or admin route contract changes",
+    "Audit sink, redaction or public serialization changes",
+    "External identity/storage, deployment or full-product security scope is introduced"
+  ],
+  "supersedes": null
+}

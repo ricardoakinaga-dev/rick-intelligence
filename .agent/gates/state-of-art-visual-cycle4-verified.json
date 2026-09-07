@@ -1,0 +1,81 @@
+{
+  "record_id": "GATE-SA-VISUAL-CYCLE4-VERIFIED-001",
+  "timestamp": "2026-09-06T10:28:00Z",
+  "gate_id": "VERIFIED",
+  "scope": "Canonical cycle2 visual UX quality and responsive accessibility",
+  "scope_ref": "SA-VISUAL",
+  "version": 1,
+  "criteria": [
+    {
+      "id": "V-001-ACCEPTANCE-EVIDENCE",
+      "description": "Two fresh independent I1 blind critics approve the exact Cycle4 production-web candidate at or above the 95 threshold with HIGH confidence and no Critical/High finding",
+      "required": true,
+      "status": "PASS",
+      "evidence_refs": [
+        ".agent/verification.jsonl#VER-SA-VISUAL-CYCLE4-GATE",
+        ".agent/verification.jsonl#VER-SA-VISUAL-CYCLE4-REVIEWS",
+        ".gauntlet-state-of-art/evidence/visual-cycle4-current/critic-dalton-raw.md",
+        ".gauntlet-state-of-art/evidence/visual-cycle4-current/critic-kuhn-raw.md"
+      ],
+      "confidence": "HIGH",
+      "limitations": "Scoped visual judgment only; the reviewers explicitly did not approve the full fourteen-criterion product bar"
+    },
+    {
+      "id": "V-002-REGRESSION-RISK",
+      "description": "The exact source/build/render candidate, production functional regression, visual matrix, durable performance records and reduced-motion/axe records reconcile without unexpected or flaky results",
+      "required": true,
+      "status": "PASS",
+      "evidence_refs": [
+        ".agent/verification.jsonl#VER-SA-VISUAL-CYCLE4-GATE",
+        ".agent/verification.jsonl#VER-SA-VISUAL-CYCLE4-PRODUCTION-REGRESSION",
+        ".agent/verification.jsonl#VER-SA-VISUAL-CYCLE4-MATRIX",
+        ".agent/verification.jsonl#VER-SA-VISUAL-CYCLE4-PERFORMANCE",
+        ".agent/verification.jsonl#VER-SA-VISUAL-CYCLE4-INTEGRITY"
+      ],
+      "confidence": "HIGH",
+      "limitations": "Local synthetic/loopback Chromium evidence; six declared functional skips remain outside the scoped claim and external services are unavailable"
+    },
+    {
+      "id": "V-003-LIMITATIONS-AUTHORITY",
+      "description": "The gate is bounded to the canonical production web slice, records its evidence limitations and preserves the remaining full-product acceptance work",
+      "required": true,
+      "status": "PASS",
+      "evidence_refs": [
+        ".agent/verification.jsonl#VER-SA-VISUAL-CYCLE4-GATE",
+        ".gauntlet-state-of-art/reports/visual-cycle4-production-web.md",
+        ".agent/verification.jsonl#VER-SA-EXTERNAL-LOCAL-INTEGRATION-BLOCKED"
+      ],
+      "confidence": "HIGH",
+      "limitations": "No production deployment, external provider/corpus, durability/restore/soak, multi-instance, telemetry, backend performance, clinical validity or final full-product review is claimed"
+    }
+  ],
+  "evidence": [
+    ".gauntlet-state-of-art/reports/visual-cycle4-production-web.md",
+    ".gauntlet-state-of-art/evidence/visual-cycle4-current/candidate-cycle4-production-web.json",
+    ".gauntlet-state-of-art/evidence/visual-cycle4-current/web-validate.log",
+    ".gauntlet-state-of-art/evidence/visual-cycle4-current/performance-summary.json",
+    ".gauntlet-state-of-art/evidence/visual-cycle4-current/visual-matrix-v4.json",
+    ".agent/verification.jsonl#VER-SA-VISUAL-CYCLE4-INTEGRITY"
+  ],
+  "confidence": "HIGH",
+  "gaps": [],
+  "conditions": [],
+  "authority": {
+    "required": false,
+    "state": "NOT_REQUIRED",
+    "actor": "Codex lead",
+    "scope": "Canonical cycle2 visual UX quality and responsive accessibility",
+    "decision": "Reversible local scoped acceptance only; no deployment, credentials, clinical claim or high-risk product promotion",
+    "evidence_ref": ".gauntlet-state-of-art/reports/visual-cycle4-production-web.md",
+    "expires_or_revalidates": "Revalidate on canonical web source/build/render changes, contrary evidence or expansion to full-product acceptance"
+  },
+  "residual_risk": "MEDIUM",
+  "decision": "PASS",
+  "next_action": "Pursue the remaining full fourteen-criterion product evidence in an authorized external runtime; retain the scoped web gate as bounded evidence",
+  "revalidation_triggers": [
+    "Canonical web source, production build, visual harness or accessibility contract changes",
+    "A new visual or functional regression contradicts the sealed Cycle4 candidate",
+    "External runtime, corpus, operations, backend performance, deployment or full-product review scope is introduced"
+  ],
+  "supersedes": "GATE-SA-VISUAL-CYCLE2-VERIFIED-001"
+}

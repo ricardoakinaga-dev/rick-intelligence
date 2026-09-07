@@ -95,8 +95,10 @@ def test_identity_byte_parity():
     for checksum in ("abc123", root_checksum("conteúdo da vaca")):
         for ws in ("default", "fazenda-a"):
             for coll in ("rag_phase0", "cvg_master_rag", "custom"):
-                assert root_doc_id(workspace_id=ws, collection_id=coll, checksum=checksum) == \
-                    legacy_contract.document_id_for_content(workspace_id=ws, collection_id=coll, checksum=checksum)
+                assert root_doc_id(workspace_id=ws, collection_id=coll, checksum=checksum,
+                                   tenant_id="default") == \
+                    legacy_contract.document_id_for_content(workspace_id=ws, collection_id=coll,
+                                                            checksum=checksum)
     assert root_point("chunk_d_0001") == legacy_contract.point_id_for_chunk("chunk_d_0001")
     assert root_normalize("rickvet_documents") == legacy_contract.normalize_collection_id("rickvet_documents")
 

@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "check": "make api16-root",
+  "result": "PASS",
+  "summary": "The authenticated root E2E suite passed publication, grounded retrieval provenance, reindex pruning, deletion tombstones, and ACL checks.",
+  "artifact": "docs/progress/phase-1.6-implementation-evidence.json",
+  "integrity": "sha256:d5f5d9a3ba8874f0b30273f3338e69683589c27553236aa738ac32c42ccfcfa1",
+  "contracts": {
+    "knowledge": "knowledge-contract-v1",
+    "ingestion": "ingestion-job-v1",
+    "rag": "rag-contract-v1"
+  }
+}

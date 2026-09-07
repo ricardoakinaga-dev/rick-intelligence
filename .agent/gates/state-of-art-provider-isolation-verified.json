@@ -1,0 +1,67 @@
+{
+  "record_id": "GATE-SA-DI-VERIFIED-001",
+  "timestamp": "2026-09-06T01:48:12Z",
+  "gate_id": "VERIFIED",
+  "scope": "App-local provider isolation correction",
+  "scope_ref": "SA-DI-ISOLATION",
+  "version": 1,
+  "criteria": [
+    {
+      "id": "V-001-ACCEPTANCE-EVIDENCE",
+      "description": "Independent D1-D6 approval after failure-first, adversarial and actual browser evidence",
+      "required": true,
+      "status": "PASS",
+      "evidence_refs": [
+        ".agent/verification.jsonl#VER-SA-DI-PEER-1-ADDENDUM"
+      ],
+      "confidence": "HIGH",
+      "limitations": "I1 same family; local request binding only; no external/shared-adapter isolation or full AAA acceptance"
+    },
+    {
+      "id": "V-002-REGRESSION-RISK",
+      "description": "530 backend,73 archived,11 independent,22 controls and48 browser regressions; exact OpenAPI",
+      "required": true,
+      "status": "PASS",
+      "evidence_refs": [
+        ".agent/verification.jsonl#VER-SA-DI-PEER-1-ADDENDUM"
+      ],
+      "confidence": "HIGH",
+      "limitations": "I1 same family; local request binding only; no external/shared-adapter isolation or full AAA acceptance"
+    },
+    {
+      "id": "V-003-LIMITATIONS-AUTHORITY",
+      "description": "Local LOW regression risk after implemented mitigation and independent evidence; full product remains unapproved",
+      "required": true,
+      "status": "PASS",
+      "evidence_refs": [
+        ".agent/verification.jsonl#VER-SA-DI-PEER-1-ADDENDUM"
+      ],
+      "confidence": "HIGH",
+      "limitations": "I1 same family; local request binding only; no external/shared-adapter isolation or full AAA acceptance"
+    }
+  ],
+  "evidence": [
+    ".agent/verification.jsonl#VER-SA-DI-PEER-1-ADDENDUM"
+  ],
+  "confidence": "HIGH",
+  "gaps": [],
+  "conditions": [],
+  "authority": {
+    "required": false,
+    "state": "NOT_REQUIRED",
+    "actor": "Codex lead",
+    "scope": "App-local provider isolation correction",
+    "decision": "Implemented mitigation and independent actual-boundary evidence close the local wrong-app selection scenario; no HIGH risk acceptance or external action",
+    "evidence_ref": "docs/architecture/app-provider-isolation.md",
+    "expires_or_revalidates": "Revalidate on request binding, factory ownership, deferred consumer or contrary evidence changes"
+  },
+  "residual_risk": "LOW",
+  "decision": "PASS",
+  "next_action": "Complete scoped isolation and inspect current responsive visual/state gaps",
+  "revalidation_triggers": [
+    "Request-selected provider access or factory container/map ownership changes",
+    "Deferred async/thread/stream consumers or shared service ownership changes",
+    "Contrary actual-boundary evidence or expanded external authority"
+  ],
+  "supersedes": null
+}

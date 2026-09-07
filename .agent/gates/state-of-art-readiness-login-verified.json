@@ -1,0 +1,67 @@
+{
+  "record_id": "GATE-SA-READINESS-LOGIN-VERIFIED-001",
+  "timestamp": "2026-09-06T01:04:04Z",
+  "gate_id": "VERIFIED",
+  "scope": "Strict readiness flags and authentication response ordering",
+  "scope_ref": "SA-READINESS-REVIEW",
+  "version": 1,
+  "criteria": [
+    {
+      "id": "V-001-ACCEPTANCE-EVIDENCE",
+      "description": "Fresh independent peer accepts R1/R2/L1/L2/V1 with actual HTTP/browser and negative controls",
+      "required": true,
+      "status": "PASS",
+      "evidence_refs": [
+        ".agent/verification.jsonl#VER-SA-READINESS-LOGIN-PEER-2"
+      ],
+      "confidence": "HIGH",
+      "limitations": "I1 contextual independence; no whole product or full auth protocol approval"
+    },
+    {
+      "id": "V-002-REGRESSION-RISK",
+      "description": "Complete backend/browser/type/lint/build regression covers affected surfaces",
+      "required": true,
+      "status": "PASS",
+      "evidence_refs": [
+        ".agent/verification.jsonl#VER-SA-READINESS-LOGIN-PEER-2"
+      ],
+      "confidence": "HIGH",
+      "limitations": "Six existing viewport skips; external services and full visual acceptance remain unavailable"
+    },
+    {
+      "id": "V-003-LIMITATIONS-AUTHORITY",
+      "description": "Scoped limitations and local-only authority remain explicit; no full product promotion",
+      "required": true,
+      "status": "PASS",
+      "evidence_refs": [
+        ".agent/verification.jsonl#VER-SA-READINESS-LOGIN-PEER-2"
+      ],
+      "confidence": "HIGH",
+      "limitations": "Provider isolation is separately required and unaccepted"
+    }
+  ],
+  "evidence": [
+    ".agent/verification.jsonl#VER-SA-READINESS-LOGIN-PEER-2"
+  ],
+  "confidence": "HIGH",
+  "gaps": [],
+  "conditions": [],
+  "authority": {
+    "required": false,
+    "state": "NOT_REQUIRED",
+    "actor": "Codex lead",
+    "scope": "Strict readiness flags and authentication response ordering",
+    "decision": "Reversible local scope with MEDIUM residual risk; no external or high-risk acceptance",
+    "evidence_ref": ".agent/plans/state-of-art-recovery.md",
+    "expires_or_revalidates": "Revalidate on source, policy or contrary evidence changes"
+  },
+  "residual_risk": "MEDIUM",
+  "decision": "PASS",
+  "next_action": "Complete only strict readiness/login correction and inspect separately required app-local provider isolation",
+  "revalidation_triggers": [
+    "Readiness normalization or browser session ordering/consumer source changes",
+    "Contrary actual HTTP/browser race or cancellation evidence emerges",
+    "Runtime or identity/cookie/API contract assumptions change"
+  ],
+  "supersedes": null
+}

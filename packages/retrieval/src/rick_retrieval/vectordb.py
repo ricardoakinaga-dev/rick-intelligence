@@ -18,6 +18,7 @@ from typing import Protocol
 
 CANONICAL_EMBEDDING_MODEL = "text-embedding-3-small"
 CANONICAL_EMBEDDING_DIM = 1536
+MAX_POINTS_PER_READ = 100_000
 
 
 class EmbeddingProvider(Protocol):
@@ -79,7 +80,11 @@ class InMemoryVectorStore:
                    if p["payload"].get("document_id") == document_id
                    and p["payload"].get("collection_id") == collection_id)
 
-    def all_points(self) -> list[dict]:
+    def all_points(self, *, limit: int = MAX_POINTS_PER_READ) -> list[dict]:
+        if isinstance(limit, bool) or not isinstance(limit, int) or not 0 < limit <= MAX_POINTS_PER_READ:
+            raise ValueError("point read limit is out of range")
+        if len(self._points) > limit:
+            raise ValueError("complete point snapshot exceeds read limit")
         return list(self._points.values())
 
 

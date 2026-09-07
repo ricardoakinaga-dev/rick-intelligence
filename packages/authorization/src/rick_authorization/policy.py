@@ -255,7 +255,14 @@ def can_access_collection(*, allowed: Iterable[str], collection_id: str | None) 
 
 def can_access_workspace(*, session_workspace: str | None, requested_workspace: str, role: str | None) -> bool:
     """PLATFORM_ADMIN may cross workspaces; others are confined to their session workspace."""
-    if requested_workspace == (session_workspace or requested_workspace):
+    # A missing server-derived workspace is not a global scope. Treating it as
+    # the requested value would let a malformed/legacy session select any
+    # workspace supplied by the caller.
+    if not isinstance(session_workspace, str) or not session_workspace.strip():
+        return False
+    if not isinstance(requested_workspace, str) or not requested_workspace.strip():
+        return False
+    if requested_workspace == session_workspace:
         return True
     return canonical_role(role) == "PLATFORM_ADMIN"
 
@@ -277,11 +284,14 @@ def build_retrieval_context(
     permissions: Iterable[str],
     role: str | None,
     requested_collection_id: str | None = None,
+    tenant_id: str,
 ) -> dict:
     """Trusted factory: request input narrows scope, never widens it."""
     if not can_access_workspace(
         session_workspace=session_workspace, requested_workspace=requested_workspace, role=role
     ):
+        raise AuthorizationError("forbidden")
+    if not isinstance(tenant_id, str) or not tenant_id.strip() or len(tenant_id.strip()) > 128:
         raise AuthorizationError("forbidden")
     allowed = list(allowed_collection_ids or [])
     if requested_collection_id:
@@ -294,6 +304,7 @@ def build_retrieval_context(
         allowed = [narrowed]
     return {
         "user_id": user_id,
+        "tenant_id": tenant_id.strip(),
         "workspace_id": requested_workspace,
         "allowed_collection_ids": allowed,
         "permissions": list(permissions or []),

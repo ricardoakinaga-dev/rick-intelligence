@@ -8,7 +8,9 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import Field
+
+from rick_contracts.base import StrictContractModel
 
 IDENTITY_CONTRACT_VERSION = "identity-contract-v1"
 AUTHORIZATION_CONTRACT_VERSION = "authorization-contract-v1"
@@ -19,21 +21,21 @@ AuthorizationState = Literal["AUTHORITATIVE", "LEGACY_UNMIGRATED", "MIGRATED"]
 AUTHORIZATION_SNAPSHOT_VERSION = 1
 
 
-class Role(BaseModel):
+class Role(StrictContractModel):
     canonical: str
     legacy_label: str | None = None
 
 
-class Permission(BaseModel):
+class Permission(StrictContractModel):
     identifier: str
 
 
-class PermissionOverrides(BaseModel):
+class PermissionOverrides(StrictContractModel):
     add: list[str] = Field(default_factory=list)
     remove: list[str] = Field(default_factory=list)
 
 
-class UserIdentity(BaseModel):
+class UserIdentity(StrictContractModel):
     user_id: str
     email: str | None = None
     role: str
@@ -47,7 +49,7 @@ class UserIdentity(BaseModel):
     role_version: int = 1
 
 
-class SessionSnapshot(BaseModel):
+class SessionSnapshot(StrictContractModel):
     """Authoritative session view. `permissions=[]` means NO permissions (modern)."""
 
     contract_version: str = SESSION_CONTRACT_VERSION
@@ -60,26 +62,30 @@ class SessionSnapshot(BaseModel):
     role: str | None = None
     canonical_role: str | None = None
     permissions: list[str] = Field(default_factory=list)
+    # Anonymous snapshots carry None; authenticated boundaries must bind an
+    # explicit tenant before authorization or data access.
     tenant_id: str | None = None
     workspace_id: str | None = None
     session_id: str | None = None
     allowed_collection_ids: list[str] = Field(default_factory=list)
 
 
-class CollectionGrant(BaseModel):
+class CollectionGrant(StrictContractModel):
+    tenant_id: str
     workspace_id: str
     allowed_collection_ids: list[str] = Field(default_factory=list)
 
 
-class RetrievalContext(BaseModel):
+class RetrievalContext(StrictContractModel):
     contract_version: str = RETRIEVAL_CONTEXT_VERSION
     user_id: str | None = None
     workspace_id: str
+    tenant_id: str
     allowed_collection_ids: list[str] = Field(default_factory=list)
     permissions: list[str] = Field(default_factory=list)
 
 
-class EvidenceItem(BaseModel):
+class EvidenceItem(StrictContractModel):
     document_id: str
     chunk_id: str | None = None
     title: str | None = None
@@ -87,7 +93,7 @@ class EvidenceItem(BaseModel):
     checksum: str | None = None
 
 
-class APIError(BaseModel):
+class APIError(StrictContractModel):
     code: str
     message: str
     request_id: str

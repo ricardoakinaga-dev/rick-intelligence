@@ -52,3 +52,23 @@ def test_admin_health_requires_permission(client):
     resp = client.get("/api/v1/admin/health")
     assert resp.status_code == 200
     assert "checks" in resp.json()
+
+
+def test_admin_metrics_are_bounded_and_redacted(client):
+    assert client.get("/api/v1/admin/metrics").status_code == 401
+    login_as(client, "admin@example.com")
+    response = client.get("/api/v1/admin/metrics")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["implementation"] in {"rick_observability", "api_fallback"}
+    assert body["export"] == {"status": "NOT_CONFIGURED", "destination": None}
+    assert body["slo"]["status"] in {"healthy", "no_data", "breach"}
+    assert body["latency"]["count"] >= 1
+    assert body["event_capacity"] == 256
+    assert len(body["events"]) <= body["event_capacity"]
+    assert all(event["event"] in {"api.http.request", "api.http.abandonment"} for event in body["events"])
+    assert all(event["fields"].get("request_id") for event in body["events"])
+    assert all(event["fields"].get("correlation_id") for event in body["events"])
+    assert all("route" not in str(counter.get("labels", {})).split("?")[-1] or "/api/" not in str(counter) for counter in body["counters"])
+    assert "/api/v1/admin/metrics" not in response.text
+    assert "authorization" not in response.text.lower()

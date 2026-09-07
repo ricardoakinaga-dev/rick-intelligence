@@ -4,12 +4,14 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import Field
+
+from rick_contracts.base import StrictContractModel
 
 MAX_CHAT_MESSAGE_CHARS = 20000
 
 
-class ChatRequest(BaseModel):
+class ChatRequest(StrictContractModel):
     message: str = Field(min_length=1, max_length=MAX_CHAT_MESSAGE_CHARS)
     conversation_id: str | None = Field(default=None, max_length=128)
     collection_id: str | None = Field(default=None, max_length=128, description="Scope hint only; server ACL decides")
@@ -18,7 +20,7 @@ class ChatRequest(BaseModel):
     stream: bool = False
 
 
-class Citation(BaseModel):
+class Citation(StrictContractModel):
     document_id: str
     chunk_id: str | None = None
     title: str | None = None
@@ -28,7 +30,7 @@ class Citation(BaseModel):
     checksum: str | None = None
 
 
-class ChatResponse(BaseModel):
+class ChatResponse(StrictContractModel):
     conversation_id: str
     message_id: str
     answer: str
@@ -36,7 +38,7 @@ class ChatResponse(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
-class ChatStreamEvent(BaseModel):
+class ChatStreamEvent(StrictContractModel):
     type: Literal["start", "delta", "citation", "completion", "error"]
     conversation_id: str | None = None
     message_id: str | None = None

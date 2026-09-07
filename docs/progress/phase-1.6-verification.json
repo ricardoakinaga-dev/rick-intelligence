@@ -1,0 +1,81 @@
+{
+  "schema_version": 1,
+  "phase": "1.6",
+  "generated_at": "2026-09-07T04:52:54.496096Z",
+  "checks": [
+    {
+      "command": [
+        "make",
+        "api16-full"
+      ],
+      "exit_code": 0,
+      "passed": true,
+      "test_pass_count": 497
+    },
+    {
+      "command": [
+        "make",
+        "api15-full"
+      ],
+      "exit_code": 0,
+      "passed": true,
+      "test_pass_count": 460
+    },
+    {
+      "command": [
+        "make",
+        "api14-full"
+      ],
+      "exit_code": 0,
+      "passed": true,
+      "test_pass_count": 519
+    },
+    {
+      "command": [
+        "make",
+        "api-security"
+      ],
+      "exit_code": 0,
+      "passed": true,
+      "test_pass_count": 25
+    },
+    {
+      "command": [
+        "make",
+        "api-contract"
+      ],
+      "exit_code": 0,
+      "passed": true,
+      "test_pass_count": 0
+    },
+    {
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exit_code": 0,
+      "passed": true,
+      "test_pass_count": 0
+    }
+  ],
+  "children_clean": true,
+  "child_status": {
+    "cvg-master-rag-v2": [],
+    "rick-professor": [],
+    "modulo-redis-locker": []
+  },
+  "benchmark_present": true,
+  "benchmark_bounds": {
+    "max_upload_bytes": 1048576,
+    "max_staged_bytes": 2097152,
+    "max_jobs": 64,
+    "retrieval_top_k": 3
+  },
+  "live_dependencies": {
+    "provider": "NOT_RUN",
+    "qdrant": "NOT_RUN",
+    "redis_locker": "NOT_RUN"
+  },
+  "note": "Sanitized local evidence; no live external dependency or production latency claim."
+}

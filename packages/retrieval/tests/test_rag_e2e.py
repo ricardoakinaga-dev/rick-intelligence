@@ -44,6 +44,7 @@ def _index_chunks(engine: RetrievalEngine, knowledge, vectors, embeddings) -> No
         payload = point["payload"]
         chunks.append({
             "chunk_id": payload["chunk_id"], "document_id": payload["document_id"],
+            "tenant_id": payload["tenant_id"],
             "workspace_id": payload["workspace_id"], "collection_id": payload["collection_id"],
             "text": payload["text"], "vector": point["vector"],
             "page_start": payload["page_start"], "checksum": payload["checksum"],
@@ -53,8 +54,14 @@ def _index_chunks(engine: RetrievalEngine, knowledge, vectors, embeddings) -> No
 
 def test_e2e_ingest_query_citation_and_grant_removal(tmp_path):
     knowledge, vectors, embeddings, ingestion = _world(tmp_path)
-    jobs = [ingestion.ingest(tmp_path / "mastite.txt", workspace_id="w", collection_id="rag_phase0"),
-            ingestion.ingest(tmp_path / "aftosa.txt", workspace_id="w", collection_id="rag_phase0")]
+    jobs = [
+        ingestion.ingest(
+            tmp_path / "mastite.txt", workspace_id="w", collection_id="rag_phase0", tenant_id="default"
+        ),
+        ingestion.ingest(
+            tmp_path / "aftosa.txt", workspace_id="w", collection_id="rag_phase0", tenant_id="default"
+        ),
+    ]
     assert all(j.status == "published" for j in jobs)
 
     engine = RetrievalEngine(backend=InMemoryBackend(), reranker=BM25FReranker(), embed=embeddings.embed)
@@ -62,7 +69,8 @@ def test_e2e_ingest_query_citation_and_grant_removal(tmp_path):
 
     vet_ctx = build_retrieval_context(user_id="vet", session_workspace="w", requested_workspace="w",
                                       allowed_collection_ids=["rag_phase0"],
-                                      permissions=["chat.query", "sources.read"], role="VETERINARIAN")
+                                      permissions=["chat.query", "sources.read"], role="VETERINARIAN",
+                                      tenant_id="default")
     result = engine.retrieve(query="protocolo de ordenha para mastite bovina", context=vet_ctx,
                              options=RetrievalOptions(top_k=3, rerank=True))
     assert result.evidence, "expected evidence for granted collection"
@@ -73,7 +81,8 @@ def test_e2e_ingest_query_citation_and_grant_removal(tmp_path):
     # Grant removed → same query yields nothing from that collection.
     no_grant_ctx = build_retrieval_context(user_id="vet", session_workspace="w", requested_workspace="w",
                                            allowed_collection_ids=["other-collection"],
-                                           permissions=["chat.query"], role="VETERINARIAN")
+                                           permissions=["chat.query"], role="VETERINARIAN",
+                                           tenant_id="default")
     denied = engine.retrieve(query="protocolo de ordenha para mastite bovina", context=no_grant_ctx,
                              options=RetrievalOptions(top_k=3, rerank=True))
     assert denied.evidence == []
@@ -85,29 +94,34 @@ def test_failure_e2e_qdrant_down_malformed_duplicate_cancel(tmp_path):
     from rick_retrieval.backends import DiskFallbackBackend
 
     knowledge, vectors, embeddings, ingestion = _world(tmp_path)
-    job = ingestion.ingest(tmp_path / "mastite.txt", workspace_id="w", collection_id="rag_phase0")
+    job = ingestion.ingest(
+        tmp_path / "mastite.txt", workspace_id="w", collection_id="rag_phase0", tenant_id="default"
+    )
     assert job.status == "published"
 
     # Duplicate ingest converges (no drift).
-    dup = ingestion.ingest(tmp_path / "mastite.txt", workspace_id="w", collection_id="rag_phase0")
+    dup = ingestion.ingest(
+        tmp_path / "mastite.txt", workspace_id="w", collection_id="rag_phase0", tenant_id="default"
+    )
     assert dup.document_id == job.document_id
 
     # Malformed input fails safely, never publishes.
     bad = tmp_path / "bad.exe"
     bad.write_bytes(b"\x00\x01")
-    failed = ingestion.ingest(bad, workspace_id="w", collection_id="rag_phase0")
+    failed = ingestion.ingest(bad, workspace_id="w", collection_id="rag_phase0", tenant_id="default")
     assert failed.status == "failed" and failed.error_code == "unsupported_media_type"
 
     # Cancel only affects non-terminal jobs.
     assert ingestion.cancel(job.job_id) is False
 
     # Disk fallback serves the same ACL-scoped corpus when primary is empty.
-    chunks = [{"chunk_id": "chunk_x_0000", "document_id": "x", "workspace_id": "w",
+    chunks = [{"chunk_id": "chunk_x_0000", "document_id": "x", "tenant_id": "default", "workspace_id": "w",
                "collection_id": "rag_phase0", "text": "mastite protocolo",
                "vector": embeddings.embed(["mastite protocolo"])[0]}]
     engine = E(backend=InMemoryBackend(), fallback=DiskFallbackBackend(tmp_path))
     engine.attach_index([])
-    ctx = {"user_id": "u", "workspace_id": "w", "allowed_collection_ids": ["rag_phase0"], "permissions": []}
+    ctx = {"user_id": "u", "tenant_id": "default", "workspace_id": "w",
+           "allowed_collection_ids": ["rag_phase0"], "permissions": []}
     # Empty primary + fallback over disk-loaded chunks.
     engine.attach_index(chunks)
     result = engine.retrieve(query="mastite", context=ctx, options=RetrievalOptions(top_k=3))

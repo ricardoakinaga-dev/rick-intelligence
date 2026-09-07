@@ -26,10 +26,15 @@ DIVERSITY_ADJACENT_PENALTY = True
 
 
 def normalize_query(query: str, *, max_chars: int = 2000) -> str:
+    if isinstance(max_chars, bool) or not isinstance(max_chars, int) or max_chars <= 0:
+        raise ValueError("max_chars must be a positive integer")
     cleaned = re.sub(r"\s+", " ", (query or "")).strip()
     if not cleaned:
         raise ValueError("empty query")
-    return cleaned[:max_chars]
+    normalized = cleaned[:max_chars]
+    if not normalized:
+        raise ValueError("empty query")
+    return normalized
 
 
 def _lexical_diversity_ratio(text: str) -> float:
@@ -95,6 +100,22 @@ class RetrievalOptions:
     max_context_chars: int = DEFAULT_MAX_CONTEXT_CHARS
     candidate_multiplier: int = DEFAULT_CANDIDATE_MULTIPLIER
 
+    def __post_init__(self) -> None:
+        if isinstance(self.top_k, bool) or not isinstance(self.top_k, int) or not 1 <= self.top_k <= 100:
+            raise ValueError("top_k must be an integer between 1 and 100")
+        if (
+            isinstance(self.max_context_chars, bool)
+            or not isinstance(self.max_context_chars, int)
+            or not 1 <= self.max_context_chars <= 1_000_000
+        ):
+            raise ValueError("max_context_chars is out of range")
+        if (
+            isinstance(self.candidate_multiplier, bool)
+            or not isinstance(self.candidate_multiplier, int)
+            or not 1 <= self.candidate_multiplier <= 100
+        ):
+            raise ValueError("candidate_multiplier must be an integer between 1 and 100")
+
 
 @dataclass
 class RetrievalResult:
@@ -118,6 +139,10 @@ class RetrievalEngine:
         options = options or RetrievalOptions()
         normalized = normalize_query(query)
         workspace_id = context["workspace_id"]
+        tenant_id = context.get("tenant_id")
+        if not isinstance(tenant_id, str) or not tenant_id.strip():
+            raise ValueError("tenant_id is required")
+        tenant_id = tenant_id.strip()
         allowed = list(context.get("allowed_collection_ids") or [])
         chunks = self._chunks()
         query_vector = self._embed_query(normalized)
@@ -125,19 +150,20 @@ class RetrievalEngine:
 
         dense, sparse = self.backend.search(
             query=normalized, query_vector=query_vector, workspace_id=workspace_id,
-            allowed_collection_ids=allowed, chunks=chunks, limit=limit)
+            allowed_collection_ids=allowed, chunks=chunks, limit=limit, tenant_id=tenant_id)
         fallback_used = False
         if not dense and not sparse and self.fallback is not None:
             dense, sparse = self.fallback.search(
                 query=normalized, query_vector=query_vector, workspace_id=workspace_id,
-                allowed_collection_ids=allowed, chunks=chunks, limit=limit)
+                allowed_collection_ids=allowed, chunks=chunks, limit=limit, tenant_id=tenant_id)
             fallback_used = bool(dense or sparse)
 
         fused = rrf_fusion(dense, sparse)
         # Authorization revalidation (defense in depth) + dedup.
         allowed_set = set(allowed)
         fused = [c for c in fused
-                 if c.get("workspace_id") == workspace_id
+                 if c.get("tenant_id") == tenant_id
+                 and c.get("workspace_id") == workspace_id
                  and ("*" in allowed_set or (c.get("collection_id") or "rag_phase0") in allowed_set)]
         fused = dedupe_candidates(fused)
         for item in fused:
@@ -154,12 +180,20 @@ class RetrievalEngine:
             if budget <= 0:
                 break
             text = item.get("text", "")
+            if not isinstance(text, str):
+                continue
+            # A single chunk must not overrun the global context budget. Keep
+            # the citation metadata while truncating only the context excerpt.
+            text = text[:budget]
+            if not text:
+                continue
             budget -= len(text)
             evidence.append({
                 "evidence_id": f"ev-{item.get('chunk_id')}",
                 "document_id": item.get("document_id"),
                 "chunk_id": item.get("chunk_id"),
                 "workspace_id": item.get("workspace_id"),
+                "tenant_id": item.get("tenant_id"),
                 "collection_id": item.get("collection_id") or "rag_phase0",
                 "text": text,
                 "source": item.get("document_filename") or item.get("source") or "",

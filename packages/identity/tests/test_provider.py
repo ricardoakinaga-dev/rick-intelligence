@@ -73,6 +73,22 @@ def test_logout_expiry_revoke():
     assert provider3.revoke_session(token3) == 0
 
 
+def test_session_touch_slides_expiry_with_the_configured_idle_ttl() -> None:
+    sessions = InMemorySessionStore(ttl_seconds=120)
+    token = sessions.create({"user_id": "u1", "tenant_id": "tenant-1"})
+    record = sessions.get(token)
+    assert record is not None
+    original_expiry = record["expires_at"]
+
+    time.sleep(0.001)
+    sessions.touch(token)
+
+    refreshed = sessions.get(token)
+    assert refreshed is not None
+    assert refreshed["last_seen_at"] >= record["created_at"]
+    assert refreshed["expires_at"] > original_expiry
+
+
 def test_password_and_role_change_invalidate():
     provider, users = make_provider()
     token = provider.login(email="u1@example.com", password="secret-pw", tenant_id="default", ip=None, user_agent=None)["session_token"]
@@ -126,3 +142,33 @@ def test_pbkdf2_roundtrip_and_user_redaction():
     assert not verify_password_hash(hashed, "wrong")
     provider, _ = make_provider()
     assert "password_plain" not in provider.get_user("u1")
+
+
+def test_tenant_binding_is_explicit_and_fail_closed():
+    provider, _ = make_provider(tenant_id="tenant-a")
+    with pytest.raises(IdentityError):
+        provider.login(
+            email="u1@example.com", password="secret-pw", tenant_id="default", ip=None, user_agent=None
+        )
+    with pytest.raises(IdentityError):
+        provider.login(
+            email="u1@example.com", password="secret-pw", tenant_id=None, ip=None, user_agent=None
+        )
+
+    provider_without_tenant, _ = make_provider(tenant_id=None)
+    with pytest.raises(IdentityError):
+        provider_without_tenant.login(
+            email="u1@example.com", password="secret-pw", tenant_id="default", ip=None, user_agent=None
+        )
+
+
+def test_session_tenant_binding_is_revalidated_on_every_refresh():
+    provider, users = make_provider(tenant_id="tenant-a")
+    token = provider.login(
+        email="u1@example.com", password="secret-pw", tenant_id="tenant-a", ip=None, user_agent=None
+    )["session_token"]
+    user = users.get_by_id("u1")
+    user["tenant_id"] = "tenant-b"
+    users.save(user)
+
+    assert not provider.validate_session(token)["authenticated"]

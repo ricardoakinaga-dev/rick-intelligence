@@ -3,9 +3,12 @@ citations reuse security.EvidenceItem; retrieval evidence extends it immutably."
 
 from __future__ import annotations
 
+import math
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import ConfigDict, Field, field_validator
+
+from rick_contracts.base import StrictContractModel
 
 RAG_SCHEMA_VERSION = "rag-contract-v1"
 CANONICAL_COLLECTION_ID = "rag_phase0"
@@ -19,7 +22,7 @@ JobStatus = Literal["queued", "validating", "parsing", "chunking", "embedding", 
                     "verifying", "published", "failed", "cancelled"]
 
 
-class DocumentDto(BaseModel):
+class DocumentDto(StrictContractModel):
     document_id: str
     workspace_id: str
     collection_id: str = CANONICAL_COLLECTION_ID
@@ -39,7 +42,7 @@ class DocumentDto(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
-class ChunkDto(BaseModel):
+class ChunkDto(StrictContractModel):
     chunk_id: str
     document_id: str
     parent_chunk_id: str | None = None
@@ -58,36 +61,58 @@ class ChunkDto(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
-class EvidenceDto(BaseModel):
-    evidence_id: str
-    document_id: str
-    chunk_id: str
-    workspace_id: str
-    collection_id: str
-    text: str
-    source: str = ""
-    title: str = ""
-    page_start: int | None = None
-    page_end: int | None = None
+class EvidenceDto(StrictContractModel):
+    model_config = ConfigDict(extra="forbid")
+
+    evidence_id: str = Field(min_length=1, max_length=128)
+    document_id: str = Field(min_length=1, max_length=128)
+    chunk_id: str = Field(min_length=1, max_length=128)
+    # Internal retrieval provenance. Public API projections deliberately omit
+    # this field, but final consumers must retain it until scope validation.
+    tenant_id: str | None = Field(default=None, min_length=1, max_length=128)
+    workspace_id: str = Field(min_length=1, max_length=128)
+    collection_id: str = Field(min_length=1, max_length=128)
+    text: str = Field(min_length=1, max_length=1_000_000)
+    source: str = Field(default="", max_length=512)
+    title: str = Field(default="", max_length=512)
+    page_start: int | None = Field(default=None, ge=0)
+    page_end: int | None = Field(default=None, ge=0)
     section: str | None = None
-    checksum: str = ""
+    checksum: str = Field(default="", max_length=256)
     score: float = 0.0
-    rank: int = 0
+    rank: int = Field(default=0, ge=0, le=1_000_000)
     dense_score: float = 0.0
     sparse_score: float = 0.0
+    confidence_score: float = 0.0
+
+    @field_validator("score", "dense_score", "sparse_score", "confidence_score", mode="before")
+    @classmethod
+    def finite_score(cls, value: object) -> float:
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(float(value)):
+            raise ValueError("score must be finite")
+        return float(value)
+
+    @field_validator("page_start", "page_end", "rank", mode="before")
+    @classmethod
+    def integer_bounds(cls, value: object) -> object:
+        if value is not None and (isinstance(value, bool) or not isinstance(value, int)):
+            raise ValueError("page and rank values must be integers")
+        return value
 
 
-class RetrievalResultDto(BaseModel):
-    query: str
+class RetrievalResultDto(StrictContractModel):
+    model_config = ConfigDict(extra="forbid")
+
+    query: str = Field(min_length=1, max_length=2_000)
     evidence: list[EvidenceDto] = Field(default_factory=list)
-    candidate_count: int = 0
-    selected_count: int = 0
-    backend: str = ""
+    candidate_count: int = Field(default=0, ge=0, le=1_000_000)
+    selected_count: int = Field(default=0, ge=0, le=1_000_000)
+    backend: str = Field(default="", max_length=128)
     fallback_used: bool = False
-    metadata: dict[str, Any] = Field(default_factory=dict)
+    metadata: dict[str, str | int | float | bool | None] = Field(default_factory=dict, max_length=32)
 
 
-class IngestionJobDto(BaseModel):
+class IngestionJobDto(StrictContractModel):
     job_id: str
     document_id: str | None = None
     status: JobStatus = "queued"

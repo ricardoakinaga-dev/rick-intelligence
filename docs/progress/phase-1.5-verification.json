@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "phase": "1.5",
+  "generated_at": "2026-09-07T04:51:44.053998Z",
+  "checks": [
+    {
+      "command": [
+        "make",
+        "api15-full"
+      ],
+      "exit_code": 0,
+      "passed": true,
+      "test_pass_count": 460
+    },
+    {
+      "command": [
+        "make",
+        "api-security"
+      ],
+      "exit_code": 0,
+      "passed": true,
+      "test_pass_count": 25
+    },
+    {
+      "command": [
+        "make",
+        "api-contract"
+      ],
+      "exit_code": 0,
+      "passed": true,
+      "test_pass_count": 0
+    },
+    {
+      "command": [
+        "make",
+        "api14-full"
+      ],
+      "exit_code": 0,
+      "passed": true,
+      "test_pass_count": 519
+    },
+    {
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exit_code": 0,
+      "passed": true,
+      "test_pass_count": 0
+    }
+  ],
+  "children_clean": true,
+  "child_status": {
+    "cvg-master-rag-v2": [],
+    "rick-professor": [],
+    "modulo-redis-locker": []
+  },
+  "benchmark_present": true,
+  "benchmark_bounds": {
+    "provider_max_attempts": 3,
+    "provider_max_response_bytes": 1000000,
+    "professor_max_evidence_items": 8,
+    "professor_max_evidence_chars": 12000,
+    "professor_max_prompt_chars": 20000,
+    "professor_max_answer_chars": 8000
+  },
+  "live_dependencies": {
+    "provider": "NOT_RUN",
+    "qdrant": "NOT_RUN",
+    "redis_locker": "NOT_RUN"
+  },
+  "note": "Sanitized local evidence; no live external dependency or production latency claim."
+}

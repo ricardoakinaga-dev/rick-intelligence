@@ -65,4 +65,8 @@ class InMemorySessionStore:
     def touch(self, token: str) -> None:
         record = self._sessions.get(token)
         if record is not None:
-            record["last_seen_at"] = time.time()
+            now = time.time()
+            record["last_seen_at"] = now
+            # Session expiry is idle/sliding, while revoked and invalidated
+            # records remain terminal in the provider boundary.
+            record["expires_at"] = now + self.ttl_seconds

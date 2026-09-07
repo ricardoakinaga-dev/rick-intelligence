@@ -18,3 +18,12 @@ internal_error` (mirrored in `packages/contracts`).
 - Validation errors report field locations, never raw values.
 - 5xx paths never include exception repr, provider bodies, credentials, URLs,
   hashes, or tokens. Covered by error/compat/streaming tests.
+- Root provider failures preserve the distinction between timeout,
+  rate-limiting, and general unavailability; malformed/permanent responses are
+  not retried. Lease contention, lease service failure, expiry, and renewal
+  loss map to `lock_unavailable` at the HTTP boundary.
+- Client cancellation is control flow: the provider stops retrying and the
+  Professor path releases the owner-bound lease before propagating cancellation.
+- Multipart requests are rejected at the declared request-size boundary and
+  the upload route also counts chunked body bytes before form parsing; neither
+  path exposes parser exceptions or source content.

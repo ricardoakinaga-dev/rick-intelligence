@@ -9,6 +9,8 @@ from rick_ingestion.chunking import (
     RecursiveChunkingStrategy,
 )
 from rick_ingestion.jobs import (
+    DEFAULT_MAX_JOBS,
+    MAX_HEARTBEATS,
     PERMANENT_ERROR_CODES,
     TERMINAL_STATES,
     TRANSIENT_ERROR_CODES,
@@ -34,10 +36,25 @@ from rick_ingestion.parsers import (
     validate_file,
 )
 from rick_ingestion.pipeline import EmbeddingProvider, IngestionService, VectorStore
+from rick_ingestion.admission import (
+    ALLOWED_OPERATIONS,
+    ALLOWED_SOURCE_TYPES,
+    InvalidChecksumError,
+    InvalidUploadFieldError,
+    InvalidUploadSizeError,
+    MAX_TOKEN_LENGTH,
+    MAX_UPLOAD_BYTES,
+    ObjectScopeLike,
+    UnsupportedOperationError,
+    UnsupportedSourceTypeError,
+    UploadJobEnvelope,
+    UploadJobEnvelopeError,
+    UploadJobScope,
+)
 
 __all__ = [
     "CHUNKER_VERSION", "DEFAULT_CHUNK_SIZE", "DEFAULT_OVERLAP",
-    "MAX_FILE_BYTES", "PARSER_VERSION", "PERMANENT_ERROR_CODES",
+    "DEFAULT_MAX_JOBS", "MAX_FILE_BYTES", "MAX_HEARTBEATS", "PARSER_VERSION", "PERMANENT_ERROR_CODES",
     "TERMINAL_STATES", "TRANSIENT_ERROR_CODES",
     "ChunkPlan", "ChunkingStrategy", "ControlledPdfParser", "DocxParser",
     "DocumentParser", "EmbeddingProvider", "IngestionJob", "IngestionService",
@@ -45,4 +62,9 @@ __all__ = [
     "ParsedPage", "TxtParser", "UnsupportedFormatError", "VectorStore",
     "generated_storage_name", "is_retryable", "parser_for",
     "sanitize_display_filename", "validate_file",
+    "ALLOWED_OPERATIONS", "ALLOWED_SOURCE_TYPES", "InvalidChecksumError",
+    "InvalidUploadFieldError", "InvalidUploadSizeError", "MAX_TOKEN_LENGTH",
+    "MAX_UPLOAD_BYTES", "ObjectScopeLike", "UnsupportedOperationError",
+    "UnsupportedSourceTypeError", "UploadJobEnvelope", "UploadJobEnvelopeError",
+    "UploadJobScope",
 ]

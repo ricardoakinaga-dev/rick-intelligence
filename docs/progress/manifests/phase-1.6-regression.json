@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "check": "make api16-verify",
+  "result": "PASS",
+  "summary": "Sanitized verification passed Phase 1.6, Phase 1.5, Phase 1.4, security, OpenAPI, whitespace, and protected-child cleanliness checks.",
+  "artifact": "docs/progress/phase-1.6-verification.json",
+  "integrity": "sha256:12b90d6701b1805b6ad97c413a54d538b8aa2f73d09f28260a1d7b27f215320b",
+  "contracts": {
+    "knowledge": "knowledge-contract-v1",
+    "ingestion": "ingestion-job-v1",
+    "lifecycle_api": "lifecycle-api-v1",
+    "readiness": "readiness-contract-v1",
+    "rag": "rag-contract-v1",
+    "chat": "chat-contract-v1"
+  }
+}

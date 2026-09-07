@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import hmac
+import ipaddress
+from collections.abc import Iterable, Mapping
 
 # Default-deny: everything not listed here requires an authenticated session.
 PUBLIC_ALLOWLIST = frozenset(
@@ -49,10 +51,73 @@ def resolve_auth_precedence(cookie_token: str | None, bearer_token: str | None) 
     return None, "none"
 
 
-def get_client_ip(trust_forwarded: bool, direct_ip: str | None, forwarded_for: str | None) -> str | None:
+def resolve_session_cookie(
+    cookies: Mapping[str, str],
+    configured_name: str,
+    *,
+    captured_compat_cookie: str | None = None,
+) -> str | None:
+    """Resolve the configured cookie before the legacy generic cookie.
+
+    A few local clients historically sent ``session_cookie``.  It remains a
+    compatibility fallback only when the configured cookie is absent; it can
+    never override an explicitly configured session cookie.  Every consumer
+    (auth, logout/revoke, and CSRF) must use this same precedence.
+    """
+    configured = cookies.get(configured_name)
+    if configured:
+        return configured
+    if configured_name == "session_cookie":
+        return configured
+    return captured_compat_cookie or cookies.get("session_cookie")
+
+
+def _is_trusted_proxy(address: str | None, trusted_proxies: Iterable[str]) -> bool:
+    if not address:
+        return False
+    try:
+        parsed = ipaddress.ip_address(address.strip())
+    except ValueError:
+        return False
+    for entry in trusted_proxies:
+        try:
+            if parsed in ipaddress.ip_network(entry, strict=False):
+                return True
+        except (TypeError, ValueError):
+            continue
+    return False
+
+
+def get_client_ip(
+    trust_forwarded: bool,
+    direct_ip: str | None,
+    forwarded_for: str | None,
+    trusted_proxies: Iterable[str] = (),
+) -> str | None:
+    """Resolve the client address only across an explicitly trusted proxy chain.
+
+    The middleware passes the configured proxy allowlist, so enabling forwarded
+    headers without trusted proxies cannot turn a client header into an identity
+    input.
+    """
+    proxy_allowlist = tuple(trusted_proxies or ())
     if trust_forwarded and forwarded_for:
-        # Take the left-most entry; proxies append to the right.
-        first = forwarded_for.split(",")[0].strip()
-        if first:
-            return first[:64]
+        if _is_trusted_proxy(direct_ip, proxy_allowlist):
+            chain = [item.strip() for item in forwarded_for.split(",") if item.strip()]
+            # Proxies append addresses on the right. Find the first untrusted
+            # hop from the right, ignoring malformed header entries.
+            for candidate in reversed(chain):
+                try:
+                    parsed = ipaddress.ip_address(candidate)
+                except (TypeError, ValueError):
+                    continue
+                if not _is_trusted_proxy(candidate, proxy_allowlist):
+                    return str(parsed)[:64]
+            # A fully trusted chain is unusual but valid; use its leftmost
+            # valid hop. Invalid header fragments never become an address.
+            for candidate in chain:
+                try:
+                    return str(ipaddress.ip_address(candidate))[:64]
+                except (TypeError, ValueError):
+                    continue
     return direct_ip

@@ -1,0 +1,84 @@
+{
+  "record_id": "GATE-SA-SECURITY-TENANT-LOCAL-VERIFIED-V11-002",
+  "timestamp": "2026-09-06T21:30:00Z",
+  "gate_id": "VERIFIED",
+  "scope": "Bounded local tenant propagation, session-cookie precedence and audit redaction boundary",
+  "scope_ref": "SA-SECURITY-TENANT-LOCAL",
+  "version": 1,
+  "criteria": [
+    {
+      "id": "V-001-ACCEPTANCE-EVIDENCE",
+      "description": "A fresh independent I1 review accepts the exact V11 candidate with explicit APPROVE, High confidence and zero Critical, High or Medium findings",
+      "required": true,
+      "status": "PASS",
+      "evidence_refs": [
+        ".agent/verification.jsonl#VER-SA-SECURITY-TENANT-LOCAL-VERIFIED-GATE-V11",
+        ".agent/verification.jsonl#VER-SA-SECURITY-TENANT-LOCAL-REVIEW-INDEPENDENT-V11-APPROVE",
+        ".gauntlet-state-of-art/evidence/security-tenant-local-current/critic-security-i1-approved-raw.md"
+      ],
+      "confidence": "HIGH",
+      "limitations": "The reviewer accepted only the frozen bounded local candidate; external identity/storage, distributed behavior, deployment and full-product security remain outside the decision"
+    },
+    {
+      "id": "V-002-REGRESSION-RISK",
+      "description": "The exact V11 source passes the no-mutation legacy-cancel regression, complete Phase 1.6 local matrix, preserved CI, root shutdown probe and 58-entry manifest validation",
+      "required": true,
+      "status": "PASS",
+      "evidence_refs": [
+        ".agent/verification.jsonl#VER-SA-SECURITY-TENANT-LOCAL-VERIFIED-GATE-V11",
+        ".agent/verification.jsonl#VER-SA-SECURITY-TENANT-LOCAL-REWORK-FULL-V11",
+        ".gauntlet-state-of-art/evidence/security-tenant-local-current/api16-full-security-tenant-v24.log",
+        ".gauntlet-state-of-art/evidence/security-tenant-local-current/make-ci-security-tenant-v25.log",
+        ".gauntlet-state-of-art/evidence/ingestion-lifecycle-current/probe-root-shutdown-security-tenant-v28.log"
+      ],
+      "confidence": "HIGH",
+      "limitations": "Hermetic local evidence only; external providers and production/runtime durability are not exercised"
+    },
+    {
+      "id": "V-003-LIMITATIONS-AUTHORITY",
+      "description": "The accepted boundary is frozen to local server-derived tenant scope, identity/session equality, ACL and redacted audit/cancellation behavior; broader security remains explicitly open",
+      "required": true,
+      "status": "PASS",
+      "evidence_refs": [
+        ".agent/verification.jsonl#VER-SA-SECURITY-TENANT-LOCAL-VERIFIED-GATE-V11",
+        ".gauntlet-state-of-art/reports/security-tenant-local-v11.md",
+        "docs/architecture/local-durability.md",
+        "docs/architecture/ingestion-lifecycle.md",
+        ".agent/verification.jsonl#VER-SA-EXTERNAL-LOCAL-INTEGRATION-BLOCKED"
+      ],
+      "confidence": "HIGH",
+      "limitations": "This is a scoped local gate, not full fourteen-criterion security or product release acceptance"
+    }
+  ],
+  "evidence": [
+    ".gauntlet-state-of-art/reports/security-tenant-local-v11.md",
+    ".gauntlet-state-of-art/evidence/security-tenant-local-current/critic-security-i1-approved-raw.md",
+    ".gauntlet-state-of-art/evidence/security-tenant-local-current/candidate-v11-manifest.json",
+    "apps/api/src/routes/knowledge.py",
+    "apps/api/src/dependencies/identity.py",
+    "packages/identity/src/rick_identity/provider.py",
+    "apps/api/tests/test_phase16_root.py"
+  ],
+  "confidence": "HIGH",
+  "gaps": [],
+  "conditions": [],
+  "authority": {
+    "required": false,
+    "state": "NOT_REQUIRED",
+    "actor": "Codex lead",
+    "scope": "Bounded local tenant propagation, session-cookie precedence and audit redaction boundary",
+    "decision": "Accept only the independently reviewed hermetic local security boundary; no external or release acceptance",
+    "evidence_ref": ".gauntlet-state-of-art/evidence/security-tenant-local-current/critic-security-i1-approved-raw.md",
+    "expires_or_revalidates": "Revalidate on identity, session, tenant scope, collection ACL, payload, ingestion, audit, cancellation, storage or expanded authority changes"
+  },
+  "residual_risk": "MEDIUM",
+  "decision": "PASS",
+  "next_action": "Continue external identity/storage, durability and full-product security evidence; reopen this local gate if contrary boundary evidence emerges",
+  "revalidation_triggers": [
+    "Tenant identity or session refresh binding changes",
+    "Collection, payload, retrieval, ingestion, audit or cancellation mutation boundaries change",
+    "External provider, storage, queue, deployment, multi-instance or production scope is introduced",
+    "Contrary cross-tenant or unscoped mutation evidence emerges"
+  ],
+  "supersedes": "GATE-SA-SECURITY-TENANT-LOCAL-VERIFIED-001"
+}

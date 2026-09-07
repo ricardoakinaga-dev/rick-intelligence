@@ -1,0 +1,76 @@
+{
+  "record_id": "GATE-SA-OBSERVABILITY-ROOT-IMPLEMENTATION-READY-002",
+  "timestamp": "2026-09-06T15:42:27Z",
+  "gate_id": "IMPLEMENTATION_READY",
+  "scope": "Local bounded worker lifecycle event stream",
+  "scope_ref": "SA-OBSERVABILITY",
+  "version": 2,
+  "criteria": [
+    {
+      "id": "IR-001",
+      "description": "The default local API composition constructs IngestionApplicationService with its own single-process executor, so the existing worker event stream is not observable through the real root application boundary",
+      "required": true,
+      "status": "PASS",
+      "evidence_refs": [
+        "apps/api/src/app.py",
+        "apps/api/src/services/ingestion_service.py",
+        "docs/architecture/observability.md"
+      ],
+      "confidence": "HIGH",
+      "limitations": "This gate authorizes implementation preparedness only; root application behavior remains unverified by this record"
+    },
+    {
+      "id": "IR-002",
+      "description": "The correction is local-only and reversible: the root API owns one bounded telemetry sink, receives only redacted lifecycle metadata with opaque job/request/correlation references, and never forwards scope, source, payload or exception text",
+      "required": true,
+      "status": "PASS",
+      "evidence_refs": [
+        "apps/api/src/core/telemetry.py",
+        "packages/observability/src/rick_observability/events.py",
+        "packages/observability/src/rick_observability/redaction.py"
+      ],
+      "confidence": "HIGH",
+      "limitations": "No exporter, collector, distributed aggregation, alert delivery, production deployment or external service effect is authorized"
+    },
+    {
+      "id": "IR-003",
+      "description": "The real root upload path and direct application-service seam can be covered with deterministic tests for lifecycle visibility, bounded immutable snapshots, reentrant sink safety and sink-failure isolation before a fresh independent review",
+      "required": true,
+      "status": "PASS",
+      "evidence_refs": [
+        "apps/api/tests/test_phase16_root.py",
+        "apps/api/tests/test_telemetry.py",
+        "Makefile"
+      ],
+      "confidence": "HIGH",
+      "limitations": "The implementation regression and fresh I1 review remain required after the source change"
+    }
+  ],
+  "evidence": [
+    "apps/api/src/app.py",
+    "apps/api/src/services/ingestion_service.py",
+    "apps/api/src/core/telemetry.py",
+    "docs/architecture/observability.md"
+  ],
+  "confidence": "HIGH",
+  "gaps": [],
+  "conditions": [],
+  "authority": {
+    "required": false,
+    "state": "NOT_REQUIRED",
+    "actor": "Codex lead",
+    "scope": "Local bounded worker lifecycle event stream",
+    "decision": "Authorize reversible hermetic API/service wiring and review only; no external effect or high-risk acceptance",
+    "evidence_ref": "docs/architecture/observability.md",
+    "expires_or_revalidates": "Revalidate before exporter, collector, distributed storage, public event contract, deployment or expanded identity/data scope"
+  },
+  "residual_risk": "MEDIUM",
+  "decision": "PASS",
+  "next_action": "Wire the default root ingestion service to the application-owned bounded telemetry sink and verify the actual upload lifecycle",
+  "revalidation_triggers": [
+    "Root factory or ingestion executor ownership changes",
+    "New event fields could contain tenant, source, content, credentials or unbounded cardinality",
+    "Scope expands to external telemetry, multi-instance coordination or deployment"
+  ],
+  "supersedes": "GATE-SA-OBSERVABILITY-WORKER-IMPLEMENTATION-READY-001"
+}

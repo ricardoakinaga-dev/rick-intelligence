@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "phase": "1.6",
+  "artifact_type": "sanitized implementation evidence",
+  "checks": [
+    {
+      "check": "make api16-domain",
+      "result": "PASS",
+      "tests": 44,
+      "scope": "knowledge listing/tombstones, ingestion validation/state, retrieval fusion/provenance"
+    },
+    {
+      "check": "make api16-worker",
+      "result": "PASS",
+      "tests": 12,
+      "scope": "bounded process-local runner and safe readiness"
+    },
+    {
+      "check": "packages/ingestion/tests/test_ingestion.py + apps/worker/tests/test_runner.py",
+      "result": "PASS",
+      "tests": 27,
+      "scope": "canonical job state transitions/retry classification plus queued, running, published, failed, cancelled, shutdown, and cooperative cancellation behavior"
+    },
+    {
+      "check": "make api16-root",
+      "result": "PASS",
+      "tests": 95,
+      "scope": "authenticated API, lifecycle routes, negative security, OpenAPI body contract, chunked upload limit"
+    },
+    {
+      "check": "make api16-benchmark",
+      "result": "PASS",
+      "samples": 30,
+      "scope": "temporary private storage -> bounded public queue -> canonical ingest -> refreshed deterministic retrieval"
+    },
+    {
+      "check": "make api-contract",
+      "result": "PASS",
+      "openapi_paths": 32,
+      "scope": "required routes plus explicit multipart and JSON request bodies"
+    }
+  ],
+  "observed_invariants": [
+    "Upload requires authenticated documents.upload permission before multipart parsing.",
+    "Client collection/workspace input only narrows the session-derived ACL scope.",
+    "Staging names are server-generated and storage is private temporary 0700/0600.",
+    "Published ingestion refreshes local retrieval; reindex prunes replaced points and delete tombstones metadata plus indexed points.",
+    "Public multipart/JSON upload returns a bounded queued job; cancellation is cooperative and can interrupt queued or running work.",
+    "Replacement and deletion failures use local compensation and fail-closed visibility gates; old published content is never retired before replacement publication.",
+    "Retry attempts are capped at three per failed/cancelled job and package/API job registries are finite.",
+    "Permanent input failures are non-retryable; transient infrastructure failures are explicitly retryable; published jobs are terminal and cannot be cancelled.",
+    "Public job/document/readiness payloads use whitelists and omit source text, paths, raw exceptions, credentials, and heartbeat internals.",
+    "The worker seam is explicitly process-local; production startup requires injected external identity and never seeds demo credentials."
+  ],
+  "external_dependencies": {
+    "provider": "NOT_RUN",
+    "qdrant": "NOT_RUN",
+    "redis_locker": "NOT_RUN",
+    "object_storage": "NOT_RUN",
+    "durable_queue": "NOT_RUN"
+  },
+  "note": "Evidence is hermetic/local and supports implementation behavior only; it makes no production availability or latency claim."
+}

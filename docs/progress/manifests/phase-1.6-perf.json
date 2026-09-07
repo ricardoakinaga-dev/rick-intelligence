@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "check": "make api16-benchmark",
+  "result": "PASS",
+  "summary": "30-sample hermetic benchmark recorded bounded upload and retrieval p50/p95 observations with provider/Qdrant/Redis explicitly not run.",
+  "artifact": "docs/progress/phase-1.6-perf.json",
+  "integrity": "sha256:b1d3454ce81ae066a802ccdbd66769165ae9e8e85f441a18658fb78df78291a6",
+  "contracts": {
+    "knowledge": "knowledge-contract-v1",
+    "ingestion": "ingestion-job-v1",
+    "lifecycle_api": "lifecycle-api-v1",
+    "readiness": "readiness-contract-v1",
+    "rag": "rag-contract-v1",
+    "chat": "chat-contract-v1"
+  }
+}

@@ -1,0 +1,78 @@
+{
+  "record_id": "GATE-SA-OBSERVABILITY-WORKER-IMPLEMENTATION-READY-001",
+  "timestamp": "2026-09-06T15:10:07Z",
+  "gate_id": "IMPLEMENTATION_READY",
+  "scope": "Local bounded worker lifecycle event stream",
+  "scope_ref": "SA-OBSERVABILITY",
+  "version": 1,
+  "criteria": [
+    {
+      "id": "IR-001",
+      "description": "The current observability audit leaves the LocalJobRunner and SQLiteDurableQueue without a structured worker event stream; the bounded correction is to emit lifecycle metadata through a shared redaction boundary",
+      "required": true,
+      "status": "PASS",
+      "evidence_refs": [
+        "docs/architecture/observability.md",
+        "docs/plans/state-of-art-backlog.md",
+        "apps/worker/runner.py",
+        "apps/worker/durable_queue.py"
+      ],
+      "confidence": "HIGH",
+      "limitations": "This gate authorizes implementation preparedness only; current worker behavior is not accepted by this record"
+    },
+    {
+      "id": "IR-002",
+      "description": "The correction is local-only, reversible and bounded: a 256-entry redacted event buffer, opaque job/worker references, no tenant/workspace/collection/source/payload fields, and sink failures isolated from queue behavior",
+      "required": true,
+      "status": "PASS",
+      "evidence_refs": [
+        "packages/observability/src/rick_observability/redaction.py",
+        "packages/observability/src/rick_observability/__init__.py",
+        "apps/worker/README.md"
+      ],
+      "confidence": "HIGH",
+      "limitations": "No exporter, collector, distributed aggregation, alert delivery, production deployment or external service effect is authorized"
+    },
+    {
+      "id": "IR-003",
+      "description": "Failure-first package and worker tests can exercise capacity, immutability, redaction, lifecycle coverage and callback-failure isolation before a fresh independent review",
+      "required": true,
+      "status": "PASS",
+      "evidence_refs": [
+        "packages/observability/tests/test_observability.py",
+        "apps/worker/tests/test_durable_queue.py",
+        "apps/worker/tests/test_runner.py",
+        "Makefile"
+      ],
+      "confidence": "HIGH",
+      "limitations": "The actual regression and fresh I1 review remain required after implementation"
+    }
+  ],
+  "evidence": [
+    "docs/architecture/observability.md",
+    "packages/observability/src/rick_observability/redaction.py",
+    "apps/worker/runner.py",
+    "apps/worker/durable_queue.py"
+  ],
+  "confidence": "HIGH",
+  "gaps": [],
+  "conditions": [],
+  "authority": {
+    "required": false,
+    "state": "NOT_REQUIRED",
+    "actor": "Codex lead",
+    "scope": "Local bounded worker lifecycle event stream",
+    "decision": "Authorize reversible hermetic worker/observability implementation and review only; no external effect or high-risk acceptance",
+    "evidence_ref": "docs/architecture/observability.md",
+    "expires_or_revalidates": "Revalidate before exporter, collector, distributed storage, public contract, deployment or expanded identity/data scope"
+  },
+  "residual_risk": "MEDIUM",
+  "decision": "PASS",
+  "next_action": "Implement the shared bounded sink and wire both local worker seams without exposing payload or scope data",
+  "revalidation_triggers": [
+    "Worker lifecycle, job identity or public status contracts change",
+    "New event fields could contain tenant, source, content, credentials or unbounded cardinality",
+    "Scope expands to external telemetry, multi-instance coordination or deployment"
+  ],
+  "supersedes": null
+}

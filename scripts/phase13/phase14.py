@@ -24,7 +24,7 @@ def _env(legacy: str = "last"):
     env = os.environ.copy()
     parts = [str(ROOT / "apps" / "api" / "src")] + [
         str(ROOT / "packages" / p / "src") for p in
-        ("contracts", "authorization", "identity", "knowledge", "ingestion", "retrieval")]
+        ("contracts", "authorization", "identity", "observability", "knowledge", "ingestion", "retrieval", "providers", "locking", "professor")]
     legacy_src = str(ROOT / "cvg-master-rag-v2" / "src")
     if legacy == "first":
         # Legacy CVG tests import top-level `services`/`models`/`core` packages;

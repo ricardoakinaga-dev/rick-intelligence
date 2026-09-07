@@ -2,7 +2,7 @@
 """Check the root control-plane pointers without mutating repository state.
 
 This is a structural/control check, not a promotion decision.  It validates
-the active plan, machine-readable ledgers, required Phase 0.6 artifacts, and
+the v2 active plan and ledgers, preserved historical controller artifacts, and
 the Git observation available in the current checkout.  A pull-request merge
 checkout is allowed to differ from origin/main; main-sync is enforced only
 when the caller requests it.
@@ -32,8 +32,8 @@ REQUIRED_FILES = (
     ".agent/backlog.json",
     ".agent/execution-log.jsonl",
     ".agent/verification.jsonl",
-    ".agent/gates/phase-0.5-verified-blocked-final.json",
-    ".agent/gates/phase-0.6-promotion-final.json",
+    ".agent/legacy-v1/gates/phase-0.5-verified-blocked-final.json",
+    ".agent/legacy-v1/gates/phase-0.6-promotion-final.json",
     ".gauntlet/state.md",
     ".github/workflows/phase-0.6.yml",
     "docs/baselines/phase-0.6-legacy-test-classification.md",
@@ -52,8 +52,8 @@ PHASE11_REQUIRED_FILES = (
     ".agent/backlog.json",
     ".agent/execution-log.jsonl",
     ".agent/verification.jsonl",
-    ".agent/gates/phase-0.6-promotion-final.json",
-    ".agent/gates/phase-1.1-implementation-ready.json",
+    ".agent/legacy-v1/gates/phase-0.6-promotion-final.json",
+    ".agent/legacy-v1/gates/phase-1.1-implementation-ready.json",
     ".gauntlet/state.md",
     ".github/workflows/phase-1.1.yml",
     "Makefile",
@@ -133,8 +133,8 @@ def _check_phase06_structure(errors: list[str], warnings: list[str]) -> None:
 
     state = _load_json(".agent/state.json", errors)
     backlog = _load_json(".agent/backlog.json", errors)
-    gate = _load_json(".agent/gates/phase-0.5-verified-blocked-final.json", errors)
-    final_gate = _load_json(".agent/gates/phase-0.6-promotion-final.json", errors)
+    gate = _load_json(".agent/legacy-v1/gates/phase-0.5-verified-blocked-final.json", errors)
+    final_gate = _load_json(".agent/legacy-v1/gates/phase-0.6-promotion-final.json", errors)
     if isinstance(state, dict):
         if state.get("active_execplan") != PHASE06_ACTIVE_PLAN:
             errors.append(".agent/state.json: active_execplan does not point to the Phase 0.6 plan")
@@ -159,7 +159,7 @@ def _check_phase06_structure(errors: list[str], warnings: list[str]) -> None:
         "VERIFIED_CANDIDATE",
         "PROMOTED",
     }:
-        errors.append(".agent/gates/phase-0.6-promotion-final.json: decision is not an allowed final classification")
+        errors.append(".agent/legacy-v1/gates/phase-0.6-promotion-final.json: decision is not an allowed final classification")
 
     execution_records = _check_jsonl(".agent/execution-log.jsonl", errors)
     verification_records = _check_jsonl(".agent/verification.jsonl", errors)
@@ -174,10 +174,10 @@ def _check_phase11_structure(
 ) -> None:
     required_files = list(PHASE11_REQUIRED_FILES)
     final_gate_ref = state.get("last_gate_record")
-    if final_gate_ref == ".agent/gates/phase-1.1-verified.json":
+    if final_gate_ref == ".agent/legacy-v1/gates/phase-1.1-verified.json":
         required_files.extend(
             [
-                ".agent/gates/phase-1.1-verified.json",
+                ".agent/legacy-v1/gates/phase-1.1-verified.json",
                 "docs/progress/phase-1.1-independent-review.md",
             ]
         )
@@ -212,16 +212,16 @@ def _check_phase11_structure(
     }:
         errors.append(".agent/state.json: status is not a recognized control-plane state")
 
-    implementation_gate = _load_json(".agent/gates/phase-1.1-implementation-ready.json", errors)
+    implementation_gate = _load_json(".agent/legacy-v1/gates/phase-1.1-implementation-ready.json", errors)
     if isinstance(implementation_gate, dict) and (
         implementation_gate.get("gate_id") != "IMPLEMENTATION_READY"
         or implementation_gate.get("decision") != "PASS"
     ):
-        errors.append(".agent/gates/phase-1.1-implementation-ready.json: gate_id/decision is not IMPLEMENTATION_READY/PASS")
+        errors.append(".agent/legacy-v1/gates/phase-1.1-implementation-ready.json: gate_id/decision is not IMPLEMENTATION_READY/PASS")
 
-    historical_gate = _load_json(".agent/gates/phase-0.6-promotion-final.json", errors)
+    historical_gate = _load_json(".agent/legacy-v1/gates/phase-0.6-promotion-final.json", errors)
     if isinstance(historical_gate, dict) and historical_gate.get("decision") != "BLOCKED":
-        errors.append(".agent/gates/phase-0.6-promotion-final.json: historical Phase 0.6 decision changed")
+        errors.append(".agent/legacy-v1/gates/phase-0.6-promotion-final.json: historical Phase 0.6 decision changed")
 
     toolchain = _load_json("toolchain.json", errors)
     if isinstance(toolchain, dict) and toolchain.get("schema_version") != "phase-1.1-toolchain.v1":
@@ -242,7 +242,7 @@ def _check_phase11_structure(
             if task_id not in ids:
                 errors.append(f".agent/backlog.json: {task_id} item is missing")
 
-    if final_gate_ref == ".agent/gates/phase-1.1-verified.json":
+    if final_gate_ref == ".agent/legacy-v1/gates/phase-1.1-verified.json":
         final_gate = _load_json(final_gate_ref, errors)
         if isinstance(final_gate, dict) and (
             final_gate.get("gate_id") != "VERIFIED"
@@ -259,11 +259,27 @@ def _check_phase11_structure(
 
 
 def _check_structure(errors: list[str], warnings: list[str]) -> None:
-    state = _load_json(".agent/state.json", errors) if (ROOT / ".agent/state.json").is_file() else None
-    if isinstance(state, dict) and state.get("active_execplan") == PHASE11_ACTIVE_PLAN:
-        _check_phase11_structure(errors, warnings, state)
+    # This checkout has migrated to v2. Historical branches must never serve
+    # as a fallback for missing, malformed or downgraded current controllers.
+    state = _load_json(".agent/state.json", errors)
+    backlog = _load_json(".agent/backlog.json", errors)
+    for name, value in (("state", state), ("backlog", backlog)):
+        if not isinstance(value, dict):
+            errors.append(f".agent/{name}.json: controller must be a JSON object")
+        elif type(value.get("schema_version")) is not int or value["schema_version"] != 2:
+            errors.append(f".agent/{name}.json: current controller requires schema_version 2")
+    if errors:
         return
-    _check_phase06_structure(errors, warnings)
+    for command in (
+        [sys.executable, str(ROOT / "scripts/state_of_art/archive_controller.py")],
+        [sys.executable, str(ROOT / "scripts/control_plane/vendor/engineering_framework/scripts/check_state.py"), str(ROOT)],
+        [sys.executable, str(ROOT / "scripts/state_of_art/review_control_views.py")],
+        [sys.executable, str(ROOT / "scripts/control_plane/vendor/gauntlet_loop/gauntlet_state.py"), "validate", "--repo", str(ROOT)],
+    ):
+        completed = subprocess.run(command, cwd=ROOT, check=False, capture_output=True, text=True)
+        print(completed.stdout, end="")
+        if completed.returncode != 0:
+            errors.append(f"Required controller check failed: {Path(command[1]).name}")
 
 
 def _check_git(args: argparse.Namespace, errors: list[str], warnings: list[str]) -> None:

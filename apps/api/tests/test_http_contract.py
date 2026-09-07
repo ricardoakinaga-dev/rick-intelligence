@@ -11,6 +11,14 @@ def test_request_id_headers(client):
     assert resp2.headers["X-Correlation-ID"] == "corr-1"
 
 
+def test_request_id_rejects_control_characters(client):
+    response = client.get("/health/live", headers={"X-Request-ID": "bad\nforged"})
+    request_id = response.headers["X-Request-ID"]
+    assert request_id != "bad\nforged"
+    assert all(ord(char) >= 0x20 for char in request_id)
+    assert len(request_id) <= 128
+
+
 def test_oversize_correlation_id_regenerated(client):
     resp = client.get("/health/live", headers={"X-Correlation-ID": "x" * 500})
     assert resp.headers["X-Correlation-ID"] != "x" * 500
@@ -58,3 +66,15 @@ def test_login_rate_limited(client):
         client.post("/api/v1/auth/login", json={"email": "nobody@example.com", "password": "x", "tenant_id": "default"})
     resp = client.post("/api/v1/auth/login", json={"email": "nobody@example.com", "password": "x", "tenant_id": "default"})
     assert resp.status_code in (401, 429)
+
+
+def test_ingestion_openapi_declares_both_upload_and_reindex_bodies(app):
+    schema = app.openapi()
+    upload = schema["paths"]["/api/v1/documents/upload"]["post"]["requestBody"]
+    multipart = upload["content"]["multipart/form-data"]["schema"]
+    assert multipart["required"] == ["file", "collection_id"]
+    assert multipart["properties"]["file"] == {"type": "string", "format": "binary"}
+    assert "application/json" in upload["content"]
+
+    reindex = schema["paths"]["/api/v1/ingestion/reindex"]["post"]["requestBody"]
+    assert reindex["content"]["application/json"]["schema"]["required"] == ["document_id"]

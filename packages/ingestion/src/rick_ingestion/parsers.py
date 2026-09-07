@@ -8,6 +8,9 @@ as metadata only.
 
 from __future__ import annotations
 
+import codecs
+import hashlib
+import io
 import re
 import secrets
 import unicodedata
@@ -19,6 +22,13 @@ SUPPORTED_EXTENSIONS = frozenset({".pdf", ".docx", ".md", ".txt"})
 PARSER_VERSION = "rick-parser-v1"
 
 MAX_FILE_BYTES = 50 * 1024 * 1024
+# A fixed read bound keeps checksum and text acquisition independent of file
+# size. The parser still returns the complete decoded text because that is the
+# existing DocumentParser contract; only the file I/O itself is chunked.
+FILE_READ_CHUNK_BYTES = 64 * 1024
+MAX_PARSED_TEXT_CHARS = 8_000_000
+MAX_PARSED_PAGES = 10_000
+MAX_PARSED_SECTIONS = 100_000
 
 
 class ParseError(Exception):
@@ -30,6 +40,49 @@ class ParseError(Exception):
 class UnsupportedFormatError(ParseError):
     def __init__(self, suffix: str):
         super().__init__("unsupported_media_type", f"Unsupported format: {suffix or '(none)'}")
+
+
+def checksum_file(path: Path) -> str:
+    """Hash a validated file with an explicit bounded read size."""
+
+    digest = hashlib.sha256()
+    try:
+        with path.open("rb") as stream:
+            while True:
+                chunk = stream.read(FILE_READ_CHUNK_BYTES)
+                if not chunk:
+                    break
+                digest.update(chunk)
+    except OSError as exc:
+        raise ParseError() from exc
+    return digest.hexdigest()
+
+
+def read_text_file(path: Path, *, encoding: str, max_chars: int = MAX_PARSED_TEXT_CHARS) -> str:
+    """Decode a file through bounded binary reads without changing text I/O semantics."""
+
+    decoder = io.IncrementalNewlineDecoder(
+        codecs.getincrementaldecoder(encoding)(),
+        translate=True,
+    )
+    pieces: list[str] = []
+    total_chars = 0
+    with path.open("rb") as stream:
+        while True:
+            chunk = stream.read(FILE_READ_CHUNK_BYTES)
+            if not chunk:
+                break
+            piece = decoder.decode(chunk, final=False)
+            total_chars += len(piece)
+            if total_chars > max_chars:
+                raise ParseError("request_too_large", "Parsed document exceeds the text limit.")
+            pieces.append(piece)
+        piece = decoder.decode(b"", final=True)
+        total_chars += len(piece)
+        if total_chars > max_chars:
+            raise ParseError("request_too_large", "Parsed document exceeds the text limit.")
+        pieces.append(piece)
+    return "".join(pieces)
 
 
 @dataclass
@@ -79,9 +132,9 @@ def generated_storage_name(suffix: str) -> str:
 class TxtParser:
     def parse(self, path: Path, *, workspace_id: str) -> ParsedDocument:
         try:
-            text = path.read_text(encoding="utf-8")
+            text = read_text_file(path, encoding="utf-8")
         except UnicodeDecodeError:
-            text = path.read_text(encoding="latin-1")
+            text = read_text_file(path, encoding="latin-1")
         except OSError as exc:
             raise ParseError() from exc
         if not text.strip():
@@ -94,15 +147,16 @@ class MarkdownParser:
 
     def parse(self, path: Path, *, workspace_id: str) -> ParsedDocument:
         try:
-            text = path.read_text(encoding="utf-8")
+            text = read_text_file(path, encoding="utf-8")
         except OSError as exc:
             raise ParseError() from exc
         if not text.strip():
             raise ParseError("validation_error", "Document is empty.")
-        sections = [
-            {"heading": match.group(2).strip(), "level": len(match.group(1))}
-            for match in self._HEADING.finditer(text)
-        ]
+        sections = []
+        for match in self._HEADING.finditer(text):
+            if len(sections) >= MAX_PARSED_SECTIONS:
+                raise ParseError("request_too_large", "Document contains too many sections.")
+            sections.append({"heading": match.group(2).strip(), "level": len(match.group(1))})
         return ParsedDocument(text=text, pages=[ParsedPage(page_number=1, text=text)], sections=sections)
 
 
@@ -116,7 +170,17 @@ class DocxParser:
             doc = DocxDocument(str(path))
         except Exception as exc:
             raise ParseError("validation_error", "Could not open DOCX document.") from exc
-        full_text = "\n".join(p.text.strip() for p in doc.paragraphs if p.text.strip())
+        paragraphs: list[str] = []
+        total_chars = 0
+        for paragraph in doc.paragraphs:
+            text = paragraph.text.strip()
+            if not text:
+                continue
+            total_chars += len(text) + (1 if paragraphs else 0)
+            if total_chars > MAX_PARSED_TEXT_CHARS:
+                raise ParseError("request_too_large", "Parsed document exceeds the text limit.")
+            paragraphs.append(text)
+        full_text = "\n".join(paragraphs)
         if not full_text:
             raise ParseError("validation_error", "DOCX contains no text.")
         return ParsedDocument(text=full_text, pages=[ParsedPage(page_number=1, text=full_text)])
@@ -129,9 +193,10 @@ class ControlledPdfParser:
     heartbeat, page-number provenance). Requires pdfplumber at call time.
     """
 
-    def __init__(self, *, pages_per_batch: int = 10, heartbeat=None) -> None:
+    def __init__(self, *, pages_per_batch: int = 10, heartbeat=None, max_text_chars: int = MAX_PARSED_TEXT_CHARS) -> None:
         self.pages_per_batch = pages_per_batch
         self.heartbeat = heartbeat or (lambda **kwargs: None)
+        self.max_text_chars = max_text_chars
 
     def page_count(self, path: Path) -> int:
         try:
@@ -150,6 +215,7 @@ class ControlledPdfParser:
         except ImportError as exc:
             raise ParseError("ingestion_failed", "PDF support is not installed.") from exc
         pages: list[ParsedPage] = []
+        total_chars = 0
         try:
             with pdfplumber.open(str(path)) as pdf:
                 total = len(pdf.pages)
@@ -167,6 +233,11 @@ class ControlledPdfParser:
                                 except Exception:
                                     pass
                         if text.strip():
+                            total_chars += len(text) + (1 if pages else 0)
+                            if total_chars > self.max_text_chars:
+                                raise ParseError("request_too_large", "Parsed document exceeds the text limit.")
+                            if len(pages) >= MAX_PARSED_PAGES:
+                                raise ParseError("request_too_large", "Document contains too many pages.")
                             pages.append(ParsedPage(page_number=start + offset + 1, text=text))
                     self.heartbeat(stage="parsing", pages_done=min(start + self.pages_per_batch, total), pages_total=total)
         except ParseError:

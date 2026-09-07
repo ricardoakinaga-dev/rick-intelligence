@@ -7,25 +7,41 @@ knowledge-intelligence platform:
 - `rick-professor/` — the current TypeScript/Fastify Professor compatibility service;
 - `modulo-redis-locker/` — the current JavaScript/Express Redis lease service.
 
-The repository is currently at **Phase 1.4 — Knowledge, Ingestion & Retrieval
-Engine Extraction**. `packages/knowledge`, `packages/ingestion` and
-`packages/retrieval` are real root-owned implementations with differential
-parity to validated legacy behavior (rag-contract-v1 preserved, stable IDs,
-hybrid+RRF+rerank, ACL); low-risk API callers read through the root knowledge
-store (DUAL + flag rollback). Legacy CVG/Professor/Locker servers remain
-byte-identical compatibility/migration surfaces; no legacy code is deleted
-in this phase. The previous Phase 0.6 promotion gate remains recorded as `BLOCKED`
-and Phases 1.1/1.3/1.3.1 as `VERIFIED_CANDIDATE` (their scopes).
+The repository is currently at **Phase 1.6 — bounded ingestion and lifecycle
+vertical slice**. `packages/knowledge`, `packages/ingestion` and `packages/retrieval`
+remain root-owned implementations with differential parity to validated
+legacy behavior; `packages/providers`, `packages/locking` and
+`packages/professor` now provide the typed provider, owner-safe lease and
+evidence-gated generation boundaries. `apps/api` can run an authenticated
+platform or OpenAI-compatible request through server-side ACL, deterministic
+retrieval, Professor orchestration, citations and safe failure mapping. The
+root API also exposes bounded multipart upload, canonical ingestion, job
+status/cancellation/retry, cursor-paginated published documents, reindex,
+document deletion, and refreshed local retrieval. The default local mode
+returns a bounded process-local upload job before processing so cancellation is
+usable from the public API; it remains hermetic and production rejects the
+stub ingestion path.
+Legacy CVG/Professor/Locker servers remain byte-identical
+compatibility/migration surfaces; no legacy code is deleted in this phase.
+Live OpenAI, Qdrant, Redis, durable jobs, and object storage remain explicit
+rollout work and are not claimed by the local fixtures. The canonical web
+caller now exists as an independently verified initial slice in `apps/web`;
+its production promotion remains gated by the missing runtime/operations
+evidence.
 
 ## Repository layout
 
 ```text
-apps/                  future canonical runtime applications
-packages/              future reusable domain and platform packages
+apps/api/              canonical FastAPI boundary (Phase 1.3/1.5)
+apps/worker/            reserved worker boundary; durable execution deferred
+apps/web/               canonical root web caller (initial State of Art slice)
+packages/              reusable domain and platform packages
 infrastructure/        future deployment, migration, and operations assets
 tests/                 root contract, integration, security, regression, and performance lanes
 docs/                  architecture, plans, progress, and evidence
 scripts/phase11/       root foundation validators and command orchestration
+scripts/phase15/       Phase 1.5 boundary checks and vertical-slice verification
+scripts/phase16/       bounded ingestion lifecycle, benchmark, and verification
 
 cvg-master-rag-v2/     preserved CVG implementation (not moved in Phase 1.1)
 rick-professor/        preserved Professor implementation (not moved in Phase 1.1)
@@ -44,10 +60,10 @@ and is checked by `make validate`.
 
 Run `make help` for the complete list.
 
-| Command | Phase 1.1 behavior |
+| Command | Current behavior |
 | --- | --- |
 | `make bootstrap` | Installs from the preserved lockfiles and prepares the existing CVG local runtime through its current bootstrap script. |
-| `make validate` | Checks the skeleton, protected legacy paths, root commands, toolchain contract, and dependency-boundary rules. |
+| `make validate` | Checks current root package boundaries, protected legacy paths, and repository layout. |
 | `make test-fast` | Runs the root validator and focused CVG, Professor, and Locker regression suites. |
 | `make test` | Runs the available full component suites, including the existing frontend smoke command; known Phase 0.6 corpus failures remain visible. |
 | `make test-integration` | Uses only disposable loopback Qdrant/Redis state and the existing Phase 0.5 integration probes. |
@@ -64,14 +80,22 @@ Run `make help` for the complete list.
 | `make api14-units` | Canonical knowledge/ingestion/retrieval unit suites. |
 | `make api14-differential` | Legacy↔root parity, shadow quality, RAG E2E. |
 | `make api14-acl` | RAG ACL negative matrix. |
-| `make api14-full` | Units + differential + API matrix + legacy regression. |
+| `make api14-full` | Phase 1.4 units + differential + API matrix + legacy regression. |
 | `make api14-benchmark` | Legacy-vs-root perf budget check. |
+| `make api15-boundaries` | Current root boundary and preservation validator. |
+| `make api15-full` | Phase 1.5 boundaries, contracts, provider, locking, Professor, and root API suites. |
+| `make api16-full` | Phase 1.6 boundaries, domain lifecycle, worker seam, readiness, root API, and hermetic benchmark. |
+| `make api16-verify` | Sanitized Phase 1.6 matrix plus Phase 1.5/1.4 regression, security, OpenAPI, and whitespace checks. |
+| `make web-validate` | Lints, typechecks, builds, and runs the canonical browser matrix at 375/768/1440 against the root API loopback. |
+| `make web-e2e` | Runs the canonical browser smoke and writes visual evidence under `artifacts/visual/state-of-art/`. |
 | `make dev`, `make up`, `make logs` | Fail closed until a canonical root application/compose boundary exists; they never guess at legacy service wiring. |
 | `make down` | Reports that no canonical root stack exists yet and changes no external state. |
 
-For the current component-specific commands and runtime prerequisites, see
+For current component-specific commands and runtime prerequisites, see
 [`docs/plans/phase-1.1-monorepo-skeleton.md`](docs/plans/phase-1.1-monorepo-skeleton.md)
-and each preserved component README.
+and [`docs/architecture/professor-provider-locking.md`](docs/architecture/professor-provider-locking.md).
+The Phase 1.6 lifecycle contract and its process-local limits are in
+[`docs/architecture/ingestion-lifecycle.md`](docs/architecture/ingestion-lifecycle.md).
 
 ## Toolchain
 

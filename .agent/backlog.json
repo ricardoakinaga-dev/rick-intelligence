@@ -1,551 +1,426 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "items": [
     {
-      "id": "PH0-INV",
-      "title": "Inventory current cross-system architecture and contracts",
+      "id": "SA-CONTROL-RECOVERY",
+      "title": "Recover canonical controller without losing historical decisions",
       "stage": "AUDIT",
       "priority": "P0",
       "status": "DONE",
-      "origin": "User Phase 0 checklist and forensic discovery",
+      "origin": "Explicit full AAA user objective and current artifact recovery; historical completion is not imported",
       "dependencies": [],
       "owner": "Codex lead",
-      "acceptance_summary": "All three repositories, runtime boundaries, stores, APIs, UI, deployment, integrations, data lifecycle, and stale evidence are mapped with citations.",
+      "acceptance_summary": "Canonical checker and archive integrity checks pass with historical consumers preserved",
       "evidence_refs": [
-        "docs/architecture/current-system.md",
-        "cvg-master-rag-v2/AGENTS.md",
-        ".agent/verification.jsonl#VER-PH0-INV-FINAL"
+        ".agent/legacy-v1/manifest.json",
+        ".agent/RECOVERY-CURRENT.md",
+        ".agent/verification.jsonl#VER-V2-CONTROL-CHECKS",
+        "docs/architecture/controller-recovery.md",
+        ".agent/verification.jsonl#VER-V2-DISPATCH-CORRECTION",
+        ".agent/verification.jsonl#VER-V2-CONTROLLER-PEER",
+        ".agent/gates/state-of-art-controller-resolved.json"
       ],
-      "next_action": "Inventory complete; preserve this baseline and defer runtime contract changes to the gated Phase 1."
+      "next_action": {
+        "id": "SA-CONTROL-RECOVERY:REOPEN",
+        "kind": "REOPEN",
+        "summary": "Reopen canonical controller recovery if contrary evidence emerges",
+        "target": ".agent/",
+        "completion_signal": "A new concrete integrity or false-green finding requires renewed verification"
+      }
     },
     {
-      "id": "PH0-CHAR",
-      "title": "Characterize critical RAG, provenance, failure, concurrency, and recovery behavior",
+      "id": "SA-READINESS-REVIEW",
+      "title": "Correct strict readiness flags and stale authentication responses",
+      "stage": "BUILD",
+      "priority": "P1",
+      "status": "DONE",
+      "origin": "Explicit full AAA user objective and current artifact recovery; historical completion is not imported",
+      "dependencies": [
+        "SA-GAUNTLET-CONTROL"
+      ],
+      "owner": "Codex lead",
+      "acceptance_summary": "Strict boolean readiness and ordered browser session state pass actual-boundary tests and fresh scoped review; provider isolation remains separately required",
+      "evidence_refs": [
+        "docs/architecture/readiness-login-state.md",
+        ".agent/gates/state-of-art-readiness-login-ready.json",
+        ".agent/verification.jsonl#VER-SA-READINESS-LOGIN-PEER-2",
+        ".agent/gates/state-of-art-readiness-login-verified.json"
+      ],
+      "next_action": {
+        "id": "SA-READINESS-REVIEW:REOPEN",
+        "kind": "REOPEN",
+        "summary": "Reopen scoped strict readiness/login work if relevant contrary evidence emerges",
+        "target": "docs/architecture/readiness-login-state.md",
+        "completion_signal": "A source/contract change or concrete acceptance violation requires renewed verification"
+      }
+    },
+    {
+      "id": "SA-DISCONNECT",
+      "title": "Correct observed client disconnect handling without hiding real errors",
+      "stage": "BUILD",
+      "priority": "P1",
+      "status": "DONE",
+      "origin": "Explicit full AAA user objective and current artifact recovery; historical completion is not imported",
+      "dependencies": [
+        "SA-GAUNTLET-CONTROL"
+      ],
+      "owner": "Codex lead",
+      "acceptance_summary": "Failure-first tests distinguish disconnects from real connected application errors",
+      "evidence_refs": [
+        "docs/architecture/http-transport-observation.md",
+        ".agent/gates/state-of-art-disconnect-ready.json",
+        ".agent/gates/state-of-art-disconnect-ready-v2.json",
+        ".agent/verification.jsonl#VER-SA-TRANSPORT-PEER-5",
+        ".agent/gates/state-of-art-disconnect-verified.json"
+      ],
+      "next_action": {
+        "id": "SA-DISCONNECT:REOPEN",
+        "kind": "REOPEN",
+        "summary": "Reopen scoped transport work if contrary evidence or relevant source changes emerge",
+        "target": "apps/api/src/core/streaming.py",
+        "completion_signal": "A new concrete acceptance violation requires renewed verification"
+      }
+    },
+    {
+      "id": "SA-VISUAL",
+      "title": "Close full responsive accessibility and visual quality gaps",
+      "stage": "BUILD",
+      "priority": "P1",
+      "status": "VERIFY",
+      "origin": "Explicit full AAA user objective and current artifact recovery; historical completion is not imported",
+      "dependencies": [
+        "SA-GAUNTLET-CONTROL"
+      ],
+      "owner": "Codex lead",
+      "acceptance_summary": "Cycle4 production-web visual gate passed two fresh blind I1 reviews at 97/100 and 95.52/100, both HIGH and APPROVE, with zero Critical/High findings; exact local regression, visual and performance evidence is bound, while full WCAG/product and fourteen-criterion acceptance remain open",
+      "evidence_refs": [
+        "docs/architecture/visual-state-quality.md",
+        ".agent/verification.jsonl#VER-SA-VISUAL-PERMISSION-BASELINE",
+        ".agent/gates/state-of-art-visual-ready.json",
+        ".gauntlet-state-of-art/visual/benchmark.json",
+        ".agent/verification.jsonl#VER-SA-VISUAL-CYCLE1-REGRESSION",
+        ".agent/verification.jsonl#VER-SA-VISUAL-QUALITY-MATRIX",
+        ".agent/verification.jsonl#VER-SA-VISUAL-TEXT-STRESS",
+      ".agent/verification.jsonl#VER-SA-VISUAL-CURRENT-INTEGRATION",
+      ".agent/verification.jsonl#VER-SA-VISUAL-CRITIC-A",
+      ".agent/verification.jsonl#VER-SA-VISUAL-CYCLE2-COPY-RECOVERY",
+      ".agent/verification.jsonl#VER-SA-VISUAL-CYCLE2-CURRENT-MATRIX",
+      ".agent/verification.jsonl#VER-SA-VISUAL-CYCLE2-CURRENT-FUNCTIONAL",
+      ".agent/verification.jsonl#VER-SA-VISUAL-CYCLE2-CRITIC-A",
+      ".agent/verification.jsonl#VER-SA-VISUAL-CYCLE2-CRITIC-B",
+      ".agent/verification.jsonl#VER-SA-VISUAL-CYCLE2-CRITIC-DIVERGENCE",
+      ".agent/verification.jsonl#VER-SA-VISUAL-CYCLE2-CORRECTED-SEARCH-RECOVERY",
+      ".agent/verification.jsonl#VER-SA-VISUAL-CYCLE2-CORRECTED-MATRIX",
+      ".agent/verification.jsonl#VER-SA-VISUAL-CYCLE2-CORRECTED-FUNCTIONAL",
+      ".agent/verification.jsonl#VER-SA-VISUAL-CYCLE2-CORRECTED-CONTROL",
+      ".agent/verification.jsonl#VER-SA-VISUAL-CYCLE2-FIX3-REVIEWS",
+      ".agent/verification.jsonl#VER-SA-VISUAL-CYCLE2-FIX3-FINAL",
+      ".agent/verification.jsonl#VER-SA-VISUAL-CYCLE2-FIX3-INTEGRITY",
+      ".agent/verification.jsonl#VER-SA-VISUAL-CYCLE2-SCOPED-GATE",
+      ".agent/verification.jsonl#VER-SA-VISUAL-CYCLE4-PRODUCTION-REGRESSION",
+      ".agent/verification.jsonl#VER-SA-VISUAL-CYCLE4-MATRIX",
+      ".agent/verification.jsonl#VER-SA-VISUAL-CYCLE4-PERFORMANCE",
+      ".agent/verification.jsonl#VER-SA-VISUAL-CYCLE4-REVIEWS",
+      ".agent/verification.jsonl#VER-SA-VISUAL-CYCLE4-INTEGRITY",
+      ".agent/verification.jsonl#VER-SA-VISUAL-CYCLE4-GATE",
+      ".agent/verification.jsonl#VER-SA-VISUAL-CYCLE4-CONTROL-CLOSURE",
+      ".agent/gates/state-of-art-visual-cycle4-verified.json",
+      ".gauntlet-state-of-art/reports/visual-cycle4-production-web.md",
+      ".gauntlet-state-of-art/reports/visual-cycle3-rejection.md",
+      ".gauntlet-state-of-art/evidence/visual-cycle4-current/candidate-cycle4-production-web.json"
+      ],
+      "next_action": {
+        "id": "SA-VISUAL:VERIFY",
+        "kind": "VERIFY",
+      "summary": "Pursue the remaining full-product AAA evidence after closing the scoped cycle2 visual gate; obtain authorized external runtime/corpus/operations/performance/release verification",
+        "target": ".gauntlet-state-of-art/visual/benchmark.json",
+        "completion_signal": "Fourteen frozen criteria have current evidence, including external durability/restore/soak, approved corpus, performance, deployment and independent full-product review"
+      }
+    },
+    {
+      "id": "SA-EXTERNAL",
+      "title": "Obtain authorized external runtime evidence for the full AAA bar",
       "stage": "AUDIT",
-      "priority": "P0",
-      "status": "DONE",
-      "origin": "User Phase 0 characterization requirements",
-      "dependencies": [
-        "PH0-INV"
-      ],
-      "owner": "Codex lead",
-      "acceptance_summary": "Representative document, chunk, embedding, persistence/index, known-query evidence, grounded answer, provenance, malformed/provider/vector failures, duplicate, restart, and concurrency behavior are recorded as pass/fail/not-run.",
-      "evidence_refs": [
-        "docs/baselines/characterization-results.json",
-        "tests/phase0/redis-locker-characterization.mjs",
-        ".agent/verification.jsonl#VER-PH0-CHAR-MATRIX"
-      ],
-      "next_action": "Characterization matrix complete; run NOT_RUN paths only after the listed environment prerequisites are provisioned."
-    },
-    {
-      "id": "PH0-BASE",
-      "title": "Capture executable performance and reproducibility baseline",
-      "stage": "AUDIT",
-      "priority": "P0",
-      "status": "DONE",
-      "origin": "User Phase 0 performance baseline requirements",
-      "dependencies": [
-        "PH0-CHAR"
-      ],
-      "owner": "Codex lead",
-      "acceptance_summary": "Environment, commands, ingestion/embedding/query/retrieval/generation latency, TTFT where applicable, memory, index size, duplicate, and concurrency measurements are saved or explicitly marked NOT_RUN.",
-      "evidence_refs": [
-        "docs/baselines/phase-0-performance.json",
-        "docs/baselines/phase-0-command-log.md",
-        ".agent/verification.jsonl#VER-PH0-BASE-ARTIFACT"
-      ],
-      "next_action": "Baseline artifact complete; rerun the conditional live measurements after environment provisioning."
-    },
-    {
-      "id": "PH0-REPORT",
-      "title": "Publish Phase 0 report, status, risks, and proposed Phase 1 layout",
-      "stage": "AUDIT",
-      "priority": "P0",
-      "status": "IN_PROGRESS",
-      "origin": "User Phase 0 report and handoff requirements",
-      "dependencies": [
-        "PH0-INV",
-        "PH0-CHAR",
-        "PH0-BASE"
-      ],
-      "owner": "Codex lead",
-      "acceptance_summary": "The required phase report sections, PHASE 0 STATUS table, VERIFIED_CANDIDATE recommendation decision, limitations, and evidence-backed Phase 1 implementation plan are complete.",
-      "evidence_refs": [
-        "docs/progress/phase-0-report.md",
-        "docs/architecture/current-system.md",
-        ".agent/verification.jsonl#VER-PH0-REPORT-REVIEW"
-      ],
-      "next_action": "Await human acceptance of the partial/non-promoted report and resolution of its open environment gates; do not start Phase 1."
-    },
-    {
-      "id": "PH05-ENV",
-      "title": "Provision and characterize the reproducible Phase 0.5 runtime baseline",
-      "stage": "BUILD",
-      "priority": "P0",
-      "status": "DONE",
-      "origin": "User Phase 0.5 runtime baseline and control task requirements",
-      "dependencies": [],
-      "owner": "Codex lead",
-      "acceptance_summary": "Pinned Python/uv/Qdrant/Redis/Node/npm versions, isolated services, repaired frontend lockfile, reproducible commands, and honest A\u2013O status evidence are captured without host-state mutation.",
-      "evidence_refs": [
-        ".agent/plans/phase-0.5-baseline-closure.md",
-        ".gauntlet/state.md",
-        "docs/baselines/phase-0.5-characterization.json",
-        "docs/baselines/phase-0.5-performance.json",
-        ".agent/verification.jsonl#VER-PH05-ENV-CURRENT"
-      ],
-      "next_action": "Capture the versioned environment artifact and run the isolated CVG, Professor, Locker, frontend, and Qdrant checks; mark unavailable provider paths explicitly."
-    },
-    {
-      "id": "PH05-RAG-CONTRACT",
-      "title": "Freeze and implement the canonical versioned RAG contract",
-      "stage": "BUILD",
-      "priority": "P0",
-      "status": "DONE",
-      "origin": "User Phase 0.5 canonical RAG contract requirements",
-      "dependencies": [
-        "PH05-ENV"
-      ],
-      "owner": "Codex lead",
-      "acceptance_summary": "Canonical collection resolution, named vectors, complete payload, deterministic IDs, RetrievalContext, compatibility adapters, schema fixtures, and idempotent document identity are implemented and tested.",
-      "evidence_refs": [
-        "docs/architecture/contracts/rag-contract-v1.md",
-        "scripts/phase05/phase05_e2e.py",
-        ".agent/verification.jsonl#VER-PH05-RAG-CURRENT"
-      ],
-      "next_action": "Add the contract document and focused model/vector/ingestion tests after the runtime baseline is recorded."
-    },
-    {
-      "id": "PH05-LOCK",
-      "title": "Make distributed Redis locking owner-safe and failure-clean",
-      "stage": "BUILD",
-      "priority": "P0",
-      "status": "DONE",
-      "origin": "User Phase 0.5 Redis lock ownership and cleanup requirements",
-      "dependencies": [
-        "PH05-ENV"
-      ],
-      "owner": "Codex lead",
-      "acceptance_summary": "Acquire, owner-bound compare-delete unlock, optional renewal, expiry, contention, wrong-owner, and Professor finally-release behavior are proven with isolated Redis evidence.",
-      "evidence_refs": [
-        "docs/progress/phase-0.5-report.md",
-        "scripts/phase05/locker_e2e.mjs",
-        ".agent/verification.jsonl#VER-PH05-LOCK-CURRENT"
-      ],
-      "next_action": "Implement the Locker contract and Professor release path once the canonical context interface is stable."
-    },
-    {
-      "id": "PH05-EVIDENCE",
-      "title": "Close Professor evidence-gate and citation integrity defects",
-      "stage": "BUILD",
-      "priority": "P0",
-      "status": "DONE",
-      "origin": "User Phase 0.5 evidence and provenance requirements",
-      "dependencies": [
-        "PH05-RAG-CONTRACT"
-      ],
-      "owner": "Codex lead",
-      "acceptance_summary": "No/weak/approved evidence states are explicit; weak single hits fall back; planner IDs are validated against authorized retrieved chunks; fabricated, wrong, inaccessible, and nonretrieved citations are rejected.",
-      "evidence_refs": [
-        "docs/architecture/contracts/rag-contract-v1.md",
-        "rick-professor/src/core/evidence.ts",
-        ".agent/verification.jsonl#VER-PH05-EVIDENCE-CURRENT"
-      ],
-      "next_action": "Add the evidence resolver and negative tests in Professor after RetrievalContext is available."
-    },
-    {
-      "id": "PH05-UPLOAD",
-      "title": "Harden upload paths, filenames, collisions, and diagnostic hygiene",
-      "stage": "BUILD",
-      "priority": "P0",
-      "status": "DONE",
-      "origin": "User Phase 0.5 upload and secret/log hygiene requirements",
-      "dependencies": [
-        "PH05-RAG-CONTRACT"
-      ],
-      "owner": "Codex lead",
-      "acceptance_summary": "Traversal, absolute paths, NULs, unsupported extensions, size limits, and collisions are handled safely; storage names are generated; logs and errors do not expose secrets or raw connection URLs.",
-      "evidence_refs": [
-        "docs/progress/phase-0.5-report.md",
-        "cvg-master-rag-v2/src/services/upload_security.py",
-        ".agent/verification.jsonl#VER-PH05-UPLOAD-CURRENT"
-      ],
-      "next_action": "Implement safe filename/storage helpers and focused API tests."
-    },
-    {
-      "id": "PH05-IDENTITY",
-      "title": "Implement canonical identity, RBAC, session lifecycle, and audit events",
-      "stage": "BUILD",
-      "priority": "P0",
-      "status": "DONE",
-      "origin": "User Phase 0.5 identity and role model requirements",
-      "dependencies": [
-        "PH05-RAG-CONTRACT"
-      ],
-      "owner": "Codex lead",
-      "acceptance_summary": "Canonical roles and permissions with legacy aliases, strong password hashing, disabled/logout/session invalidation, rate limits, generic failures, explicit route authorization, and audit events are implemented.",
-      "evidence_refs": [
-        "docs/architecture/security/identity-model.md",
-        "docs/architecture/security/permission-model.md",
-        ".agent/verification.jsonl#VER-PH05-IDENTITY-CURRENT"
-      ],
-      "next_action": "Add canonical authorization helpers and route-level negative tests while preserving legacy API compatibility."
-    },
-    {
-      "id": "PH05-ACL",
-      "title": "Enforce workspace and collection ACLs at retrieval and source boundaries",
-      "stage": "BUILD",
-      "priority": "P0",
-      "status": "DONE",
-      "origin": "User Phase 0.5 collection ownership and non-leak requirements",
-      "dependencies": [
-        "PH05-RAG-CONTRACT",
-        "PH05-IDENTITY"
-      ],
-      "owner": "Codex lead",
-      "acceptance_summary": "RetrievalContext is required at server-side filters; veterinarians see only granted collections; managers/admins receive the documented scope; documents, sources, and citations cannot cross ACLs.",
-      "evidence_refs": [
-        "docs/architecture/security/collection-acl.md",
-        "docs/architecture/security/ui-access-matrix.md",
-        ".agent/verification.jsonl#VER-PH05-ACL-CURRENT"
-      ],
-      "next_action": "Wire authorized collection IDs through CVG retrieval, Professor requests, and source/citation responses."
-    },
-    {
-      "id": "PH05-VERIFY",
-      "title": "Run integrated Phase 0.5 verification, independent critique, and promotion decision",
-      "stage": "BUILD",
-      "priority": "P0",
-      "status": "DONE",
-      "origin": "User Phase 0.5 promotion gate and gauntlet requirements",
-      "dependencies": [
-        "PH05-LOCK",
-        "PH05-EVIDENCE",
-        "PH05-UPLOAD",
-        "PH05-ACL"
-      ],
-      "owner": "Codex lead",
-      "acceptance_summary": "All required runtime, contract, security, E2E, regression, concurrency, performance, and independent-review evidence is current and the final status is one of the allowed honest outcomes.",
-      "evidence_refs": [
-        "docs/progress/phase-0.5-report.md",
-        "docs/progress/phase-0.5-independent-review.md",
-        ".agent/gates/phase-0.5-verified-blocked-final.json",
-        ".agent/verification.jsonl#VER-PH05-FULL-REGRESSION-CURRENT",
-        ".agent/verification.jsonl#VER-PH05-FRONTEND-CURRENT",
-        ".agent/verification.jsonl#VER-PH05-PERFORMANCE-CURRENT",
-        ".agent/verification.jsonl#VER-PH05-REVIEW-CURRENT",
-        ".agent/verification.jsonl#VER-PH05-FINAL-CURRENT"
-      ],
-      "next_action": "Resolve the explicit provider, historical fixture/policy, and deployment-control gaps before reopening VERIFIED; keep Phase 1 deferred."
-    },
-    {
-      "id": "PH06-RECON",
-      "title": "Reconcile the published commit and initialize Phase 0.6 closure control plane",
-      "stage": "BUILD",
-      "priority": "P0",
-      "status": "DONE",
-      "origin": "Phase 0.6 Promotion Closure requirements",
-      "dependencies": [
-        "PH05-VERIFY"
-      ],
-      "owner": "Codex lead",
-      "acceptance_summary": "Published Phase 0.5 SHA, current Git state, active Phase 0.6 plan/task, backlog and append-only ledgers are structurally aligned and checked by an executable control-plane validator.",
-      "evidence_refs": [
-        ".agent/plans/phase-0.6-promotion-closure.md",
-        "scripts/phase06/check_control_plane.py"
-      ],
-      "next_action": "Control-plane checker passed; Phase 0.6 implementation lanes are unlocked."
-    },
-    {
-      "id": "PH06-RBAC",
-      "title": "Close RBAC override semantics, session snapshots, and veterinarian policy",
-      "stage": "BUILD",
-      "priority": "P0",
-      "status": "DONE",
-      "origin": "Phase 0.6 explicit RBAC and VET access requirements",
-      "dependencies": [
-        "PH06-RECON"
-      ],
-      "owner": "CVG RBAC worker",
-      "acceptance_summary": "Explicit additions/removals and wildcard rules are deterministic, removed permissions are never re-granted, legacy sessions retain immutable effective snapshots until invalidation, and VET source/read/browse boundaries have negative coverage.",
-      "evidence_refs": [
-        "cvg-master-rag-v2/src/services/authorization.py",
-        "cvg-master-rag-v2/src/services/enterprise_service.py",
-        "cvg-master-rag-v2/src/tests/test_phase06_rbac.py",
-        ".agent/verification.jsonl#VER-PH06-RBAC-CURRENT"
-      ],
-      "next_action": "RBAC, wildcard, session-snapshot, VET and route-negative checks passed; retain the canonical permission registry as the review point."
-    },
-    {
-      "id": "PH06-LEGACY",
-      "title": "Classify and resolve the complete CVG legacy red surface",
-      "stage": "AUDIT",
-      "priority": "P0",
+      "priority": "P1",
       "status": "BLOCKED",
-      "origin": "Phase 0.6 explicit legacy test classification requirements",
-      "dependencies": [
-        "PH06-RECON"
-      ],
-      "owner": "Codex lead with read-only scout",
-      "acceptance_summary": "Every baseline failure/error has a test ID, file, failure text, root cause, allowed classification, relevance, action/evidence and final status; no unexplained red or hidden tests remain.",
-      "evidence_refs": [
-        "docs/baselines/phase-0.6-legacy-test-classification.md"
-      ],
-      "next_action": "Restore the approved corpus with provenance or record an owner-authorized permanent waiver, then rerun the full suite without masking."
-    },
-    {
-      "id": "PH06-PROVIDER",
-      "title": "Exercise the real OpenAI-compatible provider contract",
-      "stage": "BUILD",
-      "priority": "P0",
-      "status": "DONE",
-      "origin": "Phase 0.6 real provider contract requirements",
-      "dependencies": [
-        "PH06-RECON"
-      ],
-      "owner": "Professor provider worker",
-      "acceptance_summary": "A real configured provider or real loopback OpenAI-compatible HTTP server covers success and all required provider failures with safe errors, bounded retry, correlation, state integrity, citation integrity and lock cleanup.",
-      "evidence_refs": [
-        "docs/baselines/phase-0.6-provider-contract.json"
-      ],
-      "next_action": "Local real-protocol contract passed; obtain live-provider evidence only with approved endpoint and credentials."
-    },
-    {
-      "id": "PH06-LOCKER-CI",
-      "title": "Enforce Locker internal boundary and integrated CI lanes",
-      "stage": "BUILD",
-      "priority": "P0",
-      "status": "DONE",
-      "origin": "Phase 0.6 deployment boundary and CI requirements",
-      "dependencies": [
-        "PH06-RECON"
-      ],
-      "owner": "Locker/CI worker",
-      "acceptance_summary": "Locker is private-network-only in deployment examples with a lint/test guard, and CI enforces pinned fast/integration checks for all relevant component, security, contract, frontend, secret, dependency and control-plane surfaces.",
-      "evidence_refs": [
-        "docs/architecture/security/locker-boundary.md",
-        ".github/workflows/phase-0.6.yml"
-      ],
-      "next_action": "Boundary lint, component tests, dependency audits and workflow structure passed; execute GitHub lanes when published."
-    },
-    {
-      "id": "PH06-INTEGRATE",
-      "title": "Integrate Phase 0.6 evidence and prepare the final gate",
-      "stage": "VERIFY",
-      "priority": "P0",
-      "status": "DONE",
-      "origin": "Phase 0.6 report and final-gate requirements",
-      "dependencies": [
-        "PH06-RBAC",
-        "PH06-LEGACY",
-        "PH06-PROVIDER",
-        "PH06-LOCKER-CI"
-      ],
-      "owner": "Codex lead",
-      "acceptance_summary": "Required report, provider/legacy baselines, control-plane reconciliation, regression/security results and final gate accurately reflect current executable evidence.",
-      "evidence_refs": [
-        "docs/progress/phase-0.6-report.md",
-        ".agent/gates/phase-0.6-promotion-final.json"
-      ],
-      "next_action": "Integrated report, baselines, final gate and control references are complete; retain BLOCKED until corpus/waiver and external evidence are resolved."
-    },
-    {
-      "id": "PH06-REVIEW",
-      "title": "Obtain fresh independent Phase 0.6 promotion review",
-      "stage": "VERIFY",
-      "priority": "P0",
-      "status": "DONE",
-      "origin": "Phase 0.6 independent review requirements",
-      "dependencies": [
-        "PH06-INTEGRATE"
-      ],
-      "owner": "Fresh read-only reviewer",
-      "acceptance_summary": "All twelve required review questions are answered against the integrated artifact; no P0/HIGH blocker is hidden or left unexplained.",
-      "evidence_refs": [
-        "docs/progress/phase-0.6-independent-review.md"
-      ],
-      "next_action": "Twelve-question fresh read-only review completed; final classification is BLOCKED and no Phase 1 plan is authorized."
-    },
-    {
-      "id": "PH11-SKELETON",
-      "title": "Build the additive Phase 1.1 monorepo skeleton and migration-safety contract",
-      "stage": "BUILD",
-      "priority": "P0",
-      "status": "DONE",
-      "origin": "User-authorized Phase 1.1 scope from pasted-text attachment",
+      "origin": "Explicit full AAA user objective and current artifact recovery; historical completion is not imported",
       "dependencies": [],
       "owner": "Codex lead",
-      "acceptance_summary": "Root apps/packages/infrastructure/test boundaries, pinned toolchain, canonical environment template, root commands, dependency rules, migration map, and preservation validator exist without moving runtime code or editing child histories.",
+      "acceptance_summary": "Required isolated services and approved corpus are available without production side effects",
       "evidence_refs": [
-        ".agent/gates/phase-1.1-implementation-ready.json",
-        "docs/plans/phase-1.1-monorepo-skeleton.md",
-        ".agent/plans/phase-1.1-monorepo-skeleton.md",
-        ".agent/verification.jsonl#VER-PH11-ROOT-CURRENT",
-        ".agent/verification.jsonl#VER-PH11-BOUNDARY-CURRENT",
-        ".agent/verification.jsonl#VER-PH11-FAST-CURRENT",
-        ".agent/verification.jsonl#VER-PH11-INTEGRATION-CURRENT",
-        ".agent/verification.jsonl#VER-PH11-CI-CURRENT",
-        ".agent/verification.jsonl#VER-PH11-FULL-REGRESSION-CURRENT"
+        ".agent/verification.jsonl#VER-SA-EXTERNAL-LOCAL-CI-DEPENDENCIES",
+        ".agent/verification.jsonl#VER-SA-EXTERNAL-LOCAL-INTEGRATION-BLOCKED",
+        ".gauntlet-state-of-art/evidence/visual-cycle4-current/test-integration.log"
       ],
-      "next_action": "Skeleton implementation and root command verification are complete; preserve the candidate while the independent review runs."
+      "next_action": {
+        "id": "SA-EXTERNAL:WAIT",
+        "kind": "WAIT",
+        "summary": "Wait for an authorized external runtime and approved evaluation corpus",
+        "target": "docs/operations/release-readiness.md",
+        "completion_signal": "Required isolated services and approved corpus are available without production side effects"
+      },
+      "blocked_by": [
+        "External runtime and approved corpus unavailable"
+      ],
+      "reason": "No Docker/services/credentials or approved corpus available; no external deployment authorized"
     },
     {
-      "id": "PH11-REVIEW",
-      "title": "Obtain a fresh independent Phase 1.1 skeleton review",
+      "id": "SA-GAUNTLET-CONTROL",
+      "title": "Reconcile multi-round review controls and derived orchestration pointers",
       "stage": "AUDIT",
       "priority": "P0",
       "status": "DONE",
-      "origin": "Phase 1.1 independent review requirement",
+      "origin": "Observed stale noncanonical Gauntlet and orchestration sidecar states",
       "dependencies": [
-        "PH11-SKELETON"
-      ],
-      "owner": "Fresh read-only reviewer",
-      "acceptance_summary": "A reviewer without builder context checks every frozen Phase 1.1 quality-bar item, reruns the root structural command, identifies the largest remaining gap, and records a decision with limitations.",
-      "evidence_refs": [
-        ".agent/verification.jsonl#VER-PH11-CI-CURRENT",
-        ".agent/verification.jsonl#VER-PH11-CI-RECHECK-CURRENT",
-        ".agent/verification.jsonl#VER-PH11-DUAL-SNAPSHOT-RECHECK-CURRENT",
-        ".agent/verification.jsonl#VER-PH11-CLEAN-CHECKOUT-CURRENT",
-        ".agent/verification.jsonl#VER-PH11-FULL-REGRESSION-CURRENT",
-        "docs/progress/phase-1.1-independent-review.md",
-        ".agent/verification.jsonl#VER-PH11-INDEPENDENT-REVIEW-CURRENT",
-        ".agent/verification.jsonl#VER-PH11-INDEPENDENT-REVIEW-ROUND2-CURRENT",
-        ".agent/verification.jsonl#VER-PH11-INDEPENDENT-REVIEW-ROUND3-CURRENT",
-        ".agent/verification.jsonl#VER-PH11-INDEPENDENT-REVIEW-REVALIDATED-CURRENT",
-        ".agent/verification.jsonl#VER-PH11-INDEPENDENT-REVIEW-ROUND2-REVALIDATED-CURRENT"
-      ],
-      "next_action": "Independent Round 3 and exact-scope append-only revalidation passed with no remaining material Phase 1.1 gap; final gate remains bound."
-    },
-    {
-      "id": "PH11-FINAL",
-      "title": "Integrate Phase 1.1 evidence and record the verification gate",
-      "stage": "AUDIT",
-      "priority": "P0",
-      "status": "DONE",
-      "origin": "Phase 1.1 final gate and handoff requirement",
-      "dependencies": [
-        "PH11-SKELETON",
-        "PH11-REVIEW"
+        "SA-CONTROL-RECOVERY"
       ],
       "owner": "Codex lead",
-      "acceptance_summary": "Fresh command evidence, independent review, final report, append-only control-plane records, and a truthful VERIFIED gate are bound; Phase 1.2 remains locked until a later authorized scope.",
+      "acceptance_summary": "Review controller validates without importing unearned approvals; orchestration is derived from canonical backlog",
       "evidence_refs": [
-        ".agent/gates/phase-1.1-verified.json",
-        "docs/progress/phase-1.1-independent-review.md",
-        ".agent/verification.jsonl#VER-PH11-INDEPENDENT-REVIEW-ROUND3-CURRENT",
-        ".agent/verification.jsonl#VER-PH11-INTEGRATION-FINAL-CURRENT",
-        ".agent/verification.jsonl#VER-PH11-EVAL-FINAL-CURRENT",
-        ".agent/verification.jsonl#VER-PH11-FULL-REGRESSION-FINAL-CURRENT",
-        ".agent/verification.jsonl#VER-PH11-GUARDS-FINAL-CURRENT",
-        ".agent/verification.jsonl#VER-PH11-FINAL-CURRENT"
+        "docs/architecture/controller-recovery.md",
+        ".agent/verification.jsonl#VER-SA-REVIEW-CONTROLS-LOCAL",
+        "docs/architecture/review-controller-recovery.md",
+        ".agent/verification.jsonl#VER-SA-REVIEW-CONTROLS-PEER-3",
+        ".agent/gates/state-of-art-review-controls-resolved.json"
       ],
-      "next_action": "Phase 1.1 VERIFIED gate is bound; keep Phase 1.2/runtime extraction closed until a separately authorized implementation-ready scope exists."
+      "next_action": {
+        "id": "SA-GAUNTLET-CONTROL:REOPEN",
+        "kind": "REOPEN",
+        "summary": "Reopen recovered controls if contrary integrity evidence emerges",
+        "target": ".gauntlet/",
+        "completion_signal": "A concrete new integrity or acceptance bypass finding requires renewed verification"
+      }
     },
     {
-      "id": "PH13-KERNEL",
-      "title": "Build canonical apps/api kernel with versioned routes, factory, context, errors, health, adapters",
+      "id": "SA-DI-ISOLATION",
+      "title": "Bind dependency providers to the actual app/request instead of a process-global pointer",
+      "stage": "BUILD",
+      "priority": "P1",
+      "status": "DONE",
+      "origin": "Actual AppA readiness changed from503 to200 with AppB check names after constructing AppB",
+      "dependencies": [],
+      "owner": "Codex lead",
+      "acceptance_summary": "Actual concurrent app instances preserve separate identity, configuration, data and readiness providers while retaining transport behavior",
+      "evidence_refs": [
+        "docs/architecture/readiness-login-state.md",
+        "docs/architecture/app-provider-isolation.md",
+        ".agent/verification.jsonl#VER-SA-DI-BASELINE",
+        ".agent/gates/state-of-art-provider-isolation-ready.json",
+        ".agent/verification.jsonl#VER-SA-DI-PEER-1-ADDENDUM",
+        ".agent/gates/state-of-art-provider-isolation-verified.json"
+      ],
+      "next_action": {
+        "id": "SA-DI-ISOLATION:REOPEN",
+        "kind": "REOPEN",
+        "summary": "Reopen app-provider isolation if source assumptions or contrary actual-boundary evidence changes",
+        "target": "docs/architecture/app-provider-isolation.md",
+        "completion_signal": "A concrete scoped isolation failure or relevant source change requires renewed verification"
+      }
+    },
+    {
+      "id": "SA-OBSERVABILITY",
+      "title": "Close the local bounded request and worker-observability seams",
+      "stage": "BUILD",
+      "priority": "P1",
+      "status": "VERIFY",
+      "origin": "Full AAA continuation after the Cycle4 web slice; factual audit found API metrics already wired but request event correlation absent",
+      "dependencies": [
+        "SA-GAUNTLET-CONTROL"
+      ],
+      "owner": "Codex lead",
+      "acceptance_summary": "Per-process request, transport and local worker lifecycle events are bounded, redacted, correlated from server-derived or opaque references and immutable at snapshot boundary; the prior V2 review was stopped before semantic inspection and is superseded, while V3 rebinds the current local bounded telemetry and root lifecycle evidence with local regression and CI PASS pending a complete fresh I1 semantic review; full observability still requires the separate worker-seam review, external export, distributed aggregation and live drills",
+      "evidence_refs": [
+        "docs/architecture/observability.md",
+        ".gauntlet-state-of-art/reports/observability-local.md",
+        ".agent/verification.jsonl#VER-SA-OBSERVABILITY-LOCAL-EVENTS",
+        ".agent/verification.jsonl#VER-SA-OBSERVABILITY-LOCAL-REWORK-REGRESSION",
+        ".agent/verification.jsonl#VER-SA-OBSERVABILITY-LOCAL-SNAPSHOT-REGRESSION",
+    ".agent/verification.jsonl#VER-SA-OBSERVABILITY-LOCAL-PHASE16-REGRESSION",
+    ".agent/verification.jsonl#VER-SA-OBSERVABILITY-WORKER-LOCAL-REGRESSION",
+    ".agent/verification.jsonl#VER-SA-OBSERVABILITY-WORKER-REVIEW-NOETHER-NOT-RUN",
+    ".agent/gates/state-of-art-observability-root-ready.json",
+    ".agent/verification.jsonl#VER-SA-OBSERVABILITY-ROOT-LOCAL-REGRESSION",
+    ".agent/verification.jsonl#VER-SA-OBSERVABILITY-ROOT-REVIEW-FARADAY-NOT-RUN",
+    ".agent/verification.jsonl#VER-SA-OBSERVABILITY-ROOT-TERMINAL-PROBE",
+    ".agent/verification.jsonl#VER-SA-OBSERVABILITY-ROOT-PHASE16-VERIFY",
+    ".agent/verification.jsonl#VER-SA-OBSERVABILITY-ROOT-REVIEW-POINCARE",
+    ".agent/gates/state-of-art-observability-root-reorder-ready.json",
+    ".agent/verification.jsonl#VER-SA-OBSERVABILITY-ROOT-REORDER-LOCAL",
+    ".agent/verification.jsonl#VER-SA-OBSERVABILITY-ROOT-REORDER-FULL-LOCAL",
+    ".agent/verification.jsonl#VER-SA-OBSERVABILITY-ROOT-REORDER-REVIEW-VOLTA",
+    ".agent/gates/state-of-art-observability-root-reorder-verified.json",
+    ".gauntlet-state-of-art/reports/observability-local-v3.md",
+    ".gauntlet-state-of-art/evidence/observability-local-current/candidate-v3-manifest.json",
+    ".gauntlet-state-of-art/evidence/observability-local-current/critic-schrodinger-procedural-not-run.md",
+    ".gauntlet-state-of-art/evidence/observability-local-current/critic-ramanujan-not-run.md",
+    ".gauntlet-state-of-art/evidence/observability-local-current/critic-aristotle-not-run.md",
+    ".gauntlet-state-of-art/evidence/security-tenant-local-current/api16-full-security-tenant-v24.log",
+    ".gauntlet-state-of-art/evidence/security-tenant-local-current/make-ci-security-tenant-v25.log",
+    ".gauntlet-state-of-art/evidence/ingestion-lifecycle-current/probe-root-shutdown-security-tenant-v28.log",
+    ".agent/verification.jsonl#VER-SA-OBSERVABILITY-LOCAL-REVIEW-SCHRODINGER-V2-NOT-RUN",
+    ".agent/verification.jsonl#VER-SA-OBSERVABILITY-LOCAL-REWORK-FULL-V3",
+    ".agent/verification.jsonl#VER-SA-OBSERVABILITY-LOCAL-REVIEW-RAMANUJAN-V3-NOT-RUN",
+    ".agent/verification.jsonl#VER-SA-OBSERVABILITY-LOCAL-REVIEW-ARISTOTLE-V3-NOT-RUN"
+      ],
+      "next_action": {
+        "id": "SA-OBSERVABILITY:VERIFY",
+        "kind": "VERIFY",
+        "summary": "Review the frozen V3 local observability report and manifest with a fresh independent I1 critic, then continue the separate worker-seam and external/full-product evidence",
+        "target": ".gauntlet-state-of-art/evidence/observability-local-current/candidate-v3-manifest.json",
+        "completion_signal": "The fresh reviewer cites candidate V3, verifies every manifest hash and final snapshot, and returns explicit APPROVE with no Critical, High or Medium finding; no external or full-product observability claim is made"
+      }
+    },
+    {
+      "id": "SA-SECURITY-TENANT-LOCAL",
+      "title": "Close local tenant propagation and audit redaction boundaries",
       "stage": "BUILD",
       "priority": "P0",
-      "status": "DONE",
-      "origin": "Phase 1.3 unified API kernel prompt",
+      "status": "VERIFY",
+      "origin": "Read-only security audit found upload/jobs/reindex/delete tenant propagation and default audit redaction gaps",
       "dependencies": [
-        "PH11-FINAL"
+        "SA-GAUNTLET-CONTROL"
       ],
       "owner": "Codex lead",
-      "acceptance_summary": "Executable FastAPI boundary; 44 api tests + 22 security + OpenAPI 29 paths + benchmark pass; DUAL migration map with no deletion.",
+    "acceptance_summary": "Local API propagates server-derived tenant scope through lifecycle and search, collection identity includes tenant scope, malformed recovery never falls back to default, reindex results are postcondition-checked, private cleanup references survive unlink failure, cross-tenant probes are opaque and non-mutating, and the default audit sink is bounded/redacted before the admin read boundary; Chandrasekhar, Locke, Ampere, Feynman and Kierkegaard rejected V6, V7, V8, V9 and V10 for concrete tenant fail-closed findings, each finding was reproduced and corrected; V11 requires explicit tenant identity in canonical models, identity generation, login/session, retrieval, payload and ingestion boundaries, revalidates session tenant equality on every refresh, and fails closed rather than retrying an unscoped legacy cancel mutation; the complete independent V11 I1 review returned APPROVE with HIGH confidence and zero Critical/High/Medium findings, so the bounded local security gate is VERIFIED; external identity/storage and full-product security remain open",
       "evidence_refs": [
+        ".gauntlet-state-of-art/reports/security-tenant-local.md",
+        ".gauntlet-state-of-art/reports/security-tenant-local-v6.md",
+        ".gauntlet-state-of-art/evidence/security-tenant-local-current/candidate-v5-manifest.json",
+        ".gauntlet-state-of-art/evidence/security-tenant-local-current/candidate-v6-manifest.json",
+        ".gauntlet-state-of-art/evidence/security-tenant-local-current/candidate-v5-drift-after-lifecycle.md",
+            ".gauntlet-state-of-art/evidence/security-tenant-local-current/critic-v5-heisenberg-not-run.md",
+            ".gauntlet-state-of-art/evidence/security-tenant-local-current/critic-v5-newton-not-run.md",
+        ".gauntlet-state-of-art/evidence/security-tenant-local-current/api-root.log",
+        ".agent/verification.jsonl#VER-SA-SECURITY-TENANT-LOCAL-REWORK-REGRESSION-2",
+        ".agent/verification.jsonl#VER-SA-SECURITY-TENANT-LOCAL-REWORK-REGRESSION-4",
+        ".agent/verification.jsonl#VER-SA-SECURITY-TENANT-LOCAL-REVIEW-GODEL",
+        ".agent/gates/state-of-art-security-tenant-local-ready-v4.json",
+        ".gauntlet-state-of-art/evidence/security-tenant-local-current/api16-full-tenant-recovery-v7.log",
+        ".gauntlet-state-of-art/evidence/security-tenant-local-current/make-ci-tenant-recovery-v6.log",
+        ".gauntlet-state-of-art/evidence/security-tenant-local-current/api16-full-security-lifecycle-v9.log",
+    ".gauntlet-state-of-art/evidence/security-tenant-local-current/make-ci-security-lifecycle-v10.log",
+    ".gauntlet-state-of-art/reports/security-tenant-local-v7.md",
+    ".gauntlet-state-of-art/evidence/security-tenant-local-current/candidate-v7-manifest.json",
+    ".gauntlet-state-of-art/evidence/security-tenant-local-current/critic-chandrasekhar-raw.md",
+    ".gauntlet-state-of-art/evidence/security-tenant-local-current/api16-full-security-tenant-v12.log",
+    ".gauntlet-state-of-art/evidence/security-tenant-local-current/make-ci-security-tenant-v13.log",
+    ".gauntlet-state-of-art/evidence/ingestion-lifecycle-current/probe-root-shutdown-security-rebase.log",
+    ".gauntlet-state-of-art/evidence/security-tenant-local-current/critic-locke-raw.md",
+    ".gauntlet-state-of-art/reports/security-tenant-local-v8.md",
+    ".gauntlet-state-of-art/evidence/security-tenant-local-current/candidate-v8-manifest.json",
+    ".gauntlet-state-of-art/evidence/security-tenant-local-current/api16-full-security-tenant-v16.log",
+    ".gauntlet-state-of-art/evidence/security-tenant-local-current/make-ci-security-tenant-v17.log",
+    ".gauntlet-state-of-art/reports/security-tenant-local-v9.md",
+    ".gauntlet-state-of-art/evidence/security-tenant-local-current/candidate-v9-manifest.json",
+    ".gauntlet-state-of-art/evidence/security-tenant-local-current/critic-ampere-raw.md",
+    ".gauntlet-state-of-art/evidence/security-tenant-local-current/api16-full-security-tenant-v19.log",
+    ".gauntlet-state-of-art/evidence/security-tenant-local-current/make-ci-security-tenant-v20.log",
+    ".agent/verification.jsonl#VER-SA-SECURITY-TENANT-LOCAL-REVIEW-AMPERE-V8-REJECT",
+    ".agent/verification.jsonl#VER-SA-SECURITY-TENANT-LOCAL-REWORK-FULL-V9",
+    "packages/knowledge/src/rick_knowledge/payload.py",
+    "packages/knowledge/tests/test_knowledge.py",
+    ".gauntlet-state-of-art/reports/security-tenant-local-v10.md",
+    ".gauntlet-state-of-art/evidence/security-tenant-local-current/candidate-v10-manifest.json",
+    ".gauntlet-state-of-art/evidence/security-tenant-local-current/critic-feynman-raw.md",
+    ".gauntlet-state-of-art/evidence/security-tenant-local-current/api16-full-security-tenant-v21.log",
+    ".gauntlet-state-of-art/evidence/security-tenant-local-current/make-ci-security-tenant-v22.log",
+    ".gauntlet-state-of-art/evidence/ingestion-lifecycle-current/probe-root-shutdown-security-tenant-v23.log",
+    ".agent/verification.jsonl#VER-SA-SECURITY-TENANT-LOCAL-REVIEW-FEYNMAN-V9-REJECT",
+    ".agent/verification.jsonl#VER-SA-SECURITY-TENANT-LOCAL-REWORK-FULL-V10",
+    ".gauntlet-state-of-art/reports/security-tenant-local-v11.md",
+    ".gauntlet-state-of-art/evidence/security-tenant-local-current/candidate-v11-manifest.json",
+    ".gauntlet-state-of-art/evidence/security-tenant-local-current/critic-kierkegaard-raw.md",
+    ".gauntlet-state-of-art/evidence/security-tenant-local-current/critic-security-i1-approved-raw.md",
+    ".gauntlet-state-of-art/evidence/security-tenant-local-current/critic-peirce-not-run.md",
+    ".agent/gates/state-of-art-security-tenant-local-verified-v11.json",
+    ".gauntlet-state-of-art/evidence/security-tenant-local-current/critic-euler-not-run.md",
+    ".gauntlet-state-of-art/evidence/security-tenant-local-current/api16-full-security-tenant-v24.log",
+    ".gauntlet-state-of-art/evidence/security-tenant-local-current/make-ci-security-tenant-v25.log",
+    ".gauntlet-state-of-art/evidence/ingestion-lifecycle-current/probe-root-shutdown-security-tenant-v28.log",
+    ".agent/verification.jsonl#VER-SA-SECURITY-TENANT-LOCAL-REVIEW-KIERKEGAARD-V10-REJECT",
+    ".agent/verification.jsonl#VER-SA-SECURITY-TENANT-LOCAL-REWORK-FULL-V11",
+    ".agent/verification.jsonl#VER-SA-SECURITY-TENANT-LOCAL-REVIEW-EULER-V11-NOT-RUN",
+    ".agent/verification.jsonl#VER-SA-SECURITY-TENANT-LOCAL-REVIEW-INDEPENDENT-V11-APPROVE",
+    ".agent/verification.jsonl#VER-SA-SECURITY-TENANT-LOCAL-REVIEW-PEIRCE-V11-NOT-RUN",
+    ".agent/verification.jsonl#VER-SA-SECURITY-TENANT-LOCAL-VERIFIED-GATE-V11",
+        "apps/api/tests/test_phase16_root.py",
+        "apps/api/tests/test_audit_factory.py",
+        "docs/architecture/local-durability.md",
+        "docs/architecture/ingestion-lifecycle.md"
+      ],
+      "next_action": {
+        "id": "SA-SECURITY-TENANT-LOCAL:VERIFY",
+        "kind": "VERIFY",
+      "summary": "Maintain the verified V11 local gate while continuing external identity/storage and full-product security evidence",
+      "target": ".agent/gates/state-of-art-security-tenant-local-verified-v11.json",
+      "completion_signal": "A concrete new local tenant, identity, session, ACL, payload, ingestion, audit or mutation-boundary violation or a new authorized external runtime requires renewed verification"
+      }
+    },
+    {
+      "id": "SA-INGESTION-APP-LIFECYCLE",
+      "title": "Close root application-owned ingestion executor lifecycle",
+      "stage": "BUILD",
+      "priority": "P0",
+      "status": "VERIFY",
+      "origin": "Current root lifecycle probe reproduced an app-owned ingestion executor surviving ASGI lifespan close",
+      "dependencies": [
+        "SA-GAUNTLET-CONTROL"
+      ],
+      "owner": "Codex lead",
+    "acceptance_summary": "Default root app closes its owned ingestion executor and local resources through ASGI lifespan without closing caller-owned providers, losing private cleanup references or claiming distributed shutdown; V1 approval and V2/V3 evidence are superseded by the shared tenant, payload, identity and ingestion-contract rebase, Hooke's V4 review was procedurally rejected for incomplete inspection, Franklin's V5 review was stopped without a verdict, and V6 rebinds the current shared provider plus scoped cancellation contract, source/test/docs hashes and full local regression PASS pending a complete fresh I1 review",
+      "evidence_refs": [
+        ".agent/gates/state-of-art-ingestion-app-lifecycle-ready.json",
+        ".agent/verification.jsonl#VER-SA-INGESTION-APP-LIFECYCLE-BASELINE",
+        ".gauntlet-state-of-art/evidence/ingestion-lifecycle-current/probe-root-shutdown-baseline.md",
+        "docs/architecture/ingestion-lifecycle.md",
         "apps/api/src/app.py",
-        "docs/progress/phase-1.3-report.md",
-        ".agent/gates/phase-1.3-verified.json"
+    "apps/api/src/services/ingestion_service.py"
+    ,".gauntlet-state-of-art/reports/ingestion-app-lifecycle-local-v2.md"
+    ,".gauntlet-state-of-art/evidence/ingestion-lifecycle-current/candidate-v2-manifest.json"
+    ,".gauntlet-state-of-art/evidence/ingestion-lifecycle-current/critic-lagrange-raw.md"
+    ,".gauntlet-state-of-art/evidence/ingestion-lifecycle-current/probe-root-shutdown-security-rebase.log"
+    ,".gauntlet-state-of-art/evidence/security-tenant-local-current/api16-full-security-tenant-v12.log"
+    ,".gauntlet-state-of-art/evidence/security-tenant-local-current/make-ci-security-tenant-v13.log"
+    ,".gauntlet-state-of-art/reports/ingestion-app-lifecycle-local-v3.md"
+    ,".gauntlet-state-of-art/evidence/ingestion-lifecycle-current/candidate-v3-manifest.json"
+    ,".gauntlet-state-of-art/evidence/ingestion-lifecycle-current/probe-root-shutdown-security-tenant-v16.log"
+    ,".gauntlet-state-of-art/evidence/ingestion-lifecycle-current/critic-bohr-not-run.md"
+    ,".gauntlet-state-of-art/evidence/security-tenant-local-current/api16-full-security-tenant-v16.log"
+    ,".gauntlet-state-of-art/evidence/security-tenant-local-current/make-ci-security-tenant-v17.log"
+    ,".gauntlet-state-of-art/reports/ingestion-app-lifecycle-local-v4.md"
+    ,".gauntlet-state-of-art/evidence/ingestion-lifecycle-current/candidate-v4-manifest.json"
+    ,".gauntlet-state-of-art/evidence/ingestion-lifecycle-current/probe-root-shutdown-security-tenant-v17.log"
+    ,".gauntlet-state-of-art/evidence/security-tenant-local-current/api16-full-security-tenant-v19.log"
+    ,".gauntlet-state-of-art/evidence/security-tenant-local-current/make-ci-security-tenant-v20.log"
+    ,".agent/verification.jsonl#VER-SA-INGESTION-APP-LIFECYCLE-REBASE-FULL-V4"
+    ,".gauntlet-state-of-art/reports/ingestion-app-lifecycle-local-v5.md"
+    ,".gauntlet-state-of-art/evidence/ingestion-lifecycle-current/candidate-v5-manifest.json"
+    ,".gauntlet-state-of-art/evidence/ingestion-lifecycle-current/critic-hooke-raw.md"
+    ,".gauntlet-state-of-art/evidence/ingestion-lifecycle-current/probe-root-shutdown-security-tenant-v23.log"
+    ,".gauntlet-state-of-art/evidence/security-tenant-local-current/api16-full-security-tenant-v21.log"
+    ,".gauntlet-state-of-art/evidence/security-tenant-local-current/make-ci-security-tenant-v22.log"
+    ,".agent/verification.jsonl#VER-SA-INGESTION-APP-LIFECYCLE-REVIEW-HOOKE-V4-REJECT"
+    ,".agent/verification.jsonl#VER-SA-INGESTION-APP-LIFECYCLE-REBASE-FULL-V5"
+    ,".gauntlet-state-of-art/reports/ingestion-app-lifecycle-local-v6.md"
+    ,".gauntlet-state-of-art/evidence/ingestion-lifecycle-current/candidate-v6-manifest.json"
+    ,".gauntlet-state-of-art/evidence/ingestion-lifecycle-current/critic-franklin-not-run.md"
+    ,".gauntlet-state-of-art/evidence/ingestion-lifecycle-current/critic-raman-not-run.md"
+    ,".gauntlet-state-of-art/evidence/ingestion-lifecycle-current/critic-averroes-not-run.md"
+    ,".gauntlet-state-of-art/evidence/ingestion-lifecycle-current/probe-root-shutdown-security-tenant-v28.log"
+    ,".gauntlet-state-of-art/evidence/security-tenant-local-current/api16-full-security-tenant-v24.log"
+    ,".gauntlet-state-of-art/evidence/security-tenant-local-current/make-ci-security-tenant-v25.log"
+    ,".agent/verification.jsonl#VER-SA-INGESTION-APP-LIFECYCLE-REVIEW-FRANKLIN-V5-NOT-RUN"
+    ,".agent/verification.jsonl#VER-SA-INGESTION-APP-LIFECYCLE-REBASE-FULL-V6"
+    ,".agent/verification.jsonl#VER-SA-INGESTION-APP-LIFECYCLE-REVIEW-AVERROES-V6-NOT-RUN"
+    ,".agent/verification.jsonl#VER-SA-INGESTION-APP-LIFECYCLE-REVIEW-RAMAN-V6-NOT-RUN"
       ],
-      "next_action": "Kernel complete; keep legacy DUAL until Phase 1.4 dual verification per route."
-    },
-    {
-      "id": "PH13-REVIEW",
-      "title": "Fresh independent Phase 1.3 review (16 questions)",
-      "stage": "VERIFY",
-      "priority": "P0",
-      "status": "DONE",
-      "origin": "Phase 1.3 review requirement",
-      "dependencies": [
-        "PH13-KERNEL"
-      ],
-      "owner": "Fresh read-only reviewer",
-      "acceptance_summary": "All 16 questions answered; no P0/HIGH; 3 MEDIUM + 2 LOW + 1 INFO carried as Phase 1.4 prerequisites.",
-      "evidence_refs": [
-        "docs/progress/phase-1.3-independent-review.md"
-      ],
-      "next_action": "No further 1.3 work; await Phase 1.4 authorization."
-    },
-    {
-      "id": "PH131-CANON",
-      "title": "Canonicalize identity/authorization/contracts; strip apps/api policy; prove differential parity",
-      "stage": "BUILD",
-      "priority": "P0",
-      "status": "DONE",
-      "origin": "Phase 1.3.1 closure prompt",
-      "dependencies": [
-        "PH13-KERNEL"
-      ],
-      "owner": "Codex lead",
-      "acceptance_summary": "Re-grant defect closed; 78 tests green incl. differential/property/negatives; legacy byte-identical; permission check ~1us.",
-      "evidence_refs": [
-        "docs/progress/phase-1.3.1-report.md",
-        ".agent/gates/phase-1.3.1-verified.json"
-      ],
-      "next_action": "No further 1.3.1 work; await Phase 1.4 authorization."
-    },
-    {
-      "id": "PH131-REVIEW",
-      "title": "Fresh independent Phase 1.3.1 review (18 questions)",
-      "stage": "VERIFY",
-      "priority": "P0",
-      "status": "DONE",
-      "origin": "Phase 1.3.1 review requirement",
-      "dependencies": [
-        "PH131-CANON"
-      ],
-      "owner": "Fresh read-only reviewer",
-      "acceptance_summary": "All 18 questions answered; no P0/HIGH/MEDIUM.",
-      "evidence_refs": [
-        "docs/progress/phase-1.3.1-independent-review.md"
-      ],
-      "next_action": "Closed; Phase 1.4 not begun."
-    },
-    {
-      "id": "PH14-RAG",
-      "title": "Extract knowledge/ingestion/retrieval to canonical packages with differential parity",
-      "stage": "BUILD",
-      "priority": "P0",
-      "status": "DONE",
-      "origin": "Phase 1.4 migration prompt",
-      "dependencies": [
-        "PH131-CANON"
-      ],
-      "owner": "Codex lead",
-      "acceptance_summary": "108 tests green; shadow overlap 1.0; perf within budget; DUAL switches with rollback; legacy byte-identical.",
-      "evidence_refs": [
-        "docs/progress/phase-1.4-report.md",
-        ".agent/gates/phase-1.4-verified.json"
-      ],
-      "next_action": "No further 1.4 work; await Phase 1.5 authorization."
-    },
-    {
-      "id": "PH14-REVIEW",
-      "title": "Fresh independent Phase 1.4 review (18 questions)",
-      "stage": "VERIFY",
-      "priority": "P0",
-      "status": "DONE",
-      "origin": "Phase 1.4 review requirement",
-      "dependencies": [
-        "PH14-RAG"
-      ],
-      "owner": "Fresh read-only reviewer",
-      "acceptance_summary": "All 18 questions answered; no P0/HIGH/MEDIUM.",
-      "evidence_refs": [
-        "docs/progress/phase-1.4-independent-review.md"
-      ],
-      "next_action": "Closed; Phase 1.5 not begun."
+      "next_action": {
+        "id": "SA-INGESTION-APP-LIFECYCLE:VERIFY",
+        "kind": "VERIFY",
+      "summary": "Review the frozen V6 local lifecycle candidate and manifest with a fresh independent I1 critic",
+      "target": ".gauntlet-state-of-art/evidence/ingestion-lifecycle-current/candidate-v6-manifest.json",
+      "completion_signal": "The reviewer cites candidate V6, verifies every manifest hash, completes the lifecycle inspection and final snapshot check, and returns explicit APPROVE with no Critical, High or Medium finding"
+      }
     }
   ]
 }

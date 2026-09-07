@@ -1,0 +1,69 @@
+{
+  "record_id": "GATE-SA-REVIEW-CONTROLS-RESOLVED-001",
+  "timestamp": "2026-09-05T22:43:37Z",
+  "gate_id": "AUDIT_RESOLVED",
+  "scope": "Review-controller recovery only",
+  "scope_ref": "SA-GAUNTLET-CONTROL",
+  "version": 1,
+  "criteria": [
+    {
+      "id": "AR-001-BASELINE-GAPS",
+      "description": "Stale controls, approval replay and incomplete fixtures were captured and corrected",
+      "required": true,
+      "status": "PASS",
+      "evidence_refs": [
+        ".gauntlet-state-of-art/reports/review-controls-peer-1.md",
+        ".gauntlet-state-of-art/reports/review-controls-peer-2.md"
+      ],
+      "confidence": "HIGH",
+      "limitations": "Prior dirty originals are preserved relative to recorded manifests"
+    },
+    {
+      "id": "AR-002-RESOLUTION-EVIDENCE",
+      "description": "Actual CLI, current controls, final binding and archives independently verified",
+      "required": true,
+      "status": "PASS",
+      "evidence_refs": [
+        ".agent/verification.jsonl#VER-SA-REVIEW-CONTROLS-PEER-3"
+      ],
+      "confidence": "HIGH",
+      "limitations": "Synthetic fixture evidence does not authenticate external measurement claims"
+    },
+    {
+      "id": "AR-003-ACCEPTANCE-OR-ROUTING",
+      "description": "Fresh peer accepts bounded controls; product gaps routed explicitly",
+      "required": true,
+      "status": "PASS",
+      "evidence_refs": [
+        ".agent/verification.jsonl#VER-SA-REVIEW-CONTROLS-PEER-3",
+        ".agent/backlog.json"
+      ],
+      "confidence": "HIGH",
+      "limitations": "I1 same family; no full product promotion"
+    }
+  ],
+  "evidence": [
+    ".agent/verification.jsonl#VER-SA-REVIEW-CONTROLS-PEER-3"
+  ],
+  "confidence": "HIGH",
+  "gaps": [],
+  "conditions": [],
+  "authority": {
+    "required": false,
+    "state": "NOT_REQUIRED",
+    "actor": "Codex lead",
+    "scope": "Review-controller recovery only",
+    "decision": "No external effect or high-risk acceptance",
+    "evidence_ref": ".agent/plans/state-of-art-recovery.md",
+    "expires_or_revalidates": "Revalidate if scope or risk changes"
+  },
+  "residual_risk": "MEDIUM",
+  "decision": "PASS",
+  "next_action": "Design the observed API disconnect and streaming telemetry correction",
+  "revalidation_triggers": [
+    "Control validator or fixture behavior changes",
+    "Archived bytes or frozen targets change",
+    "Contrary evidence invalidates scoped peer review"
+  ],
+  "supersedes": null
+}

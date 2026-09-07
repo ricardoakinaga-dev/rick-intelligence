@@ -13,6 +13,9 @@ import uuid
 from dataclasses import dataclass, field
 
 TERMINAL_STATES = ("published", "failed", "cancelled")
+MAX_HEARTBEATS = 128
+DEFAULT_MAX_JOBS = 256
+_HEARTBEAT_FIELDS = frozenset({"pages_done", "pages_total"})
 
 _ALLOWED_TRANSITIONS: dict[str, tuple[str, ...]] = {
     "queued": ("validating", "cancelled", "failed"),
@@ -38,6 +41,9 @@ class InvalidTransitionError(Exception):
 
 @dataclass
 class IngestionJob:
+    tenant_id: str
+    workspace_id: str
+    collection_id: str
     job_id: str = field(default_factory=lambda: f"ing-{uuid.uuid4().hex[:12]}")
     document_id: str | None = None
     status: str = "queued"
@@ -46,11 +52,10 @@ class IngestionJob:
     attempt: int = 1
     error_code: str | None = None
     safe_error_message: str | None = None
-    workspace_id: str = "default"
-    collection_id: str = "rag_phase0"
     created_at: float = field(default_factory=time.time)
     started_at: float | None = None
     finished_at: float | None = None
+    cancel_requested: bool = False
     heartbeats: list[dict] = field(default_factory=list)
     metadata: dict = field(default_factory=dict)
 
@@ -73,8 +78,37 @@ class IngestionJob:
         self.error_code = error_code
         self.safe_error_message = message
 
+    def compensate_published_failure(self, *, error_code: str, message: str) -> None:
+        """Roll back a publication gate after a replacement commit fails.
+
+        ``published`` is intentionally terminal for ordinary callers.  A
+        replacement operation, however, can publish the new version before a
+        best-effort retirement of the old version completes.  This explicit
+        compensation hook keeps that exceptional rollback visible as a failed
+        job without weakening the normal state machine.
+        """
+
+        if self.status != "published":
+            raise InvalidTransitionError(f"{self.status} cannot be compensated")
+        self.status = "failed"
+        self.stage = "failed"
+        self.progress = min(1.0, max(0.0, self.progress))
+        self.finished_at = time.time()
+        self.error_code = error_code
+        self.safe_error_message = message
+
     def heartbeat(self, **fields) -> None:
-        self.heartbeats.append({"at": time.time(), "stage": self.stage, **fields})
+        # Heartbeats are diagnostic state, not an append-only event log. Keep a
+        # tiny allowlist of bounded parser counters so a malicious/custom parser
+        # cannot retain document text or grow a job without limit.
+        safe_fields = {}
+        for key in _HEARTBEAT_FIELDS:
+            value = fields.get(key)
+            if isinstance(value, int) and not isinstance(value, bool) and 0 <= value <= 10_000_000:
+                safe_fields[key] = value
+        self.heartbeats.append({"at": time.time(), "stage": self.stage, **safe_fields})
+        if len(self.heartbeats) > MAX_HEARTBEATS:
+            del self.heartbeats[: len(self.heartbeats) - MAX_HEARTBEATS]
 
 
 def is_retryable(error_code: str | None) -> bool:

@@ -14,6 +14,7 @@ ERROR_CODES = (
     "provider_rate_limit",
     "vector_store_unavailable",
     "storage_unavailable",
+    "recovery_required",
     "lock_unavailable",
     "ingestion_failed",
     "retrieval_failed",

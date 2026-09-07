@@ -24,6 +24,16 @@ id_rsa*
 **/.playwright/
 **/*.tsbuildinfo
 
+# Local agent orchestration and generated verification evidence
+.gauntlet/
+.gauntlet-*/
+.orchestrate/
+.orchestrate-*/
+.review-control-history/
+artifacts/
+.agent/legacy-v1/
+.agent/recovery-attempts/
+
 # Runtime data, logs, and local tool state
 **/data/
 **/src/data/

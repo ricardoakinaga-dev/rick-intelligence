@@ -15,6 +15,12 @@ def _legacy_imports(text: str) -> list[str]:
     hits = []
     for match in _IMPORT_RE.finditer(text):
         module = match.group(2)
+        # The canonical Phase 1.5 Python package is named rick_professor.  It
+        # is distinct from the preserved filesystem component rick-professor;
+        # the historical marker normalization must not classify the root
+        # package as a legacy import.
+        if module == "rick_professor" or module.startswith("rick_professor."):
+            continue
         for marker in LEGACY_MARKERS:
             norm = marker.replace("-", "_").replace("/", ".")
             if marker in module or norm in module.replace("-", "_"):

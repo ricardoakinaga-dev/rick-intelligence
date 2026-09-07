@@ -1,0 +1,77 @@
+{
+  "schema": "rick-triplo-aaa-quality-bar.v1",
+  "version": "2026-09-07",
+  "status": "FROZEN_FOR_EXECUTION",
+  "scope": "RICK Intelligence integrated product",
+  "owner": "Engineering + Product + Security + Operations",
+  "promotion_rule": "NO-GO while any required criterion is NOT_RUN, FAIL, BLOCKED_EXTERNAL or BLOCKED_DECISION",
+  "evidence_rule": "Only evidence generated against the current artifact fingerprint is valid; historical evidence is context, never acceptance",
+  "acceptance_bands": {
+    "A1_functional": {
+      "label": "A1 — Produto correto",
+      "required": true,
+      "criteria": [
+        "Root API, compatibility routes and contracts pass the current regression matrix",
+        "Tenant, workspace and collection authorization fails closed with no cross-scope leakage",
+        "Ingestion, retrieval, grounded response and lifecycle preserve provenance and idempotency",
+        "Web documents, search, chat and administration flows work against the canonical API"
+      ],
+      "minimum": "All P0 functional and security scenarios pass; no unclassified failure"
+    },
+    "A2_quality": {
+      "label": "A2 — Experiência e qualidade",
+      "required": true,
+      "criteria": [
+        "Visual review is current, independent and has no Critical or High finding",
+        "Responsive matrix covers 375, 768 and 1440 pixels plus zoom/reflow and reduced motion",
+        "Accessibility has no Critical or High axe result and keyboard focus is deterministic",
+        "Performance evidence includes environment, sample count, p50/p95/p99 and declared limits"
+      ],
+      "thresholds": {
+        "visual_score_min": 95,
+        "lcp_ms_p75_max": 2500,
+        "cls_max": 0.1,
+        "api_latency_measurements": ["p50", "p95", "p99"],
+        "unexpected_e2e_failures": 0,
+        "critical_or_high_accessibility_findings": 0
+      },
+      "minimum": "Every required quality dimension has fresh artifact-bound evidence"
+    },
+    "A3_production": {
+      "label": "A3 — Operação Triplo AAA",
+      "required": true,
+      "criteria": [
+        "Postgres, queue, object storage, vector store, Redis lease, provider and IdP are live-tested",
+        "Migrations, backup/restore, restart, dependency failure, canary and rollback are rehearsed",
+        "Secrets, telemetry, audit, SLOs, alerts and retention are verified without sensitive leakage",
+        "Release evidence binds HEAD, worktree fingerprint, images, commands, reviewers and limitations"
+      ],
+      "minimum": "All P0 production controls pass in an authorized production-shaped environment"
+    }
+  },
+  "current_scope_status": {
+    "api_phase_1_5": "PASS — make api15-verify",
+    "api_phase_1_6": "PASS — make api16-verify",
+    "web_local": "SCOPED_PASS — make web-validate 234/234; no planned or executable skips; 141 PNGs/141 JSONs with 0 page errors, 0 axe violations and 0 axe incomplete in visual-cycle5-current",
+    "web_performance": "LOCAL_ONLY — current maximum LCP 692 ms and CLS 0.0245569 across 18 samples",
+    "production_integrations": "NOT_RUN — Docker, Postgres, Redis, Qdrant, object storage, IdP and live provider are unavailable in this workspace",
+    "release_decision": "NO-GO"
+  },
+  "required_evidence_families": [
+    "current artifact fingerprint",
+    "contract and regression matrices",
+    "negative security and tenancy matrix",
+    "ingestion/retrieval golden set and leakage checks",
+    "independent visual and accessibility packet",
+    "performance/load/soak artifacts",
+    "durability and recovery drills",
+    "observability/redaction/alert evidence",
+    "backup/restore and release manifest",
+    "fresh independent integration and final critics"
+  ],
+  "limitations": [
+    "This manifest freezes the bar; it does not claim AAA acceptance.",
+    "The current repository has a dirty worktree, so no release fingerprint is asserted here.",
+    "External service and credential-dependent criteria remain explicitly unverified."
+  ]
+}

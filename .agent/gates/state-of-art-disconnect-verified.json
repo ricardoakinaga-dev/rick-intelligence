@@ -1,0 +1,68 @@
+{
+  "record_id": "GATE-SA-DISCONNECT-VERIFIED-001",
+  "timestamp": "2026-09-06T00:13:37Z",
+  "gate_id": "VERIFIED",
+  "scope": "HTTP transport observation correction",
+  "scope_ref": "SA-DISCONNECT",
+  "version": 1,
+  "criteria": [
+    {
+      "id": "V-001-ACCEPTANCE-EVIDENCE",
+      "description": "Fresh scoped peer accepts complete transport and nested stream ownership criteria",
+      "required": true,
+      "status": "PASS",
+      "evidence_refs": [
+        ".agent/verification.jsonl#VER-SA-TRANSPORT-PEER-5"
+      ],
+      "confidence": "HIGH",
+      "limitations": "I1 contextual independence; not full product acceptance"
+    },
+    {
+      "id": "V-002-REGRESSION-RISK",
+      "description": "403 backend/package/worker tests plus current browser and control regression preserve affected behavior",
+      "required": true,
+      "status": "PASS",
+      "evidence_refs": [
+        ".agent/verification.jsonl#VER-SA-TRANSPORT-PEER-5",
+        ".agent/verification.jsonl#VER-SA-TRANSPORT-NESTED-LOCAL"
+      ],
+      "confidence": "HIGH",
+      "limitations": "Browser30 passed6 viewport skips; external-service and full performance evidence unavailable"
+    },
+    {
+      "id": "V-003-LIMITATIONS-AUTHORITY",
+      "description": "Finite process ownership, cooperative cleanup limits and local-only authority remain explicit",
+      "required": true,
+      "status": "PASS",
+      "evidence_refs": [
+        ".agent/verification.jsonl#VER-SA-TRANSPORT-PEER-5"
+      ],
+      "confidence": "HIGH",
+      "limitations": "No forced native-code preemption, host-shutdown guarantee, fullAAA or production approval"
+    }
+  ],
+  "evidence": [
+    ".agent/verification.jsonl#VER-SA-TRANSPORT-PEER-5"
+  ],
+  "confidence": "HIGH",
+  "gaps": [],
+  "conditions": [],
+  "authority": {
+    "required": false,
+    "state": "NOT_REQUIRED",
+    "actor": "Codex lead",
+    "scope": "HTTP transport observation correction",
+    "decision": "Reversible local scope with MEDIUM residual risk; no external or high-risk acceptance",
+    "evidence_ref": ".agent/plans/state-of-art-recovery.md",
+    "expires_or_revalidates": "Revalidate on source, policy or contrary evidence changes"
+  },
+  "residual_risk": "MEDIUM",
+  "decision": "PASS",
+  "next_action": "Complete only scoped transport correction and inspect readiness/login gaps",
+  "revalidation_triggers": [
+    "Transport, streaming ownership or security composition changes",
+    "Contrary cleanup/error/admission evidence emerges",
+    "Runtime versions or production workload invalidate assumptions"
+  ],
+  "supersedes": null
+}

@@ -19,7 +19,7 @@ def _env():
 
     env = os.environ.copy()
     parts = [str(ROOT / "apps" / "api" / "src")] + [
-        str(ROOT / "packages" / p / "src") for p in ("contracts", "authorization", "identity")
+        str(ROOT / "packages" / p / "src") for p in ("contracts", "authorization", "identity", "observability")
     ]
     env["PYTHONPATH"] = os.pathsep.join(parts + [env.get("PYTHONPATH", "")])
     env.setdefault("RAG_SKIP_QDRANT_BOOTSTRAP", "1")

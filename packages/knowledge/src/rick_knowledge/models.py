@@ -12,6 +12,7 @@ class Document:
     document_id: str
     workspace_id: str
     collection_id: str
+    tenant_id: str
     document_version: str = ""
     content_checksum: str = ""
     filename: str = ""
@@ -32,6 +33,7 @@ class Document:
 class Chunk:
     chunk_id: str
     document_id: str
+    tenant_id: str
     parent_chunk_id: str | None = None
     chunk_index: int = 0
     text: str = ""
@@ -52,6 +54,7 @@ class Chunk:
 class Collection:
     workspace_id: str
     collection_id: str
+    tenant_id: str
     title: str = ""
     description: str = ""
     metadata: dict = field(default_factory=dict)

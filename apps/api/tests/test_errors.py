@@ -40,6 +40,25 @@ def test_provider_failure_mapping():
     assert translate_legacy_exception(RuntimeError("redis down")).code == "lock_unavailable"
 
 
+def test_api_error_message_and_details_are_canonicalized(app):
+    from fastapi.testclient import TestClient
+
+    from core.errors import ApiError
+
+    @app.get("/api/v1/_unsafe-api-error")
+    def unsafe_api_error():
+        raise ApiError("conflict", "provider redis://secret leaked", {"secret": "password", "user_id": "safe-user"})
+
+    response = TestClient(app, raise_server_exceptions=False).get("/api/v1/_unsafe-api-error")
+
+    assert response.status_code == 409
+    body = response.json()["error"]
+    assert body["message"] == "Resource conflict."
+    assert body["details"] == {"user_id": "safe-user"}
+    assert "redis://" not in response.text
+    assert "password" not in response.text
+
+
 def test_validation_error_shape(client):
     resp = client.post("/api/v1/auth/login", json={"email": "x"})  # missing password
     assert resp.status_code in (400, 422)

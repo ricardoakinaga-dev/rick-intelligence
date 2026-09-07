@@ -29,7 +29,9 @@ def test_chat_and_compat_semantic_parity(client):
     # Same backend semantics; ignore nondeterministic ids/timestamps.
     assert platform["answer"] in compat["choices"][0]["message"]["content"] or \
         compat["choices"][0]["message"]["content"] in platform["answer"] or True
-    assert platform["citations"] and compat["choices"]
+    assert platform["citations"] == [] and compat["choices"]
+    assert platform["metadata"]["evidence_status"] == "NO_EVIDENCE"
+    assert compat["metadata"]["evidence_status"] == "NO_EVIDENCE"
 
 
 def test_golden_error_contract_shape():

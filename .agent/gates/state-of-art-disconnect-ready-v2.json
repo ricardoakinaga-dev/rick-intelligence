@@ -1,0 +1,69 @@
+{
+  "record_id": "GATE-SA-DISCONNECT-IMPLEMENTATION-READY-002",
+  "timestamp": "2026-09-05T23:47:32Z",
+  "gate_id": "IMPLEMENTATION_READY",
+  "scope": "Canonical API transport observation correction",
+  "scope_ref": "SA-DISCONNECT",
+  "version": 2,
+  "criteria": [
+    {
+      "id": "IR-001",
+      "description": "Contract v2 defines outermost observation, bounded retained teardown and unchanged HTTP/security semantics",
+      "required": true,
+      "status": "PASS",
+      "evidence_refs": [
+        "docs/architecture/http-transport-observation.md"
+      ],
+      "confidence": "HIGH",
+      "limitations": "Implementation behavior is not yet verified"
+    },
+    {
+      "id": "IR-002",
+      "description": "Local prerequisites and authority are sufficient; no external effect or data migration",
+      "required": true,
+      "status": "PASS",
+      "evidence_refs": [
+        ".agent/backlog.json",
+        "docs/architecture/http-transport-observation.md"
+      ],
+      "confidence": "HIGH",
+      "limitations": "No production or full external-runtime evidence"
+    },
+    {
+      "id": "IR-003",
+      "description": "Disjoint ownership and failure-first capacity/error/deadline tests are executable",
+      "required": true,
+      "status": "PASS",
+      "evidence_refs": [
+        ".agent/plans/state-of-art-recovery.md",
+        "docs/architecture/http-transport-observation.md"
+      ],
+      "confidence": "HIGH",
+      "limitations": "Service-wide middleware regression requires the planned integrated suite"
+    }
+  ],
+  "evidence": [
+    "docs/architecture/http-transport-observation.md"
+  ],
+  "confidence": "HIGH",
+  "gaps": [],
+  "conditions": [],
+  "authority": {
+    "required": false,
+    "state": "NOT_REQUIRED",
+    "actor": "Codex lead",
+    "scope": "Canonical API transport observation correction",
+    "decision": "Reversible local implementation within user request; no external or high-risk acceptance",
+    "evidence_ref": ".agent/plans/state-of-art-recovery.md",
+    "expires_or_revalidates": "Revalidate if scope or risk changes"
+  },
+  "residual_risk": "MEDIUM",
+  "decision": "PASS",
+  "next_action": "Implement outermost error observation and bounded retained stream teardown under contract v2",
+  "revalidation_triggers": [
+    "Public security or request/response contracts change",
+    "Stored-data or external-effect requirements emerge",
+    "New evidence invalidates the transport classification design"
+  ],
+  "supersedes": "GATE-SA-DISCONNECT-IMPLEMENTATION-READY-001"
+}

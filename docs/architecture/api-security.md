@@ -22,10 +22,18 @@ structural test fails on missing policy. Public: `/health/live`, `/health/ready`
   deployment-model note (see ADR). CORS ≠ CSRF documented.
 - Error leaks: safe templates; legacy detail allowlisted keys only; tests assert
   no `redis://`/traceback/provider bodies.
-- Header spoofing/proxy: `X-Forwarded-For` honored only when `TRUST_FORWARDED_HEADERS=1`
-  (+`TRUSTED_PROXIES`); identity headers (`x-user-id` etc.) always ignored.
-- Rate limiting: in-process buckets for login/chat now; Redis-backed interface ready;
-  deployment limitation documented (single-process residual risk).
+- Header spoofing/proxy: `X-Forwarded-For` is honored only when
+  `TRUST_FORWARDED_HEADERS=1` and the direct peer belongs to the explicit
+  `TRUSTED_PROXIES` IP/CIDR allowlist; malformed/untrusted hops are ignored and
+  identity headers (`x-user-id` etc.) are always ignored.
+- Startup safety: production requires `RICK_IDENTITY_MODE=production` and a
+  secure session cookie. `SameSite=None` is rejected without `Secure`, and a
+  configured legacy backend fails closed if its adapter cannot load.
+- Rate limiting: in-process buckets cover login, chat/compatibility and both public
+  recovery entry points; recovery keys hash tenant/email/client identity and return
+  a neutral 429 envelope. A distributed limiter remains required for multi-replica
+  production (the injected interface is ready; local fallback is not a production
+  security boundary).
 
 ## Permissions (canonical)
 

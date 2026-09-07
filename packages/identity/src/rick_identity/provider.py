@@ -45,6 +45,14 @@ class PlainTestVerifier:
         return bool(password) and user_record.get("password_plain") == password
 
 
+def _required_tenant_id(value: object) -> str:
+    """Return an explicit tenant binding or fail closed."""
+
+    if not isinstance(value, str) or not value.strip():
+        raise IdentityError("forbidden")
+    return value.strip()
+
+
 def _anonymous_snapshot() -> dict:
     return {
         "authenticated": False,
@@ -68,7 +76,7 @@ class IdentityProviderImpl:
         self.users = users
         self.sessions = sessions
         self.verifier = verifier
-        self.tenant_policy = tenant_policy or (lambda user, tenant_id: tenant_id in (user.get("tenant_id"), "default"))
+        self.tenant_policy = tenant_policy or (lambda user, tenant_id: tenant_id == user.get("tenant_id"))
 
     # -- login -----------------------------------------------------------
     def login(self, *, email, password, tenant_id, ip, user_agent) -> dict:
@@ -77,11 +85,13 @@ class IdentityProviderImpl:
             raise IdentityError("unauthorized")
         if user.get("status", "active") != "active":
             raise IdentityError("forbidden")
-        if not self.tenant_policy(user, tenant_id or "default"):
+        requested_tenant = _required_tenant_id(tenant_id)
+        user_tenant = _required_tenant_id(user.get("tenant_id"))
+        if user_tenant != requested_tenant or not self.tenant_policy(user, requested_tenant):
             raise IdentityError("forbidden")
-        return self._issue_session(user, ip=ip, user_agent=user_agent)
+        return self._issue_session(user, tenant_id=requested_tenant, ip=ip, user_agent=user_agent)
 
-    def _issue_session(self, user: dict, *, ip, user_agent) -> dict:
+    def _issue_session(self, user: dict, *, tenant_id: str, ip, user_agent) -> dict:
         role = canonical_role(user.get("role"))
         overrides = normalize_permission_overrides(user.get("permission_overrides"))
         effective = permissions_for_role(role, overrides)
@@ -93,7 +103,7 @@ class IdentityProviderImpl:
             "permissions": effective,
             "authorization_snapshot_version": AUTHORIZATION_SNAPSHOT_VERSION,
             "authorization_state": "AUTHORITATIVE",
-            "tenant_id": user.get("tenant_id", "default"),
+            "tenant_id": tenant_id,
             "workspace_id": user.get("workspace_id", "default"),
             "allowed_collection_ids": allowed_collection_ids_for_user(user),
             "password_version": user.get("password_version", 1),
@@ -116,6 +126,13 @@ class IdentityProviderImpl:
             return _anonymous_snapshot()
         user = self.users.get_by_id(record.get("user_id") or "")
         if user is None or user.get("status", "active") != "active":
+            return _anonymous_snapshot()
+        try:
+            user_tenant = _required_tenant_id(user.get("tenant_id"))
+            session_tenant = _required_tenant_id(record.get("tenant_id"))
+        except IdentityError:
+            return _anonymous_snapshot()
+        if session_tenant != user_tenant:
             return _anonymous_snapshot()
         if user.get("password_version", 1) != record.get("password_version", 1):
             return _anonymous_snapshot()  # password change invalidates

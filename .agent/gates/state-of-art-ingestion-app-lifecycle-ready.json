@@ -1,0 +1,82 @@
+{
+  "record_id": "GATE-SA-INGESTION-APP-LIFECYCLE-IMPLEMENTATION-READY-001",
+  "timestamp": "2026-09-06T17:31:10Z",
+  "gate_id": "IMPLEMENTATION_READY",
+  "scope": "Root application-owned ingestion executor lifecycle shutdown",
+  "scope_ref": "SA-INGESTION-APP-LIFECYCLE",
+  "version": 1,
+  "criteria": [
+    {
+      "id": "IR-001",
+      "description": "The default root factory reproduces a lifecycle defect: closing the ASGI TestClient leaves the application-owned ingestion executor unshut and its worker thread alive",
+      "required": true,
+      "status": "PASS",
+      "evidence_refs": [
+        ".agent/verification.jsonl#VER-SA-INGESTION-APP-LIFECYCLE-BASELINE",
+        ".gauntlet-state-of-art/evidence/ingestion-lifecycle-current/probe-root-shutdown-baseline.md",
+        "apps/api/src/app.py",
+        "apps/api/src/services/ingestion_service.py"
+      ],
+      "confidence": "HIGH",
+      "limitations": "The baseline is local and process-bound; it is not a production shutdown or distributed-worker claim"
+    },
+    {
+      "id": "IR-002",
+      "description": "The correction is reversible and local: the default factory owns only resources it constructs, injected providers remain caller-owned, shutdown is idempotent, queued work is cancelled safely, and private cleanup/resource ordering is preserved",
+      "required": true,
+      "status": "PASS",
+      "evidence_refs": [
+        "apps/api/src/app.py",
+        "apps/api/src/services/ingestion_service.py",
+        "apps/api/src/services/job_journal.py",
+        "docs/architecture/ingestion-lifecycle.md"
+      ],
+      "confidence": "HIGH",
+      "limitations": "The gate authorizes implementation and verification only; it does not accept shutdown behavior"
+    },
+    {
+      "id": "IR-003",
+      "description": "A deterministic regression path exists for TestClient lifespan close, completed and queued uploads, resource ownership, idempotent shutdown, and preserved Phase 1.6/CI checks before a fresh independent review",
+      "required": true,
+      "status": "PASS",
+      "evidence_refs": [
+        "apps/api/tests/test_phase16_root.py",
+        "apps/api/tests/test_phase16_health.py",
+        "apps/api/tests/test_job_journal.py",
+        "Makefile",
+        ".agent/plans/state-of-art-recovery.md"
+      ],
+      "confidence": "HIGH",
+      "limitations": "External process supervisors, distributed workers, crash recovery and deployment shutdown remain outside this local task"
+    }
+  ],
+  "evidence": [
+    ".agent/verification.jsonl#VER-SA-INGESTION-APP-LIFECYCLE-BASELINE",
+    ".gauntlet-state-of-art/evidence/ingestion-lifecycle-current/probe-root-shutdown-baseline.md",
+    "apps/api/src/app.py",
+    "apps/api/src/services/ingestion_service.py",
+    "docs/architecture/ingestion-lifecycle.md"
+  ],
+  "confidence": "HIGH",
+  "gaps": [],
+  "conditions": [],
+  "authority": {
+    "required": false,
+    "state": "NOT_REQUIRED",
+    "actor": "Codex lead",
+    "scope": "Root application-owned ingestion executor lifecycle shutdown",
+    "decision": "Authorize only reversible local lifecycle implementation, fault-injection verification and fresh independent review; no external effect or release acceptance",
+    "evidence_ref": ".agent/verification.jsonl#VER-SA-INGESTION-APP-LIFECYCLE-BASELINE",
+    "expires_or_revalidates": "Revalidate on resource ownership, app lifespan, executor, journal, storage, worker or deployment scope changes"
+  },
+  "residual_risk": "MEDIUM",
+  "decision": "PASS",
+  "next_action": "Install an application-owned ASGI lifespan shutdown hook and verify local executor/resource lifecycle without changing caller-owned provider ownership",
+  "revalidation_triggers": [
+    "Root factory or ingestion executor ownership changes",
+    "Job journal, knowledge store, vector store or audit resource close semantics change",
+    "External worker, deployment or distributed recovery scope is introduced",
+    "A new probe shows shutdown can leak work, close caller-owned resources or lose private cleanup references"
+  ],
+  "supersedes": null
+}

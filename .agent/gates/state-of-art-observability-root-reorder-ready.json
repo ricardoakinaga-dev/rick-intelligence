@@ -1,0 +1,76 @@
+{
+  "record_id": "GATE-SA-OBSERVABILITY-ROOT-REORDER-IMPLEMENTATION-READY-003",
+  "timestamp": "2026-09-06T16:18:35Z",
+  "gate_id": "IMPLEMENTATION_READY",
+  "scope": "Local bounded worker lifecycle event stream",
+  "scope_ref": "SA-OBSERVABILITY",
+  "version": 3,
+  "criteria": [
+    {
+      "id": "IR-001",
+      "description": "A fresh independent review reproduced that the root executor can emit started and terminal events before enqueued because the callback is delivered after submit without a sequencing barrier",
+      "required": true,
+      "status": "PASS",
+      "evidence_refs": [
+        ".gauntlet-state-of-art/evidence/observability-local-current/critic-poincare-raw.md",
+        "apps/api/src/services/ingestion_service.py",
+        "docs/architecture/observability.md"
+      ],
+      "confidence": "HIGH",
+      "limitations": "This gate authorizes corrective implementation only; current event ordering remains unaccepted until regression and fresh review"
+    },
+    {
+      "id": "IR-002",
+      "description": "The correction is reversible and local-only: preserve enqueued-before-started ordering without invoking callbacks under the service lock, and replace namespace-only worker event admission with a finite lifecycle allowlist while retaining bounded fields and opaque references",
+      "required": true,
+      "status": "PASS",
+      "evidence_refs": [
+        "apps/api/src/services/ingestion_service.py",
+        "apps/api/src/core/telemetry.py",
+        "packages/observability/src/rick_observability/events.py"
+      ],
+      "confidence": "HIGH",
+      "limitations": "No exporter, collector, distributed aggregation, alert delivery, production deployment or external service effect is authorized"
+    },
+    {
+      "id": "IR-003",
+      "description": "Deterministic ordering, finite-name admission, root terminal paths, immutability, reentrant sink safety and sink-failure isolation can be covered before a fresh independent review",
+      "required": true,
+      "status": "PASS",
+      "evidence_refs": [
+        "apps/api/tests/test_telemetry.py",
+        "apps/api/tests/test_phase16_root.py",
+        "Makefile"
+      ],
+      "confidence": "HIGH",
+      "limitations": "The post-rework regression and fresh I1 review remain required"
+    }
+  ],
+  "evidence": [
+    ".gauntlet-state-of-art/evidence/observability-local-current/critic-poincare-raw.md",
+    "apps/api/src/services/ingestion_service.py",
+    "apps/api/src/core/telemetry.py",
+    "apps/api/tests/test_phase16_root.py"
+  ],
+  "confidence": "HIGH",
+  "gaps": [],
+  "conditions": [],
+  "authority": {
+    "required": false,
+    "state": "NOT_REQUIRED",
+    "actor": "Codex lead",
+    "scope": "Local bounded worker lifecycle event stream",
+    "decision": "Authorize only reversible hermetic ordering and finite-allowlist correction; no external effect or high-risk acceptance",
+    "evidence_ref": ".gauntlet-state-of-art/evidence/observability-local-current/critic-poincare-raw.md",
+    "expires_or_revalidates": "Revalidate before exporter, collector, distributed storage, public event contract, deployment or expanded identity/data scope"
+  },
+  "residual_risk": "MEDIUM",
+  "decision": "PASS",
+  "next_action": "Correct root event sequencing and finite worker-event admission, then rerun the bounded regression and fresh independent review",
+  "revalidation_triggers": [
+    "Worker lifecycle, root executor or public status contracts change",
+    "New event fields could contain tenant, source, content, credentials or unbounded cardinality",
+    "Scope expands to external telemetry, multi-instance coordination or deployment"
+  ],
+  "supersedes": "GATE-SA-OBSERVABILITY-ROOT-IMPLEMENTATION-READY-002"
+}

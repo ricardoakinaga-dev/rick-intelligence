@@ -6,7 +6,7 @@ from pathlib import Path
 SRC = Path(__file__).resolve().parents[1] / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
-for _pkg in ("contracts", "authorization", "identity"):
+for _pkg in ("contracts", "authorization", "identity", "observability"):
     _p = Path(__file__).resolve().parents[3] / "packages" / _pkg / "src"
     if str(_p) not in sys.path:
         sys.path.insert(0, str(_p))
@@ -56,7 +56,8 @@ def app(providers):
 
 @pytest.fixture()
 def client(app):
-    return TestClient(app, raise_server_exceptions=False)
+    with TestClient(app, raise_server_exceptions=False) as client:
+        yield client
 
 
 def login_as(client: TestClient, email: str, password: str = "password123"):

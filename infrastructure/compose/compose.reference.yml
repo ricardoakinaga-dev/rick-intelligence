@@ -1,0 +1,125 @@
+# Reference topology only. Every image/credential must be supplied by deployment.
+name: rick-intelligence-reference
+
+services:
+  postgres:
+    image: postgres:16.4-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?set in secret/config manager}
+      POSTGRES_USER: ${POSTGRES_USER:?set in secret/config manager}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in secret/config manager}
+    volumes: [postgres-data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    networks: [private]
+
+  redis:
+    image: redis:7.4-alpine
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:?set in secret/config manager}"]
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?set in secret/config manager}
+    volumes: [redis-data:/data]
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    networks: [private]
+
+  qdrant:
+    image: qdrant/qdrant:v1.12.5
+    volumes: [qdrant-data:/qdrant/storage]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:6333/healthz >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    networks: [private]
+
+  object-store:
+    image: minio/minio:RELEASE.2025-02-28T09-55-16Z
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?set in secret/config manager}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set in secret/config manager}
+    volumes: [object-data:/data]
+    healthcheck:
+      test: ["CMD-SHELL", "mc ready local"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    networks: [private]
+
+  api:
+    image: ${RICK_API_IMAGE:?set immutable registry image}
+    environment:
+      RICK_ENV: production
+      RICK_IDENTITY_MODE: production
+      RICK_API_CHAT_BACKEND: professor
+      SESSION_COOKIE_SECURE: "true"
+      SESSION_COOKIE_SAMESITE: strict
+      RICK_EXTERNAL_DATABASE_DSN: ${RICK_EXTERNAL_DATABASE_DSN:?inject through secret manager}
+      RICK_REDIS_URL: ${RICK_REDIS_URL:?inject through secret manager}
+      RICK_QDRANT_URL: ${RICK_QDRANT_URL:?inject through service config}
+      RICK_OBJECT_STORE_ENDPOINT: ${RICK_OBJECT_STORE_ENDPOINT:?inject through service config}
+      RICK_OBJECT_STORE_BUCKET: ${RICK_OBJECT_STORE_BUCKET:?inject through service config}
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      qdrant: {condition: service_healthy}
+      object-store: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:8000/health/ready >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    networks: [private, edge]
+
+  worker:
+    image: ${RICK_WORKER_IMAGE:?set immutable registry image}
+    environment:
+      RICK_ENV: production
+      RICK_EXTERNAL_DATABASE_DSN: ${RICK_EXTERNAL_DATABASE_DSN:?inject through secret manager}
+      RICK_REDIS_URL: ${RICK_REDIS_URL:?inject through secret manager}
+      RICK_QDRANT_URL: ${RICK_QDRANT_URL:?inject through service config}
+      RICK_OBJECT_STORE_ENDPOINT: ${RICK_OBJECT_STORE_ENDPOINT:?inject through service config}
+      RICK_OBJECT_STORE_BUCKET: ${RICK_OBJECT_STORE_BUCKET:?inject through service config}
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      qdrant: {condition: service_healthy}
+      object-store: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:8001/health/ready >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    networks: [private]
+
+  web:
+    image: ${RICK_WEB_IMAGE:?set immutable registry image}
+    environment:
+      RICK_API_INTERNAL_URL: http://api:8000
+      NODE_ENV: production
+    depends_on:
+      api: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:3000/login >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    networks: [edge, private]
+
+volumes:
+  postgres-data: {name: rick-postgres-data}
+  redis-data: {name: rick-redis-data}
+  qdrant-data: {name: rick-qdrant-data}
+  object-data: {name: rick-object-data}
+
+networks:
+  private:
+    internal: true
+  edge: {}

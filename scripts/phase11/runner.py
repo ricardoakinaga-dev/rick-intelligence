@@ -121,7 +121,11 @@ def python_case(label: str, args: Sequence[str], *, cwd: Path = ROOT, env=None, 
 
 
 def root_check_case():
-    return python_case("phase-1.1 skeleton validator", ["scripts/phase11/check_skeleton.py"], timeout=120)
+    # The implemented root tree is beyond the Phase 1.1 placeholder stage.
+    # Keep the historical skeleton validator available for its own regression
+    # tests, but make the public root validation target enforce current
+    # boundary/preservation rules.
+    return python_case("current root boundary validator", ["scripts/phase15/check_boundaries.py"], timeout=120)
 
 
 def mode_bootstrap() -> int:
@@ -141,6 +145,11 @@ def mode_test_fast() -> int:
         python_case(
             "Phase 1.1 boundary validator regression",
             ["-m", "unittest", "scripts/phase11/test_check_skeleton.py"],
+            timeout=120,
+        ),
+        python_case(
+            "Phase 1.5 boundary validator regression",
+            ["-m", "unittest", "scripts/phase15/test_check_boundaries.py"],
             timeout=120,
         ),
         python_case(
@@ -186,6 +195,8 @@ def mode_lint() -> int:
                 "scripts/phase11/check_skeleton.py",
                 "scripts/phase11/runner.py",
                 "scripts/phase11/test_check_skeleton.py",
+                "scripts/phase15/check_boundaries.py",
+                "scripts/phase15/test_check_boundaries.py",
             ],
             timeout=120,
         ),

@@ -82,12 +82,13 @@ def test_collections_narrow_only():
     assert not can_access_collection(allowed=["rag_phase0"], collection_id="not a collection!!!"[:0] or "")
     ctx = build_retrieval_context(user_id="u", session_workspace="w", requested_workspace="w",
                                   allowed_collection_ids=["a", "b"], permissions=["chat.query"],
-                                  role="VETERINARIAN", requested_collection_id="a")
+                                  role="VETERINARIAN", requested_collection_id="a",
+                                  tenant_id="default")
     assert ctx["allowed_collection_ids"] == ["a"]
     try:
         build_retrieval_context(user_id="u", session_workspace="w", requested_workspace="w",
                                 allowed_collection_ids=["a"], permissions=[], role="VETERINARIAN",
-                                requested_collection_id="b")
+                                requested_collection_id="b", tenant_id="default")
         raise AssertionError("widening must fail")
     except AuthorizationError:
         pass

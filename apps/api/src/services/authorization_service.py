@@ -33,6 +33,15 @@ def build_retrieval_context(session, *, workspace_id: str, collection_id: str | 
     """Server-side scope; request input narrows only. Raises ApiError(forbidden)."""
     from core.errors import ApiError
 
+    tenant_id = getattr(session, "tenant_id", None)
+    fields = getattr(session, "model_fields_set", None) or getattr(session, "__fields_set__", None)
+    if (
+        not isinstance(tenant_id, str)
+        or not tenant_id.strip()
+        or not isinstance(fields, set)
+        or "tenant_id" not in fields
+    ):
+        raise ApiError("forbidden")
     try:
         return _build_context(
             user_id=getattr(session, "user_id", None),
@@ -42,6 +51,7 @@ def build_retrieval_context(session, *, workspace_id: str, collection_id: str | 
             permissions=list(getattr(session, "permissions", None) or []),
             role=getattr(session, "canonical_role", None) or getattr(session, "role", None),
             requested_collection_id=collection_id,
+            tenant_id=tenant_id,
         )
     except AuthorizationError as exc:
         raise ApiError(exc.code or "forbidden")

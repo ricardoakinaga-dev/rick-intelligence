@@ -10,6 +10,25 @@ from rick_retrieval.pipeline import (
     dedupe_candidates,
     normalize_query,
 )
+from rick_retrieval.qdrant import (
+    HttpResponse,
+    HttpTransport,
+    QdrantBoundsError,
+    QdrantClosedError,
+    QdrantConfigurationError,
+    QdrantDeleteResult,
+    QdrantDependencyError,
+    QdrantError,
+    QdrantHealth,
+    QdrantHttpVectorStore,
+    QdrantLimits,
+    QdrantMalformedResponseError,
+    QdrantSearchHit,
+    QdrantStatusError,
+    QdrantTimeoutError,
+    QdrantTransportError,
+    QdrantValidationError,
+)
 from rick_retrieval.rerank import BM25FReranker, DisabledReranker, ModelReranker, Reranker
 from rick_retrieval.sparse import (
     LOW_SIGNAL_DOMAIN_TOKENS,
@@ -21,12 +40,19 @@ from rick_retrieval.sparse import (
     sparse_vector,
     tokenize_terms,
 )
+from rick_retrieval.sqlite_vector_store import (
+    SQLiteVectorStore,
+    SQLiteVectorStoreConfigurationError,
+    SQLiteVectorStoreError,
+    SQLiteVectorStoreValidationError,
+)
 from rick_retrieval.vectordb import (
     CANONICAL_EMBEDDING_DIM,
     CANONICAL_EMBEDDING_MODEL,
     DeterministicHashEmbedding,
     EmbeddingProvider,
     InMemoryVectorStore,
+    MAX_POINTS_PER_READ,
     QdrantVectorStore,
     VectorStore,
 )
@@ -34,11 +60,20 @@ from rick_retrieval.vectordb import (
 __all__ = [
     "LOW_SIGNAL_DOMAIN_TOKENS", "MEANINGLESS_QUERY_TOKENS", "SPARSE_MODULUS",
     "CANONICAL_EMBEDDING_DIM", "CANONICAL_EMBEDDING_MODEL", "RRF_K",
+    "MAX_POINTS_PER_READ",
     "BM25FReranker", "DeterministicHashEmbedding", "DisabledReranker",
     "DiskFallbackBackend", "EmbeddingProvider", "InMemoryBackend",
     "InMemoryVectorStore", "ModelReranker", "QdrantBackend", "Reranker",
-    "RetrievalBackend", "RetrievalEngine", "RetrievalOptions", "RetrievalResult",
-    "VectorStore", "compute_confidence", "content_query_terms", "dedupe_candidates",
+    "HttpResponse", "HttpTransport", "QdrantBoundsError", "QdrantClosedError",
+    "QdrantConfigurationError", "QdrantDeleteResult", "QdrantDependencyError",
+    "QdrantError", "QdrantHealth",
+    "QdrantHttpVectorStore", "QdrantLimits", "QdrantMalformedResponseError",
+    "QdrantSearchHit", "QdrantStatusError", "QdrantTimeoutError",
+    "QdrantTransportError", "QdrantValidationError", "RetrievalBackend",
+    "RetrievalEngine", "RetrievalOptions", "RetrievalResult", "VectorStore",
+    "SQLiteVectorStore", "SQLiteVectorStoreConfigurationError",
+    "SQLiteVectorStoreError", "SQLiteVectorStoreValidationError",
+    "compute_confidence", "content_query_terms", "dedupe_candidates",
     "normalize_query", "rrf_fusion", "sparse_hash", "sparse_overlap_score",
     "sparse_vector", "tokenize_terms",
 ]

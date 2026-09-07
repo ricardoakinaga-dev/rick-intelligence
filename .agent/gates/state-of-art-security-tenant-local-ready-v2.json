@@ -1,0 +1,75 @@
+{
+  "record_id": "GATE-SA-SECURITY-TENANT-LOCAL-IMPLEMENTATION-READY-002",
+  "timestamp": "2026-09-06T13:34:00Z",
+  "gate_id": "IMPLEMENTATION_READY",
+  "scope": "Local tenant propagation and audit redaction boundary rework",
+  "scope_ref": "SA-SECURITY-TENANT-LOCAL",
+  "version": 2,
+  "criteria": [
+    {
+      "id": "IR-001",
+      "description": "A concrete local audit reproduced collection catalog overwrite when two tenants reused one workspace and collection name, and identified default-scope coercion as unsafe for malformed recovery rows",
+      "required": true,
+      "status": "PASS",
+      "evidence_refs": [
+        "docs/architecture/local-durability.md",
+        "packages/knowledge/tests/test_knowledge.py",
+        "packages/knowledge/tests/test_sqlite_store.py"
+      ],
+      "confidence": "HIGH",
+      "limitations": "The gate authorizes bounded local correction and review only; it is not behavior acceptance"
+    },
+    {
+      "id": "IR-002",
+      "description": "The correction is reversible, local-only, and has an explicit SQLite schema migration plus focused regression path",
+      "required": true,
+      "status": "PASS",
+      "evidence_refs": [
+        "packages/knowledge/src/rick_knowledge/store.py",
+        "packages/knowledge/src/rick_knowledge/sqlite_store.py",
+        "packages/knowledge/tests/test_sqlite_store.py"
+      ],
+      "confidence": "HIGH",
+      "limitations": "No external database, object store, queue, deployment or credential side effect is authorized"
+    },
+    {
+      "id": "IR-003",
+      "description": "The bounded implementation can be verified with package, API lifecycle, full Phase 1.6 and control-plane regressions followed by a fresh independent review",
+      "required": true,
+      "status": "PASS",
+      "evidence_refs": [
+        "Makefile",
+        ".agent/backlog.json",
+        ".agent/plans/state-of-art-recovery.md"
+      ],
+      "confidence": "HIGH",
+      "limitations": "The local source remains unaccepted until post-change regression and a fresh I1 review complete"
+    }
+  ],
+  "evidence": [
+    "docs/architecture/local-durability.md",
+    "packages/knowledge/tests/test_knowledge.py",
+    "packages/knowledge/tests/test_sqlite_store.py"
+  ],
+  "confidence": "HIGH",
+  "gaps": [],
+  "conditions": [],
+  "authority": {
+    "required": false,
+    "state": "NOT_REQUIRED",
+    "actor": "Codex lead",
+    "scope": "Local tenant propagation and audit redaction boundary rework",
+    "decision": "Authorize reversible local correction, migration verification and independent review only; no external effect or high-risk acceptance",
+    "evidence_ref": "docs/architecture/local-durability.md",
+    "expires_or_revalidates": "Revalidate on tenant, collection, journal, recovery, external storage or full-product scope changes"
+  },
+  "residual_risk": "MEDIUM",
+  "decision": "PASS",
+  "next_action": "Finish bounded local correction, run the complete regression matrix and obtain a fresh independent review",
+  "revalidation_triggers": [
+    "Tenant, collection, identity, authorization or public lifecycle contract changes",
+    "Journal schema, recovery source validation or local persistence changes",
+    "External identity/storage/queue, deployment or full-product security scope is introduced"
+  ],
+  "supersedes": "GATE-SA-SECURITY-TENANT-LOCAL-IMPLEMENTATION-READY-001"
+}

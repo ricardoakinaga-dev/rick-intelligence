@@ -36,7 +36,7 @@ ROOT_FILES = (
     "docs/progress/phase-1.1-report.md",
     "docs/progress/phase-1.1-independent-review.md",
     ".agent/plans/phase-1.1-monorepo-skeleton.md",
-    ".agent/gates/phase-1.1-implementation-ready.json",
+    ".agent/legacy-v1/gates/phase-1.1-implementation-ready.json",
     "scripts/phase11/runner.py",
     "scripts/phase11/test_check_skeleton.py",
 )

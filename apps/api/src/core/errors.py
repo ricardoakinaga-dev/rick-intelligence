@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
+import re
+from collections.abc import Mapping
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from core.request_context import normalize_correlation_id, normalize_request_id
+from core.security import SECURITY_HEADERS
+from core.transport import _TransportClosed, is_transport_only
 
 ERROR_CODES = (
     "validation_error",
@@ -23,6 +28,7 @@ ERROR_CODES = (
     "provider_rate_limit",
     "vector_store_unavailable",
     "storage_unavailable",
+    "recovery_required",
     "lock_unavailable",
     "ingestion_failed",
     "retrieval_failed",
@@ -44,6 +50,7 @@ _STATUS_BY_CODE = {
     "provider_rate_limit": 429,
     "vector_store_unavailable": 503,
     "storage_unavailable": 503,
+    "recovery_required": 503,
     "lock_unavailable": 503,
     "ingestion_failed": 500,
     "retrieval_failed": 500,
@@ -65,12 +72,17 @@ _SAFE_MESSAGES = {
     "provider_rate_limit": "Provider rate limit exceeded.",
     "vector_store_unavailable": "Vector store is unavailable.",
     "storage_unavailable": "Storage is unavailable.",
+    "recovery_required": "Ingestion recovery requires operator attention.",
     "lock_unavailable": "Lock service is unavailable.",
     "ingestion_failed": "Ingestion failed.",
     "retrieval_failed": "Retrieval failed.",
     "generation_failed": "Generation failed.",
     "internal_error": "Internal server error.",
 }
+
+_SAFE_REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9\-_:.]{1,128}$")
+_SAFE_DETAIL_TEXT_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:/\[\] ',-]{0,127}$")
+_SAFE_DETAIL_KEYS = frozenset({"error", "tenant_id", "user_id", "workspace_id", "fields"})
 
 
 class ApiError(Exception):
@@ -87,8 +99,49 @@ class ApiError(Exception):
         return _STATUS_BY_CODE[self.code]
 
 
+def _safe_details(details: Any) -> dict[str, Any] | None:
+    if not isinstance(details, Mapping):
+        return None
+    result: dict[str, Any] = {}
+    for key, value in details.items():
+        if key not in _SAFE_DETAIL_KEYS:
+            continue
+        if key == "fields":
+            if not isinstance(value, (list, tuple)):
+                continue
+            fields = [
+                item.strip()
+                for item in value[:20]
+                if isinstance(item, str)
+                and len(item.strip()) <= 128
+                and _SAFE_DETAIL_TEXT_RE.fullmatch(item.strip())
+            ]
+            if fields:
+                result[key] = fields
+            continue
+        if key == "error":
+            if isinstance(value, str) and value in ERROR_CODES:
+                result[key] = value
+            continue
+        if isinstance(value, str) and _SAFE_DETAIL_TEXT_RE.fullmatch(value.strip()):
+            result[key] = value.strip()
+    return result or None
+
+
 def envelope(code: str, message: str, request_id: str, details: Any = None) -> dict:
-    return {"error": {"code": code, "message": message, "request_id": request_id, "details": details}}
+    safe_code = code if code in ERROR_CODES else "internal_error"
+    safe_request_id = request_id if isinstance(request_id, str) and _SAFE_REQUEST_ID_RE.fullmatch(request_id) else "unknown"
+    # ``message`` is deliberately ignored at the HTTP boundary. Internal
+    # exceptions may carry provider text; only the canonical code message is
+    # allowed to cross the public API.
+    return {
+        "error": {
+            "code": safe_code,
+            "message": _SAFE_MESSAGES[safe_code],
+            "request_id": safe_request_id,
+            "details": _safe_details(details),
+        }
+    }
 
 
 def _request_id(request: Request) -> str:
@@ -144,9 +197,36 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     return JSONResponse(status_code=400, content=envelope("validation_error", _SAFE_MESSAGES["validation_error"], rid, {"fields": locations[:20]}))
 
 
+class _ServerErrorResponse(JSONResponse):
+    """Let native ServerErrorMiddleware rethrow the original after transport loss."""
+
+    def __init__(self, original: Exception, **kwargs):
+        super().__init__(**kwargs)
+        self.original = original
+
+    async def __call__(self, scope, receive, send):
+        # No synthetic 500 intent for an observed, transport-only exception.
+        if is_transport_only(scope, self.original):
+            return
+        try:
+            await super().__call__(scope, receive, send)
+        except _TransportClosed:
+            # This marker comes from the actual send observer. Returning lets
+            # the native middleware raise the original exception unchanged.
+            return
+        except BaseException as secondary:
+            raise BaseExceptionGroup(
+                "application and error response failed", [self.original, secondary]
+            ) from None
+
+
 async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    rid = _request_id(request)
-    return JSONResponse(status_code=500, content=envelope("internal_error", _SAFE_MESSAGES["internal_error"], rid, None))
+    # ServerErrorMiddleware renders outside the registered policy wrappers.
+    rid = normalize_request_id(_request_id(request))
+    correlation = normalize_correlation_id(getattr(request.state, "correlation_id", None))
+    return _ServerErrorResponse(exc, status_code=500,
+        content=envelope("internal_error", _SAFE_MESSAGES["internal_error"], rid, None),
+        headers={**SECURITY_HEADERS, "X-Request-ID": rid, "X-Correlation-ID": correlation})
 
 
 def register_error_handlers(app: FastAPI) -> None:

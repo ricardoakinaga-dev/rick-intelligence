@@ -1,0 +1,71 @@
+{
+  "record_id": "GATE-SA-CONTROLLER-AUDIT-RESOLVED-001",
+  "timestamp": "2026-09-05T22:02:31Z",
+  "gate_id": "AUDIT_RESOLVED",
+  "scope": "Canonical controller recovery only",
+  "scope_ref": "SA-CONTROL-RECOVERY",
+  "version": 1,
+  "criteria": [
+    {
+      "id": "AR-001-BASELINE-GAPS",
+      "description": "Original invalid controller and CLI bypass were captured and routed",
+      "required": true,
+      "status": "PASS",
+      "evidence_refs": [
+        ".agent/RECOVERY-CURRENT.md",
+        ".gauntlet-state-of-art/reports/controller-review-1.md"
+      ],
+      "confidence": "HIGH",
+      "limitations": "Historical initial state had untracked/dirty records"
+    },
+    {
+      "id": "AR-002-RESOLUTION-EVIDENCE",
+      "description": "Current canonical controller, archive and CLI reject known-bad states",
+      "required": true,
+      "status": "PASS",
+      "evidence_refs": [
+        ".agent/verification.jsonl#VER-V2-CONTROLLER-PEER",
+        "docs/architecture/controller-recovery.md"
+      ],
+      "confidence": "HIGH",
+      "limitations": "Archive provenance relies on recorded manifest"
+    },
+    {
+      "id": "AR-003-ACCEPTANCE-OR-ROUTING",
+      "description": "Fresh peer accepts bounded recovery; remaining full-product work stays open",
+      "required": true,
+      "status": "PASS",
+      "evidence_refs": [
+        ".agent/verification.jsonl#VER-V2-CONTROLLER-PEER",
+        "docs/architecture/controller-recovery.md"
+      ],
+      "confidence": "HIGH",
+      "limitations": "No sidecar or product promotion"
+    }
+  ],
+  "evidence": [
+    ".agent/verification.jsonl#VER-V2-CONTROLLER-PEER",
+    "docs/architecture/controller-recovery.md"
+  ],
+  "confidence": "HIGH",
+  "gaps": [],
+  "conditions": [],
+  "authority": {
+    "required": false,
+    "state": "NOT_REQUIRED",
+    "actor": "Codex lead",
+    "scope": "Canonical controller recovery only",
+    "decision": "No production or high-risk acceptance",
+    "evidence_ref": ".agent/plans/state-of-art-recovery.md",
+    "expires_or_revalidates": "Revalidate if scope or risk changes"
+  },
+  "residual_risk": "MEDIUM",
+  "decision": "PASS",
+  "next_action": "Recover multi-round review sidecar without importing unearned approvals",
+  "revalidation_triggers": [
+    "Canonical controller or archive verifier behavior changes",
+    "Archived history hashes change",
+    "New evidence contradicts bounded peer review"
+  ],
+  "supersedes": null
+}

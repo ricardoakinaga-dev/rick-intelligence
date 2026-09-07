@@ -19,11 +19,23 @@ may import preserved legacy paths (import-boundary test enforces this).
 automatic Qdrant/OpenAI/Redis init. Tests inject fakes via `Providers`
 (identity, chat_backend, health_checks, audit_sink, rate_limiter).
 
+Each app owns its provider container and health registration mappings. Explicitly
+injected service/client references remain caller-owned; constructing a second app
+does not mutate the first app's settings. Routes and HTTP dependencies resolve
+`get_providers(request)` from the effective `request.app.state.providers`, never
+from a process-global pointer. Route-local helpers may receive Request; domain
+services do not. Missing app providers fail closed. See
+[app-provider isolation](app-provider-isolation.md) for scope and current evidence;
+this is not a claim that explicitly shared adapters or databases are isolated.
+
 ## Middleware order
 
-1. CORS (outermost) 2. request ID/correlation 3. security headers 4. size limits
-5. request context (incl. trusted-proxy IP) 6. session/auth (dependency level)
-7. audit/log context 8. error boundary (handlers) 9. metrics (low-cardinality).
+The actual stack wraps native server-error handling in transport observation,
+then applies request IDs, security headers, CSRF, body limits, request context,
+CORS and routing/dependencies. The current ordering, terminal metrics and
+stream-cleanup contract is documented in
+[HTTP transport observation](http-transport-observation.md). Provider isolation
+does not introduce another middleware layer or change that composition.
 
 ## Request context
 

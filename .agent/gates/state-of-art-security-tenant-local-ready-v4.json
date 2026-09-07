@@ -1,0 +1,84 @@
+{
+  "record_id": "GATE-SA-SECURITY-TENANT-LOCAL-IMPLEMENTATION-READY-004",
+  "timestamp": "2026-09-06T16:45:05Z",
+  "gate_id": "IMPLEMENTATION_READY",
+  "scope": "Local tenant propagation and audit redaction boundary rework",
+  "scope_ref": "SA-SECURITY-TENANT-LOCAL",
+  "version": 4,
+  "criteria": [
+    {
+      "id": "IR-001",
+      "description": "Godel's fresh independent I1 rejection is preserved: the candidate/report binding was not frozen, tenantless document listing remained cross-tenant, the admin job fallback omitted collection ACL, and cleanup lost restart recoverability when journal write and unlink both failed",
+      "required": true,
+      "status": "PASS",
+      "evidence_refs": [
+        ".agent/verification.jsonl#VER-SA-SECURITY-TENANT-LOCAL-REVIEW-GODEL",
+        ".gauntlet-state-of-art/evidence/security-tenant-local-current/critic-godel-raw.md"
+      ],
+      "confidence": "HIGH",
+      "limitations": "This gate preserves the rejection and authorizes correction only; it does not accept the current behavior"
+    },
+    {
+      "id": "IR-002",
+      "description": "The bounded correction will freeze one canonical report and exact artifact manifest, require non-empty tenant scope at the KnowledgeStore boundary, enforce collection ACL in every admin job path, and retain a durable private cleanup lease when journal and unlink fail together",
+      "required": true,
+      "status": "PASS",
+      "evidence_refs": [
+        ".gauntlet-state-of-art/evidence/security-tenant-local-current/critic-godel-raw.md",
+        "packages/knowledge/src/rick_knowledge/store.py",
+        "packages/knowledge/src/rick_knowledge/sqlite_store.py",
+        "apps/api/src/routes/admin.py",
+        "apps/api/src/services/ingestion_service.py",
+        "apps/api/src/services/job_journal.py"
+      ],
+      "confidence": "HIGH",
+      "limitations": "Implementation remains unaccepted until focused fault injection, complete hermetic regression, control validation and a fresh independent review"
+    },
+    {
+      "id": "IR-003",
+      "description": "The four corrections have a reversible local path through focused API/knowledge/journal tests, complete Phase 1.6 and preserved CI, exact artifact/control validation, and a fresh I1 review without external service effects",
+      "required": true,
+      "status": "PASS",
+      "evidence_refs": [
+        "Makefile",
+        ".agent/backlog.json",
+        ".agent/plans/state-of-art-recovery.md",
+        ".agent/verification.jsonl#VER-SA-SECURITY-TENANT-LOCAL-REVIEW-GODEL"
+      ],
+      "confidence": "HIGH",
+      "limitations": "No external identity, storage, queue, deployment or full-product security acceptance is authorized by this gate"
+    }
+  ],
+  "evidence": [
+    ".agent/verification.jsonl#VER-SA-SECURITY-TENANT-LOCAL-REVIEW-GODEL",
+    ".gauntlet-state-of-art/evidence/security-tenant-local-current/critic-godel-raw.md",
+    ".gauntlet-state-of-art/reports/security-tenant-audit-local.md",
+    "packages/knowledge/src/rick_knowledge/store.py",
+    "packages/knowledge/src/rick_knowledge/sqlite_store.py",
+    "apps/api/src/routes/admin.py",
+    "apps/api/src/services/ingestion_service.py",
+    "apps/api/src/services/job_journal.py"
+  ],
+  "confidence": "HIGH",
+  "gaps": [],
+  "conditions": [],
+  "authority": {
+    "required": false,
+    "state": "NOT_REQUIRED",
+    "actor": "Codex lead",
+    "scope": "Local tenant propagation and audit redaction boundary rework",
+    "decision": "Authorize only reversible local corrections, fault-injection verification and fresh independent review; no external effect or high-risk acceptance",
+    "evidence_ref": ".agent/verification.jsonl#VER-SA-SECURITY-TENANT-LOCAL-REVIEW-GODEL",
+    "expires_or_revalidates": "Revalidate on tenant, collection, admin ACL, journal, recovery, external storage or full-product scope changes"
+  },
+  "residual_risk": "MEDIUM",
+  "decision": "PASS",
+  "next_action": "Correct the four Godel findings, freeze the exact local artifact/report binding, rerun the complete local matrix and obtain a fresh independent review",
+  "revalidation_triggers": [
+    "Tenant, collection, identity, authorization or public lifecycle contract changes",
+    "KnowledgeStore protocol, admin job fallback, journal schema or cleanup recovery changes",
+    "External identity/storage/queue, deployment or full-product security scope is introduced",
+    "A contrary cross-tenant listing, ACL, durability or artifact-binding finding emerges"
+  ],
+  "supersedes": "GATE-SA-SECURITY-TENANT-LOCAL-IMPLEMENTATION-READY-003"
+}

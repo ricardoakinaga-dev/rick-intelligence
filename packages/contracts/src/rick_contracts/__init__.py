@@ -2,7 +2,23 @@
 
 from rick_contracts.chat import ChatRequest, ChatResponse, ChatStreamEvent
 from rick_contracts.errors import ERROR_CODES
+from rick_contracts.locking import LOCKING_CONTRACT_VERSION, LeaseErrorDto, LeaseRequest, LeaseResult
 from rick_contracts.pagination import Page
+from rick_contracts.professor import (
+    PROFESSOR_CONTRACT_VERSION,
+    EvidenceStatus,
+    ProfessorRequest,
+    ProfessorResponse,
+)
+from rick_contracts.providers import (
+    PROVIDER_CONTRACT_VERSION,
+    ChatCompletionResult,
+    EmbeddingResult,
+    ProviderUsage,
+    ProviderErrorCode,
+    ProviderErrorDto,
+    ProviderMessage,
+)
 from rick_contracts.rag import (
     CANONICAL_COLLECTION_ID,
     CANONICAL_EMBEDDING_DIM,
@@ -35,6 +51,10 @@ from rick_contracts.security import (
 
 __all__ = [
     "ChatRequest", "ChatResponse", "ChatStreamEvent", "ERROR_CODES", "Page",
+    "PROVIDER_CONTRACT_VERSION", "ProviderMessage", "ProviderErrorCode", "ProviderErrorDto",
+    "EmbeddingResult", "ProviderUsage", "ChatCompletionResult", "LOCKING_CONTRACT_VERSION",
+    "LeaseRequest", "LeaseResult", "LeaseErrorDto", "EvidenceStatus",
+    "PROFESSOR_CONTRACT_VERSION", "ProfessorRequest", "ProfessorResponse",
     "APIError", "AUTHORIZATION_SNAPSHOT_VERSION", "AUTHORIZATION_CONTRACT_VERSION",
     "CollectionGrant", "EvidenceItem", "IDENTITY_CONTRACT_VERSION",
     "Permission", "PermissionOverrides", "RETRIEVAL_CONTEXT_VERSION",

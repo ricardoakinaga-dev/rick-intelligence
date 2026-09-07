@@ -6,8 +6,11 @@ returns missing fields instead of silently accepting drift.
 
 from __future__ import annotations
 
+from rick_knowledge.identity import normalize_tenant_id
+
 REQUIRED_PAYLOAD_FIELDS = (
     "schema_version",
+    "tenant_id",
     "workspace_id",
     "collection_id",
     "document_id",
@@ -31,8 +34,13 @@ REQUIRED_PAYLOAD_FIELDS = (
 
 
 def build_point_payload(*, chunk, document, schema_version: str = "rag-contract-v1") -> dict:
+    document_tenant = normalize_tenant_id(getattr(document, "tenant_id", None))
+    chunk_tenant = normalize_tenant_id(getattr(chunk, "tenant_id", None))
+    if document_tenant != chunk_tenant:
+        raise ValueError("document and chunk tenant_id must match")
     return {
         "schema_version": schema_version,
+        "tenant_id": document_tenant,
         "workspace_id": document.workspace_id,
         "collection_id": document.collection_id,
         "document_id": document.document_id,

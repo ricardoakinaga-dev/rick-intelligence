@@ -13,22 +13,17 @@ ROOT = Path(__file__).resolve().parents[2]
 API_SRC = ROOT / "apps" / "api" / "src"
 API_TESTS = ROOT / "apps" / "api" / "tests"
 CONTRACTS_SRC = ROOT / "packages" / "contracts" / "src"
+ROOT_PACKAGE_SOURCES = tuple(
+    ROOT / "packages" / name / "src"
+    for name in ("contracts", "authorization", "identity", "observability", "knowledge", "ingestion", "retrieval", "providers", "locking", "professor")
+)
 
 
 def _env():
     import os
 
     env = os.environ.copy()
-    env["PYTHONPATH"] = os.pathsep.join([
-        str(API_SRC),
-        str(ROOT / "packages" / "contracts" / "src"),
-        str(ROOT / "packages" / "authorization" / "src"),
-        str(ROOT / "packages" / "identity" / "src"),
-        str(ROOT / "packages" / "knowledge" / "src"),
-        str(ROOT / "packages" / "ingestion" / "src"),
-        str(ROOT / "packages" / "retrieval" / "src"),
-        env.get("PYTHONPATH", ""),
-    ])
+    env["PYTHONPATH"] = os.pathsep.join([str(API_SRC), *(str(path) for path in ROOT_PACKAGE_SOURCES), env.get("PYTHONPATH", "")])
     env.setdefault("RAG_SKIP_QDRANT_BOOTSTRAP", "1")
     env.setdefault("SESSION_COOKIE_SECURE", "false")
     return env
@@ -81,7 +76,7 @@ def mode_benchmark() -> int:
     import os
 
     sys.path.insert(0, str(API_SRC))
-    for _pkg in ("contracts", "authorization", "identity", "knowledge", "ingestion", "retrieval"):
+    for _pkg in ("contracts", "authorization", "identity", "observability", "knowledge", "ingestion", "retrieval"):
         sys.path.insert(0, str(ROOT / "packages" / _pkg / "src"))
     import asyncio
 

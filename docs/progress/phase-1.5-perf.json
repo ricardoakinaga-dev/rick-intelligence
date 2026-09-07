@@ -1,0 +1,27 @@
+{
+  "phase": "1.5",
+  "fixture": "demo-corpus-single-document",
+  "samples": 30,
+  "runtime": {
+    "python": "3.12.3",
+    "platform": "Linux-7.0.0-31-generic-x86_64-with-glibc2.39"
+  },
+  "retrieval_ms": {
+    "p50": 0.561,
+    "p95": 0.801
+  },
+  "professor_ms": {
+    "p50": 1.051,
+    "p95": 1.339
+  },
+  "bounds": {
+    "provider_max_attempts": 3,
+    "provider_max_response_bytes": 1000000,
+    "professor_max_evidence_items": 8,
+    "professor_max_evidence_chars": 12000,
+    "professor_max_prompt_chars": 20000,
+    "professor_max_answer_chars": 8000
+  },
+  "fixture_query_sha256": "b614197d056058ebd8496e05c490f71b0778caa8015538aafaa52123de785ca5",
+  "note": "Local hermetic observation only; no live provider, Qdrant, Redis or Locker latency claim."
+}

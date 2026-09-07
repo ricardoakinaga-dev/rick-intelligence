@@ -62,10 +62,10 @@ def _candidates():
     ]
     dense, sparse = [], []
     for rank, (cid, doc, text) in enumerate(texts):
-        dense.append({"chunk_id": cid, "document_id": doc, "workspace_id": "w",
+        dense.append({"chunk_id": cid, "document_id": doc, "tenant_id": "default", "workspace_id": "w",
                       "collection_id": "rag_phase0", "text": text, "score": 0.9 - rank * 0.1})
         if rank % 2 == 0:
-            sparse.append({"chunk_id": cid, "document_id": doc, "workspace_id": "w",
+            sparse.append({"chunk_id": cid, "document_id": doc, "tenant_id": "default", "workspace_id": "w",
                            "collection_id": "rag_phase0", "text": text, "score": 0.6,
                            "sparse_score": 0.6})
     return dense, sparse
@@ -117,13 +117,14 @@ def test_engine_recall_hitrate_mrr_on_fixtures():
     ]
     vectors = embedder.embed([t for _, t in texts])
     chunks = [
-        {"chunk_id": f"c{i}", "document_id": doc, "workspace_id": "w", "collection_id": "rag_phase0",
+        {"chunk_id": f"c{i}", "document_id": doc, "tenant_id": "default", "workspace_id": "w", "collection_id": "rag_phase0",
          "text": text, "vector": vec}
         for i, ((doc, text), vec) in enumerate(zip(texts, vectors))
     ]
     engine = RetrievalEngine(backend=InMemoryBackend(), embed=embedder.embed)
     engine.attach_index(chunks)
-    ctx = {"user_id": "u", "workspace_id": "w", "allowed_collection_ids": ["rag_phase0"], "permissions": []}
+    ctx = {"user_id": "u", "tenant_id": "default", "workspace_id": "w",
+           "allowed_collection_ids": ["rag_phase0"], "permissions": []}
     result = engine.retrieve(query="protocolo de ordenha mastite bovina", context=ctx,
                              options=RetrievalOptions(top_k=4))
     ids = [e["chunk_id"] for e in result.evidence]

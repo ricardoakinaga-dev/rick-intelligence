@@ -1,0 +1,78 @@
+{
+  "record_id": "GATE-SA-SECURITY-TENANT-LOCAL-IMPLEMENTATION-READY-003",
+  "timestamp": "2026-09-06T13:47:10Z",
+  "gate_id": "IMPLEMENTATION_READY",
+  "scope": "Local tenant propagation and audit redaction boundary rework",
+  "scope_ref": "SA-SECURITY-TENANT-LOCAL",
+  "version": 3,
+  "criteria": [
+    {
+      "id": "IR-001",
+      "description": "The fresh independent Hegel review is preserved as a rejection with four Medium findings: unscoped collection listing, unvalidated reindex result scope, post-commit journal hardening exceptions, and failed-source cleanup losing its durable reference",
+      "required": true,
+      "status": "PASS",
+      "evidence_refs": [
+        ".agent/verification.jsonl#VER-SA-SECURITY-TENANT-LOCAL-REVIEW-HEGEL",
+        ".gauntlet-state-of-art/evidence/security-tenant-local-current/critic-hegel-raw.md"
+      ],
+      "confidence": "HIGH",
+      "limitations": "This is a preserved rejection and does not accept the current behavior"
+    },
+    {
+      "id": "IR-002",
+      "description": "The planned correction requires an explicit tenant for collection listing, validates reindex output against the requested tenant/workspace/collection/document, commits journal writes only after pre-commit filesystem hardening, and retains cleanup references until unlink succeeds",
+      "required": true,
+      "status": "PASS",
+      "evidence_refs": [
+        "packages/knowledge/src/rick_knowledge/store.py",
+        "packages/knowledge/src/rick_knowledge/sqlite_store.py",
+        "apps/api/src/services/ingestion_service.py",
+        "apps/api/src/services/job_journal.py"
+      ],
+      "confidence": "HIGH",
+      "limitations": "Implementation remains unaccepted until focused fault-injection, full hermetic regression and a fresh independent review"
+    },
+    {
+      "id": "IR-003",
+      "description": "The bounded implementation has a verifiable path through package/API tests, full Phase 1.6, repository CI, control validation and a fresh I1 review",
+      "required": true,
+      "status": "PASS",
+      "evidence_refs": [
+        "Makefile",
+        ".agent/backlog.json",
+        ".agent/plans/state-of-art-recovery.md"
+      ],
+      "confidence": "HIGH",
+      "limitations": "No external identity, storage, queue, deployment or full-product security acceptance is authorized by this gate"
+    }
+  ],
+  "evidence": [
+    ".agent/verification.jsonl#VER-SA-SECURITY-TENANT-LOCAL-REVIEW-HEGEL",
+    ".gauntlet-state-of-art/evidence/security-tenant-local-current/critic-hegel-raw.md",
+    "packages/knowledge/src/rick_knowledge/store.py",
+    "packages/knowledge/src/rick_knowledge/sqlite_store.py",
+    "apps/api/src/services/ingestion_service.py",
+    "apps/api/src/services/job_journal.py"
+  ],
+  "confidence": "HIGH",
+  "gaps": [],
+  "conditions": [],
+  "authority": {
+    "required": false,
+    "state": "NOT_REQUIRED",
+    "actor": "Codex lead",
+    "scope": "Local tenant propagation and audit redaction boundary rework",
+    "decision": "Authorize reversible local correction, fault-injection verification and independent review only; no external effect or high-risk acceptance",
+    "evidence_ref": ".agent/verification.jsonl#VER-SA-SECURITY-TENANT-LOCAL-REVIEW-HEGEL",
+    "expires_or_revalidates": "Revalidate on tenant, collection, journal, recovery, external storage or full-product scope changes"
+  },
+  "residual_risk": "MEDIUM",
+  "decision": "PASS",
+  "next_action": "Correct the four bounded findings, run the complete local regression matrix and obtain a fresh independent review",
+  "revalidation_triggers": [
+    "Tenant, collection, identity, authorization or public lifecycle contract changes",
+    "Journal schema, recovery source validation or local persistence changes",
+    "External identity/storage/queue, deployment or full-product security scope is introduced"
+  ],
+  "supersedes": "GATE-SA-SECURITY-TENANT-LOCAL-IMPLEMENTATION-READY-002"
+}

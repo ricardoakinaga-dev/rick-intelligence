@@ -21,7 +21,7 @@ from rick_retrieval import (
 
 def _cand(chunk_id, score=0.0, doc="d", ws="w", coll="rag_phase0", text="t"):
     return {"chunk_id": chunk_id, "document_id": doc, "workspace_id": ws,
-            "collection_id": coll, "text": text, "score": score}
+            "tenant_id": "default", "collection_id": coll, "text": text, "score": score}
 
 
 def test_rrf_math_and_constant():
@@ -35,6 +35,27 @@ def test_rrf_math_and_constant():
     assert order[0] == "b"  # present in both lists
     b = next(c for c in fused if c["chunk_id"] == "b")
     assert abs(b["score"] - (1 / 62 + 1 / 61)) < 1e-9
+
+
+def test_rrf_preserves_complete_provenance_across_sources():
+    dense = [_cand("p", 0.9, text="grounded text")]
+    dense[0].update({"source": "source.pdf", "page_start": 2})
+    sparse = [_cand("p", 0.7, text="grounded text")]
+    sparse[0].update({
+        "source": "source.pdf",
+        "title": "Source title",
+        "page_end": 4,
+        "document_filename": "source.pdf",
+        "checksum": "sha256:fixture",
+    })
+
+    fused = rrf_fusion(dense, sparse)[0]
+
+    assert fused["source"] == "source.pdf"
+    assert fused["title"] == "Source title"
+    assert fused["page_start"] == 2 and fused["page_end"] == 4
+    assert fused["document_filename"] == "source.pdf"
+    assert fused["checksum"] == "sha256:fixture"
 
 
 def test_tokenizer_and_sparse_determinism():
@@ -61,13 +82,13 @@ def test_bm25f_rerank_deterministic_and_stable():
 
 def _index():
     return [
-        {"chunk_id": "chunk_d1_0000", "document_id": "d1", "workspace_id": "w",
+        {"chunk_id": "chunk_d1_0000", "document_id": "d1", "tenant_id": "default", "workspace_id": "w",
          "collection_id": "rag_phase0", "text": "Mastite bovina: protocolo de ordenha e higiene.",
          "vector": [1.0, 0.0]},
-        {"chunk_id": "chunk_d2_0000", "document_id": "d2", "workspace_id": "w",
+        {"chunk_id": "chunk_d2_0000", "document_id": "d2", "tenant_id": "default", "workspace_id": "w",
          "collection_id": "secret", "text": "Mastite bovina: protocolo secreto.",
          "vector": [1.0, 0.0]},
-        {"chunk_id": "chunk_d3_0000", "document_id": "d3", "workspace_id": "foreign",
+        {"chunk_id": "chunk_d3_0000", "document_id": "d3", "tenant_id": "default", "workspace_id": "foreign",
          "collection_id": "rag_phase0", "text": "Mastite bovina em outra workspace.",
          "vector": [1.0, 0.0]},
     ]
@@ -76,7 +97,8 @@ def _index():
 def test_workspace_and_collection_acl_enforced():
     engine = RetrievalEngine(backend=InMemoryBackend())
     engine.attach_index(_index())
-    ctx = {"user_id": "vet", "workspace_id": "w", "allowed_collection_ids": ["rag_phase0"], "permissions": []}
+    ctx = {"user_id": "vet", "tenant_id": "default", "workspace_id": "w",
+           "allowed_collection_ids": ["rag_phase0"], "permissions": []}
     result = engine.retrieve(query="protocolo de mastite bovina", context=ctx,
                              options=RetrievalOptions(top_k=5))
     ids = {e["document_id"] for e in result.evidence}
@@ -86,7 +108,8 @@ def test_workspace_and_collection_acl_enforced():
 def test_context_budget_and_evidence_shape():
     engine = RetrievalEngine(backend=InMemoryBackend())
     engine.attach_index(_index())
-    ctx = {"user_id": "u", "workspace_id": "w", "allowed_collection_ids": ["*"], "permissions": []}
+    ctx = {"user_id": "u", "tenant_id": "default", "workspace_id": "w",
+           "allowed_collection_ids": ["*"], "permissions": []}
     result = engine.retrieve(query="mastite", context=ctx,
                              options=RetrievalOptions(top_k=5, max_context_chars=20))
     assert sum(len(e["text"]) for e in result.evidence) <= 60
@@ -104,17 +127,18 @@ def test_disk_fallback_enforces_identical_acl():
     from rick_retrieval import DiskFallbackBackend, RetrievalEngine, RetrievalOptions
 
     chunks = [
-        {"chunk_id": "c1", "document_id": "d1", "workspace_id": "w",
+        {"chunk_id": "c1", "document_id": "d1", "tenant_id": "default", "workspace_id": "w",
          "collection_id": "rag_phase0", "text": "mastite protocolo de ordenha",
          "vector": [1.0, 0.0]},
-        {"chunk_id": "c2", "document_id": "d9", "workspace_id": "w",
+        {"chunk_id": "c2", "document_id": "d9", "tenant_id": "default", "workspace_id": "w",
          "collection_id": "secret", "text": "mastite protocolo secreto restrito",
          "vector": [1.0, 0.0]},
     ]
     engine = RetrievalEngine(backend=InMemoryBackend(), fallback=DiskFallbackBackend(__import__("pathlib").Path("/tmp")))
     engine.attach_index([])  # primary empty -> fallback path over disk-loaded chunks
     engine.attach_index(chunks)
-    ctx = {"user_id": "u", "workspace_id": "w", "allowed_collection_ids": ["rag_phase0"], "permissions": []}
+    ctx = {"user_id": "u", "tenant_id": "default", "workspace_id": "w",
+           "allowed_collection_ids": ["rag_phase0"], "permissions": []}
     result = engine.retrieve(query="mastite protocolo", context=ctx, options=RetrievalOptions(top_k=5))
     assert {e["document_id"] for e in result.evidence} == {"d1"}
 
@@ -125,10 +149,11 @@ def test_provenance_non_leak_on_denial():
     secret_text = "UNIQUE-SECRETPHRASE protocolo confidencial"
     engine = RetrievalEngine(backend=InMemoryBackend())
     engine.attach_index([
-        {"chunk_id": "cs", "document_id": "dsecret", "workspace_id": "w",
+        {"chunk_id": "cs", "document_id": "dsecret", "tenant_id": "default", "workspace_id": "w",
          "collection_id": "secret", "text": secret_text, "vector": [1.0, 0.0]},
     ])
-    ctx = {"user_id": "u", "workspace_id": "w", "allowed_collection_ids": ["rag_phase0"], "permissions": []}
+    ctx = {"user_id": "u", "tenant_id": "default", "workspace_id": "w",
+           "allowed_collection_ids": ["rag_phase0"], "permissions": []}
     result = engine.retrieve(query="UNIQUE-SECRETPHRASE", context=ctx, options=RetrievalOptions(top_k=5))
     assert result.evidence == []
     assert "UNIQUE-SECRETPHRASE" not in str(result.evidence)
