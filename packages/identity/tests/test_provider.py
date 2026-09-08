@@ -39,7 +39,10 @@ def test_login_snapshot_is_authoritative():
     issued = provider.login(email="u1@example.com", password="secret-pw", tenant_id="default", ip=None, user_agent=None)
     snap = provider.validate_session(issued["session_token"])
     assert snap["authenticated"] and snap["authorization_state"] == "AUTHORITATIVE"
-    assert snap["permissions"] == ["chat.query", "collections.read", "history.read", "sources.read"]
+    assert snap["permissions"] == [
+        "cases.feedback", "cases.manage", "cases.read", "chat.query",
+        "collections.read", "history.read", "sources.read",
+    ]
     assert not permission_granted(role=None, permissions=snap["permissions"],
                                   required="documents.read", authoritative=True)
 
@@ -131,7 +134,10 @@ def test_legacy_migration_is_one_time():
     record["authorization_state"] = "LEGACY_UNMIGRATED"
     snap = provider.validate_session(token)
     assert snap["authorization_state"] == "MIGRATED"
-    assert snap["permissions"] == ["chat.query", "collections.read", "history.read", "sources.read"]
+    assert snap["permissions"] == [
+        "cases.feedback", "cases.manage", "cases.read", "chat.query",
+        "collections.read", "history.read", "sources.read",
+    ]
     snap2 = provider.validate_session(token)
     assert snap2["authorization_state"] == "MIGRATED"  # stable, not re-derived widening
 

@@ -49,11 +49,17 @@ no build. Essa configuração não autoriza acesso a um serviço de produção.
 | `/app/documents` | catálogo, filtros, upload, jobs, retry/reindex/delete confirmados pelo servidor; proteção contra resposta de coleção antiga | validação externa da persistência e recuperação |
 | `/app/search` | consulta, coleção, limite inteiro, histórico da URL, trechos e metadados; invalidação de resposta antiga | matriz visual, conteúdo longo e testes independentes |
 | `/app/chat` | pergunta, loading, resposta, citações, incerteza e clipboard | histórico persistido e streaming na interface |
-| `/admin` | guarda de papel, saúde e auditoria independentes; estados anteriores limpos na atualização | operações administrativas adicionais exigem contratos próprios |
+| `/admin` | guarda por permissões efetivas, saúde e auditoria independentes; estados anteriores limpos na atualização | operações administrativas adicionais exigem contratos próprios |
 
 O papel é exibido somente depois de resolvido pelo servidor. O controle de
 permissão do backend é autoritativo; a guarda da UI existe para impedir que
 uma navegação direta produza uma superfície enganosa.
+
+Revisão REC de 08/09/2026: [matriz de personas](rec-personas.md). A shell usa
+`session.permissions`; campo vazio/ausente não recupera acesso pelo papel.
+Catálogo somente leitura não mostra mutações; saúde/auditoria só são solicitadas
+quando cada permissão existe. Novas evidências ficam em `artifacts/rec-m0-v4/`,
+sem reutilizar as aprovações históricas abaixo como aprovação deste código.
 
 ## Sistema visual e acessibilidade
 

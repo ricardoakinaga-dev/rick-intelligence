@@ -1,0 +1,55 @@
+# Disposable dependency laboratory only; not a production composition root.
+# Invoke via integration_lab.py, which fixes project/file and disables ambient .env.
+services:
+  postgres:
+    image: postgres:16.4-alpine
+    environment:
+      POSTGRES_DB: rick_integration
+      POSTGRES_USER: rick_integration
+      POSTGRES_PASSWORD: ${REC_POSTGRES_PASSWORD:?inject local disposable password}
+    ports: ["127.0.0.1:15432:5432"]
+    volumes: [postgres-data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rick_integration -d rick_integration"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [integration]
+
+  object-store:
+    image: minio/minio:RELEASE.2025-02-28T09-55-16Z
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${REC_S3_ACCESS_KEY:?inject local disposable access ID}
+      MINIO_ROOT_PASSWORD: ${REC_S3_SECRET_KEY:?inject local disposable secret}
+    ports: ["127.0.0.1:19000:9000", "127.0.0.1:19001:9001"]
+    volumes: [objects-data:/data]
+    networks: [integration]
+
+  qdrant:
+    image: qdrant/qdrant:v1.12.5
+    environment:
+      QDRANT__SERVICE__API_KEY: ${REC_QDRANT_API_KEY:?inject local disposable key}
+    ports: ["127.0.0.1:16333:6333"]
+    volumes: [vectors-data:/qdrant/storage]
+    networks: [integration]
+
+  identity:
+    image: quay.io/keycloak/keycloak:26.7.3
+    command: ["start-dev"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: local-operator
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${REC_OIDC_ADMIN_PASSWORD:?inject local disposable password}
+    ports: ["127.0.0.1:18080:8080"]
+    volumes: [identity-data:/opt/keycloak/data]
+    networks: [integration]
+
+volumes:
+  postgres-data: {}
+  objects-data: {}
+  vectors-data: {}
+  identity-data: {}
+
+networks:
+  integration:
+    internal: true

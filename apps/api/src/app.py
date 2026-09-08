@@ -135,6 +135,7 @@ def _default_owned_resources(providers: Providers) -> tuple[object, ...]:
         providers.vector_store,
         providers.knowledge,
         providers.chat_history,
+        providers.case_store,
         providers.provider,
         providers.lease,
     )
@@ -351,6 +352,8 @@ def create_app(settings: ApiSettings | None = None, providers: Providers | None 
         ]
         if settings.chat_backend_mode == "professor" or not settings.use_legacy_adapters:
             required.extend(("provider", "lease"))
+        if settings.clinical_cases_feature_enabled:
+            required.append("case_store")
         missing = [name for name in required if getattr(providers, name, None) is None]
         if missing:
             raise RuntimeError(
@@ -360,7 +363,8 @@ def create_app(settings: ApiSettings | None = None, providers: Providers | None 
 
     if providers is None:
         from services.audit import InMemoryAuditSink
-        from services.chat_history import InMemoryChatHistoryStore
+        from services.case_store import InMemoryClinicalCaseStore, SQLiteClinicalCaseStore
+        from services.chat_history import InMemoryChatHistoryStore, SQLiteChatHistoryStore
         from services.chat_service import StubChatBackend
         from services.identity_service import InMemoryIdentityProvider
         from services.knowledge_service import seed_demo_corpus, seed_demo_points
@@ -398,7 +402,18 @@ def create_app(settings: ApiSettings | None = None, providers: Providers | None 
             knowledge, retrieval = None, None
             vectors, embeddings = None, None
         audit_sink = InMemoryAuditSink()
-        chat_history = InMemoryChatHistoryStore()
+        chat_history = (
+            SQLiteChatHistoryStore(settings.chat_history_sqlite_path)
+            if settings.chat_history_sqlite_path
+            else InMemoryChatHistoryStore()
+        )
+        case_store = None
+        if settings.clinical_cases_feature_enabled:
+            case_store = (
+                SQLiteClinicalCaseStore(settings.clinical_case_sqlite_path)
+                if settings.clinical_case_sqlite_path
+                else InMemoryClinicalCaseStore()
+            )
         job_journal = None
         ingestion_staging_path = settings.ingestion_staging_path or None
         if settings.ingestion_journal_path:
@@ -428,7 +443,7 @@ def create_app(settings: ApiSettings | None = None, providers: Providers | None 
         professor = None
         ingestion = None
         worker = None
-        selected_mode = "legacy" if settings.use_legacy_adapters else settings.chat_backend_mode
+        selected_mode = settings.selected_chat_backend
         if selected_mode == "professor":
             if retrieval is None:
                 raise RuntimeError("Professor backend requires root retrieval dependencies")
@@ -437,7 +452,7 @@ def create_app(settings: ApiSettings | None = None, providers: Providers | None 
             from services.professor_backend import ProfessorChatBackend
 
             local_provider = settings.environment in {"test", "dev", "local"}
-            provider_kind = settings.provider_kind or ("deterministic" if local_provider else "openai")
+            provider_kind = settings.selected_provider_kind
             provider_config = ProviderConfig(
                 base_url=settings.provider_base_url,
                 api_key=settings.external_chat_api_key or None,
@@ -485,6 +500,7 @@ def create_app(settings: ApiSettings | None = None, providers: Providers | None 
         providers = Providers(
             settings=settings, identity=identity, chat_backend=backend,
             health_checks=_default_health_checks(settings), audit_sink=audit_sink, chat_history=chat_history,
+            case_store=case_store,
             knowledge=knowledge, vector_store=vectors, retrieval=retrieval, provider=provider, lease=lease, professor=professor,
             ingestion=ingestion, worker=worker, job_journal=job_journal,
         )
@@ -513,6 +529,22 @@ def create_app(settings: ApiSettings | None = None, providers: Providers | None 
     app.router.route_class = ClosingStreamingRoute
     app.state.providers = providers
     app.state.settings = settings
+    # A composition fact, not a health claim. Injected implementations cannot
+    # be inferred from configured names, class reprs or secret-bearing URLs.
+    app.state.runtime_diagnostics = {
+        "composition": "factory" if factory_owns_resources else "injected",
+        "environment": settings.environment,
+        "configured_chat_backend": settings.selected_chat_backend,
+        "active_chat_backend": settings.selected_chat_backend if factory_owns_resources else "externally_managed",
+        "active_chat_provider": (
+            settings.selected_provider_kind if factory_owns_resources and settings.selected_chat_backend == "professor"
+            else "not_used" if factory_owns_resources else "externally_managed"
+        ),
+        "embedding": ("deterministic_local" if embeddings is not None else "not_configured") if factory_owns_resources else "externally_managed",
+        "active_chat_model": settings.provider_chat_model if factory_owns_resources and settings.selected_chat_backend == "professor" else None,
+        "provider_credentials_configured": bool(settings.external_chat_api_key.strip()),
+        "production_verified": False,
+    }
     app.state.telemetry = telemetry
     app.state.owned_ingestion = providers.ingestion if factory_owns_resources else None
     app.state.owned_resources = list(_default_owned_resources(providers)) if factory_owns_resources else []
@@ -533,7 +565,7 @@ def create_app(settings: ApiSettings | None = None, providers: Providers | None 
         allow_credentials=settings.cors_allow_credentials,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=[
-            "Authorization", "Content-Type", "X-Request-ID", "X-Correlation-ID", "X-API-Key",
+            "Authorization", "Content-Type", "X-Request-ID", "X-Correlation-ID", "X-API-Key", "Idempotency-Key",
             settings.csrf_header_name,
         ],
     )

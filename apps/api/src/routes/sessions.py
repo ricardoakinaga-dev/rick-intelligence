@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from core.security import resolve_session_cookie
 from dependencies.identity import get_current_session, require_authenticated
 from dependencies.services import get_providers
+from services.audit import emit_required
 
 router = APIRouter(tags=["Auth"])
 _PUBLIC_SESSION_FIELDS = ("session_id", "user_id", "created_at", "revoked")
@@ -67,11 +68,9 @@ def revoke_sessions(payload: RevokeRequest, request: Request, session=Depends(re
         actor=session, target_token=payload.session_token or current,
         target_session_id=payload.session_id, target_user_id=payload.user_id, revoke_all=payload.revoke_all,
     )
-    try:
-        if providers.audit_sink is not None:
-            providers.audit_sink.emit({"action": "auth.session_revoked", "actor_user_id": session.user_id,  # type: ignore[union-attr]
-                                       "request_id": getattr(request.state, "request_id", None),
-                                       "tenant_id": session.tenant_id})
-    except Exception:
-        pass
+    emit_required(providers.audit_sink, {
+        "action": "auth.session_revoked", "actor_user_id": session.user_id,
+        "request_id": getattr(request.state, "request_id", None),
+        "tenant_id": session.tenant_id, "workspace_id": session.workspace_id,
+    })
     return {"revoked": revoked}

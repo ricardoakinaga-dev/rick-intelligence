@@ -48,7 +48,7 @@ MAX_POINT_SNAPSHOT = 100_000
 
 _WORKSPACE_ID = re.compile(r"^[^\x00/\\]{1,128}$")
 _JOB_STATES = frozenset(
-    {"queued", "validating", "parsing", "chunking", "embedding", "indexing", "verifying", "published", "failed", "cancelled"}
+    {"queued", "processing", "validating", "parsing", "chunking", "embedding", "indexing", "verifying", "published", "failed", "cancelled"}
 )
 _TERMINAL_STATES = frozenset({"published", "failed", "cancelled"})
 _RECOVERABLE_STATES = _JOB_STATES - _TERMINAL_STATES
@@ -243,6 +243,15 @@ class IngestionApplicationService:
     after the application state lock is released, so the root retrieval
     facade can rebuild its in-memory view without blocking lifecycle callers.
     """
+
+    # Explicitly limited to the hermetic process-local adapter. Durable
+    # integrations must implement the scoped list_jobs signature themselves;
+    # the admin route refuses an unscoped fallback for those providers.
+    allow_unscoped_legacy_listing = True
+    runtime_metadata = {
+        "execution": "process-local",
+        "durability": "process-local",
+    }
 
     def __init__(
         self,
@@ -2648,6 +2657,41 @@ class IngestionApplicationService:
     def _executor_threads_alive(self) -> bool:
         return any(thread.is_alive() for thread in getattr(self._executor, "_threads", ()))
 
+    def _request_pending_shutdown_cancellation(
+        self,
+        *,
+        deadline: float | None,
+        nonblocking: bool,
+    ) -> bool:
+        """Signal work that the bounded reconciler could not enumerate.
+
+        ``ThreadPoolExecutor.shutdown(cancel_futures=True)`` can cancel a
+        future without entering the application callback that owns its
+        staging path, job row, and pending counter. When the lifecycle
+        deadline expires before our reconciler visits every future, leave the
+        futures runnable and make their cooperative entry path perform the
+        normal terminal cleanup instead.
+        """
+        if nonblocking:
+            acquired = self._lock.acquire(blocking=False)
+        elif deadline is None:
+            acquired = self._lock.acquire()
+        else:
+            acquired = self._lock.acquire(timeout=max(0.0, deadline - time.monotonic()))
+        if not acquired:
+            return False
+        try:
+            for job_id in tuple(self._scheduled_futures):
+                cancel_event = self._cancel_events.get(job_id)
+                if cancel_event is not None:
+                    cancel_event.set()
+                start_gate = self._start_gates.get(job_id)
+                if start_gate is not None:
+                    start_gate.set()
+        finally:
+            self._lock.release()
+        return True
+
     def _deliver_shutdown_events(
         self,
         events: list[dict[str, object]],
@@ -2798,13 +2842,21 @@ class IngestionApplicationService:
             deadline=cleanup_events_deadline,
             nonblocking=not wait,
         )
+        if not cleanup_complete:
+            # Do not let the executor cancel futures behind the application's
+            # bookkeeping boundary. Their cooperative callback must run so it
+            # can release private staging references and pending counters.
+            self._request_pending_shutdown_cancellation(
+                deadline=deadline,
+                nonblocking=not wait,
+            )
         self._deliver_shutdown_events(cancelled_events, deadline=deadline)
         with self._admission_condition:
             reentrant_operation = self._active_operation_threads.get(get_ident(), 0) > 0
             reentrant_event_callback = self._event_callback_threads.get(get_ident(), 0) > 0
         with self._shutdown_lock:
             if not wait:
-                self._executor.shutdown(wait=False, cancel_futures=True)
+                self._executor.shutdown(wait=False, cancel_futures=cleanup_complete)
                 with self._admission_condition:
                     no_admitted_work = self._active_operations == 0 and self._event_callbacks == 0
                 return cleanup_complete and not self._executor_threads_alive() and no_admitted_work
@@ -2813,20 +2865,20 @@ class IngestionApplicationService:
                 # admitted operation. It must release queued gates without
                 # waiting for the operation that is currently on this stack;
                 # the owning caller can retry after it returns.
-                self._executor.shutdown(wait=False, cancel_futures=True)
+                self._executor.shutdown(wait=False, cancel_futures=cleanup_complete)
                 return False
             if reentrant_event_callback:
                 # A bounded sink callback may synchronously call shutdown from
                 # its own delivery thread. Waiting for the caller that is
                 # waiting for this callback would deadlock; leave cleanup
                 # retryable and let the outer caller finish the callback.
-                self._executor.shutdown(wait=False, cancel_futures=True)
+                self._executor.shutdown(wait=False, cancel_futures=cleanup_complete)
                 return False
             if current_thread() in getattr(self._executor, "_threads", ()):
                 # A worker cannot join itself. Returning a visible incomplete
                 # result is safer than deadlocking or closing its stores.
                 return False
-            self._executor.shutdown(wait=False, cancel_futures=True)
+            self._executor.shutdown(wait=False, cancel_futures=cleanup_complete)
             if not cleanup_complete:
                 return False
             if not self._wait_for_active_operations(deadline):

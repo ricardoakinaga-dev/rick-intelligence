@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import os
+import inspect
 from itertools import islice
 from collections.abc import Mapping
 
@@ -25,12 +26,25 @@ from rick_contracts.rag import EvidenceDto, RetrievalResultDto
 MAX_REHYDRATED_POINTS = 100_000
 
 
-def _bounded_points(reader) -> list[dict]:
+def _bounded_points(
+    reader,
+    *,
+    tenant_id: str,
+    workspace_id: str,
+    allowed_collection_ids: list[str],
+) -> list[dict]:
     try:
-        points = reader(limit=MAX_REHYDRATED_POINTS)
+        points = reader(
+            limit=MAX_REHYDRATED_POINTS,
+            tenant_id=tenant_id,
+            workspace_id=workspace_id,
+            allowed_collection_ids=allowed_collection_ids,
+        )
     except TypeError:
-        # Compatibility seam for older injected adapters.
-        points = reader()
+        # A vector reader without the scope contract cannot be used for
+        # restart rehydration. Fetching a global point snapshot here would
+        # widen the tenant boundary before the retrieval engine filters it.
+        raise ValueError("vector reader does not accept authorization scope") from None
     snapshot = list(islice(points, MAX_REHYDRATED_POINTS + 1))
     if len(snapshot) > MAX_REHYDRATED_POINTS:
         raise ValueError("complete point snapshot exceeds read limit")
@@ -48,24 +62,44 @@ def _document_value(document: object, name: str, default: object = None) -> obje
 
 
 class RetrievalApplicationService:
-    def __init__(self, *, knowledge, vectors=None, embeddings=None) -> None:
+    def __init__(self, *, knowledge, vectors=None, embeddings=None, backend=None, fallback=None) -> None:
         self.knowledge = knowledge
         self.vectors = vectors
         self.embeddings = embeddings or DeterministicHashEmbedding()
-        self.engine = RetrievalEngine(backend=InMemoryBackend(), reranker=BM25FReranker(),
-                                      embed=self.embeddings.embed)
+        self.engine = RetrievalEngine(
+            backend=backend or InMemoryBackend(),
+            fallback=fallback,
+            reranker=BM25FReranker(),
+            embed=self.embeddings.embed,
+        )
         self._indexed = False
         self._points_attached = False
         self._points: list[dict] = []
         self._provenance: dict[str, dict] = {}
 
-    def _ensure_index(self) -> None:
+    def _ensure_index(self, context: Mapping[str, object]) -> None:
         if self._indexed:
             return
         if not self._points_attached and self.vectors is not None:
             all_points = getattr(self.vectors, "all_points", None)
             if callable(all_points):
-                self._points = _bounded_points(all_points)
+                tenant_id = context.get("tenant_id")
+                workspace_id = context.get("workspace_id")
+                allowed = context.get("allowed_collection_ids") or []
+                if not (
+                    isinstance(tenant_id, str)
+                    and tenant_id
+                    and isinstance(workspace_id, str)
+                    and workspace_id
+                    and isinstance(allowed, list)
+                ):
+                    raise ValueError("retrieval scope is incomplete")
+                self._points = _bounded_points(
+                    all_points,
+                    tenant_id=tenant_id,
+                    workspace_id=workspace_id,
+                    allowed_collection_ids=allowed,
+                )
         chunks = []
         for point in self._points:
             payload = point.get("payload") if isinstance(point, dict) else None
@@ -87,7 +121,23 @@ class RetrievalApplicationService:
             # make processing/failed/deleted metadata searchable on refresh.
             if self.knowledge is not None:
                 getter = getattr(self.knowledge, "get_document", None)
-                document = getter(document_id) if callable(getter) else None
+                document = None
+                if callable(getter):
+                    try:
+                        parameters = inspect.signature(getter).parameters.values()
+                    except (TypeError, ValueError):
+                        parameters = ()
+                    names = {parameter.name for parameter in parameters}
+                    scoped = {"tenant_id", "workspace_id"}.issubset(names) or any(
+                        parameter.kind is inspect.Parameter.VAR_KEYWORD
+                        for parameter in parameters
+                    )
+                    if scoped:
+                        document = getter(
+                            document_id,
+                            tenant_id=tenant_id,
+                            workspace_id=workspace_id,
+                        )
                 if document is None or _document_value(document, "status") != "published":
                     continue
                 if (
@@ -118,7 +168,7 @@ class RetrievalApplicationService:
         self._indexed = False
 
     def retrieve(self, *, query: str, context: dict, top_k: int = 3) -> RetrievalResultDto:
-        self._ensure_index()
+        self._ensure_index(context)
         result = self.engine.retrieve(query=query, context=context,
                                       options=RetrievalOptions(top_k=top_k, rerank=True))
         evidence = []

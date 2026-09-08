@@ -15,7 +15,7 @@ for _package in ("contracts", "professor"):
         sys.path.insert(0, _source)
 
 from rick_contracts.professor import ProfessorRequest
-from rick_contracts.providers import ChatCompletionResult
+from rick_contracts.providers import ChatCompletionChunk, ChatCompletionResult
 from rick_contracts.security import RetrievalContext
 from rick_professor import ProfessorLimits, ProfessorOrchestrator
 
@@ -309,3 +309,58 @@ async def test_high_level_lease_handle_is_released() -> None:
 
     assert response.evidence_status == "NO_EVIDENCE"
     assert lease.released is lease.handle
+
+
+@pytest.mark.asyncio
+async def test_stream_lease_loss_cancels_slow_provider_and_emits_safe_terminal_result() -> None:
+    retrieval = RetrievalDouble([_evidence()])
+    started = asyncio.Event()
+    cancelled = asyncio.Event()
+
+    class SlowStreamingProvider(ProviderDouble):
+        async def stream(self, *, messages, conversation_id: str):
+            started.set()
+            try:
+                await asyncio.Future()
+            except asyncio.CancelledError:
+                cancelled.set()
+                raise
+            yield ChatCompletionChunk(
+                model="deterministic", delta="late", finish_reason="stop", correlation_id="corr-stream"
+            )
+
+    class LeaseDouble:
+        def __init__(self) -> None:
+            self.renewals = 0
+            self.releases = 0
+
+        async def acquire(self, *, key: str, owner: str, ttl_ms: int) -> dict:
+            return {"acquired": True}
+
+        async def renew(self, *, key: str, owner: str, ttl_ms: int) -> dict:
+            self.renewals += 1
+            return {"renewed": False}
+
+        async def release(self, *, key: str, owner: str) -> dict:
+            self.releases += 1
+            return {"released": True}
+
+    lease = LeaseDouble()
+    orchestrator = ProfessorOrchestrator(
+        retrieval=retrieval,
+        chat_provider=SlowStreamingProvider(),
+        lease_manager=lease,
+        limits=ProfessorLimits(lease_ttl_ms=30),
+    )
+
+    async def consume():
+        return [event async for event in orchestrator.stream(_request())]
+
+    events = await asyncio.wait_for(consume(), timeout=1)
+
+    assert started.is_set()
+    assert cancelled.is_set()
+    assert lease.renewals >= 1
+    assert lease.releases == 1
+    assert events[-1]["kind"] == "final"
+    assert events[-1]["response"].metadata["failure_stage"] == "lease_lost"

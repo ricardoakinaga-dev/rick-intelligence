@@ -2,15 +2,16 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import re
 import uuid
-from collections.abc import Mapping, Sequence
+from collections.abc import AsyncIterator, Mapping, Sequence
 
 from pydantic import ValidationError
 
-from rick_contracts.providers import ChatCompletionResult, EmbeddingResult
+from rick_contracts.providers import ChatCompletionChunk, ChatCompletionResult, EmbeddingResult
 
 from rick_providers.client import (
     CorrelationIdFactory,
@@ -187,6 +188,36 @@ class DeterministicProvider:
             )
         except ValidationError:
             raise provider_error("malformed_response", operation, correlation, 1) from None
+
+    def chat_completion_stream(
+        self,
+        model_or_messages: str | Sequence[MessageInput] | None = None,
+        messages: Sequence[MessageInput] | None = None,
+        temperature: int | float | None = 0.2,
+        response_format: Mapping[str, object] | None = None,
+        *,
+        model: str | None = None,
+        correlation_id: str | None = None,
+    ) -> AsyncIterator[ChatCompletionChunk]:
+        async def stream() -> AsyncIterator[ChatCompletionChunk]:
+            result = await self.chat_completion(
+                model_or_messages, messages, temperature, response_format,
+                model=model, correlation_id=correlation_id,
+            )
+            # This is a deterministic test transport. It still emits through
+            # the same async delta contract as the network provider, allowing
+            # cancellation and ordering tests without a paid API call.
+            for index in range(0, len(result.content), 48):
+                await asyncio.sleep(0)
+                yield ChatCompletionChunk(
+                    model=result.model, delta=result.content[index:index + 48],
+                    correlation_id=result.correlation_id,
+                )
+            yield ChatCompletionChunk(
+                model=result.model, delta="", finish_reason=result.finish_reason,
+                correlation_id=result.correlation_id, usage=result.usage,
+            )
+        return stream()
 
     async def embeddings(
         self,

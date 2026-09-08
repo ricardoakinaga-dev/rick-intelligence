@@ -14,13 +14,14 @@ import json
 import math
 import re
 import uuid
-from collections.abc import Awaitable, Callable, Mapping, Sequence
+from collections.abc import AsyncIterator, Awaitable, Callable, Mapping, Sequence
 from typing import Any
 
 import httpx
 from pydantic import ValidationError
 
 from rick_contracts.providers import (
+    ChatCompletionChunk,
     ChatCompletionResult,
     EmbeddingResult,
     ProviderMessage,
@@ -288,6 +289,135 @@ class OpenAICompatibleClient:
         """Short alias used by provider consumers."""
 
         return await self.get_embedding(text, model=model, correlation_id=correlation_id)
+
+    def chat_completion_stream(
+        self,
+        model_or_messages: str | Sequence[MessageInput] | None = None,
+        messages: Sequence[MessageInput] | None = None,
+        temperature: int | float | None = 0.2,
+        response_format: Mapping[str, object] | None = None,
+        *,
+        model: str | None = None,
+        correlation_id: str | None = None,
+    ) -> AsyncIterator[ChatCompletionChunk]:
+        """Return an iterator over provider SSE deltas.
+
+        The HTTP response remains open only while the caller consumes the
+        iterator. Cancellation closes it through ``httpx``'s async context
+        manager. Retries are allowed before the first delta; after output has
+        escaped, the stream fails closed instead of duplicating a prefix.
+        """
+        return self._chat_completion_stream(
+            model_or_messages, messages, temperature, response_format,
+            model=model, correlation_id=correlation_id,
+        )
+
+    async def _chat_completion_stream(
+        self,
+        model_or_messages: str | Sequence[MessageInput] | None,
+        messages: Sequence[MessageInput] | None,
+        temperature: int | float | None,
+        response_format: Mapping[str, object] | None,
+        *,
+        model: str | None,
+        correlation_id: str | None,
+    ) -> AsyncIterator[ChatCompletionChunk]:
+        operation: ProviderOperation = "chat_completion"
+        correlation = self._prepare_operation(operation, correlation_id)
+        if model is not None:
+            if model_or_messages is not None:
+                if messages is None and not isinstance(model_or_messages, str):
+                    messages = model_or_messages
+                else:
+                    raise provider_error("invalid_model", operation, correlation, 0)
+            selected_model: object = model
+        elif messages is None and model_or_messages is not None and not isinstance(model_or_messages, str):
+            messages = model_or_messages
+            selected_model = None
+        else:
+            selected_model = model_or_messages
+        normalized_model = _validate_model(
+            self.config.chat_model if selected_model is None else selected_model,
+            operation, correlation,
+        )
+        serialized_messages = _serialize_messages(messages, operation, correlation)
+        normalized_temperature = _validate_temperature(temperature, operation, correlation)
+        normalized_format = _serialize_response_format(response_format, operation, correlation)
+        payload: dict[str, object] = {
+            "model": normalized_model, "messages": serialized_messages,
+            "temperature": normalized_temperature, "response_format": normalized_format,
+            "stream": True,
+        }
+
+        for attempt in range(1, self.config.max_attempts + 1):
+            emitted = False
+            try:
+                url = f"{self.config.base_url.rstrip('/')}/chat/completions"
+                headers = {
+                    "Accept": "text/event-stream",
+                    "Content-Type": "application/json",
+                    "Cache-Control": "no-cache",
+                    "X-Correlation-ID": correlation,
+                }
+                if self.config.api_key:
+                    headers["Authorization"] = f"Bearer {self.config.api_key}"
+                async with self._ensure_client().stream(
+                    "POST", url, headers=headers, json=payload,
+                ) as response:
+                    status = response.status_code
+                    if not 200 <= status <= 299:
+                        raw = await _read_bounded_response(response)
+                        raise _classify_http_status(status, raw or b"", operation, correlation, attempt)
+                    total_bytes = 0
+                    saw_done = False
+                    async for line in response.aiter_lines():
+                        total_bytes += len(line.encode("utf-8", errors="replace")) + 1
+                        if total_bytes > MAX_RESPONSE_BYTES:
+                            raise provider_error("malformed_response", operation, correlation, attempt)
+                        if not line or line.startswith(":"):
+                            continue
+                        if not line.startswith("data:"):
+                            continue
+                        data = line[5:].strip()
+                        if data == "[DONE]":
+                            saw_done = True
+                            break
+                        try:
+                            decoded = json.loads(data, parse_constant=_reject_json_constant)
+                        except (TypeError, ValueError, RecursionError):
+                            raise provider_error("invalid_json", operation, correlation, attempt) from None
+                        chunk = _extract_chat_chunk(decoded, normalized_model, correlation, attempt)
+                        if chunk is None:
+                            continue
+                        if chunk.delta:
+                            emitted = True
+                        yield chunk
+                    if not saw_done:
+                        raise provider_error("malformed_response", operation, correlation, attempt)
+                    return
+            except asyncio.CancelledError:
+                raise
+            except ProviderError as exc:
+                safe_error = ProviderError(
+                    exc.code, operation, correlation, attempt, exc.retryable, exc.status,
+                )
+            except httpx.InvalidURL:
+                safe_error = provider_error("invalid_configuration", operation, correlation, attempt)
+            except Exception as exc:
+                safe_error = _classify_transport_error(exc, operation, correlation, attempt)
+            if emitted or not safe_error.retryable or attempt >= self.config.max_attempts:
+                raise safe_error from None
+            delay = min(self.config.max_backoff_delay, self.config.retry_base_delay * (2 ** (attempt - 1)))
+            try:
+                result = self._sleep(delay)
+                if inspect.isawaitable(result):
+                    await result
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                raise provider_error("internal_error", operation, correlation, attempt) from None
+
+        raise provider_error("internal_error", operation, correlation, self.config.max_attempts)
 
     async def embedding(
         self,
@@ -612,6 +742,51 @@ def _extract_chat_result(
             finish_reason=finish_reason,
             correlation_id=correlation_id,
             usage=usage,
+        )
+    except ValidationError:
+        raise provider_error("malformed_response", operation, correlation_id, attempt) from None
+
+
+def _extract_chat_chunk(
+    body: object,
+    expected_model: str,
+    correlation_id: str,
+    attempt: int,
+) -> ChatCompletionChunk | None:
+    """Validate one OpenAI-compatible SSE payload without retaining raw data."""
+    operation: ProviderOperation = "chat_completion"
+    if not isinstance(body, Mapping):
+        raise provider_error("malformed_response", operation, correlation_id, attempt)
+    model = body.get("model", expected_model)
+    if not isinstance(model, str) or model.strip() != expected_model or _CORRELATION_CONTROL.search(model):
+        raise provider_error("invalid_model", operation, correlation_id, attempt)
+    choices = body.get("choices")
+    if not isinstance(choices, list):
+        raise provider_error("malformed_response", operation, correlation_id, attempt)
+    if not choices:
+        # Some providers send a usage-only event before [DONE]. It is safe to
+        # ignore it because usage is not required to validate the answer.
+        return None
+    choice = choices[0]
+    if not isinstance(choice, Mapping):
+        raise provider_error("malformed_response", operation, correlation_id, attempt)
+    delta = choice.get("delta", {})
+    if not isinstance(delta, Mapping):
+        raise provider_error("malformed_response", operation, correlation_id, attempt)
+    content = delta.get("content", "")
+    if content is None:
+        content = ""
+    if not isinstance(content, str):
+        raise provider_error("malformed_response", operation, correlation_id, attempt)
+    finish_reason = choice.get("finish_reason")
+    if finish_reason is not None and finish_reason not in _ALLOWED_FINISH_REASONS:
+        raise provider_error("malformed_response", operation, correlation_id, attempt)
+    try:
+        return ChatCompletionChunk(
+            model=expected_model,
+            delta=content,
+            finish_reason=finish_reason,
+            correlation_id=correlation_id,
         )
     except ValidationError:
         raise provider_error("malformed_response", operation, correlation_id, attempt) from None

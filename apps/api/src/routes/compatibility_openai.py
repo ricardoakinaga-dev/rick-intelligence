@@ -21,7 +21,7 @@ from dependencies.services import get_providers
 from models import SessionSnapshot
 from services.authorization_service import build_retrieval_context
 from services.chat_service import ChatApplicationService
-from routes.chat import _compat_rate_allowed
+from routes.chat import _compat_rate_allowed, _validated_stream_event
 
 router = APIRouter(tags=["Compatibility"], route_class=ClosingStreamingRoute)
 
@@ -105,7 +105,10 @@ async def chat_completions(payload: CompatRequest, request: Request):
         raise ApiError("validation_error", "Message is too long.")
     session = _compat_session(request)
     conversation_id = payload.conversation_id or payload.user or f"openwebui-{uuid.uuid4().hex[:8]}"
-    service = ChatApplicationService(providers.chat_backend, providers.chat_history)  # type: ignore[arg-type]
+    service = ChatApplicationService(
+        providers.chat_backend, providers.chat_history,
+        telemetry=getattr(request.app.state, "telemetry", None),
+    )  # type: ignore[arg-type]
     created = int(time.time())
     completion_id = f"chatcmpl-{created}-{uuid.uuid4().hex[:6]}"
     model = payload.model or "rick-professor"
@@ -120,6 +123,7 @@ async def chat_completions(payload: CompatRequest, request: Request):
                 async for event in events:
                     if await request.is_disconnected():
                         break
+                    event = _validated_stream_event(event)
                     if event["type"] == "delta":
                         yield f"data: {json.dumps({'id': completion_id, 'object': 'chat.completion.chunk', 'created': created, 'model': model, 'choices': [{'index': 0, 'delta': {'content': event.get('delta', '')}, 'finish_reason': None}]})}\n\n"
                     elif event["type"] == "error":

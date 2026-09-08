@@ -1,0 +1,88 @@
+{
+  "schema_version": "retrieval-evaluation.v1",
+  "provider": "synthetic-offline-pack",
+  "description": "Local retrieval contract pack with positive and negative structural cases.",
+  "cases": [
+    {
+      "case_id": "alpha-positive",
+      "pack": {
+        "role": "positive",
+        "model_id": "offline-ranker-a",
+        "corpus_id": "synthetic-corpus-a"
+      },
+      "query": "alpha document retrieval",
+      "context": {
+        "tenant_id": "tenant-a",
+        "workspace_id": "workspace-a",
+        "allowed_collection_ids": ["reference"]
+      },
+      "relevant_ids": ["alpha-1", "alpha-2"],
+      "denied_ids": ["beta-secret"],
+      "corpus": [
+        {"chunk_id": "alpha-1", "tenant_id": "tenant-a", "workspace_id": "workspace-a", "collection_id": "reference"},
+        {"chunk_id": "alpha-2", "tenant_id": "tenant-a", "workspace_id": "workspace-a", "collection_id": "reference"},
+        {"chunk_id": "beta-secret", "tenant_id": "tenant-b", "workspace_id": "workspace-b", "collection_id": "reference"}
+      ],
+      "results": [
+        {"chunk_id": "alpha-1", "tenant_id": "tenant-a", "workspace_id": "workspace-a", "collection_id": "reference", "rank": 0, "source": "alpha.txt", "checksum": "sha256:alpha-1"},
+        {"chunk_id": "alpha-2", "tenant_id": "tenant-a", "workspace_id": "workspace-a", "collection_id": "reference", "rank": 1, "source": "alpha.txt", "checksum": "sha256:alpha-2"}
+      ],
+      "citations": [
+        {"chunk_id": "alpha-1", "source": "alpha.txt"},
+        {"chunk_id": "alpha-2", "source": "alpha.txt"}
+      ],
+      "latency_samples_ms": [8, 9, 11]
+    },
+    {
+      "case_id": "beta-positive",
+      "pack": {
+        "role": "positive",
+        "model_id": "offline-ranker-b",
+        "corpus_id": "synthetic-corpus-b"
+      },
+      "query": "beta document retrieval",
+      "context": {
+        "tenant_id": "tenant-b",
+        "workspace_id": "workspace-b",
+        "allowed_collection_ids": ["reference"]
+      },
+      "relevant_ids": ["beta-1"],
+      "denied_ids": ["alpha-secret"],
+      "corpus": [
+        {"chunk_id": "beta-1", "tenant_id": "tenant-b", "workspace_id": "workspace-b", "collection_id": "reference"},
+        {"chunk_id": "alpha-secret", "tenant_id": "tenant-a", "workspace_id": "workspace-a", "collection_id": "reference"}
+      ],
+      "results": [
+        {"chunk_id": "beta-1", "tenant_id": "tenant-b", "workspace_id": "workspace-b", "collection_id": "reference", "rank": 0, "source": "beta.txt", "checksum": "sha256:beta-1"}
+      ],
+      "citations": [
+        {"chunk_id": "beta-1", "source": "beta.txt"}
+      ],
+      "latency_samples_ms": [7, 10, 15]
+    },
+    {
+      "case_id": "negative-no-evidence",
+      "pack": {"role": "negative", "expectation": "no_evidence"},
+      "query": "query with no matching evidence",
+      "results": [],
+      "citations": []
+    },
+    {
+      "case_id": "negative-weak-evidence",
+      "pack": {"role": "negative", "expectation": "weak_evidence"},
+      "query": "query with weak evidence",
+      "results": [
+        {"chunk_id": "weak-1", "evidence_strength": "weak", "source": "weak.txt"}
+      ],
+      "citations": []
+    },
+    {
+      "case_id": "negative-unsupported-assertion",
+      "pack": {"role": "negative", "expectation": "unsupported_assertion"},
+      "query": "unsupported statement",
+      "assertion": {"supported": false, "support_ids": []},
+      "results": [],
+      "citations": []
+    }
+  ]
+}

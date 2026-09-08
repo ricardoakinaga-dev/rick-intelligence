@@ -16,6 +16,7 @@ class Providers:
     health_checks: dict = field(default_factory=dict)
     audit_sink: object = None
     chat_history: object = None
+    case_store: object = None  # controlled local clinical-case record/review/feedback store
     job_journal: object = None
     rate_limiter: object = None
     knowledge: object = None  # rick_knowledge store (preferred read path)
@@ -29,6 +30,7 @@ class Providers:
     storage: object = None  # external durable metadata store in production
     queue: object = None  # external durable ingestion queue in production
     object_store: object = None  # external durable object store in production
+    password_reset_delivery: object = None  # caller-owned delivery port; never an API response token
 
 
 def get_providers(request: Request) -> Providers:

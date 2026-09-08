@@ -1,0 +1,70 @@
+{
+  "record_id": "GATE-REC-05-READY-001",
+  "timestamp": "2026-09-08T12:38:58Z",
+  "gate_id": "IMPLEMENTATION_READY",
+  "scope": "REC-05 local integration laboratory preparation",
+  "scope_ref": "REC-05",
+  "version": 1,
+  "criteria": [
+    {
+      "id": "IR-001",
+      "description": "Approved local stack is bounded to loopback and isolated named volumes",
+      "required": true,
+      "status": "PASS",
+      "evidence_refs": [
+        "docs/architecture/rec-integration-data.md",
+        ".agent/plans/rec-implementation.md"
+      ],
+      "confidence": "HIGH",
+      "limitations": "Entry only, not acceptance or release"
+    },
+    {
+      "id": "IR-002",
+      "description": "No API production activation, migration, paid provider call or volume deletion is in scope",
+      "required": true,
+      "status": "PASS",
+      "evidence_refs": [
+        "docs/architecture/rec-integration-data.md",
+        ".agent/plans/rec-implementation.md"
+      ],
+      "confidence": "HIGH",
+      "limitations": "Entry only, not acceptance or release"
+    },
+    {
+      "id": "IR-003",
+      "description": "Unit checks of fixed command arguments, secret names, ports and blocked-runtime path; real service verification remains open",
+      "required": true,
+      "status": "PASS",
+      "evidence_refs": [
+        "docs/architecture/rec-integration-data.md",
+        ".agent/plans/rec-implementation.md"
+      ],
+      "confidence": "HIGH",
+      "limitations": "Entry only, not acceptance or release"
+    }
+  ],
+  "evidence": [
+    "docs/architecture/rec-integration-data.md",
+    ".agent/plans/rec-implementation.md"
+  ],
+  "confidence": "HIGH",
+  "gaps": [],
+  "conditions": [],
+  "authority": {
+    "required": false,
+    "state": "NOT_REQUIRED",
+    "actor": "Codex",
+    "scope": "REC-05 local integration laboratory preparation",
+    "decision": "User approved disposable local Postgres/S3/OIDC stack and Docker installation; sudo password is a host prerequisite",
+    "evidence_ref": ".agent/plans/rec-implementation.md",
+    "expires_or_revalidates": "New external effects or product authority"
+  },
+  "residual_risk": "MEDIUM",
+  "decision": "PASS",
+  "next_action": "Prepare Compose and preflight with no runtime startup until host Docker is available",
+  "revalidation_triggers": [
+    "New external effects",
+    "Expanded authorization scope"
+  ],
+  "supersedes": null
+}

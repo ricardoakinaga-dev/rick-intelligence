@@ -7,7 +7,7 @@ const manager = {
   user_id: "copy-manager",
   email: "gestor@example.invalid",
   role: "admin_rag",
-  canonical_role: "KNOWLEDGE_MANAGER",
+  canonical_role: "KNOWLEDGE_MANAGER", permissions: ["chat.query", "documents.read", "documents.upload", "documents.manage", "ingestion.run", "reindex.run", "collections.read", "observability.read", "audit.read"],
   tenant_id: "default",
   workspace_id: "default",
   session_id: "copy-manager-session",
@@ -65,7 +65,7 @@ test("canonical role labels and administration status are presentation-only", as
 });
 
 test("an unauthorized admin route has truthful recovery and makes no admin request", async ({ page }) => {
-  const viewer = { ...manager, role: "viewer", canonical_role: "VETERINARIAN", session_id: "copy-viewer-session" };
+  const viewer = { ...manager, role: "viewer", canonical_role: "VETERINARIAN", permissions: ["chat.query"], session_id: "copy-viewer-session" };
   let adminRequests = 0;
   await mockIdentity(page, viewer);
   await page.route("**/api/v1/admin/**", route => { adminRequests += 1; return route.fulfill({ status: 500, json: { error: { message: "unexpected" } } }); });

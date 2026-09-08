@@ -21,6 +21,11 @@ class ObjectStoreErrorCode(StrEnum):
     PERMISSION = "permission_error"
     IO_ERROR = "io_error"
     PRODUCTION_MODE = "production_mode"
+    REMOTE_ERROR = "remote_error"
+    PROTOCOL_ERROR = "protocol_error"
+    TRANSPORT_ERROR = "transport_error"
+    RESPONSE_LIMIT = "response_limit"
+    CLOSED = "closed"
 
 
 _SAFE_MESSAGES: dict[ObjectStoreErrorCode, str] = {
@@ -37,6 +42,11 @@ _SAFE_MESSAGES: dict[ObjectStoreErrorCode, str] = {
     ObjectStoreErrorCode.PERMISSION: "Object store permission denied",
     ObjectStoreErrorCode.IO_ERROR: "Object store I/O failed",
     ObjectStoreErrorCode.PRODUCTION_MODE: "The local object store cannot run in production mode",
+    ObjectStoreErrorCode.REMOTE_ERROR: "The remote object store rejected the request",
+    ObjectStoreErrorCode.PROTOCOL_ERROR: "The object store returned an invalid response",
+    ObjectStoreErrorCode.TRANSPORT_ERROR: "The object store transport failed",
+    ObjectStoreErrorCode.RESPONSE_LIMIT: "The object store response exceeds the configured limit",
+    ObjectStoreErrorCode.CLOSED: "The object store is closed",
 }
 
 
@@ -133,6 +143,51 @@ class ProductionModeError(ObjectStoreError):
         super().__init__(ObjectStoreErrorCode.PRODUCTION_MODE, operation="configure")
 
 
+class ObjectStoreRemoteError(ObjectStoreError):
+    """A safe response status from a remote object-store service."""
+
+    def __init__(self, *, status_code: int, operation: str) -> None:
+        self.status_code = status_code
+        self.retryable = status_code == 408 or status_code == 429 or status_code >= 500
+        super().__init__(ObjectStoreErrorCode.REMOTE_ERROR, operation=operation)
+
+
+class ObjectStoreProtocolError(ObjectStoreError):
+    """A remote response did not satisfy the typed object-store contract."""
+
+    def __init__(self, *, operation: str) -> None:
+        super().__init__(ObjectStoreErrorCode.PROTOCOL_ERROR, operation=operation)
+
+
+class ObjectStoreTransportError(ObjectStoreError):
+    """The injected HTTP transport failed without exposing backend details."""
+
+    def __init__(self, *, operation: str) -> None:
+        super().__init__(ObjectStoreErrorCode.TRANSPORT_ERROR, operation=operation)
+
+
+class ObjectStoreResponseLimitError(ObjectStoreError):
+    """A non-object HTTP response exceeded its bounded read limit."""
+
+    def __init__(
+        self,
+        *,
+        limit: int,
+        observed: int | None = None,
+        operation: str = "response",
+    ) -> None:
+        self.limit = limit
+        self.observed = observed
+        super().__init__(ObjectStoreErrorCode.RESPONSE_LIMIT, operation=operation)
+
+
+class ObjectStoreClosedError(ObjectStoreError):
+    """An operation was attempted after the adapter was closed."""
+
+    def __init__(self) -> None:
+        super().__init__(ObjectStoreErrorCode.CLOSED, operation="closed")
+
+
 __all__ = [
     "InvalidLimitError",
     "InvalidObjectDataError",
@@ -147,6 +202,11 @@ __all__ = [
     "ObjectStoreErrorCode",
     "ObjectStoreIOError",
     "ObjectStorePermissionError",
+    "ObjectStoreProtocolError",
+    "ObjectStoreRemoteError",
+    "ObjectStoreResponseLimitError",
     "ObjectTooLargeError",
+    "ObjectStoreTransportError",
+    "ObjectStoreClosedError",
     "ProductionModeError",
 ]

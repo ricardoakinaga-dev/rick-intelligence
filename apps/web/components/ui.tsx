@@ -8,7 +8,7 @@ export function Panel({ children, className = "", as: Tag = "section" }: { child
 }
 
 export function StatusPill({ children, tone = "neutral" }: { children: ReactNode; tone?: "neutral" | "success" | "warning" | "danger" | "accent" }) {
-  return <span className={`status-pill ${tone}`}><span className="status-dot" aria-hidden="true" />{children}</span>;
+  return <span className={`status-pill ${tone}`}><span className="status-dot" aria-hidden="true" /><span className="status-pill-label">{children}</span></span>;
 }
 
 export function Button({ children, variant = "primary", className = "", ref, ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "secondary" | "ghost" | "danger"; ref?: Ref<HTMLButtonElement> }) {

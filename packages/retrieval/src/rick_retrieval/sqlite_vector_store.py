@@ -142,14 +142,41 @@ class SQLiteVectorStore:
             )
         return len(encoded)
 
-    def all_points(self, *, limit: int = MAX_POINTS_PER_READ) -> list[dict[str, Any]]:
+    def all_points(
+        self,
+        *,
+        limit: int = MAX_POINTS_PER_READ,
+        tenant_id: str | None = None,
+        workspace_id: str | None = None,
+        allowed_collection_ids: Iterable[str] | None = None,
+    ) -> list[dict[str, Any]]:
         if isinstance(limit, bool) or not isinstance(limit, int) or not 0 < limit <= MAX_POINTS_PER_READ:
             raise SQLiteVectorStoreValidationError("point read limit is out of range")
+        clauses: list[str] = []
+        parameters: list[object] = []
+        if tenant_id is not None:
+            clauses.append("json_extract(payload_json, '$.tenant_id') = ?")
+            parameters.append(tenant_id)
+        if workspace_id is not None:
+            clauses.append("json_extract(payload_json, '$.workspace_id') = ?")
+            parameters.append(workspace_id)
+        if allowed_collection_ids is not None:
+            allowed = list(allowed_collection_ids)
+            if "*" not in allowed:
+                if not allowed:
+                    return []
+                clauses.append(
+                    "json_extract(payload_json, '$.collection_id') IN ("
+                    + ",".join("?" for _ in allowed) + ")"
+                )
+                parameters.extend(allowed)
+        where = " WHERE " + " AND ".join(clauses) if clauses else ""
+        parameters.append(limit + 1)
         with self._read() as connection:
             rows = connection.execute(
                 "SELECT point_id, vector_json, payload_json, payload_checksum "
-                "FROM vector_points ORDER BY point_id LIMIT ?",
-                (limit + 1,),
+                "FROM vector_points" + where + " ORDER BY point_id LIMIT ?",
+                tuple(parameters),
             ).fetchall()
         if len(rows) > limit:
             raise SQLiteVectorStoreValidationError("complete point snapshot exceeds read limit")

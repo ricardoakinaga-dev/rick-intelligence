@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import inspect
 
 from fastapi import APIRouter, Depends, Header, Request, Response
 from pydantic import BaseModel, Field
@@ -13,6 +14,7 @@ from core.rate_limit import check_rate_limit, ensure_rate_limiter
 from core.security import resolve_session_cookie
 from dependencies.identity import get_current_session, require_authenticated
 from dependencies.services import get_providers
+from services.audit import emit_required
 
 router = APIRouter(tags=["Auth"])
 
@@ -63,23 +65,77 @@ def _recovery_response(request: Request):
     )
 
 
+def _deliver_password_reset(providers, payload: RecoveryRequest, token: str | None) -> None:
+    """Hand a reset token to an injected delivery port without returning it."""
+    delivery = getattr(providers, "password_reset_delivery", None)
+    if delivery is None or token is None:
+        return
+    method = getattr(delivery, "deliver_password_reset", None)
+    if not callable(method):
+        raise ApiError("provider_unavailable")
+    try:
+        accepted = method(
+            email=payload.email,
+            tenant_id=payload.tenant_id,
+            token=token,
+        )
+        if inspect.isawaitable(accepted) or accepted is False:
+            raise ApiError("provider_unavailable")
+    except ApiError:
+        raise
+    except Exception as exc:
+        raise ApiError("provider_unavailable") from exc
+
+
 def _public_session(snapshot) -> dict:
     return {
         "authenticated": snapshot.authenticated, "user_id": snapshot.user_id, "email": snapshot.email,
         "role": snapshot.role, "canonical_role": snapshot.canonical_role,
         "tenant_id": snapshot.tenant_id, "workspace_id": snapshot.workspace_id,
         "session_id": snapshot.session_id, "session_token": None,
+        "permissions": list(snapshot.permissions),
     }
+
+
+def _login_rate_allowed(providers, request: Request, payload: LoginRequest) -> bool:
+    """Apply login throttling through the app-owned limiter boundary.
+
+    Identity implementations may be external and are not allowed to define a
+    process-local fallback for this security control.  Local/test composition
+    receives the explicit in-memory limiter; production must inject a shared
+    implementation through ``Providers.rate_limiter``.
+    """
+
+    configured = getattr(providers, "rate_limiter", None)
+    if providers.settings.environment == "production" and configured is None:
+        raise ApiError("provider_unavailable")
+    raw_key = ":".join(
+        (
+            "login",
+            payload.tenant_id.strip(),
+            payload.email.strip().casefold(),
+            (request.client.host if request.client else None) or "",
+        )
+    )
+    key = hashlib.sha256(raw_key.encode("utf-8")).hexdigest()
+    try:
+        allowed = check_rate_limit(
+            ensure_rate_limiter(providers),
+            key,
+            limit_per_min=providers.settings.login_rate_limit_per_min,
+        )
+    except TypeError as exc:
+        raise ApiError("provider_unavailable") from exc
+    if not allowed:
+        raise ApiError("rate_limited")
+    return True
 
 
 @router.post("/api/v1/auth/login")
 def login(payload: LoginRequest, request: Request, response: Response):
     providers = get_providers(request)
     identity = providers.identity
-    # Rate limit (in-process default; Redis-backed interface ready).
-    check = getattr(identity, "check_login_rate", None)
-    if check is not None:
-        check(f"login:{payload.email.lower()}", limit_per_min=providers.settings.login_rate_limit_per_min)
+    _login_rate_allowed(providers, request, payload)
     try:
         result = identity.login(  # type: ignore[union-attr]
             email=payload.email, password=payload.password, tenant_id=payload.tenant_id,
@@ -124,9 +180,13 @@ def logout(request: Request, response: Response, session=Depends(get_current_ses
         auth = request.headers.get("authorization")
         if auth and auth.startswith("Bearer "):
             token = auth[len("Bearer "):].strip() or None
+    emit_required(providers.audit_sink, {
+        "action": "auth.logout", "actor_user_id": session.user_id,
+        "request_id": getattr(request.state, "request_id", None),
+        "tenant_id": session.tenant_id, "workspace_id": session.workspace_id,
+    })
     providers.identity.logout(token)  # type: ignore[union-attr]
     response.delete_cookie(key=providers.settings.session_cookie_name, path="/")
-    _audit("auth.logout", session.user_id, request, tenant_id=session.tenant_id)
     return {"status": "signed_out"}
 
 
@@ -142,16 +202,26 @@ def get_session(session=Depends(require_authenticated)):
 
 @router.post("/api/v1/auth/recovery")
 def recovery(payload: RecoveryRequest, request: Request):
-    if not _recovery_rate_allowed(get_providers(request), request, payload):
+    providers = get_providers(request)
+    if not _recovery_rate_allowed(providers, request, payload):
         return _recovery_response(request)
+    issue = getattr(providers.identity, "issue_password_reset", None)
+    if callable(issue):
+        token = issue(email=payload.email, tenant_id=payload.tenant_id)
+        _deliver_password_reset(providers, payload, token)
     # Neutral response whether or not the identity exists.
     return {"status": "queued"}
 
 
 @router.post("/api/v1/auth/request-password-reset")
 def request_reset(payload: RecoveryRequest, request: Request):
-    if not _recovery_rate_allowed(get_providers(request), request, payload):
+    providers = get_providers(request)
+    if not _recovery_rate_allowed(providers, request, payload):
         return _recovery_response(request)
+    issue = getattr(providers.identity, "issue_password_reset", None)
+    if callable(issue):
+        token = issue(email=payload.email, tenant_id=payload.tenant_id)
+        _deliver_password_reset(providers, payload, token)
     return {"status": "queued"}
 
 
@@ -161,5 +231,9 @@ class ConfirmResetRequest(BaseModel):
 
 
 @router.post("/api/v1/auth/confirm-password-reset")
-def confirm_reset(payload: ConfirmResetRequest):
-    raise ApiError("validation_error", "Invalid or expired reset token.")
+def confirm_reset(payload: ConfirmResetRequest, request: Request):
+    consume = getattr(get_providers(request).identity, "consume_password_reset", None)
+    if not callable(consume):
+        raise ApiError("validation_error", "Invalid or expired reset token.")
+    revoked = consume(token=payload.token, new_password=payload.new_password)
+    return {"status": "reset", "revoked_sessions": int(revoked)}

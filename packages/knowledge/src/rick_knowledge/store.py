@@ -23,7 +23,13 @@ class KnowledgeStore(Protocol):
     ) -> Collection | None: ...
     def list_collections(self, workspace_id: str, *, tenant_id: str) -> list[Collection]: ...
     def upsert_document(self, document: Document) -> None: ...
-    def get_document(self, document_id: str) -> Document | None: ...
+    def get_document(
+        self,
+        document_id: str,
+        *,
+        tenant_id: str | None = None,
+        workspace_id: str | None = None,
+    ) -> Document | None: ...
     def list_documents(
         self,
         workspace_id: str,
@@ -50,6 +56,8 @@ class InMemoryKnowledgeStore:
         self._chunks: dict[str, list[Chunk]] = {}
 
     def upsert_collection(self, collection: Collection) -> None:
+        if collection.status not in {"active", "archived"}:
+            raise ValueError("unknown collection status")
         self._collections[(collection.tenant_id, collection.workspace_id, collection.collection_id)] = collection
 
     def get_collection(
@@ -80,8 +88,21 @@ class InMemoryKnowledgeStore:
             raise ValueError(f"unknown document status: {document.status}")
         self._documents[document.document_id] = document
 
-    def get_document(self, document_id: str) -> Document | None:
-        return self._documents.get(document_id)
+    def get_document(
+        self,
+        document_id: str,
+        *,
+        tenant_id: str | None = None,
+        workspace_id: str | None = None,
+    ) -> Document | None:
+        document = self._documents.get(document_id)
+        if document is None:
+            return None
+        if tenant_id is not None and document.tenant_id != tenant_id:
+            return None
+        if workspace_id is not None and document.workspace_id != workspace_id:
+            return None
+        return document
 
     def list_documents(
         self,

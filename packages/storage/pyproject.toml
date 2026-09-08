@@ -1,7 +1,7 @@
 [project]
 name = "rick-storage"
 version = "0.1.0"
-description = "Typed local-only filesystem object-store adapter"
+description = "Typed scope-aware local and S3-compatible object-store adapters"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = []

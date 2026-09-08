@@ -5,6 +5,48 @@ from fastapi.testclient import TestClient
 from app import create_app
 from conftest import login_as
 from conftest import make_settings
+from dependencies.services import Providers
+from services.audit import InMemoryAuditSink
+from services.chat_service import StubChatBackend
+from services.identity_service import InMemoryIdentityProvider
+from core.rate_limit import InMemoryRateLimiter
+
+
+class _IdentityWithoutLocalLoginLimiter:
+    """External-provider-shaped identity surface for the route boundary test."""
+
+    def __init__(self) -> None:
+        self._inner = InMemoryIdentityProvider()
+
+    def login(self, **kwargs):
+        return self._inner.login(**kwargs)
+
+    def validate_token(self, token):
+        return self._inner.validate_token(token)
+
+
+def test_login_uses_injected_rate_limiter_when_identity_has_no_local_limiter():
+    settings = make_settings(login_rate_limit_per_min=1)
+    providers = Providers(
+        settings=settings,
+        identity=_IdentityWithoutLocalLoginLimiter(),
+        chat_backend=StubChatBackend(),
+        health_checks={},
+        audit_sink=InMemoryAuditSink(),
+        rate_limiter=InMemoryRateLimiter(),
+    )
+    client = TestClient(create_app(settings, providers), raise_server_exceptions=False)
+
+    first = client.post("/api/v1/auth/login", json={
+        "email": "vet@example.com", "password": "password123", "tenant_id": "default",
+    })
+    second = client.post("/api/v1/auth/login", json={
+        "email": "vet@example.com", "password": "wrong", "tenant_id": "default",
+    })
+
+    assert first.status_code == 200
+    assert second.status_code == 429
+    assert second.json()["error"]["code"] == "rate_limited"
 
 
 def test_login_me_logout_flow(client):

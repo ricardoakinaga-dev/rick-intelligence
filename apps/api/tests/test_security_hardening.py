@@ -222,6 +222,38 @@ def test_recovery_entry_points_share_a_bounded_neutral_rate_limit():
     assert "unknown@example.com" not in third.text
 
 
+def test_recovery_uses_injected_delivery_port_without_returning_the_token():
+    calls = []
+
+    class Delivery:
+        def deliver_password_reset(self, *, email, tenant_id, token):
+            calls.append({"email": email, "tenant_id": tenant_id, "token": token})
+            return True
+
+    settings = make_settings()
+    providers = Providers(
+        settings=settings,
+        identity=InMemoryIdentityProvider(),
+        chat_backend=StubChatBackend(),
+        health_checks={},
+        audit_sink=InMemoryAuditSink(),
+        password_reset_delivery=Delivery(),
+    )
+    client = TestClient(create_app(settings, providers), raise_server_exceptions=False)
+
+    response = client.post(
+        "/api/v1/auth/recovery",
+        json={"email": "vet@example.com", "tenant_id": "default"},
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json() == {"status": "queued"}
+    assert len(calls) == 1
+    assert calls[0]["email"] == "vet@example.com"
+    assert calls[0]["tenant_id"] == "default"
+    assert calls[0]["token"] not in response.text
+
+
 def test_recovery_rate_limit_configuration_must_be_positive():
     settings = make_settings(recovery_rate_limit_per_min=0)
 

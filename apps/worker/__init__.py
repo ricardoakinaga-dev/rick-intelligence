@@ -15,6 +15,16 @@ from .durable_queue import (
     QueueRecord,
     SQLiteDurableQueue,
 )
+from .postgres_queue import (
+    PostgresDurableQueue,
+    PostgresIngestionQueue,
+    PostgresQueueCapacityError,
+    PostgresQueueError,
+    PostgresQueueIdempotencyError,
+    PostgresQueueLeaseError,
+    QueueHealth,
+)
+from .postgres_runner import PostgresIngestionWorker, WorkerBatchResult
 
 from .runner import (
     COMPLETED,
@@ -54,4 +64,8 @@ __all__ = [
     "QueueNotFoundError",
     "QueueRecord",
     "SQLiteDurableQueue",
+    "PostgresDurableQueue", "PostgresIngestionQueue", "PostgresQueueError",
+    "PostgresQueueCapacityError", "PostgresQueueIdempotencyError",
+    "PostgresQueueLeaseError", "QueueHealth",
+    "PostgresIngestionWorker", "WorkerBatchResult",
 ]

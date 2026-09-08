@@ -7,7 +7,7 @@ import type { AxeResults } from "axe-core";
 
 const root = resolve(__dirname, "../../..");
 const benchmark = JSON.parse(readFileSync(resolve(root, ".gauntlet-state-of-art/visual/benchmark.json"), "utf8")) as { id: string; states: { id: string; route: string }[] };
-const identity = { authenticated: true, user_id: "fixture-reader", email: "leitor@example.invalid", role: "KNOWLEDGE_MANAGER", canonical_role: "KNOWLEDGE_MANAGER", tenant_id: "default", workspace_id: "default", session_id: "fixture-session" };
+const identity = { authenticated: true, user_id: "fixture-reader", email: "leitor@example.invalid", role: "KNOWLEDGE_MANAGER", canonical_role: "KNOWLEDGE_MANAGER", permissions: ["chat.query", "documents.read", "documents.upload", "documents.manage", "ingestion.run", "reindex.run", "collections.read", "observability.read", "audit.read"],  tenant_id: "default", workspace_id: "default", session_id: "fixture-session" };
 const denied = { error: { code: "forbidden", message: "A sessão não tem permissão para esta consulta.", details: null, request_id: "fixture" } };
 const unavailable = { error: { code: "unavailable", message: "Não foi possível concluir a consulta. Tente novamente.", details: null, request_id: "fixture" } };
 const title = "Guia de consulta do acervo";
@@ -18,7 +18,7 @@ const longText = Array.from({ length: 12 }, (_, i) => `Seção ${i + 1}. Este é
 async function prepare(page: Page, state: string, route: string) {
   const login = state.startsWith("custom-login-");
   const long = state.endsWith("long-content");
-  await page.route("**/api/v1/auth/me", request => request.fulfill(login ? { status: 401, json: denied } : { json: { ...identity, ...(state === "custom-admin-denied" ? { role: "VETERINARIAN", canonical_role: "VETERINARIAN" } : {}) } }));
+  await page.route("**/api/v1/auth/me", request => request.fulfill(login ? { status: 401, json: denied } : { json: { ...identity, ...(state === "custom-admin-denied" ? { role: "VETERINARIAN", canonical_role: "VETERINARIAN", permissions: ["chat.query"] } : {}) } }));
   await page.route("**/api/v1/auth/login", request => request.fulfill({ status: 401, json: denied }));
   await page.route("**/api/v1/collections?**", request => request.fulfill({ json: { items: [{ collection_id: "referencias", title: "Referências", workspace_id: "default" }], total: 1 } }));
   await page.route("**/api/v1/documents?**", request => {
@@ -139,6 +139,24 @@ for (const state of benchmark.states) {
     }, state.id.endsWith("confirmation"));
     const measured = await page.evaluate(() => ({
       overflow: document.documentElement.scrollWidth > innerWidth,
+      overflowNodes: Array.from(document.querySelectorAll<HTMLElement>("body *"))
+        .filter(node => {
+          const rect = node.getBoundingClientRect();
+          return rect.width > 0 && rect.right > innerWidth + 1 && getComputedStyle(node).visibility !== "hidden" && !node.closest('[aria-hidden="true"]');
+        })
+        .slice(0, 20)
+        .map(node => {
+          const rect = node.getBoundingClientRect();
+          return { tag: node.tagName, className: node.className, text: node.textContent?.slice(0, 90), right: rect.right, width: rect.width };
+        }),
+      layoutChain: ["html", "body", ".app-frame", ".workspace", ".topbar", ".main-content", "chat-workspace_root__", "chat-workspace_shell__", "chat-workspace_chatPanel__"].map(selector => {
+        const element = selector.endsWith("__")
+          ? Array.from(document.querySelectorAll<HTMLElement>("body *")).find(node => typeof node.className === "string" && node.className.includes(selector))
+          : document.querySelector<HTMLElement>(selector);
+        if (!element) return { selector, missing: true };
+        const rect = element.getBoundingClientRect(), style = getComputedStyle(element);
+        return { selector, tag: element.tagName, className: element.className, x: rect.x, width: rect.width, right: rect.right, cssWidth: style.width, minWidth: style.minWidth, maxWidth: style.maxWidth, display: style.display };
+      }),
       width: innerWidth, height: innerHeight, documentHeight: document.documentElement.scrollHeight,
       headings: Array.from(document.querySelectorAll("h1,h2,h3")).map(node => ({ level: node.tagName, text: node.textContent, size: getComputedStyle(node).fontSize, lineHeight: getComputedStyle(node).lineHeight })),
       fontFamily: getComputedStyle(document.body).fontFamily,
@@ -232,17 +250,21 @@ test("quality chat source inspection and return", async ({ page }, testInfo) => 
 test("quality chat missing metadata remains explicit", async ({ page }) => {
   await prepare(page, "custom-chat-response", "/app/chat");
   await page.route("**/api/v1/chat", request => request.fulfill({ json: { conversation_id: "fixture", message_id: "missing", answer: "Resposta sintética", citations: [{}], metadata: {} } }));
+  await page.getByLabel("Pergunta", { exact: true }).fill("Repita a consulta para validar os metadados.");
   await page.getByRole("button", { name: "Consultar", exact: true }).click();
-  const summary = page.locator(".source-details summary");
+  const source = page.locator(".source-details").last();
+  const summary = source.locator("summary");
   await expect(summary).toContainText("Documento sem título");
   await summary.click();
-  await expect(page.locator(".source-details dd")).toHaveText(Array(6).fill("Não informado"));
+  await expect(source.locator("dd")).toHaveText(Array(6).fill("Não informado"));
   await expect(page.getByText("Evidência fraca", { exact: true })).toBeVisible();
   await page.route("**/api/v1/chat", request => request.fulfill({ json: { conversation_id: "fixture", message_id: "empty", answer: "Sem fontes", citations: [], metadata: {} } }));
+  await page.getByLabel("Pergunta", { exact: true }).fill("Agora valide uma resposta sem fontes.");
   await page.getByRole("button", { name: "Consultar", exact: true }).click();
-  await expect(page.getByText("Nenhuma fonte retornada", { exact: true })).toBeVisible();
-  await expect(page.getByRole("link", { name: /Consultar fontes/ })).toHaveCount(0);
-  await expect(page.locator(".source-details")).toHaveCount(0);
+  const latestAnswer = page.getByRole("article", { name: "Resposta do corpus" }).last();
+  await expect(latestAnswer.getByText("Nenhuma fonte retornada", { exact: true })).toBeVisible();
+  await expect(latestAnswer.getByRole("link", { name: /Consultar fontes/ })).toHaveCount(0);
+  await expect(latestAnswer.locator(".source-details")).toHaveCount(0);
 });
 
 test("quality keyboard navigation and confirmation", async ({ page }, testInfo) => {
@@ -336,11 +358,12 @@ test("quality 200 percent text stress", async ({ page }, testInfo) => {
       return { overflow: document.documentElement.scrollWidth > innerWidth, width: innerWidth, scrollWidth: document.documentElement.scrollWidth, clippedControls: controls.filter(element => element.scrollWidth > element.clientWidth + 1 || element.scrollHeight > element.clientHeight + 1).map(element => ({ name: element.getAttribute("aria-label") || element.textContent?.trim(), className: element.className, width: element.clientWidth, scrollWidth: element.scrollWidth, height: element.clientHeight, scrollHeight: element.scrollHeight })), method: "All computed font sizes and explicit line heights doubled; no actual browser-menu zoom; screenshots require semantic inspection" };
     });
     const overflowNodes = await page.evaluate(() => Array.from(document.querySelectorAll<HTMLElement>("body *")).filter(node => { const rect = node.getBoundingClientRect(); return rect.width > 0 && rect.right > innerWidth + 1 && getComputedStyle(node).visibility !== "hidden" && !node.closest('[aria-hidden="true"]'); }).map(node => ({ tag: node.tagName, className: node.className, text: node.textContent?.slice(0, 90), right: node.getBoundingClientRect().right, width: node.getBoundingClientRect().width })));
+    const overflowMetrics = await page.evaluate(() => Array.from(document.querySelectorAll<HTMLElement>("body *")).filter(node => node.scrollWidth > node.clientWidth + 1 || node.scrollHeight > node.clientHeight + 1).map(node => ({ tag: node.tagName, className: node.className, text: node.textContent?.slice(0, 90), clientWidth: node.clientWidth, scrollWidth: node.scrollWidth, clientHeight: node.clientHeight, scrollHeight: node.scrollHeight })).slice(0, 40));
     const name = `${state}-text-200-${testInfo.project.name}`;
     const screenshot = await captureQualityScreenshot(page, testInfo, name, !state.endsWith("confirmation"));
     const accessibility = await runQualityAccessibility(page, state.endsWith("confirmation"), true);
-    await writeQualityArtifact(testInfo, name, { schema: "rick-web-quality-evidence.v1", kind: "200-percent-text-reflow", state, viewport: page.viewportSize(), screenshot, measured: { ...measured, overflowNodes }, errors, accessibility: qualityAccessibilityEvidence(accessibility, ["avoid-inline-spacing: disabled because the test injects inline font/line-height stress styles", "color-contrast: disabled because synthetic overlapping text invalidates axe background sampling during the injected stress"]), method: "Computed font sizes and explicit line heights doubled on a fresh page; this is a deterministic text-reflow stress test, not browser-menu zoom." });
-    await testInfo.attach(`${state}-text-stress`, { body: JSON.stringify({ ...measured, overflowNodes }, null, 2), contentType: "application/json" });
+    await writeQualityArtifact(testInfo, name, { schema: "rick-web-quality-evidence.v1", kind: "200-percent-text-reflow", state, viewport: page.viewportSize(), screenshot, measured: { ...measured, overflowNodes, overflowMetrics }, errors, accessibility: qualityAccessibilityEvidence(accessibility, ["avoid-inline-spacing: disabled because the test injects inline font/line-height stress styles", "color-contrast: disabled because synthetic overlapping text invalidates axe background sampling during the injected stress"]), method: "Computed font sizes and explicit line heights doubled on a fresh page; this is a deterministic text-reflow stress test, not browser-menu zoom." });
+    await testInfo.attach(`${state}-text-stress`, { body: JSON.stringify({ ...measured, overflowNodes, overflowMetrics }, null, 2), contentType: "application/json" });
     expect.soft(measured.overflow, `${state} text reflow`).toBe(false);
     expect.soft(measured.clippedControls, `${state} clipped control labels`).toEqual([]);
     const internalClipping = await page.evaluate(() => {

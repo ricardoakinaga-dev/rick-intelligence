@@ -1,4 +1,4 @@
-"""Canonical local-only object storage boundary."""
+"""Canonical scope-aware object storage boundary."""
 
 from rick_storage.errors import (
     InvalidLimitError,
@@ -10,10 +10,15 @@ from rick_storage.errors import (
     ObjectReadLimitExceededError,
     ObjectStoreConfigurationError,
     ObjectStoreCorruptionError,
+    ObjectStoreClosedError,
     ObjectStoreError,
     ObjectStoreErrorCode,
     ObjectStoreIOError,
     ObjectStorePermissionError,
+    ObjectStoreProtocolError,
+    ObjectStoreRemoteError,
+    ObjectStoreResponseLimitError,
+    ObjectStoreTransportError,
     ObjectTooLargeError,
     ProductionModeError,
 )
@@ -24,12 +29,23 @@ from rick_storage.object_store import (
     DEFAULT_MAX_READ_BYTES,
     LocalObjectStore,
 )
-from rick_storage.protocols import ObjectStore
+from rick_storage.protocols import ObjectStore, SyncHttpResponse, SyncHttpTransport
+from rick_storage.s3_object_store import (
+    AwsCredentials,
+    CredentialSource,
+    DEFAULT_MAX_RESPONSE_BYTES,
+    MAX_CONFIGURED_RESPONSE_BYTES,
+    S3CompatibleObjectStore,
+    S3ObjectStore,
+)
 
 __all__ = [
     "DEFAULT_MAX_LIST_ITEMS",
     "DEFAULT_MAX_OBJECT_BYTES",
     "DEFAULT_MAX_READ_BYTES",
+    "DEFAULT_MAX_RESPONSE_BYTES",
+    "AwsCredentials",
+    "CredentialSource",
     "InvalidLimitError",
     "InvalidObjectDataError",
     "InvalidObjectKeyError",
@@ -44,10 +60,20 @@ __all__ = [
     "ObjectStore",
     "ObjectStoreConfigurationError",
     "ObjectStoreCorruptionError",
+    "ObjectStoreClosedError",
     "ObjectStoreError",
     "ObjectStoreErrorCode",
     "ObjectStoreIOError",
     "ObjectStorePermissionError",
+    "ObjectStoreProtocolError",
+    "ObjectStoreRemoteError",
+    "ObjectStoreResponseLimitError",
+    "ObjectStoreTransportError",
     "ObjectTooLargeError",
     "ProductionModeError",
+    "MAX_CONFIGURED_RESPONSE_BYTES",
+    "S3CompatibleObjectStore",
+    "S3ObjectStore",
+    "SyncHttpResponse",
+    "SyncHttpTransport",
 ]

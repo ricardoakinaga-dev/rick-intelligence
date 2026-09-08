@@ -10,22 +10,24 @@
   "engineering_tier": "T4_CRITICAL",
   "risk_level": "MEDIUM",
   "blast_radius": "CROSS_SYSTEM",
-  "status": "VERIFY",
-  "active_execplan": ".agent/plans/state-of-art-recovery.md",
-  "active_task": "SA-OBSERVABILITY",
+  "status": "BLOCKED",
+  "active_execplan": ".agent/plans/rec-implementation.md",
+  "active_task": "REC-05",
   "verification_state": "PARTIAL",
-  "repository_state": "HEAD3c78513a572cba39d23df9fe97277bd35c395881; dirty root preserved; cycle1 and Cycle3 failures/divergent critics preserved; Cycle4 production-web candidate source40/build127/renders283 with BUILD_ID AqCusd2UtXh7A16QqgP8x; visual108PASS functional225EXPECTED219PASS6PLANNEDSKIP; performance18/18 LCPmax620ms CLSmax0.024557 limits unchanged; fresh blind Dalton97/HIGH and Kuhn95.52/HIGH approved with zero Critical/High; scoped Cycle4 visual gate bound; local observability request/transport event ring 256 bounded/redacted with shared hierarchical URL redaction and current root API suites 331 PASS; worker event stream in both seams passed 19 focused tests, reentrant probe and Phase 1.6 66/32/327 plus CI; default root ingestion executor is wired to instance-owned telemetry, post-rework root ordering and finite event admission passed 45 focused tests plus direct probe; fresh Poincare I1 rejected the pre-rework root ordering and namespace-only worker event admission with HIGH confidence; fresh Volta I1 approved the exact post-rework root lifecycle candidate with HIGH confidence, zero Critical/High/Medium and a passing mutation sentinel; prior Noether and Faraday I1 attempts returned no report and were closed without acceptance; scoped local worker-lifecycle gate is VERIFIED while external export, distributed observability and full-product acceptance remain open; default root executor shutdown remains a separate hermetic lifecycle gap; local tenant/session/audit slice has 321 API tests PASS, preserved rejections corrected and fresh Socrates PASS with zero Critical/High/Medium; fresh Godel I1 rejected the current local tenant/audit candidate with an artifact-freeze HIGH and three MEDIUM boundary findings; local durability rework scopes collection identity by tenant with reversible SQLite v1-to-v2 migration, fail-closed malformed recovery, adapter postcondition validation and retained private cleanup leases; final post-rework security api16-full 66/29/327 and CI PASS, commissioned McClintock/Russell/Beauvoir/Zeno I1 critics returned no report and were closed without acceptance; external/full fourteen-criterion acceptance remains",
+  "repository_state": "HEAD66781cb dirty; local candidate v15 binds 546 source files; API418/domain107/worker45/storage24; OpenAPI49; V6 observability, V8 ingestion-lifecycle and REC34 global V15 local integration are independently approved with no Critical/High/Medium findings; REC-05 Compose static config passes with ephemeral values but daemon preflight remains blocked; prepared release checker guards every external status; external runtime/provider/corpus/restore/load/collector/rollout NOT_RUN; REC35 NO-GO/open; no production approval.",
   "instruction_scope_refs": [
     ".agent/PLANS.md",
     "cvg-master-rag-v2/AGENTS.md",
     ".agent/RECOVERY-CURRENT.md"
   ],
-  "last_gate_record": ".agent/gates/state-of-art-observability-root-reorder-ready.json",
-  "last_event_id": "EVT-SA-OBSERVABILITY-LOCAL-REVIEW-ARISTOTLE-V3",
-  "state_revision": 185,
+  "last_gate_record": ".agent/gates/rec-05-ready.json",
+  "last_event_id": "EVT-REC-05-V15-FINAL-CRITIC-20260908",
+  "state_revision": 223,
   "next_gate": "VERIFIED",
-  "active_action_id": "SA-OBSERVABILITY:VERIFY",
-  "blocked_by": [],
+  "active_action_id": "REC-05:WAIT_RUNTIME",
+  "blocked_by": [
+    "Docker/Compose installed, but local daemon access denied inside and outside sandbox; sudo still requires user-local authentication"
+  ],
   "human_approval_required": [],
-  "updated_at": "2026-09-06T21:49:24Z"
+  "updated_at": "2026-09-08T22:11:56Z"
 }

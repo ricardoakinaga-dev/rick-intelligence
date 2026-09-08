@@ -7,13 +7,15 @@ either the live OpenAI-compatible client or a deterministic test double.
 
 from __future__ import annotations
 
+import asyncio
 import time
 import uuid
-from collections.abc import Mapping, Sequence
+import inspect
+from collections.abc import AsyncIterator, Mapping, Sequence
 from threading import RLock
 from typing import Any, Callable
 
-from rick_contracts.providers import ChatCompletionResult, EmbeddingResult, ProviderMessage
+from rick_contracts.providers import ChatCompletionChunk, ChatCompletionResult, EmbeddingResult, ProviderMessage
 from rick_providers.errors import ProviderError, provider_error
 from rick_providers.protocols import AsyncProvider
 
@@ -170,6 +172,59 @@ class ResilientProvider:
         else:
             self._record_success()
             return result
+
+    def chat_completion_stream(
+        self,
+        model_or_messages: str | Sequence[ProviderMessage | Mapping[str, object]] | None = None,
+        messages: Sequence[ProviderMessage | Mapping[str, object]] | None = None,
+        temperature: int | float | None = 0.2,
+        response_format: Mapping[str, object] | None = None,
+        *, model: str | None = None, correlation_id: str | None = None,
+    ) -> AsyncIterator[ChatCompletionChunk]:
+        return self._chat_completion_stream(
+            model_or_messages, messages, temperature, response_format,
+            model=model, correlation_id=correlation_id,
+        )
+
+    async def _chat_completion_stream(
+        self,
+        model_or_messages: str | Sequence[ProviderMessage | Mapping[str, object]] | None,
+        messages: Sequence[ProviderMessage | Mapping[str, object]] | None,
+        temperature: int | float | None,
+        response_format: Mapping[str, object] | None,
+        *, model: str | None, correlation_id: str | None,
+    ) -> AsyncIterator[ChatCompletionChunk]:
+        self._validate_prompt(model_or_messages, messages)
+        correlation = self._guard("chat_completion", correlation_id)
+        target = getattr(self.provider, "chat_completion_stream", None)
+        if not callable(target):
+            result = await self.chat_completion(
+                model_or_messages, messages, temperature, response_format,
+                model=model, correlation_id=correlation,
+            )
+            yield ChatCompletionChunk(
+                model=result.model, delta=result.content, finish_reason=result.finish_reason,
+                correlation_id=result.correlation_id, usage=result.usage,
+            )
+            return
+        try:
+            stream = target(
+                model_or_messages, messages, temperature, response_format,
+                model=model, correlation_id=correlation,
+            )
+            if inspect.isawaitable(stream):
+                stream = await stream
+            async for chunk in stream:
+                if not isinstance(chunk, ChatCompletionChunk):
+                    chunk = ChatCompletionChunk.model_validate(chunk)
+                yield chunk
+        except asyncio.CancelledError:
+            raise
+        except ProviderError as exc:
+            self._record_failure(exc)
+            raise
+        else:
+            self._record_success()
 
     async def aclose(self) -> None:
         closer = getattr(self.provider, "aclose", None)

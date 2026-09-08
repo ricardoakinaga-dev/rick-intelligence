@@ -15,6 +15,19 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("manifest", type=Path)
     args = parser.parse_args()
+    if args.manifest.is_dir():
+        try:
+            from backup_restore import verify_backup
+
+            report = verify_backup(args.manifest)
+        except Exception:
+            print("backup payload verification failed", file=sys.stderr)
+            return 2
+        print(
+            f"backup payload: PASS; backup_id={report['backup_id']}; "
+            f"files={report['file_count']}; bytes={report['byte_count']}"
+        )
+        return 0
     try:
         payload = json.loads(args.manifest.read_text(encoding="utf-8"))
     except (OSError, ValueError) as exc:

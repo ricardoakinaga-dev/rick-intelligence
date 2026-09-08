@@ -1,0 +1,120 @@
+{
+  "schema": "rick-rec-source-snapshot.v1",
+  "revision": "66781cbe96c10786bbf9b9150ee4798df62fdba6",
+  "dirty": true,
+  "web_build_id": "-yZ4reyxzbhM8MUH-vfST",
+  "limitations": [
+    "Uncommitted local candidate, not release or independent review",
+    "Synthetic API; no paid generation or external storage"
+  ],
+  "files": [
+    {
+      "path": ".env.example",
+      "sha256": "6128b418bcae0af26fc92c76ba7ed65f75db70674540e9f0fe53a071821bccc8"
+    },
+    {
+      "path": "Makefile",
+      "sha256": "8b49637c18375b14f23a276642d211ae23ad2681d68acbd7dcb93123531a8557"
+    },
+    {
+      "path": "apps/api/src/app.py",
+      "sha256": "b9eec19ea967fd4623eb2885e084ea17d1543bad5cccc07c8672e4910867d909"
+    },
+    {
+      "path": "apps/api/src/core/config.py",
+      "sha256": "d7bdb4f7ac5ed5661e1363564638a7a96e9fa77047f564730390866af8ec9065"
+    },
+    {
+      "path": "apps/api/src/routes/admin.py",
+      "sha256": "02491c5db8798def0a10d0df887a5ec983b68d2975afddc7470e4765030c09b1"
+    },
+    {
+      "path": "apps/api/src/routes/auth.py",
+      "sha256": "3ab95d9ff5c084fe91f3cf0dd23d96ad5ff09baaaa9b5f580280cf39c1dd51a1"
+    },
+    {
+      "path": "apps/api/tests/test_rec_foundation.py",
+      "sha256": "2f1d5690a0f0f2d9f5880b9ee921e5511fedae9e98946ba72b05324305e7433d"
+    },
+    {
+      "path": "apps/web/app/admin/page.tsx",
+      "sha256": "3823721b005b3f6f978e2fd9e3236ee2373851e85f958126e58b008b3042dee5"
+    },
+    {
+      "path": "apps/web/app/app/documents/page.tsx",
+      "sha256": "1684a12ac62ccfb13d0fa1ad26dc53786f52a007abb12c019d847190174406f8"
+    },
+    {
+      "path": "apps/web/app/app/page.tsx",
+      "sha256": "f746769a12acd698039b1d62565dad210612056ce9967c6c16d365112f011e79"
+    },
+    {
+      "path": "apps/web/components/app-shell.tsx",
+      "sha256": "0b1eaa7ca43c2e184234c7d8c5a55b4d74588cef3a8bbdbe67ef2c789394491c"
+    },
+    {
+      "path": "apps/web/lib/permissions.ts",
+      "sha256": "d1391e768ba13b90ace1849f76430a10765e03bd08dcecc9584810984335b6a2"
+    },
+    {
+      "path": "apps/web/playwright.config.ts",
+      "sha256": "e6d447afe2f696a9818beb7ea051d090b4eb529ff5a549e113890d587d98a542"
+    },
+    {
+      "path": "apps/web/tests/copy-recovery.spec.ts",
+      "sha256": "48074b110e95891b4456f1e2b2b5723c78f37ba8b3da2d3b411e9027d9183410"
+    },
+    {
+      "path": "apps/web/tests/document-state.spec.ts",
+      "sha256": "174a62d822a53000e883792654e185f66836cf75695cf5df65cfb851bd46121f"
+    },
+    {
+      "path": "apps/web/tests/permissions.spec.ts",
+      "sha256": "f3537e6235d6461aa42a160cf67e96b83e049a5951fd424114cd2547367e65c6"
+    },
+    {
+      "path": "apps/web/tests/search-state.spec.ts",
+      "sha256": "29f3ab627e53230ace474d82ea74e1d258f22733c3e920fdea9eeb810492aab5"
+    },
+    {
+      "path": "apps/web/tests/session-ordering.spec.ts",
+      "sha256": "8fbbfd5b3e028942283bb0d6847727673475c73eb1699aa865986395070b8c60"
+    },
+    {
+      "path": "apps/web/tests/visual-evidence.spec.ts",
+      "sha256": "ced591b581ecfbafea85589dc640a146e2efdada46a0ceb4cee4f65d32841f5b"
+    },
+    {
+      "path": "apps/web/tests/visual-matrix.spec.ts",
+      "sha256": "f5e0fe2b74c8bd3581d3ed8fb03ceea5c8f31bbcdf91b86fe17dc21dccf0b9b1"
+    },
+    {
+      "path": "apps/web/tests/web-lifecycle.spec.ts",
+      "sha256": "9ff3105eff502a4bc52ca3400ed267005c19ec6da124c10296d0b838e11ab6ad"
+    },
+    {
+      "path": "apps/web/tests/workbench-state.spec.ts",
+      "sha256": "3f85e2ffac521727c0531af5da2fa818c1f1febf174125802bb8c0e534ccc97c"
+    },
+    {
+      "path": "apps/web/types/api.ts",
+      "sha256": "fd3617b9d91c5e78343438d6e8fc418211c6f21f40d468e8e9b4eb5423654ad6"
+    },
+    {
+      "path": "infrastructure/compose/INTEGRATION.md",
+      "sha256": "802118471ebe4c52b381988c211b5cfe5eb3e224c61758f3834be853e6e5848c"
+    },
+    {
+      "path": "infrastructure/compose/compose.integration.yml",
+      "sha256": "3fb608fb1111a3c44edc1d587e43c4bd85ff6d7485844bcc8c2f5a92aff38d39"
+    },
+    {
+      "path": "infrastructure/scripts/integration_lab.py",
+      "sha256": "87302f679d01a53c1875bead096ab5382e6f4befb6814c1a270ce984be9e7dce"
+    },
+    {
+      "path": "infrastructure/scripts/tests/test_integration_lab.py",
+      "sha256": "c989b4e9c20ea4d09c36af2f169b4fe27390797094380fc7f1c4dd2f26653508"
+    }
+  ]
+}

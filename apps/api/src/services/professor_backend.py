@@ -7,11 +7,11 @@ provider retry policy.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import AsyncIterator, Sequence
 
 from rick_contracts.chat import Citation
 from rick_contracts.professor import ProfessorRequest
-from rick_contracts.providers import ChatCompletionResult, ProviderMessage
+from rick_contracts.providers import ChatCompletionChunk, ChatCompletionResult, ProviderMessage
 from rick_contracts.security import RetrievalContext
 from rick_professor import ProfessorLimits, ProfessorOrchestrator
 
@@ -40,6 +40,23 @@ class ProviderChatAdapter:
             messages=messages,
             correlation_id=correlation_id,
         )
+
+    def stream(self, *, messages: Sequence[ProviderMessage], conversation_id: str) -> AsyncIterator[ChatCompletionChunk]:
+        async def iterate() -> AsyncIterator[ChatCompletionChunk]:
+            target = getattr(self.provider, "chat_completion_stream", None)
+            if callable(target):
+                stream = target(messages=messages, correlation_id=f"chat-{conversation_id}"[:128])
+                if hasattr(stream, "__await__"):
+                    stream = await stream
+                async for chunk in stream:
+                    yield chunk if isinstance(chunk, ChatCompletionChunk) else ChatCompletionChunk.model_validate(chunk)
+                return
+            result = await self.complete(messages=messages, conversation_id=conversation_id)
+            yield ChatCompletionChunk(
+                model=result.model, delta=result.content, finish_reason=result.finish_reason,
+                correlation_id=result.correlation_id, usage=result.usage,
+            )
+        return iterate()
 
 
 class OwnedLeaseAdapter:
@@ -82,11 +99,26 @@ class ProfessorChatBackend:
             limits=limits,
         )
 
-    async def generate(self, *, message: str, context: dict, conversation_id: str) -> dict:
+    def readiness_check(self) -> bool:
+        """Assert that the composed grounded chat wrapper is usable locally."""
+
+        return self.lease is not None and callable(getattr(self.provider.provider, "chat_completion", None))
+
+    async def generate(self, *, message: str, context: dict, conversation_id: str,
+                       history: list[dict[str, str]] | None = None) -> dict:
+        prior = []
+        for item in list(history or [])[-50:]:
+            if not isinstance(item, dict) or item.get("role") not in {"user", "assistant"}:
+                continue
+            try:
+                prior.append(ProviderMessage(role=item["role"], content=str(item.get("content") or "")[:2_000]))
+            except Exception:
+                continue
         request = ProfessorRequest(
             query=message,
             conversation_id=conversation_id,
             retrieval_context=RetrievalContext.model_validate(context),
+            history=prior,
         )
         result = await self.orchestrator.run(request)
         if result.evidence_status == "GENERATION_FAILED":
@@ -102,3 +134,46 @@ class ProfessorChatBackend:
                 **result.metadata,
             },
         }
+
+    def generate_stream(self, *, message: str, context: dict, conversation_id: str,
+                        history: list[dict[str, str]] | None = None):
+        """Yield provider deltas and a final citation-validated result."""
+        prior = []
+        for item in list(history or [])[-50:]:
+            if not isinstance(item, dict) or item.get("role") not in {"user", "assistant"}:
+                continue
+            try:
+                prior.append(ProviderMessage(role=item["role"], content=str(item.get("content") or "")[:2_000]))
+            except Exception:
+                continue
+        request = ProfessorRequest(
+            query=message,
+            conversation_id=conversation_id,
+            retrieval_context=RetrievalContext.model_validate(context),
+            history=prior,
+        )
+
+        async def stream():
+            async for event in self.orchestrator.stream(request):
+                if event.get("kind") == "delta":
+                    yield {"type": "delta", "delta": str(event.get("delta") or "")}
+                    continue
+                result = event.get("response")
+                if result is None:
+                    continue
+                if result.evidence_status == "GENERATION_FAILED":
+                    raise ProfessorBackendError(str(result.metadata.get("failure_stage", "provider_failed")))
+                if result.evidence_status == "CITATION_INVALID":
+                    raise ProfessorBackendError("citation_invalid")
+                yield {
+                    "type": "final",
+                    "result": {
+                        "answer": result.answer,
+                        "citations": [c.model_dump(mode="json") for c in result.citations],
+                        "metadata": {
+                            "backend": "professor", "evidence_status": result.evidence_status,
+                            **result.metadata,
+                        },
+                    },
+                }
+        return stream()

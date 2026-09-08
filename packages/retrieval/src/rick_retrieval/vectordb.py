@@ -80,12 +80,30 @@ class InMemoryVectorStore:
                    if p["payload"].get("document_id") == document_id
                    and p["payload"].get("collection_id") == collection_id)
 
-    def all_points(self, *, limit: int = MAX_POINTS_PER_READ) -> list[dict]:
+    def all_points(
+        self,
+        *,
+        limit: int = MAX_POINTS_PER_READ,
+        tenant_id: str | None = None,
+        workspace_id: str | None = None,
+        allowed_collection_ids: list[str] | None = None,
+    ) -> list[dict]:
         if isinstance(limit, bool) or not isinstance(limit, int) or not 0 < limit <= MAX_POINTS_PER_READ:
             raise ValueError("point read limit is out of range")
-        if len(self._points) > limit:
+        allowed = set(allowed_collection_ids or [])
+        points = [
+            point for point in self._points.values()
+            if (tenant_id is None or point.get("payload", {}).get("tenant_id") == tenant_id)
+            and (workspace_id is None or point.get("payload", {}).get("workspace_id") == workspace_id)
+            and (
+                allowed_collection_ids is None
+                or "*" in allowed
+                or point.get("payload", {}).get("collection_id") in allowed
+            )
+        ]
+        if len(points) > limit:
             raise ValueError("complete point snapshot exceeds read limit")
-        return list(self._points.values())
+        return points
 
 
 class QdrantVectorStore:

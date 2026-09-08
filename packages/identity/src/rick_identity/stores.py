@@ -29,9 +29,27 @@ class InMemoryUserStore:
     def get_by_id(self, user_id: str) -> dict | None:
         return self._by_id.get(user_id)
 
+    def get_by_id_for_tenant(self, user_id: str, tenant_id: str) -> dict | None:
+        record = self._by_id.get(user_id)
+        return record if record is not None and record.get("tenant_id") == tenant_id else None
+
+    def list_users(self, *, tenant_id: str | None = None, workspace_id: str | None = None) -> list[dict]:
+        return [
+            record
+            for record in self._by_id.values()
+            if (tenant_id is None or record.get("tenant_id") == tenant_id)
+            and (workspace_id is None or record.get("workspace_id") == workspace_id)
+        ]
+
     def save(self, record: dict) -> None:
+        user_id = record["user_id"]
+        previous = self._by_id.get(user_id)
+        if previous is not None:
+            previous_email = (previous.get("email") or "").strip().lower()
+            if previous_email and self._by_email.get(previous_email) is previous:
+                self._by_email.pop(previous_email, None)
         self._by_email[(record.get("email") or "").strip().lower()] = record
-        self._by_id[record["user_id"]] = record
+        self._by_id[user_id] = record
 
 
 class InMemorySessionStore:
@@ -70,3 +88,7 @@ class InMemorySessionStore:
             # Session expiry is idle/sliding, while revoked and invalidated
             # records remain terminal in the provider boundary.
             record["expires_at"] = now + self.ttl_seconds
+
+    def records(self) -> list[dict]:
+        """Return session records for administrative, already-scoped adapters."""
+        return list(self._sessions.values())

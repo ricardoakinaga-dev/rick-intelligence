@@ -14,6 +14,12 @@ MAX_CHAT_MESSAGE_CHARS = 20000
 class ChatRequest(StrictContractModel):
     message: str = Field(min_length=1, max_length=MAX_CHAT_MESSAGE_CHARS)
     conversation_id: str | None = Field(default=None, max_length=128)
+    idempotency_key: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=128,
+        description="Client retry key; scoped to the authenticated user and conversation turn",
+    )
     collection_id: str | None = Field(default=None, max_length=128, description="Scope hint only; server ACL decides")
     workspace_id: str | None = Field(default=None, max_length=128)
     mode: str = Field(default="grounded", max_length=32)
@@ -38,6 +44,58 @@ class ChatResponse(StrictContractModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
+class ConversationSummary(StrictContractModel):
+    conversation_id: str = Field(min_length=1, max_length=128)
+    title: str = Field(min_length=1, max_length=160)
+    workspace_id: str = Field(min_length=1, max_length=128)
+    collection_id: str | None = Field(default=None, max_length=128)
+    status: Literal["active", "archived"]
+    created_at: float
+    updated_at: float
+    message_count: int = Field(ge=0, le=100_000)
+
+
+class ConversationListResponse(StrictContractModel):
+    items: list[ConversationSummary] = Field(default_factory=list, max_length=100)
+    total: int = Field(ge=0, le=100_000)
+    next_cursor: str | None = Field(default=None, max_length=256)
+
+
+class ConversationMessage(StrictContractModel):
+    conversation_id: str = Field(min_length=1, max_length=128)
+    message_id: str = Field(min_length=1, max_length=128)
+    question: str = Field(max_length=20_000)
+    answer: str = Field(max_length=8_000)
+    citations: list[Citation] = Field(default_factory=list, max_length=32)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    created_at: float
+
+
+class ConversationDetailResponse(StrictContractModel):
+    conversation: ConversationSummary
+    items: list[ConversationMessage] = Field(default_factory=list, max_length=100)
+    total: int = Field(ge=0, le=100_000)
+    next_cursor: str | None = Field(default=None, max_length=256)
+
+
+class HistoryListResponse(StrictContractModel):
+    items: list[ConversationMessage] = Field(default_factory=list, max_length=100)
+    total: int = Field(ge=0, le=100_000)
+    next_cursor: str | None = Field(default=None, max_length=256)
+
+
+class SourceItem(Citation):
+    conversation_id: str = Field(min_length=1, max_length=128)
+    message_id: str = Field(min_length=1, max_length=128)
+    created_at: float
+
+
+class SourceListResponse(StrictContractModel):
+    items: list[SourceItem] = Field(default_factory=list, max_length=100)
+    total: int = Field(ge=0, le=100_000)
+    next_cursor: str | None = Field(default=None, max_length=256)
+
+
 class ChatStreamEvent(StrictContractModel):
     type: Literal["start", "delta", "citation", "completion", "error"]
     conversation_id: str | None = None
@@ -48,3 +106,4 @@ class ChatStreamEvent(StrictContractModel):
     citations: list[Citation] = Field(default_factory=list)
     code: str | None = None
     message: str | None = None
+    provisional: bool | None = None

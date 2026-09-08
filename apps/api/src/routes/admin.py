@@ -8,10 +8,14 @@ from pydantic import BaseModel, Field
 from core.errors import ApiError
 from dependencies.identity import require_permission
 from dependencies.services import get_providers
+from services.audit import emit_required
 from services.ingestion_service import safe_job_json
 
 router = APIRouter(tags=["Admin"])
-_PUBLIC_USER_FIELDS = ("user_id", "email", "role", "canonical_role", "tenant_id", "workspace_id", "status")
+_PUBLIC_USER_FIELDS = (
+    "user_id", "email", "role", "canonical_role", "tenant_id", "workspace_id", "status",
+    "authorized_collection_ids", "permission_overrides",
+)
 
 
 def _public_user(item: object) -> dict:
@@ -42,8 +46,12 @@ def list_users(request: Request, session=Depends(require_permission("users.manag
         raise ApiError("provider_unavailable")
     context = _scope(session)
     tenant_id = _required_tenant(context)
+    try:
+        scoped_items = list_method(tenant_id=tenant_id, workspace_id=context.get("workspace_id"))
+    except TypeError:
+        raise ApiError("provider_unavailable") from None
     raw_items = [
-        item for item in list(list_method() or [])
+        item for item in list(scoped_items or [])
         if _job_field(item, "tenant_id", None) == tenant_id
     ]
     items = [_public_user(item) for item in raw_items]
@@ -55,6 +63,16 @@ class CreateUserRequest(BaseModel):
     role: str = Field(min_length=1, max_length=64)
     tenant_id: str = Field(min_length=1, max_length=128)
     password: str = Field(min_length=8, max_length=256)
+
+
+def _validated_role(value: str) -> str:
+    from rick_authorization import CANONICAL_ROLES, LEGACY_ROLE_ALIASES
+
+    candidate = (value or "").strip().lower()
+    canonical = candidate.upper() if candidate.upper() in CANONICAL_ROLES else LEGACY_ROLE_ALIASES.get(candidate)
+    if canonical not in CANONICAL_ROLES:
+        raise ApiError("validation_error", "Unknown role.")
+    return canonical
 
 
 @router.post("/api/v1/admin/users", status_code=201)
@@ -69,13 +87,77 @@ def create_user(payload: CreateUserRequest, request: Request, session=Depends(re
     tenant_id = _required_tenant(context)
     if payload.tenant_id.strip() != tenant_id:
         raise ApiError("forbidden")
-    user = create(email=payload.email, role=payload.role, tenant_id=tenant_id, password=payload.password)
+    user = create(email=payload.email, role=_validated_role(payload.role), tenant_id=tenant_id, password=payload.password)
     return {"status": "created", "user": _public_user(user)}
 
 
+class UpdateUserRequest(BaseModel):
+    email: str | None = Field(default=None, min_length=3, max_length=256)
+    role: str | None = Field(default=None, min_length=1, max_length=64)
+    workspace_id: str | None = Field(default=None, min_length=1, max_length=128)
+    authorized_collection_ids: list[str] | None = Field(default=None, max_length=64)
+    permission_overrides: dict | None = None
+
+
+@router.patch("/api/v1/admin/users/{user_id}")
+def update_user(user_id: str, payload: UpdateUserRequest, request: Request,
+                session=Depends(require_permission("users.manage"))):
+    providers = get_providers(request)
+    update = getattr(providers.identity, "update_user", None)
+    if not callable(update):
+        raise ApiError("provider_unavailable")
+    values = payload.model_dump(exclude_unset=True)
+    if "role" in values and values["role"] is not None:
+        values["role"] = _validated_role(values["role"])
+    user = update(actor=session, user_id=user_id, **values)
+    _audit_admin_event(request, "admin.user_updated", session, user_id)
+    return {"status": "updated", "user": _public_user(user)}
+
+
+@router.post("/api/v1/admin/users/{user_id}/deactivate")
+def deactivate_user(user_id: str, request: Request,
+                    session=Depends(require_permission("users.manage"))):
+    providers = get_providers(request)
+    deactivate = getattr(providers.identity, "deactivate_user", None)
+    if not callable(deactivate):
+        raise ApiError("provider_unavailable")
+    revoked = deactivate(actor=session, user_id=user_id)
+    _audit_admin_event(request, "admin.user_deactivated", session, user_id)
+    return {"status": "disabled", "user_id": user_id, "revoked_sessions": revoked}
+
+
+class ResetPasswordRequest(BaseModel):
+    password: str = Field(min_length=8, max_length=256)
+
+
+@router.post("/api/v1/admin/users/{user_id}/reset-password")
+def reset_user_password(user_id: str, payload: ResetPasswordRequest, request: Request,
+                        session=Depends(require_permission("users.manage"))):
+    providers = get_providers(request)
+    reset = getattr(providers.identity, "reset_password", None)
+    if not callable(reset):
+        raise ApiError("provider_unavailable")
+    revoked = reset(actor=session, user_id=user_id, password=payload.password)
+    _audit_admin_event(request, "admin.user_password_reset", session, user_id)
+    return {"status": "reset", "user_id": user_id, "revoked_sessions": revoked}
+
+
+def _audit_admin_event(request: Request, action: str, session, target_id: str) -> None:
+    emit_required(get_providers(request).audit_sink, {
+        "action": action, "actor_user_id": session.user_id, "target_id": target_id,
+        "tenant_id": session.tenant_id, "workspace_id": session.workspace_id,
+        "request_id": getattr(request.state, "request_id", None),
+    })
+
+
 @router.get("/api/v1/admin/sessions")
-def admin_sessions(session=Depends(require_permission("sessions.revoke"))):
-    return {"items": [], "total": 0}
+def admin_sessions(request: Request, session=Depends(require_permission("sessions.revoke"))):
+    providers = get_providers(request)
+    list_method = getattr(providers.identity, "list_sessions_for_actor", None)
+    if not callable(list_method):
+        raise ApiError("provider_unavailable")
+    items = list_method(session)
+    return {"items": items[:100], "total": len(items[:100])}
 
 
 class AdminRevokeRequest(BaseModel):
@@ -104,10 +186,12 @@ def admin_revoke(payload: AdminRevokeRequest, request: Request, session=Depends(
                 target_user_id=payload.user_id,
                 revoke_all=payload.revoke_all,
             ))
-        if providers.audit_sink is not None and revoked:
-            providers.audit_sink.emit({"action": "auth.session_revoked", "actor_user_id": session.user_id,  # type: ignore[union-attr]
-                                       "target_id": payload.user_id or payload.session_id,
-                                       "tenant_id": session.tenant_id})
+        if revoked:
+            emit_required(providers.audit_sink, {
+                "action": "auth.session_revoked", "actor_user_id": session.user_id,
+                "target_id": payload.user_id or payload.session_id,
+                "tenant_id": session.tenant_id, "workspace_id": session.workspace_id,
+            })
     except ApiError:
         raise
     except Exception:
@@ -144,6 +228,8 @@ def list_jobs(request: Request, session=Depends(require_permission("runtime.mana
                     limit=100,
                 )
             except TypeError:
+                if not getattr(service, "allow_unscoped_legacy_listing", False):
+                    raise ApiError("provider_unavailable") from None
                 try:
                     raw_items = method(limit=100)
                 except TypeError:
@@ -153,7 +239,10 @@ def list_jobs(request: Request, session=Depends(require_permission("runtime.mana
                 if _job_visible(item, context)
             ]
             items = [safe_job_json(item) for item in list(raw_items or [])[:100]]
-    return {"items": items, "total": len(items), "metadata": {"execution": "process-local", "durability": "process-local"}}
+    metadata = getattr(service, "runtime_metadata", None) if service is not None else None
+    if not isinstance(metadata, dict):
+        metadata = {"execution": "unconfigured", "durability": "unconfigured"}
+    return {"items": items, "total": len(items), "metadata": dict(metadata)}
 
 
 @router.get("/api/v1/admin/audit")
@@ -166,13 +255,15 @@ def list_audit(request: Request, session=Depends(require_permission("audit.read"
     context = _scope(session)
     tenant_id = _required_tenant(context)
     list_events = getattr(sink, "list", None)
-    if callable(list_events):
-        try:
-            events = list(list_events(limit=50, order="desc") or [])
-        except (TypeError, ValueError):
-            events = []
-    else:
-        events = list(getattr(sink, "events", []) or [])[-50:]
+    if not callable(list_events):
+        raise ApiError("provider_unavailable")
+    try:
+        events = list(list_events(
+            limit=50, order="desc", tenant_id=tenant_id,
+            workspace_id=context.get("workspace_id"),
+        ) or [])
+    except (TypeError, ValueError):
+        raise ApiError("provider_unavailable") from None
     events = [
         {
             key: event[key]
@@ -189,5 +280,6 @@ def list_audit(request: Request, session=Depends(require_permission("audit.read"
 
 
 @router.get("/api/v1/admin/system")
-def system_info(session=Depends(require_permission("runtime.manage"))):
-    return {"status": "ok", "version": "1.6.0", "api_version": "v1"}
+def system_info(request: Request, session=Depends(require_permission("runtime.manage"))):
+    return {"status": "ok", "version": "1.6.0", "api_version": "v1",
+            "runtime": dict(request.app.state.runtime_diagnostics)}

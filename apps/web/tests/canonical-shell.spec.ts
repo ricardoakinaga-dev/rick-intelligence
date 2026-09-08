@@ -86,5 +86,5 @@ test("connects the authorized admin and grounded chat surfaces", async ({ page }
   await page.getByLabel("Pergunta").fill("Quais documentos estão disponíveis?");
   await page.getByRole("button", { name: "Consultar" }).click();
   await expect(page.getByRole("heading", { name: "Leitura do resultado" })).toBeVisible();
-  await expect(page.getByText("Fontes associadas")).toBeVisible();
+  await expect(page.getByRole("article", { name: "Resposta do corpus" }).last().getByText("Fontes associadas", { exact: true })).toBeVisible();
 });

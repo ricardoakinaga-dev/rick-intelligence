@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 
 const identity = (name: string) => ({
   authenticated: true, user_id: name, email: `${name}@example.invalid`,
-  role: "viewer", canonical_role: "VIEWER", tenant_id: "synthetic",
+  role: "viewer", canonical_role: "VIEWER", permissions: ["chat.query", "documents.read", "documents.upload", "documents.manage", "ingestion.run", "reindex.run", "collections.read", "observability.read", "audit.read"],  tenant_id: "synthetic",
   workspace_id: name, session_id: `synthetic-${name}`,
 });
 const failure = { error: { code: "unauthorized", message: "Synthetic login rejected." } };

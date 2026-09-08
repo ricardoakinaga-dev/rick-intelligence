@@ -39,16 +39,19 @@ def test_role_aliases():
 
 
 def test_base_permissions():
-    assert permissions_for_role("VETERINARIAN") == ["chat.query", "collections.read", "history.read", "sources.read"]
+    assert permissions_for_role("VETERINARIAN") == [
+        "cases.feedback", "cases.manage", "cases.read",
+        "chat.query", "collections.read", "history.read", "sources.read",
+    ]
     km = permissions_for_role("KNOWLEDGE_MANAGER")
-    assert "documents.read" in km and "users.manage" not in km and "runtime.manage" not in km
+    assert "documents.read" in km and "cases.review" in km and "users.manage" not in km and "runtime.manage" not in km
     assert permissions_for_role("PLATFORM_ADMIN") == ["*"]
 
 
 def test_removal_wins_and_empty_means_none():
     assert "documents.read" not in permissions_for_role("KNOWLEDGE_MANAGER", {"remove": ["documents.read"]})
     assert permissions_for_role("VETERINARIAN", {"add": ["documents.read"], "remove": ["documents.read"]}) == \
-        ["chat.query", "collections.read", "history.read", "sources.read"]
+        ["cases.feedback", "cases.manage", "cases.read", "chat.query", "collections.read", "history.read", "sources.read"]
     assert not permission_granted(role=None, permissions=[], required="chat.query", authoritative=True)
 
 

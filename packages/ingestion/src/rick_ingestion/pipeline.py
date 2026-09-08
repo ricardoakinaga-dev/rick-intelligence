@@ -12,12 +12,13 @@ flow through events; document text never enters logs.
 from __future__ import annotations
 
 import math
+import inspect
 from contextlib import nullcontext
 from itertools import islice
 from numbers import Real
 from pathlib import Path
 from threading import RLock
-from typing import Any, Callable, Protocol
+from typing import Any, Callable, Mapping, Protocol
 
 from rick_ingestion.chunking import CHUNKER_VERSION, RecursiveChunkingStrategy
 from rick_ingestion.jobs import DEFAULT_MAX_JOBS, IngestionJob, is_retryable
@@ -54,6 +55,68 @@ class VectorStore(Protocol):
 
 
 MAX_POINT_SNAPSHOT = 100_000
+
+
+def _accepts_scope(method: object) -> bool:
+    """Detect the additive scoped adapter seam without catching inner errors."""
+
+    try:
+        parameters = inspect.signature(method).parameters.values()
+    except (TypeError, ValueError):
+        return False
+    names = {parameter.name for parameter in parameters}
+    return {"tenant_id", "workspace_id"}.issubset(names) or any(
+        parameter.kind is inspect.Parameter.VAR_KEYWORD for parameter in parameters
+    )
+
+
+def _scoped_call(
+    method: Callable[..., Any],
+    *args: Any,
+    tenant_id: str | None,
+    workspace_id: str | None,
+    **kwargs: Any,
+) -> Any:
+    """Call a scoped adapter when it advertises the scope contract.
+
+    Local compatibility stores retain their historical one-argument methods;
+    external stores opt into the keyword pair. Signature inspection avoids
+    turning a real adapter failure into an unsafe unscoped retry.
+    """
+
+    if isinstance(tenant_id, str) and isinstance(workspace_id, str) and _accepts_scope(method):
+        return method(
+            *args,
+            tenant_id=tenant_id,
+            workspace_id=workspace_id,
+            **kwargs,
+        )
+    return method(*args, **kwargs)
+
+
+def _safe_document_metadata(value: Mapping[str, object] | None) -> dict[str, object]:
+    """Keep only bounded object provenance needed by durable ingestion."""
+
+    if value is None:
+        return {}
+    if not isinstance(value, Mapping):
+        raise ValueError("document metadata must be a mapping")
+    result: dict[str, object] = {}
+    for key in ("object_key", "object_source_id", "created_by"):
+        raw = value.get(key)
+        if raw is None:
+            continue
+        if not isinstance(raw, str) or not raw.strip() or len(raw) > 512:
+            raise ValueError("document metadata is invalid")
+        if any(ord(char) < 0x20 or ord(char) == 0x7F for char in raw):
+            raise ValueError("document metadata is invalid")
+        result[key] = raw.strip()
+    byte_size = value.get("byte_size")
+    if byte_size is not None:
+        if isinstance(byte_size, bool) or not isinstance(byte_size, int) or not 0 <= byte_size <= 50 * 1024 * 1024:
+            raise ValueError("document metadata is invalid")
+        result["byte_size"] = byte_size
+    return result
 
 
 class IngestionEvents(Protocol):
@@ -177,6 +240,8 @@ class IngestionService:
         collection_id: str,
         *,
         document_written: bool,
+        tenant_id: str,
+        workspace_id: str,
     ) -> None:
         """Compensate every local write made before publication.
 
@@ -188,7 +253,13 @@ class IngestionService:
         if not document_id or not document_written:
             return
         try:
-            self.vectors.delete_document(document_id, collection_id)
+            _scoped_call(
+                self.vectors.delete_document,
+                document_id,
+                collection_id,
+                tenant_id=tenant_id,
+                workspace_id=workspace_id,
+            )
         except Exception:
             # A failed index delete must not hide the failed job or leak the
             # original exception. The retrieval status gate is the second line
@@ -199,8 +270,20 @@ class IngestionService:
             try:
                 clear_chunks = getattr(self.knowledge, "replace_document_chunks", None)
                 if callable(clear_chunks):
-                    clear_chunks(document_id, [])
-                set_status(document_id, "failed")
+                    _scoped_call(
+                        clear_chunks,
+                        document_id,
+                        [],
+                        tenant_id=tenant_id,
+                        workspace_id=workspace_id,
+                    )
+                _scoped_call(
+                    set_status,
+                    document_id,
+                    "failed",
+                    tenant_id=tenant_id,
+                    workspace_id=workspace_id,
+                )
                 return
             except Exception:
                 pass
@@ -209,7 +292,12 @@ class IngestionService:
         delete_document = getattr(self.knowledge, "delete_document", None)
         if callable(delete_document):
             try:
-                delete_document(document_id)
+                _scoped_call(
+                    delete_document,
+                    document_id,
+                    tenant_id=tenant_id,
+                    workspace_id=workspace_id,
+                )
             except Exception:
                 pass
 
@@ -275,6 +363,8 @@ class IngestionService:
         old_document_id: str,
         collection_id: str,
         old_points: list[dict],
+        tenant_id: str,
+        workspace_id: str,
         retirement_started: bool = True,
     ) -> None:
         """Make a failed replacement non-searchable and restore old points."""
@@ -283,7 +373,13 @@ class IngestionService:
         # replacement attempt. Compensation must never delete its data.
         if not job.metadata.get("deduplicated", False):
             try:
-                self.vectors.delete_document(new_document_id, collection_id)
+                _scoped_call(
+                    self.vectors.delete_document,
+                    new_document_id,
+                    collection_id,
+                    tenant_id=tenant_id,
+                    workspace_id=workspace_id,
+                )
             except Exception:
                 pass
             self._mark_document_failed(new_document_id)
@@ -295,16 +391,34 @@ class IngestionService:
                     batch = old_points[offset:offset + 1_000]
                     if self.vectors.upsert_points(batch) != len(batch):
                         raise RuntimeError("incomplete compensation write")
-                restored = self.vectors.count_for_document(old_document_id, collection_id) == len(old_points)
+                restored = _scoped_call(
+                    self.vectors.count_for_document,
+                    old_document_id,
+                    collection_id,
+                    tenant_id=tenant_id,
+                    workspace_id=workspace_id,
+                ) == len(old_points)
             except Exception:
                 restored = False
         try:
-            self.knowledge.set_document_status(old_document_id, "published" if restored else "unpublished")
+            _scoped_call(
+                self.knowledge.set_document_status,
+                old_document_id,
+                "published" if restored else "unpublished",
+                tenant_id=tenant_id,
+                workspace_id=workspace_id,
+            )
         except Exception:
             # A failed restore is safer as unpublished than as a misleading
             # published record with an unknown index state.
             try:
-                self.knowledge.set_document_status(old_document_id, "unpublished")
+                _scoped_call(
+                    self.knowledge.set_document_status,
+                    old_document_id,
+                    "unpublished",
+                    tenant_id=tenant_id,
+                    workspace_id=workspace_id,
+                )
             except Exception:
                 pass
         try:
@@ -339,13 +453,15 @@ class IngestionService:
                display_filename: str | None = None, request_id: str | None = None,
                correlation_id: str | None = None, job_id: str | None = None,
                cancel_check: Callable[[], bool] | None = None,
-               publication_guard: Callable[[], object] | None = None) -> IngestionJob:
+               publication_guard: Callable[[], object] | None = None,
+               document_metadata: Mapping[str, object] | None = None) -> IngestionJob:
         with self._operation_lock:
             return self._ingest(
                 path, workspace_id=workspace_id, collection_id=collection_id,
                 tenant_id=tenant_id, display_filename=display_filename,
                 request_id=request_id, correlation_id=correlation_id, job_id=job_id,
                 cancel_check=cancel_check, publication_guard=publication_guard,
+                document_metadata=document_metadata,
             )
 
     def _ingest(self, path: Path, *, workspace_id: str, collection_id: str,
@@ -353,9 +469,11 @@ class IngestionService:
                 request_id: str | None = None, correlation_id: str | None = None,
                 job_id: str | None = None,
                 cancel_check: Callable[[], bool] | None = None,
-                publication_guard: Callable[[], object] | None = None) -> IngestionJob:
+                publication_guard: Callable[[], object] | None = None,
+                document_metadata: Mapping[str, object] | None = None) -> IngestionJob:
         tenant_id = normalize_tenant_id(tenant_id)
         collection_id = normalize_collection_id(collection_id)
+        safe_document_metadata = _safe_document_metadata(document_metadata)
         job_kwargs = {
             "tenant_id": tenant_id,
             "workspace_id": workspace_id,
@@ -393,7 +511,12 @@ class IngestionService:
             )
             job.document_id = document_id
 
-            existing = self.knowledge.get_document(document_id)
+            existing = _scoped_call(
+                self.knowledge.get_document,
+                document_id,
+                tenant_id=tenant_id,
+                workspace_id=workspace_id,
+            )
             if existing is not None and existing.status == "published":
                 # Idempotent re-ingest: same identities, no duplicate drift.
                 job.metadata["deduplicated"] = True
@@ -447,10 +570,16 @@ class IngestionService:
                 status="processing", parser_version=PARSER_VERSION,
                 chunker_version=CHUNKER_VERSION,
                 embedding_model=self.embeddings.model, embedding_version=self.embedding_version,
+                metadata=safe_document_metadata,
             )
             self.knowledge.upsert_collection(Collection(
                 workspace_id=workspace_id, collection_id=collection_id,
-                tenant_id=tenant_id, title=collection_id))
+                tenant_id=tenant_id, title=collection_id,
+                metadata=(
+                    {"created_by": safe_document_metadata["created_by"]}
+                    if "created_by" in safe_document_metadata else {}
+                ),
+            ))
             document_written = True
             # Mark before the call: an adapter is allowed to persist and then
             # raise, and compensation must cover that partial write too.
@@ -470,7 +599,13 @@ class IngestionService:
                 )
                 for plan in plans
             ]
-            self.knowledge.replace_document_chunks(document_id, chunks)
+            _scoped_call(
+                self.knowledge.replace_document_chunks,
+                document_id,
+                chunks,
+                tenant_id=tenant_id,
+                workspace_id=workspace_id,
+            )
             from rick_knowledge import build_point_payload
 
             points = []
@@ -481,13 +616,25 @@ class IngestionService:
             indexed = self.vectors.upsert_points(points)
 
             advance("verifying", progress=0.9)
-            if self.vectors.count_for_document(document_id, collection_id) < len(chunks):
+            if _scoped_call(
+                self.vectors.count_for_document,
+                document_id,
+                collection_id,
+                tenant_id=tenant_id,
+                workspace_id=workspace_id,
+            ) < len(chunks):
                 raise RuntimeError("verify failed: indexed points below chunk count")
             publish_context = publication_guard() if callable(publication_guard) else nullcontext()
             with publish_context:
                 with self._lock:
                     self._checkpoint(job, cancel_check)
-                    self.knowledge.set_document_status(document_id, "published")
+                    _scoped_call(
+                        self.knowledge.set_document_status,
+                        document_id,
+                        "published",
+                        tenant_id=tenant_id,
+                        workspace_id=workspace_id,
+                    )
                     job.document_id = document_id
                     advance("published", progress=1.0)
             self.events.emit({**base_event, "type": "ingestion.completed",
@@ -495,7 +642,8 @@ class IngestionService:
             return job
         except _CancellationRequested:
             self._cleanup_failed_document(
-                document_id, collection_id, document_written=document_written
+                document_id, collection_id, document_written=document_written,
+                tenant_id=tenant_id, workspace_id=workspace_id,
             )
             if job.status != "cancelled":
                 job.cancel_requested = True
@@ -504,7 +652,8 @@ class IngestionService:
             return job
         except ParseError as exc:
             self._cleanup_failed_document(
-                document_id, collection_id, document_written=document_written
+                document_id, collection_id, document_written=document_written,
+                tenant_id=tenant_id, workspace_id=workspace_id,
             )
             job.transition("failed", error_code=exc.code, message=exc.args[0] if exc.args else "Ingestion failed.")
             self.events.emit({**base_event, "type": "ingestion.failed", "error_code": exc.code,
@@ -512,7 +661,8 @@ class IngestionService:
             return job
         except Exception:
             self._cleanup_failed_document(
-                document_id, collection_id, document_written=document_written
+                document_id, collection_id, document_written=document_written,
+                tenant_id=tenant_id, workspace_id=workspace_id,
             )
             if job.status == "cancelled":
                 self.events.emit({**base_event, "type": "ingestion.cancelled"})
@@ -529,7 +679,12 @@ class IngestionService:
             return self._reindex(document_id, path, **kwargs)
 
     def _reindex(self, document_id: str, path: Path, **kwargs: Any) -> IngestionJob:
-        previous = self.knowledge.get_document(document_id)
+        previous = _scoped_call(
+            self.knowledge.get_document,
+            document_id,
+            tenant_id=kwargs.get("tenant_id"),
+            workspace_id=kwargs.get("workspace_id"),
+        )
         job = self.ingest(path, **kwargs)
         # A failed replacement must not remove the currently published
         # version. Only commit the old-version retirement after the new
@@ -546,8 +701,20 @@ class IngestionService:
                 collection_id = normalize_collection_id(kwargs.get("collection_id", "rag_phase0"))
                 old_points = self._snapshot_points(self.vectors, document_id, collection_id)
                 retirement_started = True
-                self.vectors.delete_document(document_id, collection_id)
-                self.knowledge.set_document_status(document_id, "unpublished")
+                _scoped_call(
+                    self.vectors.delete_document,
+                    document_id,
+                    collection_id,
+                    tenant_id=kwargs["tenant_id"],
+                    workspace_id=kwargs["workspace_id"],
+                )
+                _scoped_call(
+                    self.knowledge.set_document_status,
+                    document_id,
+                    "unpublished",
+                    tenant_id=kwargs["tenant_id"],
+                    workspace_id=kwargs["workspace_id"],
+                )
             except Exception:
                 self._rollback_replacement(
                     job,
@@ -555,6 +722,8 @@ class IngestionService:
                     old_document_id=document_id,
                     collection_id=normalize_collection_id(kwargs.get("collection_id", "rag_phase0")),
                     old_points=old_points,
+                    tenant_id=kwargs["tenant_id"],
+                    workspace_id=kwargs["workspace_id"],
                     retirement_started=retirement_started,
                 )
         return job

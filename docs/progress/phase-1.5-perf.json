@@ -1,4 +1,5 @@
 {
+  "schema_version": 2,
   "phase": "1.5",
   "fixture": "demo-corpus-single-document",
   "samples": 30,
@@ -7,12 +8,99 @@
     "platform": "Linux-7.0.0-31-generic-x86_64-with-glibc2.39"
   },
   "retrieval_ms": {
-    "p50": 0.561,
-    "p95": 0.801
+    "n": 30,
+    "p50": 0.601,
+    "p95": 0.83,
+    "p99": 0.922,
+    "min": 0.492,
+    "max": 0.922
   },
   "professor_ms": {
-    "p50": 1.051,
-    "p95": 1.339
+    "n": 30,
+    "p50": 1.249,
+    "p95": 1.815,
+    "p99": 1.893,
+    "min": 1.021,
+    "max": 1.893
+  },
+  "ttft_ms": {
+    "status": "OBSERVED",
+    "n": 30,
+    "p50": 1.193,
+    "p95": 1.51,
+    "p99": 1.563,
+    "min": 0.996,
+    "max": 1.563
+  },
+  "completion_ms": {
+    "status": "OBSERVED",
+    "n": 30,
+    "p50": 1.401,
+    "p95": 1.732,
+    "p99": 1.765,
+    "min": 1.132,
+    "max": 1.765
+  },
+  "memory": {
+    "status": "OBSERVED",
+    "unit": "bytes",
+    "method": "procfs_rss_and_vmhwm_or_resource_maxrss",
+    "rss_before_bytes": 51249152,
+    "rss_after_bytes": 51798016,
+    "rss_delta_bytes": 548864,
+    "peak_rss_bytes": 51798016,
+    "scope": "entire benchmark process; not an isolated request allocation"
+  },
+  "cost": {
+    "status": "NOT_RUN",
+    "amount": null,
+    "currency": null,
+    "reason": "No billing telemetry is available and no external provider was executed."
+  },
+  "failure_scenarios": [
+    {
+      "id": "provider_failure",
+      "scope": "LOCAL_DETERMINISTIC",
+      "deterministic": true,
+      "expected": "provider_failed",
+      "observed": "provider_failed",
+      "status": "PASS"
+    },
+    {
+      "id": "lease_unavailable",
+      "scope": "LOCAL_DETERMINISTIC",
+      "deterministic": true,
+      "expected": "lease_unavailable",
+      "observed": "lease_unavailable",
+      "status": "PASS"
+    }
+  ],
+  "soak_scenario": {
+    "id": "bounded_local_soak",
+    "scope": "LOCAL_DETERMINISTIC",
+    "deterministic": true,
+    "status": "PASS",
+    "iterations": 10,
+    "iterations_completed": 10,
+    "failures": 0,
+    "duration_ms": 13.49,
+    "invariants": [
+      "all completions retained APPROVED_EVIDENCE",
+      "no external dependency was contacted"
+    ]
+  },
+  "local_scenarios_status": "PASS",
+  "external_scenarios": {
+    "distributed_load": {
+      "status": "NOT_RUN",
+      "scope": "EXTERNAL",
+      "reason": "External load and multi-replica capacity testing is outside this hermetic benchmark."
+    },
+    "provider_soak": {
+      "status": "NOT_RUN",
+      "scope": "EXTERNAL",
+      "reason": "No live provider or paid workload was contacted."
+    }
   },
   "bounds": {
     "provider_max_attempts": 3,

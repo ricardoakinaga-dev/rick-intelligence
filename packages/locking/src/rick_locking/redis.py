@@ -257,6 +257,19 @@ class RedisLeaseStore:
         )
         return _script_result(result, "release", corr)
 
+    async def health_check(self) -> bool:
+        """Check Redis liveness without changing a lease key."""
+
+        ping = getattr(self._client, "ping", None)
+        if not callable(ping):
+            return False
+        correlation = correlation_id_for("acquire", None)
+        try:
+            result = await self._call("acquire", correlation, lambda: ping())
+        except LeaseError:
+            return False
+        return result is True or result == "PONG" or result == b"PONG"
+
     async def close(self) -> None:
         """Close the injected client only when ownership was explicitly given."""
 
@@ -315,6 +328,9 @@ class RedisLeaseClient(LeaseClient):
 
     async def close(self) -> None:
         await self.store.close()
+
+    async def health_check(self) -> bool:
+        return await self.store.health_check()
 
 
 RedisLeaseBackend = RedisLeaseStore

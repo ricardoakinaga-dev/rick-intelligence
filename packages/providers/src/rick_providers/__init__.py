@@ -6,6 +6,7 @@ explicitly non-production deterministic test/dev provider.
 
 from rick_contracts.providers import (
     PROVIDER_CONTRACT_VERSION,
+    ChatCompletionChunk,
     ChatCompletionResult,
     EmbeddingResult,
     ProviderErrorCode,
@@ -53,6 +54,7 @@ __all__ = [
     "ProviderErrorCode",
     "ProviderErrorDto",
     "EmbeddingResult",
+    "ChatCompletionChunk",
     "ChatCompletionResult",
     "ProviderConfig",
     "ProviderConfigurationError",

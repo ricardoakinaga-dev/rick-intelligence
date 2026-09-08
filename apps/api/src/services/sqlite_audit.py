@@ -379,10 +379,18 @@ class SQLiteAuditSink:
 
         return self.append(event)
 
-    def emit(self, event: object) -> None:
+    def emit(self, event: object) -> bool:
         """Best-effort sink interface used by the API audit hooks."""
 
-        self.append(event)
+        return self.append(event)
+
+    def health_check(self) -> bool:
+        try:
+            with self._read() as connection:
+                connection.execute("SELECT 1").fetchone()
+            return True
+        except Exception:
+            return False
 
     @staticmethod
     def _normalise_order(order: str) -> str:
@@ -407,6 +415,8 @@ class SQLiteAuditSink:
         order: str = "desc",
         *,
         newest_first: bool | None = None,
+        tenant_id: str | None = None,
+        workspace_id: str | None = None,
     ) -> list[dict[str, object]]:
         """Read detached event dicts ordered by insertion id."""
 
@@ -424,8 +434,26 @@ class SQLiteAuditSink:
         if limit == 0:
             return []
 
-        query = f"SELECT event_json FROM audit_events ORDER BY id {direction}"
-        parameters: tuple[object, ...] = ()
+        clauses: list[str] = []
+        parameters_list: list[object] = []
+        if tenant_id is not None:
+            if not isinstance(tenant_id, str) or not tenant_id.strip():
+                raise ValueError("tenant_id is required")
+            clauses.append("json_extract(event_json, '$.tenant_id') = ?")
+            parameters_list.append(tenant_id.strip())
+        if workspace_id is not None:
+            if not isinstance(workspace_id, str) or not workspace_id.strip():
+                raise ValueError("workspace_id is required")
+            clauses.append(
+                "(json_extract(event_json, '$.workspace_id') IS NULL "
+                "OR json_extract(event_json, '$.workspace_id') = ?)"
+            )
+            parameters_list.append(workspace_id.strip())
+        query = "SELECT event_json FROM audit_events"
+        if clauses:
+            query += " WHERE " + " AND ".join(clauses)
+        query += f" ORDER BY id {direction}"
+        parameters: tuple[object, ...] = tuple(parameters_list)
         if limit is not None:
             query += " LIMIT ?"
             parameters = (limit,)
@@ -448,10 +476,15 @@ class SQLiteAuditSink:
         order: str = "desc",
         *,
         newest_first: bool | None = None,
+        tenant_id: str | None = None,
+        workspace_id: str | None = None,
     ) -> list[dict[str, object]]:
         """Short spelling for :meth:`list_events`."""
 
-        return self.list_events(limit=limit, order=order, newest_first=newest_first)
+        return self.list_events(
+            limit=limit, order=order, newest_first=newest_first,
+            tenant_id=tenant_id, workspace_id=workspace_id,
+        )
 
     @property
     def events(self) -> list[dict[str, object]]:

@@ -15,6 +15,8 @@ Provider modes:
 from __future__ import annotations
 
 import os
+import hashlib
+import secrets
 import time
 import uuid
 
@@ -27,6 +29,7 @@ from rick_identity import (
     Pbkdf2Verifier,
     PlainTestVerifier,
 )
+from rick_authorization import CANONICAL_ROLES, LEGACY_ROLE_ALIASES, canonical_role
 from rick_identity.passwords import hash_password
 
 
@@ -48,6 +51,7 @@ class InMemoryIdentityProvider:
             raise RuntimeError("Refusing to start: test credential verifier selected in production mode.")
         self._provider = IdentityProviderImpl(users=self._users, sessions=self._sessions, verifier=verifier)  # type: ignore[arg-type]
         self._login_attempts: dict[str, list[float]] = {}
+        self._reset_tokens: dict[str, tuple[str, float]] = {}
         self._seed_demo_users()
 
     # -- seed data (DATA, not policy: grants/overrides resolved by canonical engine) --
@@ -118,29 +122,55 @@ class InMemoryIdentityProvider:
             if isinstance(item, dict)
         ]
 
-    def list_users(self) -> list[dict]:
-        """Return the store's redacted user view; never expose credentials."""
-        records = getattr(self._users, "_by_id", {})
-        if not isinstance(records, dict):
+    def list_sessions_for_actor(self, actor) -> list[dict]:
+        """List redacted sessions inside the actor's tenant only."""
+        actor_tenant = getattr(actor, "tenant_id", None)
+        if not isinstance(actor_tenant, str) or not actor_tenant.strip():
             return []
-        items = []
-        for user_id in records:
-            user = self._provider.get_user(user_id)
-            if user is not None:
-                items.append(user)
-        return items
+        result = []
+        for record in self._sessions.records():
+            user = self._users.get_by_id(record.get("user_id") or "")
+            if not isinstance(user, dict) or user.get("tenant_id") != actor_tenant:
+                continue
+            result.append({
+                "session_id": record.get("session_id"), "user_id": record.get("user_id"),
+                "email": user.get("email"), "tenant_id": actor_tenant,
+                "workspace_id": user.get("workspace_id"),
+                "created_at": record.get("created_at"), "last_seen_at": record.get("last_seen_at"),
+                "expires_at": record.get("expires_at"),
+                "revoked": record.get("revoked_at") is not None,
+            })
+        return sorted(result, key=lambda item: (float(item.get("created_at") or 0), str(item.get("session_id") or "")), reverse=True)
+
+    def list_users(
+        self,
+        *,
+        tenant_id: str | None = None,
+        workspace_id: str | None = None,
+    ) -> list[dict]:
+        """Return a redacted, optionally tenant/workspace-scoped user view."""
+        records = self._users.list_users(tenant_id=tenant_id, workspace_id=workspace_id)
+        return [
+            user
+            for record in records
+            if (user := self._provider.get_user(record.get("user_id", ""))) is not None
+        ]
 
     def create_user(self, *, email: str, role: str, tenant_id: str, password: str) -> dict:
         """Create a real hermetic user; external providers own production writes."""
         from core.errors import ApiError
 
         normalized_email = (email or "").strip().lower()
+        candidate_role = (role or "").strip().lower()
+        normalized_role = candidate_role.upper() if candidate_role.upper() in CANONICAL_ROLES else LEGACY_ROLE_ALIASES.get(candidate_role)
+        if normalized_role not in CANONICAL_ROLES:
+            raise ApiError("validation_error", "Unknown role.")
         if self._users.get_by_email(normalized_email) is not None:
             raise ApiError("conflict")
         record = {
             "user_id": f"user-{uuid.uuid4().hex[:16]}",
             "email": normalized_email,
-            "role": role,
+            "role": normalized_role,
             "tenant_id": tenant_id,
             "workspace_id": "default",
             "status": "active",
@@ -157,6 +187,120 @@ class InMemoryIdentityProvider:
         return self._provider.get_user(record["user_id"]) or {
             "user_id": record["user_id"], "email": normalized_email, "role": role,
         }
+
+    def update_user(self, *, actor, user_id: str, email: str | None = None,
+                    role: str | None = None, workspace_id: str | None = None,
+                    authorized_collection_ids: list[str] | None = None,
+                    permission_overrides: dict | None = None) -> dict:
+        """Apply a tenant-scoped profile update and invalidate changed roles."""
+        from core.errors import ApiError
+
+        self._assert_same_tenant(actor, user_id)
+        user = self._users.get_by_id(user_id)
+        if user is None:
+            raise ApiError("not_found")
+        if email is not None:
+            normalized = email.strip().lower()
+            if not normalized or self._users.get_by_email(normalized) not in (None, user):
+                raise ApiError("conflict")
+            user["email"] = normalized
+        if role is not None:
+            candidate_role = (role or "").strip().lower()
+            normalized_role = candidate_role.upper() if candidate_role.upper() in CANONICAL_ROLES else LEGACY_ROLE_ALIASES.get(candidate_role)
+            if normalized_role not in CANONICAL_ROLES:
+                raise ApiError("validation_error")
+            if canonical_role(user.get("role")) != normalized_role:
+                user["role"] = normalized_role
+                user["role_version"] = int(user.get("role_version", 1)) + 1
+        if workspace_id is not None:
+            workspace = workspace_id.strip()
+            if not workspace or len(workspace) > 128:
+                raise ApiError("validation_error")
+            user["workspace_id"] = workspace
+        if authorized_collection_ids is not None:
+            user["authorized_collection_ids"] = sorted({value.strip() for value in authorized_collection_ids if value.strip()})
+        if permission_overrides is not None:
+            user["permission_overrides"] = permission_overrides
+        self._users.save(user)
+        return self._provider.get_user(user_id) or {"user_id": user_id}
+
+    def deactivate_user(self, *, actor, user_id: str) -> int:
+        """Disable a user and revoke every active session atomically in memory."""
+        from core.errors import ApiError
+
+        self._assert_same_tenant(actor, user_id)
+        user = self._users.get_by_id(user_id)
+        if user is None:
+            raise ApiError("not_found")
+        if user.get("status", "active") != "active":
+            return 0
+        if canonical_role(user.get("role")) == "PLATFORM_ADMIN":
+            active_admins = sum(
+                1 for candidate in self._users._by_id.values()
+                if candidate.get("tenant_id") == actor.tenant_id
+                and candidate.get("status", "active") == "active"
+                and canonical_role(candidate.get("role")) == "PLATFORM_ADMIN"
+            )
+            if active_admins <= 1:
+                raise ApiError("conflict", "The last active administrator cannot be disabled.")
+        user["status"] = "disabled"
+        user["password_version"] = int(user.get("password_version", 1)) + 1
+        self._users.save(user)
+        return self._provider.revoke_user_sessions(user_id, reason="user_disabled")
+
+    def reset_password(self, *, actor, user_id: str, password: str) -> int:
+        from core.errors import ApiError
+
+        self._assert_same_tenant(actor, user_id)
+        if not isinstance(password, str) or len(password) < 8:
+            raise ApiError("validation_error")
+        user = self._users.get_by_id(user_id)
+        if user is None:
+            raise ApiError("not_found")
+        if self.mode == "production":
+            user["password_hash"] = hash_password(password)
+            user.pop("password_plain", None)
+        else:
+            user["password_plain"] = password
+            user.pop("password_hash", None)
+        user["password_version"] = int(user.get("password_version", 1)) + 1
+        self._users.save(user)
+        return self._provider.revoke_user_sessions(user_id, reason="password_reset")
+
+    def issue_password_reset(self, *, email: str, tenant_id: str | None) -> str | None:
+        """Issue a short-lived single-use token for an injected delivery port."""
+        normalized = (email or "").strip().lower()
+        user = self._users.get_by_email(normalized)
+        if user is None or (tenant_id and user.get("tenant_id") != tenant_id.strip()):
+            return None
+        token = secrets.token_urlsafe(32)
+        self._reset_tokens[hashlib.sha256(token.encode("utf-8")).hexdigest()] = (
+            user["user_id"], time.time() + 900,
+        )
+        return token
+
+    def consume_password_reset(self, *, token: str, new_password: str) -> int:
+        from core.errors import ApiError
+
+        if not isinstance(token, str) or not token.strip() or len(token) > 512:
+            raise ApiError("validation_error", "Invalid or expired reset token.")
+        key = hashlib.sha256(token.encode("utf-8")).hexdigest()
+        record = self._reset_tokens.pop(key, None)
+        if record is None or time.time() >= record[1]:
+            raise ApiError("validation_error", "Invalid or expired reset token.")
+        user = self._users.get_by_id(record[0])
+        if user is None or user.get("status", "active") != "active":
+            raise ApiError("validation_error", "Invalid or expired reset token.")
+        if len(new_password) < 8:
+            raise ApiError("validation_error")
+        if self.mode == "production":
+            user["password_hash"] = hash_password(new_password)
+            user.pop("password_plain", None)
+        else:
+            user["password_plain"] = new_password
+        user["password_version"] = int(user.get("password_version", 1)) + 1
+        self._users.save(user)
+        return self._provider.revoke_user_sessions(user["user_id"], reason="password_recovery")
 
     def revoke_session_by_id(self, *, actor, session_id: str) -> int:
         """Resolve a session identifier without exposing bearer tokens."""

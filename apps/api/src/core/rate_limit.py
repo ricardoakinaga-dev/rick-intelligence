@@ -3,9 +3,82 @@
 from __future__ import annotations
 
 from collections import defaultdict, deque
+import math
 import threading
 import time
-from typing import Any
+from typing import Any, Protocol
+
+
+class RateLimiter(Protocol):
+    """Synchronous limiter contract used by the API routes."""
+
+    def check(self, key: str, *, limit_per_min: int) -> bool:
+        """Consume one request from ``key`` and report whether it is allowed."""
+
+
+class DistributedRateLimitBackend(Protocol):
+    """Atomic shared-counter boundary for :class:`DistributedRateLimiter`.
+
+    The implementation must increment ``key`` and establish or preserve its
+    expiry as one atomic operation.  Redis, for example, can provide this
+    with a Lua script or ``INCR`` plus an expiry set only on the first write.
+    The API package intentionally does not construct a Redis client; callers
+    inject an implementation at composition time.
+    """
+
+    def increment(self, key: str, *, window_seconds: float) -> int:
+        """Return the counter value after the atomic increment."""
+
+
+class DistributedRateLimiter:
+    """Synchronous adapter over a shared, expiry-aware counter backend.
+
+    Each key is counted in a fixed window whose duration is supplied to the
+    backend.  The backend owns the cross-process atomicity and expiry; this
+    adapter only applies the configured limit.  If the backend is unavailable,
+    malformed, or raises for any other operational reason, the request is
+    rejected.  It never silently falls back to local memory because that would
+    bypass the distributed security boundary.
+
+    Real Redis wiring remains external: inject a synchronous adapter that
+    implements :class:`DistributedRateLimitBackend`.  Until that wiring is
+    present, :class:`InMemoryRateLimiter` remains the explicit local fallback
+    and is not a multi-replica boundary.
+    """
+
+    def __init__(
+        self,
+        backend: DistributedRateLimitBackend,
+        *,
+        window_seconds: float = 60.0,
+    ) -> None:
+        if not callable(getattr(backend, "increment", None)):
+            raise ValueError("distributed rate-limit backend must expose increment()")
+        if not isinstance(window_seconds, (int, float)) or isinstance(window_seconds, bool):
+            raise ValueError("rate-limit window must be a positive finite number")
+        if not math.isfinite(window_seconds) or window_seconds <= 0:
+            raise ValueError("rate-limit window must be a positive finite number")
+        self._backend = backend
+        self.window_seconds = float(window_seconds)
+
+    def check(self, key: str, *, limit_per_min: int) -> bool:
+        """Atomically count a request and fail closed if the backend is unsafe."""
+
+        if not isinstance(limit_per_min, int) or isinstance(limit_per_min, bool):
+            return False
+        if limit_per_min <= 0:
+            return False
+
+        try:
+            count = self._backend.increment(key, window_seconds=self.window_seconds)
+        except Exception:
+            # Backend failures must not expose connection details or turn the
+            # rate-limit boundary into an accidental fail-open path.
+            return False
+
+        if not isinstance(count, int) or isinstance(count, bool) or count < 1:
+            return False
+        return count <= limit_per_min
 
 
 class InMemoryRateLimiter:

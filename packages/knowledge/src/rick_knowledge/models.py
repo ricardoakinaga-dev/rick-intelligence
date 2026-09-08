@@ -57,4 +57,6 @@ class Collection:
     tenant_id: str
     title: str = ""
     description: str = ""
+    status: str = "active"
+    version: int = 1
     metadata: dict = field(default_factory=dict)

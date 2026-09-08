@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { resolve } from "node:path";
 
-const session = { authenticated: true, user_id: "synthetic-vet", email: "vet@example.invalid", role: "VETERINARIAN", canonical_role: "VETERINARIAN", tenant_id: "default", workspace_id: "default", session_id: "synthetic-session" };
+const session = { authenticated: true, user_id: "synthetic-vet", email: "vet@example.invalid", role: "VETERINARIAN", canonical_role: "VETERINARIAN", permissions: ["chat.query", "documents.read", "documents.upload", "documents.manage", "ingestion.run", "reindex.run", "collections.read", "observability.read", "audit.read"],  tenant_id: "default", workspace_id: "default", session_id: "synthetic-session" };
 const failure = { error: { code: "unavailable", message: "Synthetic failure", details: null, request_id: "synthetic" } };
 const docs = (total: number) => ({ items: [], total, offset: 0, limit: 20 });
 

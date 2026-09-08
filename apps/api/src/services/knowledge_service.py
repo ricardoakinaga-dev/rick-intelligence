@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import os
 from collections.abc import Mapping
+import inspect
+import re
 
 from rick_authorization import can_access_collection
 from rick_knowledge import (
@@ -50,10 +52,29 @@ def _field(item: object, name: str) -> object:
     return getattr(item, name, None)
 
 
+def _scoped_store_call(method, *args, tenant_id: str, workspace_id: str):
+    """Call a store only when it accepts the complete authorization scope."""
+
+    try:
+        parameters = inspect.signature(method).parameters.values()
+    except (TypeError, ValueError):
+        parameters = ()
+    names = {parameter.name for parameter in parameters}
+    supports_scope = {"tenant_id", "workspace_id"}.issubset(names) or any(
+        parameter.kind is inspect.Parameter.VAR_KEYWORD for parameter in parameters
+    )
+    if not supports_scope:
+        raise TypeError("store read does not accept tenant/workspace scope")
+    return method(*args, tenant_id=tenant_id, workspace_id=workspace_id)
+
+
 def _required_tenant_id(value: object) -> str:
     if not isinstance(value, str) or not value.strip():
         raise ValueError("tenant_id is required")
     return normalize_tenant_id(value)
+
+
+_COLLECTION_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$")
 
 
 def seed_demo_corpus(store) -> None:
@@ -108,18 +129,100 @@ class KnowledgeApplicationService:
                 or not isinstance(collection_id, str)
             ):
                 continue
+            status = _field(collection, "status") or "active"
+            if status == "archived":
+                continue
             items.append({
                 "collection_id": collection_id,
                 "title": _field(collection, "title") or "",
+                "description": _field(collection, "description") or "",
                 "workspace_id": workspace_id,
+                "status": status,
+                "version": _field(collection, "version") or 1,
             })
         return [i for i in items if can_access_collection(allowed=allowed, collection_id=i["collection_id"])]
+
+    def list_managed_collections(self, *, workspace_id: str, tenant_id: str) -> list[dict]:
+        """Return the tenant/workspace catalog for a manager, including archives."""
+        tenant = _required_tenant_id(tenant_id)
+        result = []
+        for collection in self.store.list_collections(workspace_id, tenant_id=tenant):
+            if _field(collection, "tenant_id") != tenant or _field(collection, "workspace_id") != workspace_id:
+                continue
+            result.append(self._public_collection(collection))
+        return result
+
+    @staticmethod
+    def _public_collection(collection: object) -> dict:
+        return {
+            "collection_id": _field(collection, "collection_id"),
+            "title": _field(collection, "title") or "",
+            "description": _field(collection, "description") or "",
+            "workspace_id": _field(collection, "workspace_id"),
+            "tenant_id": _field(collection, "tenant_id"),
+            "status": _field(collection, "status") or "active",
+            "version": _field(collection, "version") or 1,
+        }
+
+    def create_collection(self, *, workspace_id: str, tenant_id: str, collection_id: str,
+                          title: str, description: str = "") -> dict:
+        tenant = _required_tenant_id(tenant_id)
+        collection_id = (collection_id or "").strip()
+        title = (title or "").strip()
+        if not _COLLECTION_ID.fullmatch(collection_id) or not title or len(title) > 256:
+            raise ValueError("collection is invalid")
+        existing = self.store.get_collection(workspace_id, collection_id, tenant_id=tenant)
+        if existing is not None:
+            raise KeyError(collection_id)
+        collection = Collection(
+            workspace_id=workspace_id, collection_id=collection_id, tenant_id=tenant,
+            title=title, description=(description or "").strip()[:2_000], status="active", version=1,
+        )
+        self.store.upsert_collection(collection)
+        return self._public_collection(collection)
+
+    def update_collection(self, *, workspace_id: str, tenant_id: str, collection_id: str,
+                          title: str | None = None, description: str | None = None) -> dict:
+        tenant = _required_tenant_id(tenant_id)
+        collection = self.store.get_collection(workspace_id, collection_id, tenant_id=tenant)
+        if collection is None:
+            raise KeyError(collection_id)
+        if getattr(collection, "status", "active") == "archived":
+            raise ValueError("archived collection cannot be edited")
+        if title is not None:
+            title = title.strip()
+            if not title or len(title) > 256:
+                raise ValueError("collection title is invalid")
+            collection.title = title
+        if description is not None:
+            collection.description = description.strip()[:2_000]
+        collection.version = int(getattr(collection, "version", 1)) + 1
+        self.store.upsert_collection(collection)
+        return self._public_collection(collection)
+
+    def archive_collection(self, *, workspace_id: str, tenant_id: str, collection_id: str) -> dict:
+        tenant = _required_tenant_id(tenant_id)
+        collection = self.store.get_collection(workspace_id, collection_id, tenant_id=tenant)
+        if collection is None:
+            raise KeyError(collection_id)
+        collection.status = "archived"
+        collection.version = int(getattr(collection, "version", 1)) + 1
+        self.store.upsert_collection(collection)
+        return self._public_collection(collection)
 
     def get_document(
         self, *, document_id: str, workspace_id: str, allowed: list[str], tenant_id: str
     ) -> dict | None:
-        document = self.store.get_document(document_id)
         tenant = _required_tenant_id(tenant_id)
+        getter = getattr(self.store, "get_document", None)
+        if not callable(getter):
+            return None
+        document = _scoped_store_call(
+            getter,
+            document_id,
+            tenant_id=tenant,
+            workspace_id=workspace_id,
+        )
         if (
             document is None
             or _field(document, "workspace_id") != workspace_id

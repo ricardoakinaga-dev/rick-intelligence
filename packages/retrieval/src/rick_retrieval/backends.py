@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Protocol
 
@@ -88,6 +89,57 @@ class QdrantBackend:
 
     def search(self, *, query, query_vector, workspace_id, allowed_collection_ids, chunks, limit,
                tenant_id):
+        # The canonical HTTP adapter already owns Qdrant request encoding and
+        # ACL revalidation. Prefer it when present so the application does not
+        # need qdrant-client objects just to perform a dense search. The older
+        # client-backed path remains available for existing integrations.
+        direct_search = getattr(self.store, "search", None)
+        if callable(direct_search):
+            try:
+                hits = direct_search(
+                    query_vector,
+                    tenant_id=tenant_id,
+                    workspace_id=workspace_id,
+                    allowed_collection_ids=allowed_collection_ids,
+                    limit=limit,
+                )
+            except TypeError:
+                # A non-canonical compatibility store may expose a different
+                # search shape; let the established client path handle it.
+                hits = None
+            if hits is not None:
+                dense: list[dict] = []
+                for hit in hits:
+                    payload = hit.get("payload") if isinstance(hit, Mapping) else getattr(hit, "payload", None)
+                    if not isinstance(payload, Mapping):
+                        continue
+                    chunk_id = payload.get("chunk_id")
+                    if not isinstance(chunk_id, str) or not chunk_id:
+                        continue
+                    score = hit.get("score") if isinstance(hit, Mapping) else getattr(hit, "score", None)
+                    try:
+                        score = float(score)
+                    except (TypeError, ValueError):
+                        continue
+                    if not math.isfinite(score):
+                        continue
+                    dense.append({
+                        "chunk_id": chunk_id,
+                        "document_id": payload.get("document_id"),
+                        "tenant_id": payload.get("tenant_id"),
+                        "workspace_id": payload.get("workspace_id"),
+                        "collection_id": payload.get("collection_id"),
+                        "text": payload.get("text", ""),
+                        "source": payload.get("source", ""),
+                        "document_filename": payload.get("document_filename", payload.get("source", "")),
+                        "title": payload.get("title", ""),
+                        "page_start": payload.get("page_start"),
+                        "page_end": payload.get("page_end"),
+                        "section": payload.get("section"),
+                        "checksum": payload.get("checksum", ""),
+                        "score": score,
+                    })
+                return dense[:limit], []
         try:
             from qdrant_client.models import FieldCondition, Filter, MatchValue
         except ImportError as exc:

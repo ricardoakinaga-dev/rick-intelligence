@@ -2,17 +2,19 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Activity, BookOpen, ChevronRight, CircleUserRound, LogOut, Menu, MessageSquareText, Search, ShieldCheck, X } from "lucide-react";
+import { Activity, BookOpen, ChevronRight, CircleUserRound, ClipboardCheck, LogOut, Menu, MessageSquareText, Search, ShieldCheck, X } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
 import { useSession } from "@/components/session-provider";
 import { Button, Spinner, StatusPill } from "@/components/ui";
-import { isAdministrativeRole, presentRole } from "@/lib/presentation";
+import { presentRole } from "@/lib/presentation";
+import { hasAdminReadAccess, hasPermission } from "@/lib/permissions";
 
 const nav = [
-  { href: "/app", label: "Visão geral", caption: "Seu espaço de trabalho", icon: Activity },
-  { href: "/app/documents", label: "Documentos", caption: "Acervo e importações", icon: BookOpen },
-  { href: "/app/search", label: "Busca", caption: "Encontrar evidência", icon: Search },
-  { href: "/app/chat", label: "Perguntas", caption: "Respostas e fontes", icon: MessageSquareText },
+  { href: "/app", label: "Visão geral", caption: "Seu espaço de trabalho", icon: Activity, permission: null },
+  { href: "/app/documents", label: "Documentos", caption: "Acervo e importações", icon: BookOpen, permission: "documents.read" },
+  { href: "/app/search", label: "Busca", caption: "Encontrar evidência", icon: Search, permission: "chat.query" },
+  { href: "/app/chat", label: "Perguntas", caption: "Respostas e fontes", icon: MessageSquareText, permission: "chat.query" },
+  { href: "/app/cases", label: "Casos", caption: "Registro e revisão", icon: ClipboardCheck, permission: "cases.read" },
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -108,11 +110,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   if (pathname === "/login") return <>{logoutNotice}{children}</>;
   if (!ready || !session) return <>{logoutNotice}<div className="app-loading"><Spinner label="Validando sua sessão" /><p>Validando sua identidade e as permissões do espaço de trabalho.</p></div></>;
 
-  const adminNav = { href: "/admin", label: "Administração", caption: "Controles operacionais", icon: ShieldCheck };
+  const adminNav = { href: "/admin", label: "Administração", caption: "Controles operacionais", icon: ShieldCheck, permission: "audit.read" };
   const allNav = [...nav, adminNav];
-  const visibleNav = isAdministrativeRole(session.role) || isAdministrativeRole(session.canonical_role)
-    ? allNav
-    : nav;
+  const visibleNav = allNav.filter(item => item.href === "/admin" ? hasAdminReadAccess(session) : item.permission === null || hasPermission(session, item.permission));
   const current = allNav.find((item) => pathname === item.href) ?? allNav[0];
   const mobileRailHidden = mobileViewport && !mobileOpen;
   const handleRailKeyDown = (event: ReactKeyboardEvent<HTMLElement>) => {

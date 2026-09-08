@@ -37,6 +37,10 @@ LEGACY_ROLE_ALIASES = {
 
 CANONICAL_PERMISSION_IDS = (
     "audit.read",
+    "cases.feedback",
+    "cases.manage",
+    "cases.read",
+    "cases.review",
     "chat.query",
     "collections.manage",
     "collections.read",
@@ -61,6 +65,10 @@ CANONICAL_PERMISSION_IDS = (
 ROLE_PERMISSIONS: dict[str, tuple[str, ...]] = {
     "PLATFORM_ADMIN": ("*",),
     "KNOWLEDGE_MANAGER": (
+        "cases.feedback",
+        "cases.manage",
+        "cases.read",
+        "cases.review",
         "chat.query",
         "history.read",
         "library.browse",
@@ -78,6 +86,9 @@ ROLE_PERMISSIONS: dict[str, tuple[str, ...]] = {
         "corpus.repair",
     ),
     "VETERINARIAN": (
+        "cases.feedback",
+        "cases.manage",
+        "cases.read",
         "chat.query",
         "history.read",
         "sources.read",

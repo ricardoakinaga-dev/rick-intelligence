@@ -1,0 +1,69 @@
+{
+  "record_id": "GATE-REC-M0-READY-001",
+  "timestamp": "2026-09-08T12:15:00Z",
+  "gate_id": "IMPLEMENTATION_READY",
+  "scope": "REC M0 reversible local boundaries",
+  "scope_ref": "REC-M0",
+  "version": 1,
+  "criteria": [
+    {
+      "id": "IR-001",
+      "description": "Scope, baseline defects, rollback and verification procedures defined for config and permission boundaries",
+      "required": true,
+      "status": "PASS",
+      "evidence_refs": [
+        ".agent/plans/rec-implementation.md",
+        "docs/reports/reanalise-programa-2026-09-08.md"
+      ],
+      "confidence": "HIGH",
+      "limitations": "Entry only, not acceptance or release"
+    },
+    {
+      "id": "IR-002",
+      "description": "Explicit public permissions are additive, absent grants deny UI actions; settings retain production fail-closed gates",
+      "required": true,
+      "status": "PASS",
+      "evidence_refs": [
+        ".agent/plans/rec-implementation.md",
+        "docs/reports/reanalise-programa-2026-09-08.md"
+      ],
+      "confidence": "HIGH",
+      "limitations": "Entry only, not acceptance or release"
+    },
+    {
+      "id": "IR-003",
+      "description": "Focused API/browser regressions plus full API and web checks defined; source changes are reversible",
+      "required": true,
+      "status": "PASS",
+      "evidence_refs": [
+        ".agent/plans/rec-implementation.md",
+        "docs/reports/reanalise-programa-2026-09-08.md"
+      ],
+      "confidence": "HIGH",
+      "limitations": "Entry only, not acceptance or release"
+    }
+  ],
+  "evidence": [
+    ".agent/plans/rec-implementation.md"
+  ],
+  "confidence": "HIGH",
+  "gaps": [],
+  "conditions": [],
+  "authority": {
+    "required": false,
+    "state": "NOT_REQUIRED",
+    "actor": "Codex",
+    "scope": "REC M0 reversible local boundaries",
+    "decision": "User requested implementation; external decisions remain pending",
+    "evidence_ref": ".agent/plans/rec-implementation.md",
+    "expires_or_revalidates": "New external effects or product authority"
+  },
+  "residual_risk": "MEDIUM",
+  "decision": "PASS",
+  "next_action": "Implement local M0 and verify regressions",
+  "revalidation_triggers": [
+    "New external effects",
+    "Expanded authorization scope"
+  ],
+  "supersedes": null
+}

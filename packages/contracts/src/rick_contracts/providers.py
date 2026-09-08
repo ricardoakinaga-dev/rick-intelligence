@@ -97,3 +97,20 @@ class ChatCompletionResult(StrictContractModel):
     finish_reason: Literal["stop", "length", "content_filter", "unknown"] = "stop"
     correlation_id: str = Field(min_length=1, max_length=128)
     usage: ProviderUsage | None = None
+
+
+class ChatCompletionChunk(StrictContractModel):
+    """One provider-produced incremental chat delta.
+
+    The chunk is deliberately smaller than the final result. Citation
+    validation belongs to Professor after the final content is assembled.
+    """
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    contract_version: Literal[PROVIDER_CONTRACT_VERSION] = PROVIDER_CONTRACT_VERSION
+    model: str = Field(min_length=1, max_length=256)
+    delta: str = Field(default="", max_length=1_000_000)
+    finish_reason: Literal["stop", "length", "content_filter", "unknown"] | None = None
+    correlation_id: str = Field(min_length=1, max_length=128)
+    usage: ProviderUsage | None = None

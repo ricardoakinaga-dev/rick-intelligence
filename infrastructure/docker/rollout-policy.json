@@ -1,0 +1,47 @@
+{
+  "schema": "rick.release.policy/v1",
+  "release_gate": "REC-33",
+  "immutable_image": {
+    "require_digest": true,
+    "allow_mutable_tags": false,
+    "digest_algorithm": "sha256"
+  },
+  "signature": {
+    "required": true,
+    "tool": "cosign",
+    "verification": "keyless-or-approved-key",
+    "identity_and_issuer_must_be_recorded": true
+  },
+  "scan": {
+    "required": true,
+    "tool": "trivy",
+    "block_severities": [
+      "CRITICAL",
+      "HIGH"
+    ],
+    "allow_unfixed": false,
+    "sbom_required": true
+  },
+  "canary": {
+    "min_duration_seconds": 900,
+    "min_requests": 100,
+    "max_5xx_rate": 0.01,
+    "max_p95_latency_ms": 1500,
+    "max_dead_letter_increase": 0,
+    "abort_on_readiness_failure": true,
+    "observe_before_promote": true
+  },
+  "rollback": {
+    "previous_release_digest_required": true,
+    "max_seconds": 300,
+    "data_deletion_forbidden": true,
+    "migration_policy": "rollback-images-only-when-backward-compatible-otherwise-roll-forward",
+    "triggers": [
+      "readiness_failure",
+      "error_budget_breach",
+      "p95_latency_breach",
+      "dead_letter_growth",
+      "signature_or_scan_policy_failure"
+    ]
+  }
+}

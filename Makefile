@@ -12,7 +12,7 @@ WEB_CURRENT_EVIDENCE_DIR := $(ROOT)/.gauntlet-state-of-art/evidence/visual-cycle
 
 .DEFAULT_GOAL := help
 
-.PHONY: help bootstrap validate dev test test-fast test-integration lint typecheck build up down logs ci eval eval-retrieval storage-test ops-migration-check ops-static web-install web-lint web-typecheck web-build web-e2e web-validate api-dev api-test api-contract api-security api-benchmark api131-canonical api131-differential api131-full api131-benchmark api14-units api14-differential api14-acl api14-full api14-benchmark api15-contracts api15-provider api15-lock api15-professor api15-root api15-benchmark api15-verify api15-full api15-boundaries api16-domain api16-worker api16-root api16-benchmark api16-full api16-verify
+.PHONY: help bootstrap validate dev test test-fast test-integration lint typecheck build up down logs ci eval eval-retrieval eval-retrieval-pack storage-test ops-migration-check ops-static ops-backup-test web-install web-lint web-typecheck web-build web-e2e web-validate api-dev api-test api-contract api-security api-benchmark api131-canonical api131-differential api131-full api131-benchmark api14-units api14-differential api14-acl api14-full api14-benchmark api15-contracts api15-provider api15-lock api15-professor api15-root api15-benchmark api15-verify api15-full api15-boundaries api16-domain api16-worker api16-root api16-benchmark api16-full api16-verify
 
 help:
 	@printf '%s\n' 'RICK Intelligence root commands:'
@@ -29,6 +29,7 @@ help:
 	@printf '%s\n' '  make ci               validate + fast tests + lint + typecheck + build'
 	@printf '%s\n' '  make eval             deterministic non-live Phase 0.5 plumbing evaluation'
 	@printf '%s\n' '  make eval-retrieval   offline retrieval/ACL/provenance evaluation fixture'
+	@printf '%s\n' '  make eval-retrieval-pack  versioned local thresholds and negative-case pack'
 	@printf '%s\n' '  make storage-test     local object-store security and restart tests'
 	@printf '%s\n' '  make ops-static       migration/env/runbook static checks (no services)'
 	@printf '%s\n' '  make api-dev          run canonical apps/api kernel (hermetic by default)'
@@ -89,15 +90,21 @@ eval:
 eval-retrieval:
 	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)" $(PYTHON) "$(ROOT)/scripts/state_of_art/evaluate_retrieval.py" --fixture "$(ROOT)/scripts/state_of_art/tests/fixtures/retrieval_fixture.json" --pretty
 
+eval-retrieval-pack:
+	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT):$(ROOT)/scripts/state_of_art" $(PYTHON) "$(ROOT)/scripts/state_of_art/evaluate_pack.py" --pack "$(ROOT)/docs/evaluation/packs/rec22-local-v1" --pretty
+
 storage-test:
 	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)/packages/storage/src" $(PYTHON) -m pytest -q -p no:cacheprovider "$(ROOT)/packages/storage/tests"
 
 ops-migration-check:
-	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) "$(ROOT)/infrastructure/scripts/check-migration-order.py" "$(ROOT)/infrastructure/migrations"
+	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) "$(ROOT)/infrastructure/scripts/migrate.py" "$(ROOT)/infrastructure/migrations" --check
 
 ops-static: ops-migration-check
 	bash -n "$(ROOT)/infrastructure/scripts/validate-env.sh"
-	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) -m py_compile "$(ROOT)/infrastructure/scripts/backup-restore-check.py"
+	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) -m py_compile "$(ROOT)/infrastructure/scripts/backup-restore-check.py" "$(ROOT)/infrastructure/scripts/backup_restore.py"
+
+ops-backup-test:
+	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) -m pytest -q -p no:cacheprovider "$(ROOT)/infrastructure/scripts/tests/test_backup_restore.py"
 
 api-dev:
 	$(PYTHON) "$(PHASE13_RUNNER)" dev
@@ -194,7 +201,7 @@ web-typecheck:
 	cd "$(WEB_DIR)" && npm run typecheck
 
 web-build:
-	cd "$(WEB_DIR)" && RICK_API_INTERNAL_URL="http://127.0.0.1:$${RICK_API_TEST_PORT:-8000}" npm run build
+	cd "$(WEB_DIR)" && RICK_API_INTERNAL_URL="http://127.0.0.1:$${RICK_API_TEST_PORT:-8001}" npm run build
 
 web-e2e:
 	cd "$(WEB_DIR)" && RICK_WEB_E2E_PRODUCTION=1 RICK_VISUAL_EVIDENCE_DIR="$(WEB_CURRENT_EVIDENCE_DIR)/production-test-results" RICK_PERFORMANCE_EVIDENCE_DIR="$(WEB_CURRENT_EVIDENCE_DIR)/performance" npm run test:e2e

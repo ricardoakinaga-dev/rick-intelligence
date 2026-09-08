@@ -17,6 +17,7 @@ from core.errors import ApiError
 from core.middleware import is_request_too_large
 from dependencies.identity import require_authenticated
 from dependencies.services import get_providers
+from services.audit import emit_required
 from services.authorization_service import build_retrieval_context, filter_collection_items, has_permission
 from services.ingestion_service import IngestionApplicationService, safe_job_json
 
@@ -410,6 +411,133 @@ class UploadRequest(BaseModel):
     content: str = Field(min_length=1, max_length=50 * 1024 * 1024)
 
 
+class CollectionCreateRequest(BaseModel):
+    collection_id: str = Field(min_length=1, max_length=128)
+    title: str = Field(min_length=1, max_length=256)
+    description: str = Field(default="", max_length=2_000)
+    workspace_id: str | None = Field(default=None, max_length=128)
+
+
+class CollectionUpdateRequest(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=256)
+    description: str | None = Field(default=None, max_length=2_000)
+
+
+@router.post("/api/v1/collections", status_code=201)
+def create_collection(payload: CollectionCreateRequest, request: Request,
+                      session=Depends(require_authenticated)):
+    if not has_permission(session, "collections.manage"):
+        raise ApiError("forbidden")
+    service = _knowledge_service(request)
+    if service is None:
+        raise ApiError("provider_unavailable")
+    context = _scope(session, workspace_id=payload.workspace_id)
+    try:
+        item = service.create_collection(
+            workspace_id=context["workspace_id"], tenant_id=context["tenant_id"],
+            collection_id=payload.collection_id, title=payload.title,
+            description=payload.description,
+        )
+    except KeyError:
+        raise ApiError("conflict") from None
+    except ValueError:
+        raise ApiError("validation_error") from None
+    emit_required(get_providers(request).audit_sink, {
+        "action": "collection.create", "actor_user_id": session.user_id,
+        "target_id": payload.collection_id, "tenant_id": context["tenant_id"],
+        "workspace_id": context["workspace_id"],
+    })
+    return item
+
+
+@router.patch("/api/v1/collections/{collection_id}")
+def update_collection(collection_id: str, payload: CollectionUpdateRequest, request: Request,
+                      session=Depends(require_authenticated)):
+    if not has_permission(session, "collections.manage"):
+        raise ApiError("forbidden")
+    service = _knowledge_service(request)
+    if service is None:
+        raise ApiError("provider_unavailable")
+    context = _scope(session)
+    try:
+        item = service.update_collection(
+            workspace_id=context["workspace_id"], tenant_id=context["tenant_id"],
+            collection_id=collection_id, **payload.model_dump(exclude_unset=True),
+        )
+    except KeyError:
+        raise ApiError("not_found") from None
+    except ValueError:
+        raise ApiError("conflict") from None
+    return item
+
+
+@router.post("/api/v1/collections/{collection_id}/archive")
+def archive_collection(collection_id: str, request: Request,
+                       session=Depends(require_authenticated)):
+    if not has_permission(session, "collections.manage"):
+        raise ApiError("forbidden")
+    service = _knowledge_service(request)
+    if service is None:
+        raise ApiError("provider_unavailable")
+    context = _scope(session)
+    try:
+        item = service.archive_collection(
+            workspace_id=context["workspace_id"], tenant_id=context["tenant_id"],
+            collection_id=collection_id,
+        )
+    except KeyError:
+        raise ApiError("not_found") from None
+    _audit_collection(request, "collection.archive", session, collection_id, context)
+    return item
+
+
+class CollectionGrantRequest(BaseModel):
+    granted: bool
+
+
+@router.put("/api/v1/collections/{collection_id}/grants/{user_id}")
+def set_collection_grant(collection_id: str, user_id: str, payload: CollectionGrantRequest,
+                         request: Request, session=Depends(require_authenticated)):
+    if not has_permission(session, "collections.manage"):
+        raise ApiError("forbidden")
+    service = _knowledge_service(request)
+    if service is None:
+        raise ApiError("provider_unavailable")
+    context = _scope(session, collection_id=collection_id)
+    identity = get_providers(request).identity
+    list_users = getattr(identity, "list_users", None)
+    if not callable(list_users):
+        raise ApiError("provider_unavailable")
+    try:
+        users = list_users(
+            tenant_id=context["tenant_id"],
+            workspace_id=context["workspace_id"],
+        ) or []
+    except TypeError:
+        raise ApiError("provider_unavailable") from None
+    target = next((item for item in users if _job_field(item, "user_id") == user_id), None)
+    if target is None or _job_field(target, "tenant_id") != context["tenant_id"]:
+        raise ApiError("not_found")
+    current = list(_job_field(target, "authorized_collection_ids", []) or [])
+    normalized = collection_id.strip()
+    current = [item for item in current if item != normalized]
+    if payload.granted:
+        current.append(normalized)
+    update = getattr(identity, "update_user", None)
+    if not callable(update):
+        raise ApiError("provider_unavailable")
+    update(actor=session, user_id=user_id, authorized_collection_ids=current)
+    _audit_collection(request, "collection.grant_updated", session, user_id, context)
+    return {"user_id": user_id, "collection_id": normalized, "granted": payload.granted}
+
+
+def _audit_collection(request: Request, action: str, session, target_id: str, context: dict) -> None:
+    emit_required(get_providers(request).audit_sink, {
+        "action": action, "actor_user_id": session.user_id, "target_id": target_id,
+        "tenant_id": context["tenant_id"], "workspace_id": context["workspace_id"],
+    })
+
+
 @router.get("/api/v1/collections")
 def list_collections(request: Request, session=Depends(require_authenticated)):
     if not has_permission(session, "collections.read"):
@@ -422,6 +550,8 @@ def list_collections(request: Request, session=Depends(require_authenticated)):
             tenant_id=ctx["tenant_id"],
             allowed=list(ctx["allowed_collection_ids"]),
         )
+        # Application service is the scope owner; keep the response a stable
+        # collection DTO even when an injected store returns dataclasses.
     else:
         items = [
             item for item in filter_collection_items(_DEMO_COLLECTIONS, ctx)
@@ -539,19 +669,14 @@ def delete_document(document_id: str, request: Request, session=Depends(require_
         _api_ingestion_error(exc)
     if result is None:
         raise ApiError("not_found")
-    try:
-        providers = get_providers(request)
-        if providers.audit_sink is not None:
-            providers.audit_sink.emit({
-                "action": "document.delete",
-                "actor_user_id": session.user_id,
-                "target_id": document_id,
-                "tenant_id": ctx["tenant_id"],
-                "workspace_id": ctx["workspace_id"],
-                "request_id": getattr(request.state, "request_id", None),
-            })
-    except Exception:
-        pass
+    emit_required(get_providers(request).audit_sink, {
+        "action": "document.delete",
+        "actor_user_id": session.user_id,
+        "target_id": document_id,
+        "tenant_id": ctx["tenant_id"],
+        "workspace_id": ctx["workspace_id"],
+        "request_id": getattr(request.state, "request_id", None),
+    })
     return result
 
 
@@ -701,21 +826,14 @@ async def upload_document(request: Request, session=Depends(require_authenticate
         # do not expose a job whose scope drifted during upload.
         raise ApiError("ingestion_failed")
     response = _job_envelope(result)
-    try:
-        providers = get_providers(request)
-        if providers.audit_sink is not None:
-            providers.audit_sink.emit(
-                {
-                    "action": "document.upload",
-                    "actor_user_id": session.user_id,
-                    "target_id": response["job_id"],
-                    "tenant_id": ctx["tenant_id"],
-                    "workspace_id": ctx["workspace_id"],
-                    "request_id": request_id,
-                }
-            )
-    except Exception:
-        pass
+    emit_required(get_providers(request).audit_sink, {
+        "action": "document.upload",
+        "actor_user_id": session.user_id,
+        "target_id": response["job_id"],
+        "tenant_id": ctx["tenant_id"],
+        "workspace_id": ctx["workspace_id"],
+        "request_id": request_id,
+    })
     return response
 
 
@@ -738,6 +856,12 @@ def _document_for_reindex(document_id: str, request: Request, *, tenant_id: str)
     if service is None:
         return None
     store = getattr(service, "store", None)
+    getter = getattr(store, "get_document_for_tenant", None)
+    if callable(getter):
+        try:
+            return getter(document_id, tenant_id=tenant_id)
+        except Exception:
+            return None
     getter = getattr(store, "get_document", None)
     if not callable(getter):
         return None

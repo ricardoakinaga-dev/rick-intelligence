@@ -6,6 +6,20 @@ observations and emits `retrieval-evaluation-result.v1`; it does not import the
 API, call Qdrant, call an embedding/LLM provider, or turn a synthetic fixture
 into production evidence.
 
+`scripts/state_of_art/evaluate_pack.py` composes that harness with a versioned
+manifest, explicit thresholds, model/corpus grouping, and structural negative
+cases. The checked-in REC-22 local pack can be run with:
+
+```bash
+PYTHONPATH=scripts/state_of_art python3 scripts/state_of_art/evaluate_pack.py \
+  --pack docs/evaluation/packs/rec22-local-v1 --pretty
+```
+
+The pack includes positive ranking/ACL/provenance observations and synthetic
+`no_evidence`, `weak_evidence`, and `unsupported_assertion` cases. Its report
+keeps results per model/corpus pair and returns `PASS`, `FAIL`, or
+`INCONCLUSIVE` when a threshold or negative-case expectation cannot be proved.
+
 ## Run
 
 ```bash
@@ -34,6 +48,12 @@ only the fixture and are not a production quality, capacity, or SLO claim.
   invalid;
 - `INCONCLUSIVE` means required annotations/scope are absent or partial;
 - `NOT_RUN` means no fixture was supplied or live evaluation was requested.
+
+Pack thresholds are local harness thresholds over the supplied observations;
+they do not constitute the D04 promotion pack. A real promotion decision still
+requires reviewed golden queries, corpus provenance/license, freshness and
+deletion cases, provider failure cases, threshold ownership, and a reproducible
+runtime artifact.
 
 Live mode is deliberately declaration-only. It returns `NOT_RUN` whether or
 not provider environment markers exist until a separately reviewed live

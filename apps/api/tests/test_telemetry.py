@@ -141,6 +141,49 @@ def test_worker_queue_and_runner_events_keep_bounded_operational_fields():
         "error": "provider_timeout",
         "recovered": 7,
     }
+    assert any(
+        item["name"] == "api.worker.jobs"
+        and item["labels"] == {"status": "dead"}
+        and item["total"] == 1
+        for item in telemetry.snapshot()["counters"]
+    )
+
+
+def test_operational_metrics_are_bounded_and_export_their_real_names():
+    telemetry = ApiTelemetry()
+    telemetry.record_readiness(status="degraded", check_count=3)
+    telemetry.record_worker_job(status="dead")
+    telemetry.record_provider_failure(provider="qdrant", reason="timeout")
+    telemetry.record_provider_failure(provider="provider-with-secret", reason="secret-detail")
+    telemetry.record_retrieval(duration_ms=40, outcome="success")
+    telemetry.record_retrieval(duration_ms=1_600, outcome="error")
+
+    snapshot = telemetry.snapshot()
+    counters = {
+        (item["name"], tuple(sorted(item["labels"].items()))): item["total"]
+        for item in snapshot["counters"]
+    }
+    assert snapshot["readiness"] == {
+        "status": "degraded",
+        "ok": False,
+        "observations": 1,
+        "check_count": 3,
+    }
+    assert counters[("api.worker.jobs", (("status", "dead"),))] == 1
+    assert counters[("api.provider.failures", (("provider", "vector_store"), ("reason", "timeout")))] == 1
+    assert counters[("api.provider.failures", (("provider", "unknown"), ("reason", "unknown")))] == 1
+    assert snapshot["retrieval"]["histogram"]["count"] == 2
+    assert snapshot["retrieval"]["histogram"]["buckets"]["50.0"] == 1
+    assert snapshot["retrieval"]["histogram"]["buckets"]["1500.0"] == 1
+
+    exposition = telemetry.prometheus_text()
+    assert 'rick_api_readiness_status{service="api",status="degraded"} 1' in exposition
+    assert 'rick_api_worker_jobs_total{status="dead"} 1' in exposition
+    assert 'rick_api_provider_failures_total{provider="vector_store",reason="timeout"} 1' in exposition
+    assert 'rick_api_retrieval_latency_ms_bucket{le="1500"} 1' in exposition
+    assert "rick_api_retrieval_latency_ms_count 2" in exposition
+    assert "provider-with-secret" not in exposition
+    assert "secret-detail" not in exposition
 
 
 def test_worker_event_schema_rejects_cross_event_fields_and_invalid_states():

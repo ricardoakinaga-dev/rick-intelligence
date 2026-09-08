@@ -6,10 +6,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { useSession } from "@/components/session-provider";
 import { presentRole } from "@/lib/presentation";
+import { hasPermission } from "@/lib/permissions";
 import { Button, EmptyState, Panel } from "@/components/ui";
 import type { DocumentListResponse, HealthResponse } from "@/types/api";
 
-type Resource<T> = { status: "loading" } | { status: "success"; data: T } | { status: "error"; code: number; message: string };
+type Resource<T> = { status: "loading" } | { status: "restricted" } | { status: "success"; data: T } | { status: "error"; code: number; message: string };
 
 export default function WorkspaceHome() {
   const { session } = useSession();
@@ -18,11 +19,13 @@ export default function WorkspaceHome() {
   const generation = useRef(0);
   const invalidate = useCallback(() => ++generation.current, []);
   const workspaceId = session?.workspace_id;
+  const canReadDocuments = hasPermission(session, "documents.read");
+  const canQuery = hasPermission(session, "chat.query");
 
   const load = useCallback(async () => {
     if (!workspaceId) return;
     const current = invalidate();
-    setDocuments({ status: "loading" });
+    setDocuments({ status: canReadDocuments ? "loading" : "restricted" });
     setHealth({ status: "loading" });
     // Each resource settles independently: a denied corpus does not hide health.
     async function read<T>(request: Promise<T>, commit: (state: Resource<T>) => void, fallback: string) {
@@ -34,10 +37,10 @@ export default function WorkspaceHome() {
       }
     }
     await Promise.all([
-      read(api.documents(workspaceId), setDocuments, "Não foi possível carregar os documentos."),
+      canReadDocuments ? read(api.documents(workspaceId), setDocuments, "Não foi possível carregar os documentos.") : Promise.resolve(),
       read(api.health(), setHealth, "Não foi possível consultar a disponibilidade."),
     ]);
-  }, [invalidate, workspaceId]);
+  }, [canReadDocuments, invalidate, workspaceId]);
 
   useEffect(() => {
     void load();
@@ -45,7 +48,7 @@ export default function WorkspaceHome() {
   }, [invalidate, load]);
 
   const loading = documents.status === "loading" || health.status === "loading";
-  const denied = documents.status === "error" && documents.code === 403;
+  const denied = !canReadDocuments || (documents.status === "error" && documents.code === 403);
   const healthy = health.status === "success" && ["ready", "ok", "healthy"].includes(health.data.status);
   const degraded = health.status === "success" && health.data.status === "degraded";
   const unavailable = health.status === "error" && health.code === 503;
@@ -57,15 +60,15 @@ export default function WorkspaceHome() {
       <div><span className="eyebrow">Visão geral · {workspaceId}</span><h1>Seu espaço de evidências.</h1><p>Pergunte, consulte as fontes e faça sua própria avaliação.</p></div>
     </div>
 
-    <Panel className="question-entry">
+    {canQuery ? <Panel className="question-entry">
       <div className="question-entry-icon" aria-hidden="true"><MessageSquareText size={24} /></div>
       <div><h2>O que você precisa saber?</h2><p>Faça uma pergunta sobre os documentos do seu espaço. Confira as fontes retornadas antes de usar a resposta.</p>
         <Link className="button primary button-link" href="/app/chat">Fazer uma pergunta<ArrowRight size={17} aria-hidden="true" /></Link>
       </div>
-    </Panel>
+    </Panel> : null}
 
     <div className="workbench-tools">
-      <Link href="/app/search" className="workbench-tool"><FileSearch size={22} aria-hidden="true" /><span><strong>Buscar evidências</strong><small>Leia os trechos e a origem de cada resultado.</small></span><ArrowRight size={17} aria-hidden="true" /></Link>
+      {canQuery ? <Link href="/app/search" className="workbench-tool"><FileSearch size={22} aria-hidden="true" /><span><strong>Buscar evidências</strong><small>Leia os trechos e a origem de cada resultado.</small></span><ArrowRight size={17} aria-hidden="true" /></Link> : null}
       {!denied ? <Link href="/app/documents" className="workbench-tool"><BookOpen size={22} aria-hidden="true" /><span><strong>Documentos</strong><small>Consulte o acervo e acompanhe as importações.</small></span><ArrowRight size={17} aria-hidden="true" /></Link> : null}
     </div>
 

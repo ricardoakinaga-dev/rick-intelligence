@@ -1,0 +1,139 @@
+{
+  "schema": "rick.release.manifest/v1",
+  "release_id": "rec33-local-prepared-2026-09-08",
+  "status": "PREPARED_NOT_RUN",
+  "source_revision": {
+    "value": null,
+    "status": "NOT_CAPTURED"
+  },
+  "build": {
+    "status": "NOT_RUN",
+    "builder": "docker-buildx",
+    "context": ".",
+    "provenance_required": true,
+    "sbom_required": true,
+    "network_access_during_validation": false
+  },
+  "policy_file": "rollout-policy.json",
+  "base_images": [
+    {
+      "service": "api",
+      "argument": "PYTHON_IMAGE",
+      "ref": null,
+      "status": "NOT_RUN",
+      "required": "immutable-ref-with-sha256-digest"
+    },
+    {
+      "service": "worker",
+      "argument": "PYTHON_IMAGE",
+      "ref": null,
+      "status": "NOT_RUN",
+      "required": "immutable-ref-with-sha256-digest"
+    },
+    {
+      "service": "web",
+      "argument": "NODE_BUILD_IMAGE",
+      "ref": null,
+      "status": "NOT_RUN",
+      "required": "immutable-ref-with-sha256-digest"
+    },
+    {
+      "service": "web",
+      "argument": "NODE_RUNTIME_IMAGE",
+      "ref": null,
+      "status": "NOT_RUN",
+      "required": "immutable-ref-with-sha256-digest"
+    }
+  ],
+  "images": [
+    {
+      "service": "api",
+      "dockerfile": "infrastructure/docker/api.Dockerfile",
+      "context": ".",
+      "build_status": "NOT_RUN",
+      "image_ref": null,
+      "digest": null,
+      "digest_status": "NOT_RUN",
+      "scan": {
+        "status": "NOT_RUN",
+        "tool": "trivy",
+        "report": null,
+        "critical": null,
+        "high": null,
+        "sbom": null
+      },
+      "signature": {
+        "status": "NOT_RUN",
+        "tool": "cosign",
+        "bundle": null,
+        "identity": null,
+        "issuer": null
+      }
+    },
+    {
+      "service": "worker",
+      "dockerfile": "infrastructure/docker/worker.Dockerfile",
+      "context": ".",
+      "build_status": "NOT_RUN",
+      "image_ref": null,
+      "digest": null,
+      "digest_status": "NOT_RUN",
+      "scan": {
+        "status": "NOT_RUN",
+        "tool": "trivy",
+        "report": null,
+        "critical": null,
+        "high": null,
+        "sbom": null
+      },
+      "signature": {
+        "status": "NOT_RUN",
+        "tool": "cosign",
+        "bundle": null,
+        "identity": null,
+        "issuer": null
+      }
+    },
+    {
+      "service": "web",
+      "dockerfile": "infrastructure/docker/web.Dockerfile",
+      "context": ".",
+      "build_status": "NOT_RUN",
+      "image_ref": null,
+      "digest": null,
+      "digest_status": "NOT_RUN",
+      "scan": {
+        "status": "NOT_RUN",
+        "tool": "trivy",
+        "report": null,
+        "critical": null,
+        "high": null,
+        "sbom": null
+      },
+      "signature": {
+        "status": "NOT_RUN",
+        "tool": "cosign",
+        "bundle": null,
+        "identity": null,
+        "issuer": null
+      }
+    }
+  ],
+  "rollout": {
+    "canary": {
+      "status": "NOT_RUN",
+      "evidence": null
+    },
+    "rollback": {
+      "status": "NOT_RUN",
+      "evidence": null,
+      "previous_release_digest": null,
+      "migration_compatibility": "NOT_RUN"
+    }
+  },
+  "secrets": {
+    "baked_into_image": false,
+    "build_secret_mounts_required": false,
+    "runtime_injected": true
+  }
+}

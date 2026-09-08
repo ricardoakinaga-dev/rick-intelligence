@@ -1,6 +1,6 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 
-const session = { authenticated: true, user_id: "synthetic-km", email: "km@example.invalid", role: "KNOWLEDGE_MANAGER", canonical_role: "KNOWLEDGE_MANAGER", tenant_id: "default", workspace_id: "default", session_id: "synthetic-session" };
+const session = { authenticated: true, user_id: "synthetic-km", email: "km@example.invalid", role: "KNOWLEDGE_MANAGER", canonical_role: "KNOWLEDGE_MANAGER", permissions: ["chat.query", "documents.read", "documents.upload", "documents.manage", "ingestion.run", "reindex.run", "collections.read", "observability.read", "audit.read"],  tenant_id: "default", workspace_id: "default", session_id: "synthetic-session" };
 function result(query: string) {
   return { query, total: 1, items: [{ document_id: "doc", chunk_id: query, title: `Resultado ${query}`, text: `Trecho sintético ${query}`, source: "fixture", score: 0.9, rank: 1, page_start: 2, page_end: 3, section: null, checksum: "fixture-checksum", collection_id: "default", workspace_id: "default" }], metadata: { backend: "fixture", candidate_count: 1, selected_count: 1, fallback_used: false, workspace_id: "default" } };
 }

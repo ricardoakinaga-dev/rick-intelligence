@@ -6,6 +6,8 @@ from collections.abc import Mapping
 import re
 from urllib.parse import urlsplit, urlunsplit
 
+from core.errors import ApiError
+
 
 DEFAULT_RETENTION = 10_000
 _ALLOWED_FIELDS = frozenset({
@@ -19,6 +21,30 @@ _SENSITIVE_VALUE_MARKERS = (
     "password", "passphrase", "private document", "document content", "prompt",
     "secret", "token=", "reset token", "access token",
 )
+
+
+def emit_required(sink: object, event: dict) -> None:
+    """Persist an audit event or fail the mutation request closed."""
+
+    if sink is None:
+        raise ApiError("provider_unavailable")
+    health = getattr(sink, "health_check", None)
+    if callable(health):
+        try:
+            healthy = health()
+        except Exception:
+            raise ApiError("provider_unavailable") from None
+        if healthy is not True:
+            raise ApiError("provider_unavailable")
+    emitter = getattr(sink, "emit", None)
+    if not callable(emitter):
+        raise ApiError("provider_unavailable")
+    try:
+        result = emitter(event)
+    except Exception:
+        raise ApiError("provider_unavailable") from None
+    if result is False:
+        raise ApiError("provider_unavailable")
 
 
 def _strip_url_credentials(value: str) -> str | None:
@@ -93,11 +119,11 @@ class InMemoryAuditSink:
         self.max_events = max_events
         self.events: list[dict] = []
 
-    def emit(self, event: dict) -> None:
+    def emit(self, event: dict) -> bool:
         try:
             sanitized = _redact(event)
             if not isinstance(sanitized, dict):
-                return
+                return False
             sanitized = {
                 key: value for key, value in sanitized.items()
                 if key in _ALLOWED_FIELDS
@@ -120,9 +146,38 @@ class InMemoryAuditSink:
                     continue
                 safe[key] = value
             if not safe.get("action"):
-                return
+                return False
             self.events.append(safe)
             if len(self.events) > self.max_events:
                 del self.events[:-self.max_events]
+            return True
         except Exception:
-            pass  # Audit must never break the request path; failure is best-effort.
+            return False
+
+    def health_check(self) -> bool:
+        return True
+
+    def list(
+        self,
+        *,
+        tenant_id: str,
+        workspace_id: str | None = None,
+        limit: int = 50,
+        order: str = "desc",
+    ) -> list[dict]:
+        if not isinstance(tenant_id, str) or not tenant_id.strip():
+            raise ValueError("tenant_id is required")
+        if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 1_000:
+            raise ValueError("audit limit is out of range")
+        normalized_order = order.strip().lower()
+        if normalized_order not in {"asc", "ascending", "oldest", "desc", "descending", "newest"}:
+            raise ValueError("audit order is invalid")
+        items = [
+            dict(event)
+            for event in self.events
+            if event.get("tenant_id") == tenant_id
+            and (workspace_id is None or event.get("workspace_id") in {None, workspace_id})
+        ]
+        if normalized_order in {"desc", "descending", "newest"}:
+            items.reverse()
+        return items[:limit]

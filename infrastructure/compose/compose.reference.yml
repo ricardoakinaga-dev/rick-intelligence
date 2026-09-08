@@ -87,13 +87,14 @@ services:
       RICK_QDRANT_URL: ${RICK_QDRANT_URL:?inject through service config}
       RICK_OBJECT_STORE_ENDPOINT: ${RICK_OBJECT_STORE_ENDPOINT:?inject through service config}
       RICK_OBJECT_STORE_BUCKET: ${RICK_OBJECT_STORE_BUCKET:?inject through service config}
+      RICK_WORKER_COMPOSITION: ${RICK_WORKER_COMPOSITION:?inject reviewed module:factory composition}
     depends_on:
       postgres: {condition: service_healthy}
       redis: {condition: service_healthy}
       qdrant: {condition: service_healthy}
       object-store: {condition: service_healthy}
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:8001/health/ready >/dev/null"]
+      test: ["CMD", "python", "/opt/rick/docker/worker-entrypoint.py", "--health-check"]
       interval: 10s
       timeout: 5s
       retries: 12

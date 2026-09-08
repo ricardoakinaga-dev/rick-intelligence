@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+import time
 from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, Depends, Request
@@ -113,6 +114,29 @@ def _public_metadata(result: object, context: dict) -> dict:
     }
 
 
+def _record_retrieval_telemetry(request: Request, *, started: float, outcome: str) -> None:
+    """Record local retrieval timing without coupling the endpoint to telemetry."""
+
+    telemetry = getattr(request.app.state, "telemetry", None)
+    recorder = getattr(telemetry, "record_retrieval", None)
+    if callable(recorder):
+        try:
+            recorder(duration_ms=max(0.0, (time.perf_counter() - started) * 1_000), outcome=outcome)
+        except Exception:
+            # Metrics are advisory and must not alter the canonical API error.
+            pass
+
+
+def _record_retrieval_failure(request: Request) -> None:
+    telemetry = getattr(request.app.state, "telemetry", None)
+    recorder = getattr(telemetry, "record_provider_failure", None)
+    if callable(recorder):
+        try:
+            recorder(provider="retrieval", reason="unavailable")
+        except Exception:
+            pass
+
+
 @router.post("/api/v1/search")
 def search(payload: SearchRequest, request: Request, session=Depends(require_authenticated)):
     if not has_permission(session, "sources.read"):
@@ -131,12 +155,16 @@ def search(payload: SearchRequest, request: Request, session=Depends(require_aut
         collection_id=payload.collection_id,
     )
     retrieval = _retrieval_service(request)
+    started = time.perf_counter()
     try:
         result = retrieval.retrieve(query=payload.query, context=context, top_k=payload.top_k)
     except Exception:
+        _record_retrieval_telemetry(request, started=started, outcome="error")
+        _record_retrieval_failure(request)
         # Retrieval implementations may contain provider/store details. The
         # canonical error envelope is the only public failure surface.
         raise ApiError("retrieval_failed") from None
+    _record_retrieval_telemetry(request, started=started, outcome="success")
 
     evidence = _value(result, "evidence", ()) or ()
     if isinstance(evidence, (str, bytes, bytearray)) or not isinstance(evidence, (list, tuple)):

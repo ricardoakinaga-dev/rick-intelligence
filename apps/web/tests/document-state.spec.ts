@@ -1,6 +1,6 @@
 import { expect, test, type Route } from "@playwright/test";
 
-const session = { authenticated: true, user_id: "synthetic", email: "km@example.invalid", role: "KNOWLEDGE_MANAGER", canonical_role: "KNOWLEDGE_MANAGER", tenant_id: "default", workspace_id: "default", session_id: "synthetic" };
+const session = { authenticated: true, user_id: "synthetic", email: "km@example.invalid", role: "KNOWLEDGE_MANAGER", canonical_role: "KNOWLEDGE_MANAGER", permissions: ["chat.query", "documents.read", "documents.upload", "documents.manage", "ingestion.run", "reindex.run", "collections.read", "observability.read", "audit.read"],  tenant_id: "default", workspace_id: "default", session_id: "synthetic" };
 const catalog = (name: string) => ({ total: 1, next_cursor: null, items: [{ document_id: name, title: `Documento ${name}`, collection_id: name, workspace_id: "default", status: "published", source_type: "md" }] });
 
 test.beforeEach(async ({ page }) => {

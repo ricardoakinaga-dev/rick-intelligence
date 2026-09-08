@@ -6,7 +6,7 @@ const session = {
   user_id: "user-km",
   email: "km@example.com",
   role: "admin_rag",
-  canonical_role: "KNOWLEDGE_MANAGER",
+  canonical_role: "KNOWLEDGE_MANAGER", permissions: ["chat.query", "documents.read", "documents.upload", "documents.manage", "ingestion.run", "reindex.run", "collections.read", "observability.read", "audit.read"],
   tenant_id: "tenant-1",
   workspace_id: "workspace-1",
   session_id: "session-1",

@@ -6,7 +6,7 @@ const session = {
   user_id: "user-km",
   email: "km@example.com",
   role: "admin_rag",
-  canonical_role: "KNOWLEDGE_MANAGER",
+  canonical_role: "KNOWLEDGE_MANAGER", permissions: ["chat.query", "documents.read", "documents.upload", "documents.manage", "ingestion.run", "reindex.run", "collections.read", "observability.read", "audit.read"],
   tenant_id: "tenant-1",
   workspace_id: "workspace-1",
   session_id: "session-visual",
@@ -67,7 +67,9 @@ test("captures the grounded chat evidence state at the canonical viewports", asy
   await page.getByLabel("Pergunta").fill("Uma pergunta diferente sem resposta disponível");
   await page.getByRole("button", { name: "Consultar" }).click();
   await expect(page.locator(".answer-panel").getByRole("alert").getByText("Consulta indisponível.", { exact: true })).toBeVisible();
-  await expect(page.locator(".answer-text")).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Copiar" })).toHaveCount(0);
-  await expect(page.getByText("Com evidência", { exact: true })).toHaveCount(0);
+  // The workspace keeps the previously persisted answer visible while the
+  // newer failed turn remains recoverable in the same conversation.
+  await expect(page.locator(".answer-text")).toHaveCount(1);
+  await expect(page.getByRole("button", { name: "Copiar", exact: true })).toHaveCount(1);
+  await expect(page.getByText("Com evidência", { exact: true })).toHaveCount(1);
 });

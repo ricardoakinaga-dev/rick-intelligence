@@ -37,7 +37,9 @@ _ALLOWED_PAYLOAD = frozenset({
     "correlation_id", "collection_id", "workspace_id", "tenant_id",
 })
 _ACTIVE = frozenset({"queued", "leased"})
-_TERMINAL = frozenset({"acked", "dead", "cancelled"})
+# ``published`` is the canonical external queue acknowledgement state; the
+# local SQLite adapter historically calls the same terminal state ``acked``.
+_TERMINAL = frozenset({"acked", "published", "dead", "cancelled"})
 
 
 class DurableQueueError(RuntimeError):
@@ -80,6 +82,7 @@ class QueueRecord:
     created_at: float
     updated_at: float
     last_error: str | None = None
+    document_id: str | None = None
 
     @property
     def terminal(self) -> bool:
@@ -101,6 +104,7 @@ class QueueRecord:
             "created_at": self.created_at,
             "updated_at": self.updated_at,
             "last_error": self.last_error,
+            "document_id": self.document_id,
         }
 
 

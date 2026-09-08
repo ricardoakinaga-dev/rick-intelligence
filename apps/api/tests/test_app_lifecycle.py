@@ -273,6 +273,68 @@ def test_shutdown_cancels_queued_uploads_and_is_idempotent(tmp_path: Path) -> No
     assert stopped.value.code == "storage_unavailable"
 
 
+def test_shutdown_timeout_preserves_queued_future_reconciliation(tmp_path: Path) -> None:
+    started = threading.Event()
+    release = threading.Event()
+
+    class CooperativeIngestion:
+        def ingest(self, _path, **kwargs):
+            started.set()
+            release.wait(2)
+            cancelled = kwargs.get("cancel_check")
+            is_cancelled = callable(cancelled) and cancelled()
+            return {
+                "job_id": kwargs["job_id"],
+                "document_id": None if is_cancelled else f"doc-{kwargs['job_id']}",
+                "status": "cancelled" if is_cancelled else "published",
+                "stage": "cancelled" if is_cancelled else "published",
+                "progress": 0.0 if is_cancelled else 1.0,
+                "attempt": 1,
+                "error_code": None,
+                "tenant_id": kwargs["tenant_id"],
+                "workspace_id": kwargs["workspace_id"],
+                "collection_id": kwargs["collection_id"],
+            }
+
+    service = IngestionApplicationService(
+        CooperativeIngestion(),
+        staging_root=tmp_path / "staging",
+        max_jobs=2,
+    )
+    first = service.submit_upload(
+        io.BytesIO(b"first"),
+        filename="first.txt",
+        collection_id="collection-a",
+        workspace_id="workspace-a",
+        tenant_id="tenant-a",
+    )
+    assert started.wait(1)
+    second = service.submit_upload(
+        io.BytesIO(b"second"),
+        filename="second.txt",
+        collection_id="collection-a",
+        workspace_id="workspace-a",
+        tenant_id="tenant-a",
+    )
+
+    # A zero deadline intentionally expires before the application reconciler
+    # can visit the queue. The executor must leave the queued future runnable
+    # so its normal callback owns source cleanup and pending-counter release.
+    assert service.shutdown(wait=True, timeout=0) is False
+    queued_future = service._scheduled_futures[second["job_id"]]
+    assert queued_future.cancelled() is False
+    assert second["job_id"] in service._job_paths
+
+    release.set()
+    assert service.shutdown(wait=True, timeout=2) is True
+    assert first["job_id"] in service._jobs
+    assert service._async_pending == 0
+    assert service._scheduled_futures == {}
+    assert service._job_paths == {}
+    assert all(not thread.is_alive() for thread in service._executor._threads)
+    assert list((tmp_path / "staging").iterdir()) == []
+
+
 def test_all_synchronous_mutations_fail_closed_after_shutdown(tmp_path: Path) -> None:
     service = IngestionApplicationService(object(), staging_root=tmp_path / "staging")
     assert service.shutdown(wait=True) is True

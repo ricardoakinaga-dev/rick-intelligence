@@ -264,6 +264,16 @@ except ImportError:  # Keep a minimal, bounded local runtime for packaged API im
 MAX_ROUTE_FAMILIES = 16
 MAX_HISTOGRAM_SAMPLES = 10_000
 MAX_TELEMETRY_EVENTS = 256
+MAX_METRIC_OBSERVATION_MS = 86_400_000.0
+_RETRIEVAL_LATENCY_BUCKETS_MS = (50.0, 100.0, 250.0, 500.0, 1_000.0, 1_500.0, 2_000.0, 5_000.0, 10_000.0)
+_READINESS_STATUSES = frozenset({"unknown", "ready", "degraded", "not_ready"})
+_PROVIDER_COMPONENTS = frozenset({
+    "chat", "embedding", "object_store", "provider", "queue", "qdrant", "redis",
+    "retrieval", "storage", "vector_store", "unknown",
+})
+_PROVIDER_FAILURE_REASONS = frozenset({
+    "error", "invalid_response", "rate_limited", "timeout", "unavailable", "unknown",
+})
 _HTTP_METHODS = frozenset({"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"})
 _WORKER_EVENT_FIELDS = frozenset({
     "job_ref", "worker_ref", "request_ref", "correlation_ref", "status", "stage",
@@ -409,6 +419,15 @@ class ApiTelemetry:
     def __init__(self) -> None:
         self._counters = CounterRegistry(max_metrics=256)
         self._latency = Histogram("api.http.latency_ms", max_samples=MAX_HISTOGRAM_SAMPLES)
+        self._stream_ttft = Histogram("api.chat.stream.ttft_ms", max_samples=MAX_HISTOGRAM_SAMPLES)
+        self._stream_duration = Histogram("api.chat.stream.duration_ms", max_samples=MAX_HISTOGRAM_SAMPLES)
+        self._retrieval_latency = Histogram("api.retrieval.latency_ms", max_samples=MAX_HISTOGRAM_SAMPLES)
+        self._retrieval_bucket_counts = {bucket: 0 for bucket in _RETRIEVAL_LATENCY_BUCKETS_MS}
+        self._retrieval_observations = 0
+        self._retrieval_sum_ms = 0.0
+        self._readiness_status = "unknown"
+        self._readiness_observations = 0
+        self._readiness_check_count = 0
         self._recent_errors: deque[bool] = deque(maxlen=MAX_HISTOGRAM_SAMPLES)
         self._events: deque[dict[str, object]] = deque(maxlen=MAX_TELEMETRY_EVENTS)
         self._slo = AlertRule("api.http", max_error_rate=0.05, max_latency_p95=2_000.0)
@@ -486,6 +505,9 @@ class ApiTelemetry:
         fields = self._worker_event_fields(event_name, raw_fields)
         normalized = safe_event(fields, event_name=event_name)
         with self._lock:
+            status = fields.get("status")
+            if isinstance(status, str) and status in _WORKER_STATES:
+                self._counters.increment("api.worker.jobs", labels={"status": status})
             self._events.append(deepcopy(normalized))
 
     def record_abandonment(self, *, path: str, reason: str,
@@ -503,6 +525,119 @@ class ApiTelemetry:
                 "outcome": "transport_abandoned",
                 "reason": reason,
             }, event_name="api.http.abandonment"))
+
+    def record_stream(self, *, outcome: str, ttft_ms: float | None,
+                      duration_ms: float) -> None:
+        """Record bounded live-stream timings and terminal outcome.
+
+        Stream labels are a finite status vocabulary. Request text, identities,
+        conversation ids and provider details never reach the metric registry.
+        """
+
+        if outcome not in {"complete", "partial", "error", "cancelled"}:
+            raise ValueError("unknown stream outcome")
+        try:
+            duration = max(0.0, float(duration_ms))
+        except (TypeError, ValueError):
+            duration = 0.0
+        ttft = None
+        if ttft_ms is not None:
+            try:
+                observed = float(ttft_ms)
+                if math.isfinite(observed) and observed >= 0:
+                    ttft = observed
+            except (TypeError, ValueError):
+                pass
+        with self._lock:
+            self._counters.increment("api.chat.stream.outcomes", labels={"status": outcome})
+            self._stream_duration.observe(duration)
+            if ttft is not None:
+                self._stream_ttft.observe(ttft)
+
+    def record_readiness(self, *, status: str, check_count: int = 0) -> None:
+        """Record the latest bounded readiness state and probe count."""
+
+        if status not in _READINESS_STATUSES:
+            raise ValueError("unknown readiness status")
+        try:
+            checks = int(check_count)
+        except (TypeError, ValueError):
+            checks = 0
+        checks = max(0, min(checks, MAX_ROUTE_FAMILIES * 4))
+        with self._lock:
+            self._counters.increment("api.readiness", labels={"status": status})
+            self._readiness_status = status
+            self._readiness_check_count = checks
+            self._readiness_observations = min(
+                self._readiness_observations + 1,
+                MAX_HISTOGRAM_SAMPLES,
+            )
+
+    def record_worker_job(self, *, status: str) -> None:
+        """Count worker lifecycle observations using the finite job vocabulary."""
+
+        if status not in _WORKER_STATES:
+            raise ValueError("unknown worker job status")
+        with self._lock:
+            self._counters.increment("api.worker.jobs", labels={"status": status})
+
+    @staticmethod
+    def _provider_component(value: object) -> str:
+        if isinstance(value, str):
+            candidate = value.strip().lower().replace("-", "_")
+            if candidate == "qdrant":
+                return "vector_store"
+            if candidate in _PROVIDER_COMPONENTS:
+                return candidate
+        return "unknown"
+
+    @staticmethod
+    def _provider_failure_reason(value: object) -> str:
+        if isinstance(value, str):
+            candidate = value.strip().lower().replace("-", "_")
+            if candidate in _PROVIDER_FAILURE_REASONS:
+                return candidate
+        return "unknown"
+
+    def record_provider_failure(self, *, provider: str = "unknown", reason: str = "unknown") -> None:
+        """Count provider failures with bounded component and reason labels."""
+
+        with self._lock:
+            self._counters.increment(
+                "api.provider.failures",
+                labels={
+                    "provider": self._provider_component(provider),
+                    "reason": self._provider_failure_reason(reason),
+                },
+            )
+
+    @staticmethod
+    def _bounded_duration(value: object) -> float:
+        try:
+            observed = float(value)
+        except (TypeError, ValueError):
+            return 0.0
+        if not math.isfinite(observed):
+            return 0.0
+        return max(0.0, min(observed, MAX_METRIC_OBSERVATION_MS))
+
+    def record_retrieval(self, *, duration_ms: float, outcome: str = "success") -> None:
+        """Record bounded retrieval duration and a finite terminal outcome."""
+
+        if outcome not in {"success", "error"}:
+            raise ValueError("unknown retrieval outcome")
+        observed = self._bounded_duration(duration_ms)
+        with self._lock:
+            self._counters.increment("api.retrieval.requests", labels={"status": outcome})
+            self._retrieval_latency.observe(observed)
+            for bucket in _RETRIEVAL_LATENCY_BUCKETS_MS:
+                if observed <= bucket:
+                    self._retrieval_bucket_counts[bucket] += 1
+            # The fixed buckets are exported as Prometheus histogram counters;
+            # unlike the bounded summary samples, these values must be
+            # monotonic for rate()/histogram_quantile() to remain valid.
+            self._retrieval_observations += 1
+            self._retrieval_sum_ms += observed
 
     def record_request(self, *, method: str, path: str, status: int, duration_ms: float,
                        failed: bool = False, request_id: str | None = None,
@@ -542,6 +677,20 @@ class ApiTelemetry:
         with self._lock:
             snapshots = self._counters.snapshot()
             latency = self._latency.snapshot()
+            stream_ttft = self._stream_ttft.snapshot()
+            stream_duration = self._stream_duration.snapshot()
+            retrieval_latency = self._retrieval_latency.snapshot()
+            retrieval_buckets = {
+                str(bucket): count for bucket, count in self._retrieval_bucket_counts.items()
+            }
+            retrieval_observations = self._retrieval_observations
+            retrieval_sum_ms = round(self._retrieval_sum_ms, 6)
+            readiness = {
+                "status": self._readiness_status,
+                "ok": self._readiness_status == "ready",
+                "observations": self._readiness_observations,
+                "check_count": self._readiness_check_count,
+            }
             total = len(self._recent_errors)
             errors = sum(self._recent_errors)
             events = tuple(deepcopy(event) for event in self._events)
@@ -567,7 +716,189 @@ class ApiTelemetry:
                 "max_latency_p95_ms": self._slo.max_latency_p95,
             },
             "latency": latency,
+            "readiness": readiness,
+            "retrieval": {
+                "latency": retrieval_latency,
+                "histogram": {
+                    "buckets": retrieval_buckets,
+                    "+Inf": retrieval_observations,
+                    "count": retrieval_observations,
+                    "sum_ms": retrieval_sum_ms,
+                },
+            },
+            "stream": {
+                "ttft": stream_ttft,
+                "duration": stream_duration,
+                "outcomes": [
+                    snapshot.as_dict() for snapshot in snapshots
+                    if snapshot.name == "api.chat.stream.outcomes"
+                ],
+            },
             "counters": [snapshot.as_dict() for snapshot in snapshots],
             "events": list(events),
             "event_capacity": MAX_TELEMETRY_EVENTS,
         }
+
+    @staticmethod
+    def _prometheus_label_value(value: object) -> str:
+        """Escape only values from the finite internal label taxonomy."""
+
+        text = str(value)
+        return text.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
+
+    @classmethod
+    def _prometheus_labels(cls, labels: object) -> str:
+        if not isinstance(labels, Mapping):
+            return ""
+        # Keep this list explicit so arbitrary request data cannot become a
+        # Prometheus label even if it reaches the registry in the future.
+        allowed = {"le", "provider", "reason", "route", "service", "status"}
+        pairs = [
+            f'{key}="{cls._prometheus_label_value(labels[key])}"'
+            for key in sorted(labels)
+            if key in allowed and isinstance(key, str)
+        ]
+        return "{" + ",".join(pairs) + "}" if pairs else ""
+
+    @staticmethod
+    def _prometheus_name(value: object) -> str:
+        candidate = re.sub(r"[^A-Za-z0-9_]", "_", str(value))
+        candidate = candidate.strip("_") or "metric"
+        if candidate[0].isdigit():
+            candidate = "metric_" + candidate
+        if not candidate.endswith("_total"):
+            candidate += "_total"
+        return "rick_" + candidate
+
+    def prometheus_text(self) -> str:
+        """Return a bounded Prometheus exposition for this API process.
+
+        This is intentionally a protected, process-local inspection endpoint.
+        It contains no event payloads, identities, paths, query strings, or
+        unbounded labels. A collector may scrape it through an authenticated
+        management route and aggregate it outside the application.
+        """
+
+        current = self.snapshot()
+        lines: list[str] = [
+            "# HELP rick_api_process_up API process telemetry endpoint is available.",
+            "# TYPE rick_api_process_up gauge",
+            "rick_api_process_up 1",
+        ]
+        seen: set[str] = set()
+        counters = current.get("counters", [])
+        if isinstance(counters, list):
+            for raw in counters:
+                if not isinstance(raw, Mapping):
+                    continue
+                name = self._prometheus_name(raw.get("name", "metric"))
+                labels = self._prometheus_labels(raw.get("labels"))
+                if name not in seen:
+                    lines.extend((f"# HELP {name} Bounded RICK counter.", f"# TYPE {name} counter"))
+                    seen.add(name)
+                try:
+                    value = float(raw.get("total", 0.0))
+                except (TypeError, ValueError):
+                    continue
+                if not math.isfinite(value) or value < 0:
+                    continue
+                lines.append(f"{name}{labels} {value:g}")
+
+        readiness = current.get("readiness")
+        if isinstance(readiness, Mapping):
+            current_status = readiness.get("status")
+            if current_status in _READINESS_STATUSES:
+                lines.extend((
+                    "# HELP rick_api_readiness_status Latest API readiness state (one active status is 1).",
+                    "# TYPE rick_api_readiness_status gauge",
+                ))
+                for status in sorted(_READINESS_STATUSES):
+                    value = 1 if status == current_status else 0
+                    lines.append(
+                        "rick_api_readiness_status"
+                        f'{{service="api",status="{self._prometheus_label_value(status)}"}} {value}'
+                    )
+
+        retrieval = current.get("retrieval")
+        retrieval_histogram = retrieval.get("histogram") if isinstance(retrieval, Mapping) else None
+        if isinstance(retrieval_histogram, Mapping):
+            lines.extend((
+                "# HELP rick_api_retrieval_latency_ms Retrieval latency in milliseconds.",
+                "# TYPE rick_api_retrieval_latency_ms histogram",
+            ))
+            buckets = retrieval_histogram.get("buckets")
+            if isinstance(buckets, Mapping):
+                for bucket in _RETRIEVAL_LATENCY_BUCKETS_MS:
+                    raw_count = buckets.get(str(bucket), 0)
+                    try:
+                        count = int(raw_count)
+                    except (TypeError, ValueError):
+                        count = 0
+                    count = max(0, count)
+                    le = str(int(bucket)) if bucket.is_integer() else str(bucket)
+                    lines.append(f'rick_api_retrieval_latency_ms_bucket{{le="{le}"}} {count}')
+                try:
+                    inf_count = int(retrieval_histogram.get("+Inf", 0))
+                except (TypeError, ValueError):
+                    inf_count = 0
+                lines.append(f'rick_api_retrieval_latency_ms_bucket{{le="+Inf"}} {max(0, inf_count)}')
+            for suffix, value in (("count", retrieval_histogram.get("count")),
+                                  ("sum", retrieval_histogram.get("sum_ms"))):
+                try:
+                    observed = float(value)
+                except (TypeError, ValueError):
+                    continue
+                if not math.isfinite(observed) or observed < 0:
+                    continue
+                lines.append(f"rick_api_retrieval_latency_ms_{suffix} {observed:g}")
+
+        latency = current.get("latency")
+        if isinstance(latency, Mapping):
+            for suffix, value in (("count", latency.get("count")), ("p50", latency.get("p50")),
+                                  ("p95", latency.get("p95")), ("max", latency.get("max"))):
+                if value is None:
+                    continue
+                try:
+                    observed = float(value)
+                except (TypeError, ValueError):
+                    continue
+                if not math.isfinite(observed) or observed < 0:
+                    continue
+                metric = f"rick_api_http_latency_ms_{suffix}"
+                kind = "counter" if suffix == "count" else "gauge"
+                lines.extend((f"# HELP {metric} API response latency summary.", f"# TYPE {metric} {kind}", f"{metric} {observed:g}"))
+
+        stream = current.get("stream")
+        if isinstance(stream, Mapping):
+            for key, metric_name in (("ttft", "rick_api_chat_stream_ttft_ms"),
+                                     ("duration", "rick_api_chat_stream_duration_ms")):
+                histogram = stream.get(key)
+                if not isinstance(histogram, Mapping):
+                    continue
+                for suffix, value in (("count", histogram.get("count")),
+                                      ("p50", histogram.get("p50")),
+                                      ("p95", histogram.get("p95")),
+                                      ("max", histogram.get("max"))):
+                    if value is None:
+                        continue
+                    try:
+                        observed = float(value)
+                    except (TypeError, ValueError):
+                        continue
+                    if not math.isfinite(observed) or observed < 0:
+                        continue
+                    kind = "counter" if suffix == "count" else "gauge"
+                    lines.extend((f"# HELP {metric_name}_{suffix} API chat stream timing summary.",
+                                  f"# TYPE {metric_name}_{suffix} {kind}",
+                                  f"{metric_name}_{suffix} {observed:g}"))
+
+        slo = current.get("slo")
+        if isinstance(slo, Mapping):
+            status = slo.get("status")
+            if status in {"healthy", "breach", "no_data"}:
+                lines.extend((
+                    "# HELP rick_api_slo_status Current bounded API SLO state.",
+                    "# TYPE rick_api_slo_status gauge",
+                    f'rick_api_slo_status{{status="{self._prometheus_label_value(status)}"}} 1',
+                ))
+        return "\n".join(lines) + "\n"

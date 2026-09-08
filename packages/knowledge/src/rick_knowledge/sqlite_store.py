@@ -177,10 +177,15 @@ class SQLiteKnowledgeStore:
 
     @staticmethod
     def _collection(row: sqlite3.Row) -> Collection:
+        metadata = _metadata_value(row["metadata_json"])
+        status = metadata.pop("__rick_status", "active")
+        version = metadata.pop("__rick_version", 1)
         return Collection(
             workspace_id=row["workspace_id"], collection_id=row["collection_id"],
             tenant_id=row["tenant_id"], title=row["title"], description=row["description"],
-            metadata=_metadata_value(row["metadata_json"]),
+            status=status if status in {"active", "archived"} else "active",
+            version=version if isinstance(version, int) and not isinstance(version, bool) else 1,
+            metadata=metadata,
         )
 
     @staticmethod
@@ -210,6 +215,13 @@ class SQLiteKnowledgeStore:
         )
 
     def upsert_collection(self, collection: Collection) -> None:
+        if collection.status not in {"active", "archived"}:
+            raise ValueError("unknown collection status")
+        metadata = {
+            **(collection.metadata if isinstance(collection.metadata, dict) else {}),
+            "__rick_status": collection.status,
+            "__rick_version": collection.version,
+        }
         with self._transaction():
             self._connection.execute(
                 """INSERT INTO collections
@@ -219,7 +231,7 @@ class SQLiteKnowledgeStore:
                   tenant_id=excluded.tenant_id, title=excluded.title,
                   description=excluded.description, metadata_json=excluded.metadata_json""",
                 (collection.workspace_id, collection.collection_id, collection.tenant_id,
-                 collection.title, collection.description, _metadata(collection.metadata)),
+                 collection.title, collection.description, _metadata(metadata)),
             )
 
     def get_collection(
@@ -283,9 +295,25 @@ class SQLiteKnowledgeStore:
                  document.embedding_model, document.embedding_version, _metadata(document.metadata)),
             )
 
-    def get_document(self, document_id: str) -> Document | None:
+    def get_document(
+        self,
+        document_id: str,
+        *,
+        tenant_id: str | None = None,
+        workspace_id: str | None = None,
+    ) -> Document | None:
         with self._read() as connection:
-            row = connection.execute("SELECT * FROM documents WHERE document_id = ?", (document_id,)).fetchone()
+            clauses = ["document_id = ?"]
+            params: list[object] = [document_id]
+            if tenant_id is not None:
+                clauses.append("tenant_id = ?")
+                params.append(tenant_id)
+            if workspace_id is not None:
+                clauses.append("workspace_id = ?")
+                params.append(workspace_id)
+            row = connection.execute(
+                "SELECT * FROM documents WHERE " + " AND ".join(clauses), tuple(params)
+            ).fetchone()
         return self._document(row) if row else None
 
     def list_documents(

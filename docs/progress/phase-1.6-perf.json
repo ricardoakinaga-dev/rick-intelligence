@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "phase": "1.6",
   "workload": "local upload -> canonical ingest -> refreshed retrieval",
   "samples": 30,
@@ -8,16 +8,108 @@
     "platform": "Linux-7.0.0-31-generic-x86_64-with-glibc2.39"
   },
   "upload_ms": {
-    "p50": 1.27,
-    "p95": 1.508
+    "n": 30,
+    "p50": 1.62,
+    "p95": 2.522,
+    "p99": 2.616,
+    "min": 1.379,
+    "max": 2.616
   },
   "enqueue_ms": {
-    "p50": 0.147,
-    "p95": 0.23
+    "n": 30,
+    "p50": 0.21,
+    "p95": 0.328,
+    "p99": 0.411,
+    "min": 0.166,
+    "max": 0.411
   },
   "retrieval_ms": {
-    "p50": 9.475,
-    "p95": 10.14
+    "n": 30,
+    "p50": 10.223,
+    "p95": 13.636,
+    "p99": 27.432,
+    "min": 9.405,
+    "max": 27.432
+  },
+  "ttft_ms": {
+    "status": "NOT_APPLICABLE",
+    "reason": "Phase 1.6 exercises ingestion and retrieval; it has no generated token stream."
+  },
+  "completion_ms": {
+    "status": "NOT_APPLICABLE",
+    "reason": "Phase 1.6 has no answer-generation completion event."
+  },
+  "memory": {
+    "status": "OBSERVED",
+    "unit": "bytes",
+    "method": "procfs_rss_and_vmhwm_or_resource_maxrss",
+    "rss_before_bytes": 37761024,
+    "rss_after_bytes": 40353792,
+    "rss_delta_bytes": 2592768,
+    "peak_rss_bytes": 40398848,
+    "scope": "entire benchmark process; not an isolated request allocation"
+  },
+  "cost": {
+    "status": "NOT_RUN",
+    "amount": null,
+    "currency": null,
+    "reason": "No billing telemetry is available and no external provider was executed."
+  },
+  "failure_scenarios": [
+    {
+      "id": "oversized_upload",
+      "scope": "LOCAL_DETERMINISTIC",
+      "deterministic": true,
+      "expected": "request_too_large",
+      "observed": "request_too_large",
+      "status": "PASS"
+    },
+    {
+      "id": "empty_upload",
+      "scope": "LOCAL_DETERMINISTIC",
+      "deterministic": true,
+      "expected": "validation_error",
+      "observed": "validation_error",
+      "status": "PASS"
+    },
+    {
+      "id": "unsupported_extension",
+      "scope": "LOCAL_DETERMINISTIC",
+      "deterministic": true,
+      "expected": "unsupported_media_type",
+      "observed": "unsupported_media_type",
+      "status": "PASS"
+    }
+  ],
+  "soak_scenario": {
+    "id": "bounded_local_soak",
+    "scope": "LOCAL_DETERMINISTIC",
+    "deterministic": true,
+    "status": "PASS",
+    "iterations": 30,
+    "iterations_completed": 30,
+    "upload_published": 30,
+    "retrieval_with_evidence": 30,
+    "failures": 0,
+    "definition": "bounded sequential upload and retrieval samples; no concurrency or wall-time target",
+    "invariants": [
+      "all uploads published",
+      "all retrievals returned evidence",
+      "no external dependency was contacted"
+    ]
+  },
+  "local_scenarios_status": "PASS",
+  "external_scenarios": {
+    "distributed_load": {
+      "status": "NOT_RUN",
+      "scope": "EXTERNAL",
+      "reason": "External load, failover and multi-replica capacity testing is outside this hermetic benchmark."
+    },
+    "dependency_down": {
+      "status": "NOT_RUN",
+      "scope": "EXTERNAL",
+      "reason": "No Qdrant, Redis, object store or worker service was stopped or contacted."
+    }
   },
   "bounds": {
     "max_upload_bytes": 1048576,

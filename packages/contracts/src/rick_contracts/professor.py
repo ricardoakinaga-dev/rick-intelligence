@@ -9,6 +9,7 @@ from pydantic import ConfigDict, Field
 from rick_contracts.chat import Citation
 from rick_contracts.base import StrictContractModel
 from rick_contracts.rag import EvidenceDto
+from rick_contracts.providers import ProviderMessage
 from rick_contracts.security import RetrievalContext
 
 PROFESSOR_CONTRACT_VERSION = "professor-contract-v1"
@@ -29,6 +30,7 @@ class ProfessorRequest(StrictContractModel):
     conversation_id: str = Field(min_length=1, max_length=128)
     retrieval_context: RetrievalContext
     mode: str = Field(default="grounded", min_length=1, max_length=32)
+    history: list[ProviderMessage] = Field(default_factory=list, max_length=100)
 
 
 class ProfessorResponse(StrictContractModel):

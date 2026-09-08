@@ -80,7 +80,8 @@ class IdentityProviderImpl:
 
     # -- login -----------------------------------------------------------
     def login(self, *, email, password, tenant_id, ip, user_agent) -> dict:
-        user = self.users.get_by_email(email)
+        tenant_lookup = getattr(self.users, "get_by_email_for_tenant", None)
+        user = tenant_lookup(email, tenant_id) if callable(tenant_lookup) else self.users.get_by_email(email)
         if user is None or not self.verifier.verify(user, password):
             raise IdentityError("unauthorized")
         if user.get("status", "active") != "active":
@@ -124,7 +125,12 @@ class IdentityProviderImpl:
         now = time.time()
         if record.get("revoked_at") is not None or now >= record.get("expires_at", 0):
             return _anonymous_snapshot()
-        user = self.users.get_by_id(record.get("user_id") or "")
+        scoped_lookup = getattr(self.users, "get_by_id_for_tenant", None)
+        user = (
+            scoped_lookup(record.get("user_id") or "", record.get("tenant_id"))
+            if callable(scoped_lookup)
+            else self.users.get_by_id(record.get("user_id") or "")
+        )
         if user is None or user.get("status", "active") != "active":
             return _anonymous_snapshot()
         try:
@@ -183,6 +189,9 @@ class IdentityProviderImpl:
             self.sessions.delete(token)
 
     def list_sessions(self, user_id: str) -> list[dict]:
+        listed = getattr(self.sessions, "list_for_user", None)
+        if callable(listed):
+            return list(listed(user_id) or [])
         items = []
         for token in self.sessions.tokens_for_user(user_id):
             record = self.sessions.get(token)
@@ -201,10 +210,16 @@ class IdentityProviderImpl:
     def revoke_session(self, token: str) -> int:
         if self.sessions.get(token) is None:
             return 0
+        revoke = getattr(self.sessions, "revoke", None)
+        if callable(revoke):
+            return int(revoke(token, reason="manual_revoke"))
         self.sessions.delete(token)
         return 1
 
     def revoke_user_sessions(self, user_id: str, *, reason: str = "manual_revoke") -> int:
+        revoke_all = getattr(self.sessions, "revoke_user", None)
+        if callable(revoke_all):
+            return int(revoke_all(user_id, reason=reason))
         tokens = self.sessions.tokens_for_user(user_id)
         for token in tokens:
             self.sessions.delete(token)

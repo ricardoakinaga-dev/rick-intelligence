@@ -11,6 +11,8 @@ boundary.
 - responsive `/app` clinical workbench;
 - documents catalog, bounded upload and ingestion job polling;
 - grounded chat with confidence and evidence cards;
+- gated human case records with structured hypotheses, evidence references,
+  human review, and auditable feedback;
 - root `/admin` boundary for the next operational slice;
 - keyboard-visible focus, reduced motion, loading, empty, error and permission
   states.
