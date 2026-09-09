@@ -19,6 +19,7 @@ from rick_evidence.models import (
 from rick_evidence.validator import (
     ClaimSupportReport,
     CitationValidationReport,
+    EvidenceAuthority,
     EvidenceValidationError,
     EvidenceValidationReport,
     EvidenceValidator,
@@ -27,6 +28,7 @@ from rick_evidence.validator import (
 __all__ = [
     "ClaimSupportReport",
     "CitationValidationReport",
+    "EvidenceAuthority",
     "EVIDENCE_BUNDLE_CONTRACT_VERSION",
     "EVIDENCE_CONTRACT_VERSION",
     "Evidence",

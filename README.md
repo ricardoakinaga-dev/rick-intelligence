@@ -7,34 +7,42 @@ knowledge-intelligence platform:
 - `rick-professor/` — the current TypeScript/Fastify Professor compatibility service;
 - `modulo-redis-locker/` — the current JavaScript/Express Redis lease service.
 
-The repository is currently at **Phase 1.6 — bounded ingestion and lifecycle
-vertical slice**. `packages/knowledge`, `packages/ingestion` and `packages/retrieval`
-remain root-owned implementations with differential parity to validated
-legacy behavior; `packages/providers`, `packages/locking` and
-`packages/professor` now provide the typed provider, owner-safe lease and
-evidence-gated generation boundaries. `apps/api` can run an authenticated
-platform or OpenAI-compatible request through server-side ACL, deterministic
-retrieval, Professor orchestration, citations and safe failure mapping. The
-root API also exposes bounded multipart upload, canonical ingestion, job
-status/cancellation/retry, cursor-paginated published documents, reindex,
-document deletion, and refreshed local retrieval. The default local mode
-returns a bounded process-local upload job before processing so cancellation is
-usable from the public API; it remains hermetic and production rejects the
-stub ingestion path.
-Legacy CVG/Professor/Locker servers remain byte-identical
-compatibility/migration surfaces; no legacy code is deleted in this phase.
-Live OpenAI, Qdrant, Redis, durable jobs, and object storage remain explicit
-rollout work and are not claimed by the local fixtures. The canonical web
-caller now exists as an independently verified initial slice in `apps/web`;
-its production promotion remains gated by the missing runtime/operations
-evidence.
+The repository is now in **Phase 2 — Production Intelligence Runtime
+Closure**. `packages/knowledge`, `packages/ingestion` and `packages/retrieval`
+remain root-owned implementations with differential parity to validated legacy
+behavior; `packages/providers`, `packages/locking`, `packages/evidence`,
+`packages/decision` and `packages/professor` provide typed platform boundaries.
+`apps/api`, `apps/worker` and `apps/web` contain the canonical public,
+durable-job and browser surfaces, while the three legacy systems remain
+byte-identical compatibility/migration surfaces.
+
+The current honest classification is **STATE_OF_ART_CANDIDATE**. Local
+contracts, deterministic tests, static checks and frontend build evidence are
+substantial; live PostgreSQL/Redis/Qdrant/object-storage execution,
+multi-worker fencing, distributed observability, restore/chaos/soak,
+production-shaped performance, complete API-backed visual states and release
+promotion evidence remain open or externally blocked. No production,
+`STATE_OF_ART`, `AAA` or `TRIPLE_AAA` claim is made here. A mandatory gate
+that is `NOT_RUN`, `BLOCKED_EXTERNAL` or failed keeps the candidate below
+promotion.
+
+The current audit is
+[`phase-2-current-gap-audit.md`](docs/reports/phase-2-current-gap-audit.md)
+and the execution plan is
+[`phase-2-production-intelligence-runtime.md`](docs/plans/phase-2-production-intelligence-runtime.md).
+The final local report, scorecard and external blocker matrix are
+[`phase-2-final-report.md`](docs/progress/phase-2-final-report.md),
+[`state-of-art-triple-aaa-final-audit.md`](docs/reports/state-of-art-triple-aaa-final-audit.md)
+and [`external-evidence-blockers.md`](docs/reports/external-evidence-blockers.md).
+The original request is archived at
+[`state-of-art-triple-aaa-2026-09-09.txt`](docs/prompts/state-of-art-triple-aaa-2026-09-09.txt).
 
 ## Repository layout
 
 ```text
 apps/api/              canonical FastAPI boundary (Phase 1.3/1.5)
-apps/worker/            reserved worker boundary; durable execution deferred
-apps/web/               canonical root web caller (initial State of Art slice)
+apps/worker/            canonical durable worker boundary and runtime
+apps/web/               canonical root web caller and visual-state surface
 packages/              reusable domain and platform packages
 infrastructure/        future deployment, migration, and operations assets
 tests/                 root contract, integration, security, regression, and performance lanes
@@ -88,14 +96,21 @@ Run `make help` for the complete list.
 | `make api16-verify` | Sanitized Phase 1.6 matrix plus Phase 1.5/1.4 regression, security, OpenAPI, and whitespace checks. |
 | `make web-validate` | Lints, typechecks, builds, and runs the canonical browser matrix at 375/768/1440 against the root API loopback. |
 | `make web-e2e` | Runs the canonical browser smoke and writes visual evidence under `artifacts/visual/state-of-art/`. |
-| `make dev`, `make up`, `make logs` | Fail closed until a canonical root application/compose boundary exists; they never guess at legacy service wiring. |
-| `make down` | Reports that no canonical root stack exists yet and changes no external state. |
+| `make dev` | Runs the canonical development Compose lifecycle in the foreground; it fails closed when Docker, required environment or reviewed composition inputs are unavailable. |
+| `make up`, `make down`, `make logs` | Operate the selected canonical root Compose file (`RICK_COMPOSE_FILE` may select staging); static configuration is not runtime proof. |
+| `make release-evidence` | Generates the ignored, commit-bound release manifest; the release gate still rejects missing, stale, wrong-hash, blocked or not-run mandatory evidence. |
+| `make postgres-runtime` | Runs the real PostgreSQL migration/queue/fencing gate from an explicit `RICK_TEST_DATABASE_DSN`; returns `BLOCKED_EXTERNAL` when unavailable. |
+| `make redis-runtime` | Runs the real Redis namespace/lease/rate-limit gate from an explicit `RICK_TEST_REDIS_URL`; local semantics do not imply production-safe TLS/auth. |
+| `make object-qdrant-runtime` | Runs the real object/vector lifecycle gate from explicit test endpoints; no endpoint discovery or fake transport is used. |
+| `make triple-aaa-verify` | Executes the integrated fail-closed packet and writes a redacted ignored result; `0` is reserved for all mandatory lanes passing, `2` means external blocking, `1` means failure. |
 
 For current component-specific commands and runtime prerequisites, see
 [`docs/plans/phase-1.1-monorepo-skeleton.md`](docs/plans/phase-1.1-monorepo-skeleton.md)
 and [`docs/architecture/professor-provider-locking.md`](docs/architecture/professor-provider-locking.md).
-The Phase 1.6 lifecycle contract and its process-local limits are in
-[`docs/architecture/ingestion-lifecycle.md`](docs/architecture/ingestion-lifecycle.md).
+The Phase 2 lifecycle contract and its current gaps are in
+[`docs/architecture/ingestion-lifecycle.md`](docs/architecture/ingestion-lifecycle.md),
+[`docs/architecture/release-integrity.md`](docs/architecture/release-integrity.md)
+and [`docs/operations/release-readiness.md`](docs/operations/release-readiness.md).
 
 ## Toolchain
 

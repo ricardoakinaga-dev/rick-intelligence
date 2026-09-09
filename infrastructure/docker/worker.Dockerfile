@@ -41,6 +41,8 @@ RUN python -m pip install --no-cache-dir --disable-pip-version-check \
       "PyJWT==2.7.0" \
       "pdfplumber==0.10.3" \
       "python-docx==1.1.0" \
+      "psycopg[binary]==3.2.3" \
+      "redis==5.2.1" \
     && python -m compileall -q /opt/rick/apps/api/src /opt/rick/apps/worker /opt/rick/packages /opt/rick/docker \
     && find /opt/rick -type d -name __pycache__ -prune -exec rm -rf {} + \
     && chown -R 10001:10001 /opt/rick

@@ -70,7 +70,88 @@ class EvidenceDecisionGate:
     every other non-answer decision is returned as an empty evidence set.
     """
 
-    def __init__(self, retrieval) -> None:
+    class _KnowledgeAuthority:
+        """Resolve retrieval projections against canonical PostgreSQL knowledge."""
+
+        def __init__(self, knowledge) -> None:
+            self.knowledge = knowledge
+
+        def resolve(self, candidate: object, *, scope) -> Mapping[str, object] | None:
+            raw = candidate if isinstance(candidate, Mapping) else {}
+            document_id = raw.get("document_id")
+            chunk_id = raw.get("chunk_id")
+            if not isinstance(document_id, str) or not document_id.strip():
+                return None
+            if not isinstance(chunk_id, str) or not chunk_id.strip():
+                return None
+            try:
+                document = self.knowledge.get_document(
+                    document_id,
+                    tenant_id=scope.tenant_id,
+                    workspace_id=scope.workspace_id,
+                )
+                if document is None or document.collection_id != scope.collection_id:
+                    return None
+                if document.status != "published":
+                    return None
+                get_chunks = self.knowledge.get_chunks
+                try:
+                    parameters = inspect.signature(get_chunks).parameters.values()
+                except (TypeError, ValueError):
+                    parameters = ()
+                names = {parameter.name for parameter in parameters}
+                scoped_chunks = {"tenant_id", "workspace_id"}.issubset(names) or any(
+                    parameter.kind is inspect.Parameter.VAR_KEYWORD
+                    for parameter in parameters
+                )
+                if scoped_chunks:
+                    chunks = get_chunks(
+                        document_id,
+                        tenant_id=scope.tenant_id,
+                        workspace_id=scope.workspace_id,
+                    )
+                else:
+                    # The in-memory/SQLite compatibility stores expose the
+                    # historical document-only chunk read. The document was
+                    # already resolved with the complete scope above; retain
+                    # the boundary by revalidating every returned chunk.
+                    chunks = get_chunks(document_id)
+            except Exception:
+                return None
+            chunk = next(
+                (
+                    item for item in chunks
+                    if getattr(item, "chunk_id", None) == chunk_id
+                    and getattr(item, "document_id", document_id) == document_id
+                    and getattr(item, "tenant_id", scope.tenant_id) == scope.tenant_id
+                ),
+                None,
+            )
+            if chunk is None:
+                return None
+            return {
+                "tenant_id": document.tenant_id,
+                "workspace_id": document.workspace_id,
+                "collection_id": document.collection_id,
+                "document_id": document.document_id,
+                "document_version": document.document_version,
+                "chunk_id": chunk.chunk_id,
+                "source": getattr(document, "display_filename", "") or getattr(document, "filename", ""),
+                "title": (
+                    getattr(document, "title", "")
+                    or getattr(document, "display_filename", "")
+                    or getattr(document, "filename", "")
+                ),
+                "checksum": chunk.checksum or document.content_checksum,
+                "text": chunk.text,
+                "page_start": chunk.page_start,
+                "page_end": chunk.page_end,
+                "section": chunk.section,
+                "retrieval_score": raw.get("retrieval_score", raw.get("score", 0.0)),
+                "reranking_score": raw.get("reranking_score", raw.get("rerank_score", 0.0)),
+            }
+
+    def __init__(self, retrieval, *, knowledge=None) -> None:
         from rick_decision import (
             DecisionAction,
             DecisionInput,
@@ -91,7 +172,12 @@ class EvidenceDecisionGate:
         self._UserIntent = UserIntent
         self._EvidenceBundle = EvidenceBundle
         self._EvidenceScope = EvidenceScope
-        self.validator = EvidenceValidator(max_bundle_items=8)
+        authority = self._KnowledgeAuthority(knowledge) if knowledge is not None else None
+        self.validator = EvidenceValidator(
+            max_bundle_items=8,
+            authority=authority,
+            require_authority=knowledge is not None,
+        )
         self.decision_layer = DecisionLayer(evidence_validator=self.validator)
 
     @staticmethod
@@ -184,33 +270,70 @@ class EvidenceDecisionGate:
                 selected_collection = collection_id
             if collection_id != selected_collection:
                 continue
+            scope = self._EvidenceScope(
+                tenant_id=tenant_id,
+                workspace_id=workspace_id,
+                collection_id=selected_collection,
+            )
+            authoritative = None
+            if self.validator.authority is not None:
+                try:
+                    authoritative = self.validator.authority.resolve(candidate, scope=scope)
+                except Exception:
+                    authoritative = None
+                if not isinstance(authoritative, Mapping):
+                    continue
             try:
                 evidence = self.validator.issue(
                     candidate,
-                    scope=self._EvidenceScope(
-                        tenant_id=tenant_id,
-                        workspace_id=workspace_id,
-                        collection_id=selected_collection,
-                    ),
+                    scope=scope,
+                    _resolved_candidate=authoritative,
                 )
             except Exception:
                 # Missing or malformed provenance is not a reason to trust a
                 # legacy identifier. It is simply excluded from generation.
                 continue
-            candidate.update(
+            raw_quality = candidate.get(
+                "retrieval_quality_score", candidate.get("confidence_score", 0.0)
+            )
+            # Never return the retrieval projection's text or provenance to
+            # Professor. Evidence.issue() may have resolved a canonical
+            # record, so the public candidate must be reconstructed from that
+            # immutable object rather than updated in place.
+            normalized.append(
                 {
                     "evidence_id": evidence.evidence_id,
+                    "tenant_id": evidence.tenant_id,
+                    "workspace_id": evidence.workspace_id,
+                    "collection_id": evidence.collection_id,
+                    "document_id": evidence.document_id,
                     "document_version": evidence.document_version,
+                    "chunk_id": evidence.chunk_id,
                     "source": evidence.source,
-                    "checksum": evidence.checksum,
-                    "retrieval_quality_score": candidate.get(
-                        "retrieval_quality_score", candidate.get("confidence_score", 0.0)
+                    "title": (
+                        authoritative.get("title", "")
+                        if isinstance(authoritative, Mapping)
+                        else candidate.get("title", "")
                     ),
+                    "checksum": evidence.checksum,
+                    "text": evidence.text,
+                    "page_start": evidence.page_start,
+                    "page_end": evidence.page_end,
+                    "section": evidence.section,
+                    "retrieval_quality_score": raw_quality,
+                    # Ranking signals are not provenance. Preserve only the
+                    # bounded typed scores needed by Professor's existing
+                    # approval threshold; source text and identity above
+                    # come exclusively from the issued Evidence object.
+                    "confidence_score": raw_quality,
+                    "score": candidate.get("score", 0.0),
+                    "rank": candidate.get("rank", 0),
+                    "dense_score": candidate.get("dense_score", 0.0),
+                    "sparse_score": candidate.get("sparse_score", 0.0),
+                    "reranking_score": evidence.reranking_score,
                 }
             )
-            normalized.append(candidate)
             issued.append(evidence)
-            raw_quality = candidate.get("retrieval_quality_score", 0.0)
             try:
                 quality = float(raw_quality)
             except (TypeError, ValueError):
@@ -318,9 +441,9 @@ class ProfessorChatBackend:
 
     provider_kind = "professor"
 
-    def __init__(self, *, retrieval, provider, lease=None, limits: ProfessorLimits | None = None) -> None:
+    def __init__(self, *, retrieval, provider, lease=None, knowledge=None, limits: ProfessorLimits | None = None) -> None:
         self.retrieval = retrieval
-        self.evidence_gate = EvidenceDecisionGate(retrieval)
+        self.evidence_gate = EvidenceDecisionGate(retrieval, knowledge=knowledge)
         self.provider = ProviderChatAdapter(provider)
         self.lease = OwnedLeaseAdapter(lease) if lease is not None else None
         self.orchestrator = ProfessorOrchestrator(

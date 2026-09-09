@@ -420,7 +420,8 @@ def mode_compose(action: str) -> int:
     if not shutil.which("docker"):
         print("NOT_AVAILABLE: Docker is required for the root compose lifecycle.", file=sys.stderr)
         return 2
-    command = ["docker", "compose", "-f", str(compose.relative_to(ROOT)), action]
+    compose_action = "up" if action == "dev" else action
+    command = ["docker", "compose", "-f", str(compose.relative_to(ROOT)), compose_action]
     if action == "up":
         command.append("-d")
     return 0 if run_case(f"root compose {action}", command) else 1

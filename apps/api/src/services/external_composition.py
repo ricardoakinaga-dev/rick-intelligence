@@ -344,7 +344,12 @@ def build_external_providers(
         or not callable(getattr(lease, "readiness_check", None))
     ):
         raise ExternalCompositionError("production-safe Redis lease")
-    professor = ProfessorChatBackend(retrieval=retrieval, provider=provider, lease=lease)
+    professor = ProfessorChatBackend(
+        retrieval=retrieval,
+        provider=provider,
+        lease=lease,
+        knowledge=knowledge,
+    )
     canonical_ingestion = IngestionService(
         knowledge=knowledge,
         vectors=vectors,

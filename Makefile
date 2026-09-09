@@ -12,7 +12,7 @@ WEB_CURRENT_EVIDENCE_DIR := $(ROOT)/.gauntlet-state-of-art/evidence/visual-cycle
 
 .DEFAULT_GOAL := help
 
-.PHONY: help bootstrap validate dev test test-fast test-integration lint typecheck build up down logs ci eval eval-retrieval eval-retrieval-pack storage-test ops-migration-check ops-static ops-backup-test jobs-test web-install web-lint web-typecheck web-build web-e2e web-validate api-dev api-test api-contract api-security api-benchmark api131-canonical api131-differential api131-full api131-benchmark api14-units api14-differential api14-acl api14-full api14-benchmark api15-contracts api15-provider api15-lock api15-professor api15-root api15-benchmark api15-verify api15-full api15-boundaries api16-domain api16-worker api16-root api16-benchmark api16-full api16-verify
+.PHONY: help bootstrap validate dev test test-fast test-integration lint typecheck build up down logs ci eval eval-retrieval eval-retrieval-pack security-adversarial storage-test ops-migration-check ops-static compose-static postgres-runtime redis-runtime object-qdrant-runtime triple-aaa-verify ops-backup-test jobs-test release-evidence web-install web-lint web-typecheck web-build web-e2e web-validate api-dev api-test api-contract api-security api-benchmark api131-canonical api131-differential api131-full api131-benchmark api14-units api14-differential api14-acl api14-full api14-benchmark api15-contracts api15-provider api15-lock api15-professor api15-root api15-benchmark api15-verify api15-full api15-boundaries api16-domain api16-worker api16-root api16-benchmark api16-full api16-verify
 
 help:
 	@printf '%s\n' 'RICK Intelligence root commands:'
@@ -30,8 +30,15 @@ help:
 	@printf '%s\n' '  make eval             deterministic non-live Phase 0.5 plumbing evaluation'
 	@printf '%s\n' '  make eval-retrieval   offline retrieval/ACL/provenance evaluation fixture'
 	@printf '%s\n' '  make eval-retrieval-pack  versioned local thresholds and negative-case pack'
+	@printf '%s\n' '  make security-adversarial validate the bounded synthetic RAG attack corpus'
 	@printf '%s\n' '  make storage-test     local object-store security and restart tests'
 	@printf '%s\n' '  make ops-static       migration/env/runbook static checks (no services)'
+	@printf '%s\n' '  make compose-static   render both canonical Compose topologies without starting services'
+	@printf '%s\n' '  make postgres-runtime run the real PostgreSQL migration/queue gate from RICK_TEST_DATABASE_DSN'
+	@printf '%s\n' '  make redis-runtime run the real Redis lease/rate-limit gate from RICK_TEST_REDIS_URL'
+	@printf '%s\n' '  make object-qdrant-runtime run the real object/vector gate from explicit test URLs'
+	@printf '%s\n' '  make triple-aaa-verify run the fail-closed integrated verification packet'
+	@printf '%s\n' '  make release-evidence generate the ignored commit-bound release manifest'
 	@printf '%s\n' '  make api-dev          run canonical apps/api kernel (hermetic by default)'
 	@printf '%s\n' '  make api-test         Phase 1.3 API matrix (routing/auth/errors/health/compat/streaming)'
 	@printf '%s\n' '  make api-contract     OpenAPI generation + required-path check'
@@ -93,6 +100,9 @@ eval-retrieval:
 eval-retrieval-pack:
 	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT):$(ROOT)/scripts/state_of_art" $(PYTHON) "$(ROOT)/scripts/state_of_art/evaluate_pack.py" --pack "$(ROOT)/docs/evaluation/packs/rec22-local-v1" --pretty
 
+security-adversarial:
+	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) "$(ROOT)/scripts/phase11/check_adversarial_corpus.py"
+
 storage-test:
 	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)/packages/storage/src" $(PYTHON) -m pytest -q -p no:cacheprovider "$(ROOT)/packages/storage/tests"
 
@@ -102,6 +112,24 @@ ops-migration-check:
 ops-static: ops-migration-check
 	bash -n "$(ROOT)/infrastructure/scripts/validate-env.sh"
 	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) -m py_compile "$(ROOT)/infrastructure/scripts/backup-restore-check.py" "$(ROOT)/infrastructure/scripts/backup_restore.py"
+
+compose-static:
+	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) "$(ROOT)/scripts/phase11/check_compose.py"
+
+postgres-runtime:
+	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)" $(PYTHON) "$(ROOT)/scripts/phase11/postgres_runtime_gate.py"
+
+redis-runtime:
+	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)/packages/contracts/src:$(ROOT)/packages/locking/src" $(PYTHON) "$(ROOT)/scripts/phase11/redis_runtime_gate.py"
+
+object-qdrant-runtime:
+	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)/packages/knowledge/src:$(ROOT)/packages/retrieval/src:$(ROOT)/packages/storage/src" $(PYTHON) "$(ROOT)/scripts/phase11/object_qdrant_runtime_gate.py"
+
+triple-aaa-verify:
+	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) "$(ROOT)/scripts/state_of_art/triple_aaa_verify.py"
+
+release-evidence:
+	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) "$(ROOT)/scripts/state_of_art/generate_release_evidence.py" --environment local-hermetic
 
 ops-backup-test:
 	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) -m pytest -q -p no:cacheprovider "$(ROOT)/infrastructure/scripts/tests/test_backup_restore.py"

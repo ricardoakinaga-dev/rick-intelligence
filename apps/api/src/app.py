@@ -487,7 +487,12 @@ def create_app(settings: ApiSettings | None = None, providers: Providers | None 
                 lease = InMemoryLeaseClient()
             else:
                 raise RuntimeError("Professor backend requires a configured lease service")
-            professor = ProfessorChatBackend(retrieval=retrieval, provider=provider, lease=lease)
+            professor = ProfessorChatBackend(
+                retrieval=retrieval,
+                provider=provider,
+                lease=lease,
+                knowledge=knowledge,
+            )
             backend = professor
         elif selected_mode == "legacy":
             # Legacy is an explicit rollback mode. A configured adapter that

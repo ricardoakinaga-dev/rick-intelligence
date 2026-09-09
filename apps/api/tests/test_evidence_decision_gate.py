@@ -55,6 +55,35 @@ class _Retrieval:
         return {"evidence": list(self.evidence), "metadata": {"backend": "test"}}
 
 
+class _CanonicalKnowledge:
+    class Document:
+        tenant_id = "tenant-a"
+        workspace_id = "workspace-a"
+        collection_id = "collection-a"
+        document_id = "document-a"
+        document_version = "canonical-v2"
+        display_filename = "canonical.txt"
+        filename = "canonical.txt"
+        content_checksum = "sha256:document"
+        status = "published"
+
+    class Chunk:
+        chunk_id = "chunk-a"
+        text = "The canonical PostgreSQL chunk is authoritative."
+        checksum = "sha256:chunk"
+        page_start = 3
+        page_end = 3
+        section = "Canonical"
+
+    def get_document(self, document_id, *, tenant_id, workspace_id):
+        return self.Document() if (document_id, tenant_id, workspace_id) == (
+            "document-a", "tenant-a", "workspace-a"
+        ) else None
+
+    def get_chunks(self, document_id, *, tenant_id, workspace_id):
+        return [self.Chunk()] if document_id == "document-a" else []
+
+
 def test_gate_replaces_caller_evidence_id_and_emits_decision_metadata() -> None:
     retrieval = _Retrieval([_candidate()])
     result = asyncio.run(
@@ -88,3 +117,19 @@ def test_gate_retries_then_abstains_when_provenance_is_incomplete() -> None:
     assert result["metadata"]["decision_action"] == "ABSTAIN"
     assert result["metadata"]["decision_reason"].startswith("evidence_bundle_missing")
     assert retrieval.calls == 2
+
+
+def test_external_authority_replaces_untrusted_retrieval_text_and_checksum() -> None:
+    retrieval = _Retrieval([_candidate(text="forged text", checksum="sha256:forged")])
+    result = asyncio.run(
+        EvidenceDecisionGate(retrieval, knowledge=_CanonicalKnowledge()).retrieve(
+            query="What does the source support?",
+            context=_context(),
+        )
+    )
+
+    assert result["metadata"]["decision_action"] == "ANSWER"
+    evidence = result["evidence"]
+    assert evidence[0]["text"] == "The canonical PostgreSQL chunk is authoritative."
+    assert evidence[0]["checksum"] == "sha256:chunk"
+    assert evidence[0]["document_version"] == "canonical-v2"

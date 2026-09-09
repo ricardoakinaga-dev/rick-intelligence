@@ -8,6 +8,7 @@ type SessionContextValue = {
   session: Session | null;
   ready: boolean;
   error: string | null;
+  errorKind: "validation" | "mutation" | null;
   signIn: (body: { email: string; password: string; tenant_id: string }) => Promise<Session>;
   signOut: () => Promise<void>;
   refresh: () => Promise<void>;
@@ -19,6 +20,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [errorKind, setErrorKind] = useState<"validation" | "mutation" | null>(null);
   const generation = useRef(0);
   const mounted = useRef(false);
   const mutation = useRef<{ kind: "login" | "logout"; settled: Promise<void> } | null>(null);
@@ -34,12 +36,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       if (!isCurrent(operation)) return;
       setSession(next);
       setError(null);
+      setErrorKind(null);
     } catch (cause) {
       if (!isCurrent(operation)) return;
       setSession(null);
-      setError(cause instanceof ApiError
-        ? cause.status === 401 || cause.status === 403 ? null : cause.message
-        : "Não foi possível validar a sessão.");
+      const unauthenticated = cause instanceof ApiError && (cause.status === 401 || cause.status === 403);
+      setError(unauthenticated ? null : cause instanceof ApiError ? cause.message : "Não foi possível validar a sessão.");
+      setErrorKind(unauthenticated ? null : "validation");
     } finally {
       if (isCurrent(operation)) setReady(true);
     }
@@ -58,12 +61,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     session,
     ready,
     error,
+    errorKind,
     signIn: async (body) => {
       if (!mounted.current || mutation.current) {
         throw new ApiError("Uma operação de sessão já está em andamento.", 409, "session_busy");
       }
       const operation = nextGeneration();
       setError(null);
+      setErrorKind(null);
       const pending = { kind: "login" as const, settled: Promise.resolve() };
       mutation.current = pending;
       const result = (async () => {
@@ -75,12 +80,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           }
           setSession(next);
           setError(null);
+          setErrorKind(null);
           setReady(true);
           return next;
         } catch (cause) {
           if (isCurrent(operation)) {
             setSession(null);
             setError(cause instanceof ApiError ? cause.message : "Não foi possível abrir a sessão.");
+            setErrorKind("mutation");
             setReady(true);
           }
           throw cause;
@@ -98,6 +105,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       const operation = nextGeneration();
       setSession(null);
       setError(null);
+      setErrorKind(null);
       setReady(true);
       const pending = { kind: "logout" as const, settled: Promise.resolve() };
       mutation.current = pending;
@@ -112,6 +120,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           // for callers; the UI must catch and present it.
           if (isCurrent(operation)) {
             setError(cause instanceof ApiError ? cause.message : "Não foi possível encerrar a sessão no servidor.");
+            setErrorKind("mutation");
           }
           throw cause;
         } finally {
@@ -121,7 +130,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       return pending.settled;
     },
     refresh,
-  }), [error, isCurrent, nextGeneration, ready, refresh, session]);
+  }), [error, errorKind, isCurrent, nextGeneration, ready, refresh, session]);
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }

@@ -14,10 +14,17 @@ import sqlite3
 from threading import RLock
 from typing import Iterable, Iterator
 
-from rick_knowledge.models import DOCUMENT_STATUSES, Chunk, Collection, Document
+from rick_knowledge.models import (
+    DOCUMENT_STATUSES,
+    Chunk,
+    Collection,
+    Document,
+    materialize_lineage,
+    utc_timestamp,
+)
 
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 
 def _metadata(value: object) -> str:
@@ -56,7 +63,7 @@ class SQLiteKnowledgeStore:
     def _initialize(self) -> None:
         with self._transaction():
             current = int(self._connection.execute("PRAGMA user_version").fetchone()[0])
-            if current not in (0, 1, SCHEMA_VERSION):
+            if current not in (0, 1, 2, SCHEMA_VERSION):
                 raise RuntimeError(f"unsupported knowledge schema version: {current}")
             if current == 0:
                 self._connection.executescript(
@@ -89,6 +96,10 @@ class SQLiteKnowledgeStore:
                         embedding_model TEXT NOT NULL,
                         embedding_version TEXT NOT NULL,
                         metadata_json TEXT NOT NULL,
+                        ingestion_version TEXT NOT NULL DEFAULT '',
+                        object_ref TEXT NOT NULL DEFAULT '',
+                        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        published_at TEXT,
                         CHECK (status IN ('draft','processing','published','unpublished','deleted','partial','failed'))
                     );
                     CREATE TABLE IF NOT EXISTS chunks (
@@ -112,9 +123,12 @@ class SQLiteKnowledgeStore:
                     );
                     CREATE INDEX IF NOT EXISTS documents_scope_idx
                         ON documents (tenant_id, workspace_id, collection_id, status, document_id);
+                    CREATE INDEX IF NOT EXISTS documents_lineage_idx
+                        ON documents (tenant_id, workspace_id, collection_id, document_id,
+                                      document_version, ingestion_version);
                     CREATE INDEX IF NOT EXISTS chunks_document_idx
                         ON chunks (document_id, chunk_index, chunk_id);
-                    PRAGMA user_version = 2;
+                    PRAGMA user_version = 3;
                     """
                 )
             elif current == 1:
@@ -146,7 +160,29 @@ class SQLiteKnowledgeStore:
                 )
                 self._connection.execute("DROP TABLE collections")
                 self._connection.execute("ALTER TABLE collections_v2 RENAME TO collections")
-                self._connection.execute("PRAGMA user_version = 2")
+                current = 2
+
+            if current == 2:
+                # Expand the document row without rewriting the table, then
+                # backfill only deterministic legacy aliases. Unknown
+                # publication history remains NULL rather than being guessed.
+                self._connection.executescript(
+                    """
+                    ALTER TABLE documents ADD COLUMN ingestion_version TEXT NOT NULL DEFAULT '';
+                    ALTER TABLE documents ADD COLUMN object_ref TEXT NOT NULL DEFAULT '';
+                    ALTER TABLE documents ADD COLUMN created_at TEXT NOT NULL DEFAULT '';
+                    ALTER TABLE documents ADD COLUMN published_at TEXT;
+                    UPDATE documents
+                    SET ingestion_version = COALESCE(NULLIF(ingestion_version, ''), document_version),
+                        object_ref = COALESCE(NULLIF(object_ref, ''), NULLIF(filename, ''),
+                                              NULLIF(display_filename, ''), document_id),
+                        created_at = CASE WHEN created_at = '' THEN CURRENT_TIMESTAMP ELSE created_at END;
+                    CREATE INDEX IF NOT EXISTS documents_lineage_idx
+                        ON documents (tenant_id, workspace_id, collection_id, document_id,
+                                      document_version, ingestion_version);
+                    PRAGMA user_version = 3;
+                    """
+                )
 
     @contextmanager
     def _transaction(self) -> Iterator[None]:
@@ -200,6 +236,10 @@ class SQLiteKnowledgeStore:
             parser_version=row["parser_version"], chunker_version=row["chunker_version"],
             embedding_model=row["embedding_model"], embedding_version=row["embedding_version"],
             metadata=_metadata_value(row["metadata_json"]),
+            ingestion_version=row["ingestion_version"] or row["document_version"],
+            object_ref=row["object_ref"] or row["filename"] or row["display_filename"] or row["document_id"],
+            created_at=row["created_at"],
+            published_at=row["published_at"],
         )
 
     @staticmethod
@@ -265,10 +305,19 @@ class SQLiteKnowledgeStore:
     def upsert_document(self, document: Document) -> None:
         if document.status not in DOCUMENT_STATUSES:
             raise ValueError(f"unknown document status: {document.status}")
+        materialize_lineage(document, published=document.status == "published")
         with self._transaction():
             previous = self._connection.execute(
-                "SELECT status FROM documents WHERE document_id = ?", (document.document_id,)
+                "SELECT tenant_id, workspace_id, collection_id, status, published_at "
+                "FROM documents WHERE document_id = ?",
+                (document.document_id,),
             ).fetchone()
+            if previous and (
+                previous["tenant_id"] != document.tenant_id
+                or previous["workspace_id"] != document.workspace_id
+                or previous["collection_id"] != document.collection_id
+            ):
+                raise ValueError("document scope cannot change")
             if previous and previous["status"] == "deleted" and document.status != "deleted":
                 raise ValueError("deleted documents cannot transition; ingest a new version")
             self._connection.execute(
@@ -276,8 +325,9 @@ class SQLiteKnowledgeStore:
                 (document_id, workspace_id, collection_id, tenant_id, document_version,
                  content_checksum, filename, display_filename, title, source_type, mime_type,
                  language, status, parser_version, chunker_version, embedding_model,
-                 embedding_version, metadata_json)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 embedding_version, metadata_json, ingestion_version, object_ref,
+                 created_at, published_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(document_id) DO UPDATE SET
                   workspace_id=excluded.workspace_id, collection_id=excluded.collection_id,
                   tenant_id=excluded.tenant_id, document_version=excluded.document_version,
@@ -287,12 +337,20 @@ class SQLiteKnowledgeStore:
                   language=excluded.language, status=excluded.status,
                   parser_version=excluded.parser_version, chunker_version=excluded.chunker_version,
                   embedding_model=excluded.embedding_model, embedding_version=excluded.embedding_version,
-                  metadata_json=excluded.metadata_json""",
+                  metadata_json=excluded.metadata_json, ingestion_version=excluded.ingestion_version,
+                  object_ref=excluded.object_ref,
+                  published_at=CASE
+                    WHEN excluded.status = 'published'
+                      THEN COALESCE(excluded.published_at, documents.published_at, CURRENT_TIMESTAMP)
+                    ELSE COALESCE(excluded.published_at, documents.published_at)
+                  END""",
                 (document.document_id, document.workspace_id, document.collection_id, document.tenant_id,
                  document.document_version, document.content_checksum, document.filename,
                  document.display_filename, document.title, document.source_type, document.mime_type,
                  document.language, document.status, document.parser_version, document.chunker_version,
-                 document.embedding_model, document.embedding_version, _metadata(document.metadata)),
+                 document.embedding_model, document.embedding_version, _metadata(document.metadata),
+                 document.ingestion_version, document.object_ref, document.created_at,
+                 document.published_at),
             )
 
     def get_document(
@@ -365,7 +423,17 @@ class SQLiteKnowledgeStore:
                 raise KeyError(document_id)
             if row["status"] == "deleted" and status != "deleted":
                 raise ValueError("deleted documents cannot transition; ingest a new version")
-            self._connection.execute("UPDATE documents SET status = ? WHERE document_id = ?", (status, document_id))
+            published_at = utc_timestamp() if status == "published" else None
+            self._connection.execute(
+                """UPDATE documents
+                   SET status = ?,
+                       published_at = CASE
+                           WHEN ? = 'published' THEN COALESCE(published_at, ?)
+                           ELSE published_at
+                       END
+                 WHERE document_id = ?""",
+                (status, status, published_at, document_id),
+            )
 
     def delete_document(self, document_id: str) -> int:
         with self._transaction():
@@ -376,12 +444,17 @@ class SQLiteKnowledgeStore:
 
     def replace_document_chunks(self, document_id: str, chunks: list[Chunk]) -> None:
         with self._transaction():
-            if self._connection.execute("SELECT 1 FROM documents WHERE document_id = ?", (document_id,)).fetchone() is None:
+            document = self._connection.execute(
+                "SELECT tenant_id FROM documents WHERE document_id = ?", (document_id,)
+            ).fetchone()
+            if document is None:
                 raise KeyError(document_id)
             self._connection.execute("DELETE FROM chunks WHERE document_id = ?", (document_id,))
             for chunk in chunks:
                 if chunk.document_id != document_id:
                     raise ValueError("chunk document_id does not match parent")
+                if chunk.tenant_id != document["tenant_id"]:
+                    raise ValueError("chunk tenant_id does not match parent")
                 self._connection.execute(
                     """INSERT INTO chunks
                     (chunk_id, document_id, tenant_id, parent_chunk_id, chunk_index, text,

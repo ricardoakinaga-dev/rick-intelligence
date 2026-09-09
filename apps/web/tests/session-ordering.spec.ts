@@ -53,6 +53,25 @@ async function currentSession(page: Page) {
   await expect(page.locator(".rail-context strong")).toHaveText("current");
 }
 
+test("session validation failure stays recoverable without exposing private content", async ({ page }) => {
+  let attempts = 0;
+  await page.route("**/api/v1/auth/me", (route) => {
+    attempts += 1;
+    if (attempts === 1) {
+      return route.fulfill({ status: 503, json: { error: { code: "dependency_unavailable", message: "internal detail" } } });
+    }
+    return route.fulfill({ json: identity("recovered") });
+  });
+  await page.goto("/app");
+  const notice = page.locator(".session-error-state");
+  await expect(notice).toContainText("Sessão indisponível.");
+  await expect(notice).toContainText("Nenhum conteúdo privado foi exibido.");
+  await expect(notice).not.toContainText("internal detail");
+  await notice.getByRole("button", { name: "Tentar novamente" }).click();
+  await expect(page).toHaveURL(/\/app$/);
+  await expect(page.locator(".profile-button strong")).toHaveText("recovered@example.invalid");
+});
+
 for (const status of [401, 200]) {
   test(`older refresh ${status} cannot replace successful login`, async ({ page }) => {
     const release = await setup(page);

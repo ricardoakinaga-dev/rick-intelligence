@@ -15,7 +15,14 @@ import json
 import math
 from typing import Protocol
 
-from rick_knowledge.models import DOCUMENT_STATUSES, Chunk, Collection, Document
+from rick_knowledge.models import (
+    DOCUMENT_STATUSES,
+    Chunk,
+    Collection,
+    Document,
+    _timestamp_text,
+    materialize_lineage,
+)
 
 
 class DbConnection(Protocol):
@@ -43,6 +50,13 @@ def _json_value(value: object, default: object) -> object:
             return default
         return parsed if isinstance(parsed, (dict, list)) else default
     return default
+
+
+def _row_timestamp(value: object) -> str | None:
+    try:
+        return _timestamp_text(value)
+    except ValueError:
+        return None
 
 
 def _row_dict(cursor: object, row: object) -> dict[str, object]:
@@ -183,6 +197,16 @@ class PostgresKnowledgeStore:
             embedding_model=str(row.get("embedding_model") or ""),
             embedding_version=str(row.get("embedding_version") or ""),
             metadata=dict(metadata) if isinstance(metadata, Mapping) else {},
+            ingestion_version=str(row.get("ingestion_version") or row.get("document_version") or ""),
+            object_ref=str(
+                row.get("object_ref")
+                or row.get("object_key")
+                or row.get("filename")
+                or row.get("display_filename")
+                or ""
+            ),
+            created_at=_row_timestamp(row.get("created_at")),
+            published_at=_row_timestamp(row.get("published_at")),
         )
 
     @staticmethod
@@ -257,18 +281,24 @@ class PostgresKnowledgeStore:
     def upsert_document(self, document: Document) -> None:
         if document.status not in DOCUMENT_STATUSES:
             raise PostgresKnowledgeError("invalid_input")
+        try:
+            materialize_lineage(document, published=document.status == "published")
+        except ValueError:
+            raise PostgresKnowledgeError("invalid_input") from None
         creator = self._creator(document.metadata, self._created_by)
         metadata = dict(document.metadata or {})
-        object_key = str(metadata.get("object_key") or document.filename or document.document_id)
+        object_key = str(metadata.get("object_key") or document.object_ref or document.filename or document.document_id)
         byte_size = metadata.get("byte_size", 0)
         if isinstance(byte_size, bool) or not isinstance(byte_size, int) or byte_size < 0:
             raise PostgresKnowledgeError("invalid_input")
         with self._session(write=True) as (_connection, cursor):
-            self._execute(cursor, "SELECT tenant_id, workspace_id, status FROM rick_documents WHERE document_id = %s FOR UPDATE", (document.document_id,))
+            self._execute(cursor, "SELECT tenant_id, workspace_id, collection_id, status "
+                         "FROM rick_documents WHERE document_id = %s FOR UPDATE", (document.document_id,))
             existing = self._fetchone(cursor)
             if existing and (
                 existing.get("tenant_id") != document.tenant_id
                 or existing.get("workspace_id") != document.workspace_id
+                or existing.get("collection_id") != document.collection_id
             ):
                 # A caller must never be able to move a document primary key
                 # across scopes through an upsert.
@@ -278,28 +308,40 @@ class PostgresKnowledgeStore:
             self._execute(cursor, """
                 INSERT INTO rick_documents
                     (document_id, tenant_id, workspace_id, collection_id, document_version,
-                     content_checksum, object_key, byte_size, title, display_filename,
+                     content_checksum, object_key, object_ref, ingestion_version, byte_size,
+                     title, display_filename,
                      mime_type, status, parser_version, chunker_version, embedding_model,
-                     embedding_version, created_by, filename, source_type, language, metadata)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                     embedding_version, created_by, filename, source_type, language, metadata,
+                     created_at, published_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                        %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (document_id) DO UPDATE SET
                     tenant_id = EXCLUDED.tenant_id, workspace_id = EXCLUDED.workspace_id,
                     collection_id = EXCLUDED.collection_id, document_version = EXCLUDED.document_version,
                     content_checksum = EXCLUDED.content_checksum, object_key = EXCLUDED.object_key,
+                    object_ref = EXCLUDED.object_ref, ingestion_version = EXCLUDED.ingestion_version,
                     byte_size = EXCLUDED.byte_size, title = EXCLUDED.title,
                     display_filename = EXCLUDED.display_filename, mime_type = EXCLUDED.mime_type,
                     status = EXCLUDED.status, parser_version = EXCLUDED.parser_version,
                     chunker_version = EXCLUDED.chunker_version, embedding_model = EXCLUDED.embedding_model,
                     embedding_version = EXCLUDED.embedding_version, filename = EXCLUDED.filename,
                     source_type = EXCLUDED.source_type, language = EXCLUDED.language,
-                    metadata = EXCLUDED.metadata, updated_at = NOW()
+                    metadata = EXCLUDED.metadata,
+                    published_at = CASE
+                        WHEN EXCLUDED.status = 'published'
+                          THEN COALESCE(EXCLUDED.published_at, rick_documents.published_at, NOW())
+                        ELSE COALESCE(EXCLUDED.published_at, rick_documents.published_at)
+                    END,
+                    updated_at = NOW()
             """, (
                 document.document_id, document.tenant_id, document.workspace_id, document.collection_id,
-                document.document_version, document.content_checksum, object_key, byte_size,
+                document.document_version, document.content_checksum, object_key, document.object_ref,
+                document.ingestion_version, byte_size,
                 document.title, document.display_filename or document.filename, document.mime_type,
                 document.status, document.parser_version, document.chunker_version,
                 document.embedding_model, document.embedding_version, creator, document.filename,
                 document.source_type, document.language, json.dumps(metadata, ensure_ascii=False, sort_keys=True),
+                document.created_at, document.published_at,
             ))
 
     @staticmethod
@@ -425,7 +467,18 @@ class PostgresKnowledgeStore:
                 raise PostgresKnowledgeError("not_found")
             if row.get("status") == "deleted" and status != "deleted":
                 raise PostgresKnowledgeError("conflict")
-            self._execute(cursor, f"UPDATE rick_documents SET status = %s, updated_at = NOW() WHERE {where}", (status, *params))
+            self._execute(
+                cursor,
+                f"""UPDATE rick_documents
+                       SET status = %s,
+                           published_at = CASE
+                               WHEN %s = 'published' THEN COALESCE(published_at, NOW())
+                               ELSE published_at
+                           END,
+                           updated_at = NOW()
+                     WHERE {where}""",
+                (status, status, *params),
+            )
 
     def delete_document(
         self,
@@ -472,6 +525,8 @@ class PostgresKnowledgeStore:
             self._execute(cursor, "DELETE FROM rick_chunks WHERE document_id = %s AND tenant_id = %s AND workspace_id = %s", (document_id, document["tenant_id"], document["workspace_id"]))
             for index, chunk in enumerate(chunks):
                 if chunk.document_id != document_id or chunk.chunk_index != index:
+                    raise PostgresKnowledgeError("invalid_input")
+                if chunk.tenant_id != document["tenant_id"]:
                     raise PostgresKnowledgeError("invalid_input")
                 metadata = dict(chunk.metadata or {})
                 self._execute(cursor, """

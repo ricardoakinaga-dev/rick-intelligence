@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Protocol
 
 from pydantic import Field
 
@@ -72,6 +72,22 @@ class ClaimSupportReport(_ContractModel):
     coverage: float = Field(default=0.0, ge=0.0, le=1.0)
 
 
+class EvidenceAuthority(Protocol):
+    """Synchronous canonical source used before evidence issuance.
+
+    Retrieval output is an untrusted projection.  A production authority must
+    resolve the document/chunk again inside the already authorized scope and
+    return the canonical text, checksum and version fields.
+    """
+
+    def resolve(
+        self,
+        candidate: object,
+        *,
+        scope: EvidenceScope,
+    ) -> Mapping[str, object] | None: ...
+
+
 def _scope(value: EvidenceScope | Mapping[str, object]) -> EvidenceScope:
     if isinstance(value, EvidenceScope):
         return value
@@ -113,6 +129,8 @@ class EvidenceValidator:
     max_bundle_items: int = 20
     max_text_chars: int = _MAX_TEXT_CHARS
     min_claim_token_coverage: float = 0.80
+    authority: EvidenceAuthority | None = None
+    require_authority: bool = False
 
     def __post_init__(self) -> None:
         if not isinstance(self.max_bundle_items, int) or isinstance(self.max_bundle_items, bool):
@@ -126,6 +144,42 @@ class EvidenceValidator:
         _finite_score(self.min_claim_token_coverage, name="min_claim_token_coverage")
         if not 0.0 <= self.min_claim_token_coverage <= 1.0:
             raise ValueError("min_claim_token_coverage must be between zero and one")
+        if self.require_authority and self.authority is None:
+            raise ValueError("authoritative evidence resolution is required")
+
+    def _resolve_authoritative(
+        self,
+        candidate: object,
+        *,
+        scope: EvidenceScope,
+    ) -> object:
+        """Replace retrieval fields with a canonical, scope-bound record."""
+
+        if self.authority is None:
+            if self.require_authority:
+                raise EvidenceValidationError("authoritative_resolution_unavailable")
+            return candidate
+        resolver = getattr(self.authority, "resolve", None)
+        if not callable(resolver):
+            raise EvidenceValidationError("authoritative_resolution_unavailable")
+        try:
+            resolved = resolver(candidate, scope=scope)
+        except EvidenceValidationError:
+            raise
+        except Exception as exc:
+            raise EvidenceValidationError("authoritative_resolution_failed") from exc
+        if not isinstance(resolved, Mapping):
+            raise EvidenceValidationError("authoritative_evidence_missing")
+        resolved_value = dict(resolved)
+        for name in ("tenant_id", "workspace_id", "collection_id"):
+            if resolved_value.get(name) != getattr(scope, name):
+                raise EvidenceValidationError("authoritative_scope_mismatch")
+        for name in ("document_id", "chunk_id"):
+            supplied = _read(candidate, name, None)
+            authoritative = resolved_value.get(name)
+            if supplied is not None and authoritative != supplied:
+                raise EvidenceValidationError("authoritative_identity_mismatch")
+        return resolved_value
 
     def issue(
         self,
@@ -133,6 +187,7 @@ class EvidenceValidator:
         *,
         scope: EvidenceScope | Mapping[str, object],
         document_version: str | None = None,
+        _resolved_candidate: Mapping[str, object] | None = None,
     ) -> Evidence:
         """Issue one server-owned evidence item from a retrieval candidate."""
 
@@ -144,6 +199,15 @@ class EvidenceValidator:
         for name, supplied in candidate_scope.items():
             if supplied is not None and supplied != getattr(expected, name):
                 raise EvidenceValidationError("candidate_scope_mismatch")
+
+        candidate = (
+            dict(_resolved_candidate)
+            if _resolved_candidate is not None
+            else self._resolve_authoritative(candidate, scope=expected)
+        )
+        for name in ("tenant_id", "workspace_id", "collection_id"):
+            if candidate.get(name) != getattr(expected, name):
+                raise EvidenceValidationError("authoritative_scope_mismatch")
 
         version = document_version
         candidate_version = _candidate_value(candidate, "document_version", "version")
@@ -404,6 +468,7 @@ class EvidenceValidator:
 __all__ = [
     "ClaimSupportReport",
     "CitationValidationReport",
+    "EvidenceAuthority",
     "EvidenceValidationError",
     "EvidenceValidationReport",
     "EvidenceValidator",

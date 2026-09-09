@@ -10,6 +10,7 @@ turns an unavailable Docker/service/provider path into production evidence.
 from __future__ import annotations
 
 import argparse
+from datetime import datetime
 import hashlib
 import json
 import os
@@ -19,6 +20,15 @@ import sys
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
+
+try:  # Package import for tests; script-directory fallback for direct execution.
+    from scripts.state_of_art.release_manifest import (
+        MANIFEST_SCHEMA,
+        ManifestValidationError,
+        ReleaseEvidenceManifest,
+    )
+except ImportError:  # pragma: no cover - exercised by the workflow's direct script call.
+    from release_manifest import MANIFEST_SCHEMA, ManifestValidationError, ReleaseEvidenceManifest
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -459,6 +469,108 @@ def _safe_evidence_path(root: Path, raw_path: str) -> tuple[Path | None, str | N
     return resolved, None
 
 
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _validate_timestamp(value: str, field: str, failures: list[str]) -> None:
+    try:
+        parsed = value.replace("Z", "+00:00")
+        timestamp = datetime.fromisoformat(parsed)
+    except ValueError:
+        failures.append(f"{field} is not an ISO-8601 timestamp")
+        return
+    if timestamp.tzinfo is None:
+        failures.append(f"{field} must include a timezone")
+
+
+def _evaluate_typed_manifest(
+    path: Path,
+    payload: Mapping[str, Any],
+    checkout: Mapping[str, Any],
+    *,
+    root: Path,
+) -> dict[str, Any]:
+    """Validate the strict v2 manifest and its referenced bytes."""
+
+    result: dict[str, Any] = {
+        "path": str(path.relative_to(root) if path.is_relative_to(root) else path),
+        "required": True,
+        "schema_version": MANIFEST_SCHEMA,
+    }
+    try:
+        manifest = ReleaseEvidenceManifest.from_mapping(payload)
+    except ManifestValidationError as exc:
+        result.update({"classification": FAIL, "reason": "; ".join(exc.errors)})
+        return result
+
+    failures = manifest.structural_errors()
+    binding = manifest.commit_binding
+    expected_head = str(checkout.get("head") or "").lower()
+    expected_tree = str(checkout.get("tree") or "").lower()
+    expected_fingerprint = str(checkout.get("fingerprint") or "").lower()
+    if not expected_head or binding.commit_sha != expected_head:
+        failures.append("manifest commit binding does not match this checkout HEAD")
+    if expected_tree and binding.tree_sha != expected_tree:
+        failures.append("manifest commit binding does not match this checkout tree")
+    if not expected_fingerprint or binding.checkout_fingerprint != expected_fingerprint:
+        failures.append("manifest commit binding does not match this checkout fingerprint")
+    if checkout.get("status") != "CLEAN" or not binding.clean_worktree:
+        failures.append("manifest is not bound to a clean release checkout")
+    _validate_timestamp(manifest.generated_at, "manifest.generated_at", failures)
+
+    manifest_relative = path.relative_to(root).as_posix() if path.is_relative_to(root) else ""
+
+    def check_file(raw_path: str, expected_hash: str, field: str) -> None:
+        if raw_path == manifest_relative:
+            failures.append(f"{field} cannot self-reference the release manifest")
+            return
+        safe_path, path_error = _safe_evidence_path(root, raw_path)
+        if path_error or safe_path is None:
+            failures.append(f"{field}: {path_error or 'invalid path'}")
+            return
+        if not safe_path.is_file():
+            failures.append(f"{field}: referenced file is absent")
+            return
+        try:
+            actual_hash = _sha256_file(safe_path)
+        except OSError as exc:
+            failures.append(f"{field}: could not hash referenced file: {exc}")
+            return
+        if actual_hash != expected_hash:
+            failures.append(f"{field}: referenced artifact hash does not match")
+
+    for index, artifact in enumerate(manifest.artifacts):
+        check_file(artifact.path, artifact.sha256, f"artifacts[{index}]")
+    for gate in manifest.gates:
+        _validate_timestamp(gate.timestamp, f"gate {gate.gate_id}.timestamp", failures)
+        for index, evidence in enumerate(gate.evidence_paths):
+            check_file(evidence.path, evidence.sha256, f"gate {gate.gate_id}.evidence_paths[{index}]")
+
+    blocking_gates = [gate for gate in manifest.gates if gate.result != "PASS"]
+    if failures:
+        result["classification"] = FAIL
+        result["reason"] = "; ".join(failures)
+    elif blocking_gates:
+        blocking_ids = ", ".join(f"{gate.gate_id}={gate.result}" for gate in blocking_gates)
+        if any(gate.result in {"FAIL", "BLOCKED_EXTERNAL", "STALE", "INVALID"} for gate in blocking_gates):
+            result["classification"] = FAIL
+        else:
+            result["classification"] = NOT_RUN
+        result["reason"] = f"mandatory gates are not PASS: {blocking_ids}"
+    else:
+        result["classification"] = PASS
+        result["reason"] = "typed manifest, artifact hashes and mandatory gates are valid"
+    result["gate_results"] = [
+        {"gate_id": gate.gate_id, "result": gate.result} for gate in manifest.gates
+    ]
+    return result
+
+
 def evaluate_evidence(
     path: Path,
     checkout: Mapping[str, Any],
@@ -498,6 +610,9 @@ def evaluate_evidence(
             }
         )
         return result
+
+    if payload.get("schema_version") == MANIFEST_SCHEMA:
+        return _evaluate_typed_manifest(path, payload, checkout, root=root)
 
     observed_head, observed_fingerprint = _extract_identity(payload)
     expected_head = checkout.get("head")

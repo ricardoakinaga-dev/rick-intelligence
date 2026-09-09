@@ -33,6 +33,11 @@ jobs:
           PYTHONDONTWRITEBYTECODE: "1"
         run: python3 -m unittest discover -s scripts/state_of_art/tests -p 'test_*.py' -v
 
+      - name: Generate commit-bound release evidence
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python3 scripts/state_of_art/generate_release_evidence.py --environment ci
+
       - name: Run explicit root release checks
         env:
           PYTHONDONTWRITEBYTECODE: "1"

@@ -87,6 +87,62 @@ services:
       retries: 20
     networks: [private]
 
+  jaeger:
+    <<: *service-hardening
+    image: jaegertracing/all-in-one:1.68.0
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+      SPAN_STORAGE_TYPE: memory
+    ports:
+      - 127.0.0.1:16686:16686
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:14269/ >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    networks: [private]
+
+  otel-collector:
+    <<: *service-hardening
+    image: otel/opentelemetry-collector-contrib:0.123.0
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    volumes:
+      - ./infrastructure/compose/otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml:ro
+    ports:
+      - 127.0.0.1:14317:4317
+      - 127.0.0.1:14318:4318
+      - 127.0.0.1:18889:8889
+    depends_on:
+      jaeger: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:13133/ >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    networks: [private]
+
+  metrics:
+    <<: *service-hardening
+    image: prom/prometheus:v2.55.1
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=7d
+      - --web.enable-lifecycle
+    volumes:
+      - ./infrastructure/compose/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - metrics-data:/prometheus
+    ports:
+      - 127.0.0.1:19090:9090
+    depends_on:
+      otel-collector: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:9090/-/ready >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    networks: [private]
+
   api:
     <<: *service-hardening
     image: ${RICK_API_IMAGE:?supply an immutable API image reference}
@@ -110,6 +166,12 @@ services:
       LLM_BASE_URL: ${LLM_BASE_URL:?set the reviewed provider endpoint}
       LLM_MODEL: ${LLM_MODEL:?set the reviewed chat model}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:?set the reviewed embedding model}
+      OTEL_SERVICE_NAME: rick-api
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${RICK_OTEL_ENDPOINT:?set the collector endpoint}
+      OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_METRICS_EXPORTER: otlp
+      OTEL_LOGS_EXPORTER: none
       CORS_ALLOWED_ORIGINS: http://localhost:13000
       SESSION_COOKIE_SECURE: "true"
       SESSION_COOKIE_SAMESITE: strict
@@ -120,6 +182,7 @@ services:
       redis: {condition: service_healthy}
       qdrant: {condition: service_healthy}
       object-store: {condition: service_healthy}
+      otel-collector: {condition: service_healthy}
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=4).read()\""]
       interval: 10s
@@ -144,11 +207,18 @@ services:
       RICK_OBJECT_STORE_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:?inject the object-store secret}
       RICK_WORKER_COMPOSITION: ${RICK_WORKER_COMPOSITION:?supply the reviewed worker module:factory composition}
       RICK_WORKER_ID: ${RICK_WORKER_ID:?set a unique worker identity}
+      OTEL_SERVICE_NAME: rick-worker
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${RICK_OTEL_ENDPOINT:?set the collector endpoint}
+      OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_METRICS_EXPORTER: otlp
+      OTEL_LOGS_EXPORTER: none
     depends_on:
       postgres: {condition: service_healthy}
       redis: {condition: service_healthy}
       qdrant: {condition: service_healthy}
       object-store: {condition: service_healthy}
+      otel-collector: {condition: service_healthy}
     healthcheck:
       test: ["CMD", "python", "/opt/rick/docker/worker-entrypoint.py", "--health-check"]
       interval: 10s
@@ -178,6 +248,7 @@ volumes:
   redis-data: {name: rick-intelligence-dev-redis}
   qdrant-data: {name: rick-intelligence-dev-qdrant}
   object-data: {name: rick-intelligence-dev-objects}
+  metrics-data: {name: rick-intelligence-dev-metrics}
 
 networks:
   private:

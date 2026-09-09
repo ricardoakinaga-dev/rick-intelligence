@@ -9,6 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 import pytest
 
 from rick_knowledge import (
+    LINEAGE_PAYLOAD_FIELDS,
     REQUIRED_PAYLOAD_FIELDS,
     Chunk,
     Collection,
@@ -121,7 +122,11 @@ def test_payload_contract_and_drift():
     payload = build_point_payload(chunk=chunk, document=doc)
     assert validate_payload(payload) == []
     assert payload["page_start"] == 2 and payload["schema_version"] == "rag-contract-v1"
-    assert set(REQUIRED_PAYLOAD_FIELDS) >= set(payload) - {"document_filename", "qdrant_collection"}
+    assert payload["ingestion_version"] == "sha256:abc"
+    assert payload["object_ref"] == "f.pdf"
+    assert set(REQUIRED_PAYLOAD_FIELDS) >= set(payload) - {
+        "document_filename", "qdrant_collection", "object_key",
+    }
     broken = {k: v for k, v in payload.items() if k != "checksum"}
     assert validate_payload(broken) == ["checksum"]
 
@@ -132,3 +137,57 @@ def test_payload_contract_and_drift():
     tenantless_document = replace(doc, tenant_id=None)
     with pytest.raises(ValueError, match="tenant_id is required"):
         build_point_payload(chunk=chunk, document=tenantless_document)
+
+
+def test_lineage_payload_serializes_the_exact_published_version_and_validates_drift():
+    document = Document(
+        document_id="doc-lineage",
+        workspace_id="workspace-a",
+        collection_id="collection-a",
+        tenant_id="tenant-a",
+        document_version="document-v7",
+        ingestion_version="ingestion-v3",
+        object_ref="s3://private/tenant-a/workspace-a/source-v3.pdf",
+        created_at="2026-09-09T12:00:00Z",
+        published_at="2026-09-09T12:03:00Z",
+        parser_version="parser-v2",
+        chunker_version="chunker-v4",
+        embedding_model="text-embedding-3-small",
+        embedding_version="embedding-v5",
+    )
+    chunk = Chunk(
+        chunk_id="chunk-lineage-0000",
+        document_id=document.document_id,
+        tenant_id=document.tenant_id,
+        text="version-bound evidence",
+        checksum="sha256:chunk",
+        index_version="qdrant-index-v2",
+    )
+
+    payload = build_point_payload(chunk=chunk, document=document)
+
+    assert all(field in payload for field in LINEAGE_PAYLOAD_FIELDS)
+    assert {field: payload[field] for field in LINEAGE_PAYLOAD_FIELDS} == {
+        "document_id": "doc-lineage",
+        "document_version": "document-v7",
+        "ingestion_version": "ingestion-v3",
+        "parser_version": "parser-v2",
+        "chunker_version": "chunker-v4",
+        "embedding_model": "text-embedding-3-small",
+        "embedding_version": "embedding-v5",
+        "index_version": "qdrant-index-v2",
+        "checksum": "sha256:chunk",
+        "object_ref": "s3://private/tenant-a/workspace-a/source-v3.pdf",
+        "created_at": "2026-09-09T12:00:00Z",
+        "published_at": "2026-09-09T12:03:00Z",
+    }
+    assert payload["tenant_id"] == "tenant-a"
+    assert payload["workspace_id"] == "workspace-a"
+    assert payload["collection_id"] == "collection-a"
+    assert payload["object_key"] == payload["object_ref"]
+    assert validate_payload(payload) == []
+
+    without_object_ref = {key: value for key, value in payload.items() if key != "object_ref"}
+    assert validate_payload(without_object_ref) == ["object_ref"]
+    blank_ingestion = {**payload, "ingestion_version": ""}
+    assert validate_payload(blank_ingestion) == ["ingestion_version"]

@@ -50,5 +50,9 @@ artifacts/
 *.db
 *.zip
 
+# Generated release evidence is bound to the checkout at CI time and must not
+# become a self-referential tracked artifact.
+docs/progress/release-evidence.json
+
 # OS noise
 .DS_Store

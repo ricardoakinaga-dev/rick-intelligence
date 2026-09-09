@@ -3,7 +3,7 @@ name = "rick-api"
 version = "1.3.0"
 description = "RICK Intelligence canonical API kernel (Phase 1.3)"
 requires-python = ">=3.12"
-dependencies = ["fastapi==0.109.2", "uvicorn==0.27.1", "pydantic==2.6.1", "python-multipart==0.0.9", "httpx==0.27.0", "anyio==4.15.0"]
+dependencies = ["fastapi==0.109.2", "uvicorn==0.27.1", "pydantic==2.6.1", "python-multipart==0.0.9", "httpx==0.27.0", "anyio==4.15.0", "psycopg[binary]==3.2.3", "redis==5.2.1"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

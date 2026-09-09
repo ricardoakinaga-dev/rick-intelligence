@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Iterable, Protocol
 
-from rick_knowledge.models import DOCUMENT_STATUSES, Chunk, Collection, Document
+from rick_knowledge.models import DOCUMENT_STATUSES, Chunk, Collection, Document, materialize_lineage
 
 
 class KnowledgeStore(Protocol):
@@ -86,6 +86,14 @@ class InMemoryKnowledgeStore:
     def upsert_document(self, document: Document) -> None:
         if document.status not in DOCUMENT_STATUSES:
             raise ValueError(f"unknown document status: {document.status}")
+        existing = self._documents.get(document.document_id)
+        if existing and (
+            existing.tenant_id != document.tenant_id
+            or existing.workspace_id != document.workspace_id
+            or existing.collection_id != document.collection_id
+        ):
+            raise ValueError("document scope cannot change")
+        materialize_lineage(document, published=document.status == "published")
         self._documents[document.document_id] = document
 
     def get_document(
@@ -162,6 +170,7 @@ class InMemoryKnowledgeStore:
         if document.status == "deleted" and status != "deleted":
             raise ValueError("deleted documents cannot transition; ingest a new version")
         document.status = status
+        materialize_lineage(document, published=status == "published")
 
     def delete_document(self, document_id: str) -> int:
         chunks = self._chunks.pop(document_id, [])
@@ -171,8 +180,14 @@ class InMemoryKnowledgeStore:
         return len(chunks)
 
     def replace_document_chunks(self, document_id: str, chunks: list[Chunk]) -> None:
-        if document_id not in self._documents:
+        document = self._documents.get(document_id)
+        if document is None:
             raise KeyError(document_id)
+        for chunk in chunks:
+            if chunk.document_id != document_id:
+                raise ValueError("chunk document_id does not match parent")
+            if chunk.tenant_id != document.tenant_id:
+                raise ValueError("chunk tenant_id does not match parent")
         self._chunks[document_id] = list(chunks)
 
     def get_chunks(self, document_id: str) -> list[Chunk]:

@@ -111,9 +111,40 @@ def test_collections_are_tenant_scoped_and_v1_migrates_without_overwrite(tmp_pat
 
     migrated = SQLiteKnowledgeStore(legacy)
     with sqlite3.connect(legacy) as check:
-        assert check.execute("PRAGMA user_version").fetchone()[0] == 2
+        assert check.execute("PRAGMA user_version").fetchone()[0] == 3
+        columns = {row[1] for row in check.execute("PRAGMA table_info(documents)")}
+        assert {"ingestion_version", "object_ref", "created_at", "published_at"} <= columns
     assert migrated.get_collection("workspace-a", "shared", tenant_id="tenant-a").title == "legacy"
     migrated.close()
+
+
+def test_lineage_fields_round_trip_with_scope_and_publication_state(tmp_path):
+    store = SQLiteKnowledgeStore(tmp_path / "lineage.sqlite3")
+    document = Document(
+        document_id="doc-lineage",
+        workspace_id="workspace-a",
+        collection_id="collection-a",
+        tenant_id="tenant-a",
+        document_version="document-v7",
+        ingestion_version="ingestion-v3",
+        object_ref="objects/tenant-a/document-v7.pdf",
+        created_at="2026-09-09T12:00:00Z",
+        published_at="2026-09-09T12:03:00Z",
+        status="published",
+    )
+
+    store.upsert_document(document)
+    stored = store.get_document("doc-lineage", tenant_id="tenant-a", workspace_id="workspace-a")
+
+    assert stored is not None
+    assert stored.tenant_id == "tenant-a"
+    assert stored.workspace_id == "workspace-a"
+    assert stored.collection_id == "collection-a"
+    assert stored.ingestion_version == "ingestion-v3"
+    assert stored.object_ref == "objects/tenant-a/document-v7.pdf"
+    assert stored.created_at == "2026-09-09T12:00:00Z"
+    assert stored.published_at == "2026-09-09T12:03:00Z"
+    store.close()
 
 
 def test_delete_is_tombstone_and_cannot_be_resurrected(tmp_path):

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Activity, BookOpen, ChevronRight, CircleUserRound, ClipboardCheck, LogOut, Menu, MessageSquareText, Search, ShieldCheck, X } from "lucide-react";
+import { Activity, AlertTriangle, BookOpen, ChevronRight, CircleUserRound, ClipboardCheck, LogOut, Menu, MessageSquareText, Search, ShieldCheck, X } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
 import { useSession } from "@/components/session-provider";
 import { Button, Spinner, StatusPill } from "@/components/ui";
@@ -21,7 +21,7 @@ const nav = [
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { session, ready, signOut } = useSession();
+  const { session, ready, error: sessionError, errorKind: sessionErrorKind, refresh, signOut } = useSession();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [mobileViewport, setMobileViewport] = useState(() => typeof window !== "undefined" && window.matchMedia("(max-width: 900px)").matches);
   const railRef = useRef<HTMLElement>(null);
@@ -58,8 +58,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [session]);
 
   useEffect(() => {
-    if (ready && !session && pathname !== "/login") router.replace(`/login?next=${encodeURIComponent(pathname)}`);
-  }, [pathname, ready, router, session]);
+    if (ready && !session && (!sessionError || sessionErrorKind !== "validation") && pathname !== "/login") router.replace(`/login?next=${encodeURIComponent(pathname)}`);
+  }, [pathname, ready, router, session, sessionError, sessionErrorKind]);
 
   useLayoutEffect(() => setMobileOpen(false), [pathname]);
 
@@ -109,7 +109,12 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [mobileOpen, mobileViewport]);
 
   if (pathname === "/login") return <><NetworkStatus />{logoutNotice}{children}</>;
-  if (!ready || !session) return <>{logoutNotice}<div className="app-loading"><Spinner label="Validando sua sessão" /><p>Validando sua identidade e as permissões do espaço de trabalho.</p></div></>;
+  if (!ready || !session) {
+    if (sessionError && sessionErrorKind === "validation") {
+      return <>{logoutNotice}<div className="session-error-state" role="alert" aria-live="assertive"><div><AlertTriangle size={24} aria-hidden="true" /><h1>Sessão indisponível.</h1><p>Não foi possível confirmar sua identidade agora. Nenhum conteúdo privado foi exibido. Tente validar novamente ou volte ao login.</p><div className="session-error-actions"><Button variant="secondary" onClick={() => void refresh()}>Tentar novamente</Button><Link className="button ghost button-link" href="/login">Voltar ao login</Link></div></div></div></>;
+    }
+    return <>{logoutNotice}<div className="app-loading"><Spinner label="Validando sua sessão" /><p>Validando sua identidade e as permissões do espaço de trabalho.</p></div></>;
+  }
 
   const adminNav = { href: "/admin", label: "Administração", caption: "Controles operacionais", icon: ShieldCheck, permission: "audit.read" };
   const allNav = [...nav, adminNav];

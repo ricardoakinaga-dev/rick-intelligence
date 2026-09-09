@@ -78,6 +78,38 @@ def test_upsert_uses_one_transaction_and_deleted_documents_cannot_resurrect() ->
     assert connection.commits == 0
 
 
+def test_upsert_writes_scoped_document_lineage_columns() -> None:
+    connection = Connection([])
+    store = PostgresKnowledgeStore(lambda: connection, created_by="operator-1")
+    document = Document(
+        document_id="doc-lineage",
+        tenant_id="tenant-a",
+        workspace_id="workspace-a",
+        collection_id="clinical",
+        document_version="document-v7",
+        ingestion_version="ingestion-v3",
+        object_ref="s3://private/tenant-a/document-v7.pdf",
+        created_at="2026-09-09T12:00:00Z",
+        published_at="2026-09-09T12:03:00Z",
+        status="published",
+        metadata={"byte_size": 12},
+    )
+
+    store.upsert_document(document)
+
+    query, params = connection.cursor_instance.calls[1]
+    assert "object_ref" in query
+    assert "ingestion_version" in query
+    assert "created_at" in query and "published_at" in query
+    assert params[6:9] == (
+        "s3://private/tenant-a/document-v7.pdf",
+        "s3://private/tenant-a/document-v7.pdf",
+        "ingestion-v3",
+    )
+    assert params[-2:] == ("2026-09-09T12:00:00Z", "2026-09-09T12:03:00Z")
+    assert connection.commits == 1
+
+
 def test_chunk_replacement_is_transactional_and_requires_stable_order() -> None:
     connection = Connection([{"tenant_id": "tenant-a", "workspace_id": "workspace-a", "collection_id": "clinical"}])
     store = PostgresKnowledgeStore(lambda: connection, created_by="operator-1")

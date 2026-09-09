@@ -165,3 +165,45 @@ def test_nonfinite_scores_and_oversized_bundles_are_rejected() -> None:
             scope=_scope(),
         )
     assert limited.value.code == "evidence_limit_exceeded"
+
+
+def test_authority_replaces_untrusted_projection_fields() -> None:
+    class Authority:
+        def resolve(self, candidate, *, scope):
+            return {
+                "tenant_id": scope.tenant_id,
+                "workspace_id": scope.workspace_id,
+                "collection_id": scope.collection_id,
+                "document_id": "document-a",
+                "document_version": "canonical-v2",
+                "chunk_id": "chunk-a-0001",
+                "source": "canonical.txt",
+                "checksum": "sha256:canonical",
+                "text": "The canonical source is authoritative.",
+            }
+
+    issued = EvidenceValidator(authority=Authority(), require_authority=True).issue(
+        {
+            **_candidate(),
+            "text": "forged projection text",
+            "checksum": "sha256:forged",
+            "document_version": "canonical-v2",
+        },
+        scope=_scope(),
+    )
+
+    assert issued.text == "The canonical source is authoritative."
+    assert issued.checksum == "sha256:canonical"
+    assert issued.source == "canonical.txt"
+
+
+def test_required_authority_rejects_missing_canonical_record() -> None:
+    class MissingAuthority:
+        def resolve(self, candidate, *, scope):
+            return None
+
+    with pytest.raises(EvidenceValidationError) as caught:
+        EvidenceValidator(authority=MissingAuthority(), require_authority=True).issue(
+            _candidate(), scope=_scope()
+        )
+    assert caught.value.code == "authoritative_evidence_missing"
