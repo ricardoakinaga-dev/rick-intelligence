@@ -497,6 +497,82 @@ def evaluate_matrix(
                         envelope_errors.append("promoted capability requires successful runtime status")
                     if not isinstance(runtime_record.get("procedure"), str) or not runtime_record["procedure"].strip():
                         envelope_errors.append("procedure")
+                    if not isinstance(runtime_record.get("environment"), str) or not runtime_record["environment"].strip():
+                        envelope_errors.append("environment")
+                    limitations = runtime_record.get("limitations")
+                    if isinstance(limitations, str):
+                        limitations_valid = bool(limitations.strip())
+                    elif isinstance(limitations, Sequence) and not isinstance(limitations, (str, bytes, bytearray)):
+                        limitations_valid = bool(limitations) and all(
+                            isinstance(item, str) and item.strip() for item in limitations
+                        )
+                    else:
+                        limitations_valid = False
+                    if not limitations_valid:
+                        envelope_errors.append("limitations")
+                    if not isinstance(runtime_record.get("next_action"), str) or not runtime_record["next_action"].strip():
+                        envelope_errors.append("next_action")
+                    artifact_digest = runtime_record.get("artifact_sha256")
+                    if (
+                        not isinstance(artifact_digest, str)
+                        or not SHA256_RE.fullmatch(artifact_digest.removeprefix("sha256:").lower())
+                    ):
+                        envelope_errors.append("artifact_sha256")
+                    raw_artifacts = runtime_record.get("raw_artifacts")
+                    if (
+                        not isinstance(raw_artifacts, Sequence)
+                        or isinstance(raw_artifacts, (str, bytes, bytearray))
+                        or not raw_artifacts
+                    ):
+                        envelope_errors.append("raw_artifacts")
+                    else:
+                        raw_digests: set[str] = set()
+                        for raw_index, raw_ref in enumerate(raw_artifacts):
+                            if not isinstance(raw_ref, Mapping):
+                                envelope_errors.append(f"raw_artifacts[{raw_index}]")
+                                continue
+                            raw_path = raw_ref.get("path")
+                            raw_hash = raw_ref.get("sha256")
+                            raw_description = raw_ref.get("description")
+                            if (
+                                not isinstance(raw_path, str)
+                                or not raw_path.strip()
+                                or not isinstance(raw_hash, str)
+                                or not SHA256_RE.fullmatch(raw_hash.removeprefix("sha256:").lower())
+                                or not isinstance(raw_description, str)
+                                or not raw_description.strip()
+                            ):
+                                envelope_errors.append(f"raw_artifacts[{raw_index}]")
+                                continue
+                            raw_target, raw_path_error = _safe_path(root, raw_path)
+                            if raw_path_error or raw_target is None or not raw_target.is_file():
+                                envelope_errors.append(f"raw_artifacts[{raw_index}].path")
+                                continue
+                            actual_raw_hash = _hash_file(raw_target)
+                            normalized_raw_hash = raw_hash.removeprefix("sha256:").lower()
+                            raw_digests.add(normalized_raw_hash)
+                            if actual_raw_hash != normalized_raw_hash:
+                                envelope_errors.append(f"raw_artifacts[{raw_index}].sha256")
+                                rejection_codes.add("WRONG_HASH_REJECTED")
+                        if (
+                            isinstance(artifact_digest, str)
+                            and raw_digests
+                            and artifact_digest.removeprefix("sha256:").lower() not in raw_digests
+                        ):
+                            envelope_errors.append("artifact_sha256 does not match raw_artifacts")
+                            rejection_codes.add("WRONG_HASH_REJECTED")
+                    if runtime_record.get("freshness") != "CURRENT":
+                        envelope_errors.append("freshness")
+                        rejection_codes.add("STALE_RUNTIME_EVIDENCE_REJECTED")
+                    if not isinstance(runtime_record.get("clean_worktree"), bool):
+                        envelope_errors.append("clean_worktree")
+                    elif runtime_record["clean_worktree"] is not True:
+                        envelope_errors.append("clean_worktree=true required")
+                        rejection_codes.add("DIRTY_RUNTIME_EVIDENCE_REJECTED")
+                    if not isinstance(runtime_record.get("production_safe"), bool):
+                        envelope_errors.append("production_safe")
+                    if runtime_status == "PROMOTABLE" and runtime_record.get("production_safe") is not True:
+                        envelope_errors.append("promotable runtime evidence requires production_safe=true")
                     observed_at = runtime_record.get("observed_at")
                     if not isinstance(observed_at, str):
                         envelope_errors.append("observed_at")

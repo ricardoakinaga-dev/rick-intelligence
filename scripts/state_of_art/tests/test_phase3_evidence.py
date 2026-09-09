@@ -29,6 +29,12 @@ def _ref(root: Path, path: str, description: str) -> dict[str, str]:
     }
 
 
+def _raw_ref(root: Path, filename: str) -> dict[str, str]:
+    path = root / filename
+    path.write_text(f"raw runtime fixture: {filename}\n", encoding="utf-8")
+    return _ref(root, filename, "raw runtime gate fixture")
+
+
 def _fixture(tmp_path: Path) -> tuple[Path, dict[str, object], dict[str, object]]:
     (tmp_path / "audit.md").write_text("audit\n", encoding="utf-8")
     (tmp_path / "test.py").write_text("assert True\n", encoding="utf-8")
@@ -168,6 +174,7 @@ def test_verified_runtime_cannot_reuse_static_artifact_as_runtime_evidence(tmp_p
 
 def test_verified_runtime_accepts_distinct_bound_envelope_with_independent_review(tmp_path: Path) -> None:
     path, payload, checkout = _fixture(tmp_path)
+    raw_ref = _raw_ref(tmp_path, "raw-success.json")
     runtime = tmp_path / "runtime.json"
     runtime.write_text(json.dumps({
         "schema_version": "state-of-art-runtime-evidence.v1",
@@ -177,10 +184,15 @@ def test_verified_runtime_accepts_distinct_bound_envelope_with_independent_revie
         "commit_sha": HEAD,
         "tree_sha": TREE,
         "checkout_fingerprint": CHECKOUT,
+        "clean_worktree": True,
         "environment": "fixture-runtime",
         "procedure": "fixture runtime procedure",
         "exit_status": 0,
         "observed_at": "2026-09-09T20:00:00+00:00",
+        "artifact_sha256": raw_ref["sha256"],
+        "raw_artifacts": [raw_ref],
+        "freshness": "CURRENT",
+        "production_safe": False,
         "reviewer": {"id": "runner", "kind": "automated", "name": "fixture runner", "independent": False},
         "limitations": "fixture is local only",
         "next_action": "run an independent review",
@@ -198,6 +210,7 @@ def test_verified_runtime_accepts_distinct_bound_envelope_with_independent_revie
 
 def test_blocked_runtime_envelope_is_bound_without_becoming_a_pass(tmp_path: Path) -> None:
     path, payload, checkout = _fixture(tmp_path)
+    raw_ref = _raw_ref(tmp_path, "raw-blocked.json")
     runtime = tmp_path / "runtime-blocked.json"
     runtime.write_text(json.dumps({
         "schema_version": "state-of-art-runtime-evidence.v1",
@@ -207,10 +220,15 @@ def test_blocked_runtime_envelope_is_bound_without_becoming_a_pass(tmp_path: Pat
         "commit_sha": HEAD,
         "tree_sha": TREE,
         "checkout_fingerprint": CHECKOUT,
+        "clean_worktree": True,
         "environment": "fixture-runtime",
         "procedure": "fixture runtime procedure was not executable",
         "exit_status": 2,
         "observed_at": "2026-09-09T20:00:00+00:00",
+        "artifact_sha256": raw_ref["sha256"],
+        "raw_artifacts": [raw_ref],
+        "freshness": "CURRENT",
+        "production_safe": False,
         "reviewer": {"id": "runner", "kind": "automated", "name": "fixture runner", "independent": False},
         "limitations": "fixture dependency is unavailable",
         "next_action": "provide the dependency",
@@ -228,6 +246,7 @@ def test_blocked_runtime_envelope_is_bound_without_becoming_a_pass(tmp_path: Pat
 
 def test_runtime_envelope_wrong_tree_is_rejected(tmp_path: Path) -> None:
     path, payload, checkout = _fixture(tmp_path)
+    raw_ref = _raw_ref(tmp_path, "raw-wrong-tree.json")
     runtime = tmp_path / "runtime-wrong-tree.json"
     runtime.write_text(json.dumps({
         "schema_version": "state-of-art-runtime-evidence.v1",
@@ -237,10 +256,15 @@ def test_runtime_envelope_wrong_tree_is_rejected(tmp_path: Path) -> None:
         "commit_sha": HEAD,
         "tree_sha": "d" * 40,
         "checkout_fingerprint": CHECKOUT,
+        "clean_worktree": True,
         "environment": "fixture-runtime",
         "procedure": "fixture runtime procedure",
         "exit_status": 0,
         "observed_at": "2026-09-09T20:00:00+00:00",
+        "artifact_sha256": raw_ref["sha256"],
+        "raw_artifacts": [raw_ref],
+        "freshness": "CURRENT",
+        "production_safe": False,
         "reviewer": {"id": "runner", "kind": "automated", "name": "fixture runner", "independent": False},
         "limitations": "fixture is local only",
         "next_action": "run an independent review",
@@ -253,6 +277,41 @@ def test_runtime_envelope_wrong_tree_is_rejected(tmp_path: Path) -> None:
 
     assert result["classification"] == "FAILED"
     assert "WRONG_COMMIT_EVIDENCE_REJECTED" in result["rejection_codes"]
+
+
+def test_stale_runtime_envelope_is_rejected(tmp_path: Path) -> None:
+    path, payload, checkout = _fixture(tmp_path)
+    raw_ref = _raw_ref(tmp_path, "raw-stale.json")
+    runtime = tmp_path / "runtime-stale.json"
+    runtime.write_text(json.dumps({
+        "schema_version": "state-of-art-runtime-evidence.v1",
+        "record_id": "runtime-fixture-stale-1",
+        "capability_id": "P0-TEST",
+        "status": "BLOCKED_EXTERNAL",
+        "commit_sha": HEAD,
+        "tree_sha": TREE,
+        "checkout_fingerprint": CHECKOUT,
+        "clean_worktree": True,
+        "environment": "fixture-runtime",
+        "procedure": "fixture runtime procedure",
+        "exit_status": 2,
+        "observed_at": "2026-09-09T20:00:00+00:00",
+        "artifact_sha256": raw_ref["sha256"],
+        "raw_artifacts": [raw_ref],
+        "freshness": "STALE",
+        "production_safe": False,
+        "reviewer": {"id": "runner", "kind": "automated", "name": "fixture runner", "independent": False},
+        "limitations": "fixture is stale",
+        "next_action": "run a current fixture",
+    }), encoding="utf-8")
+    payload["capabilities"][0]["status"] = "BLOCKED_EXTERNAL"  # type: ignore[index]
+    payload["capabilities"][0]["runtime_evidence"] = [_ref(tmp_path, "runtime-stale.json", "stale runtime envelope")]  # type: ignore[index]
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = evaluate_matrix(path, checkout, root=tmp_path, require_complete=False)
+
+    assert result["classification"] == "FAILED"
+    assert "STALE_RUNTIME_EVIDENCE_REJECTED" in result["rejection_codes"]
 
 
 def test_verify_missing_matrix_returns_nonzero(tmp_path: Path) -> None:

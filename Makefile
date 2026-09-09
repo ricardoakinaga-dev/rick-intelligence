@@ -12,7 +12,7 @@ WEB_CURRENT_EVIDENCE_DIR := $(ROOT)/.gauntlet-state-of-art/evidence/visual-cycle
 
 .DEFAULT_GOAL := help
 
-.PHONY: help bootstrap validate dev test test-fast test-integration lint typecheck build up down logs ci eval eval-retrieval eval-retrieval-pack security-adversarial storage-test ops-migration-check ops-static compose-static postgres-runtime phase3-postgres-runtime redis-runtime object-qdrant-runtime triple-aaa-verify ops-backup-test jobs-test release-evidence phase3-evidence phase3-evidence-verify phase3-performance phase3-chaos phase3-soak web-install web-lint web-typecheck web-build web-e2e web-validate api-dev api-test api-contract api-security api-benchmark api131-canonical api131-differential api131-full api131-benchmark api14-units api14-differential api14-acl api14-full api14-benchmark api15-contracts api15-provider api15-lock api15-professor api15-root api15-benchmark api15-verify api15-full api15-boundaries api16-domain api16-worker api16-root api16-benchmark api16-full api16-verify
+.PHONY: help bootstrap validate dev test test-fast test-integration lint typecheck build up down logs ci eval eval-retrieval eval-retrieval-pack security-adversarial storage-test ops-migration-check ops-static compose-static postgres-runtime phase3-postgres-runtime phase3-redis-runtime phase3-object-qdrant-runtime redis-runtime object-qdrant-runtime triple-aaa-verify ops-backup-test jobs-test release-evidence phase3-evidence phase3-evidence-verify phase3-performance phase3-chaos phase3-soak web-install web-lint web-typecheck web-build web-e2e web-validate api-dev api-test api-contract api-security api-benchmark api131-canonical api131-differential api131-full api131-benchmark api14-units api14-differential api14-acl api14-full api14-benchmark api15-contracts api15-provider api15-lock api15-professor api15-root api15-benchmark api15-verify api15-full api15-boundaries api16-domain api16-worker api16-root api16-benchmark api16-full api16-verify
 
 help:
 	@printf '%s\n' 'RICK Intelligence root commands:'
@@ -37,7 +37,9 @@ help:
 	@printf '%s\n' '  make postgres-runtime run the real PostgreSQL migration/queue gate from RICK_TEST_DATABASE_DSN'
 	@printf '%s\n' '  make phase3-postgres-runtime emit commit-bound PostgreSQL runtime evidence'
 	@printf '%s\n' '  make redis-runtime run the real Redis lease/rate-limit gate from RICK_TEST_REDIS_URL'
+	@printf '%s\n' '  make phase3-redis-runtime emit commit-bound Redis runtime evidence'
 	@printf '%s\n' '  make object-qdrant-runtime run the real object/vector gate from explicit test URLs'
+	@printf '%s\n' '  make phase3-object-qdrant-runtime emit commit-bound object/vector runtime evidence'
 	@printf '%s\n' '  make triple-aaa-verify run the fail-closed integrated verification packet'
 	@printf '%s\n' '  make release-evidence generate the ignored commit-bound release manifest'
 	@printf '%s\n' '  make phase3-evidence generate the ignored Phase 3 capability matrix'
@@ -125,6 +127,12 @@ postgres-runtime:
 
 phase3-postgres-runtime:
 	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)" $(PYTHON) "$(ROOT)/scripts/state_of_art/run_phase3_postgres.py"
+
+phase3-redis-runtime:
+	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT):$(ROOT)/packages/contracts/src:$(ROOT)/packages/locking/src" $(PYTHON) "$(ROOT)/scripts/state_of_art/run_phase3_redis.py"
+
+phase3-object-qdrant-runtime:
+	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT):$(ROOT)/packages/knowledge/src:$(ROOT)/packages/retrieval/src:$(ROOT)/packages/storage/src" $(PYTHON) "$(ROOT)/scripts/state_of_art/run_phase3_object_qdrant.py"
 
 redis-runtime:
 	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)/packages/contracts/src:$(ROOT)/packages/locking/src" $(PYTHON) "$(ROOT)/scripts/phase11/redis_runtime_gate.py"
