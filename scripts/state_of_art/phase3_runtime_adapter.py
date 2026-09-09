@@ -55,15 +55,15 @@ _SENSITIVE_VALUE = re.compile(
     re.IGNORECASE,
 )
 _SENSITIVE_ASSIGNMENT = re.compile(
-    r"\b([A-Za-z0-9_-]*(?:password|passphrase|secret|token|api[_-]?key|access[_-]?key|private[_-]?key|authorization|cookie|credential|dsn|url|bearer)[A-Za-z0-9_-]*)"
-    r"(\s*[:=]\s*)(?:\"[^\"]*\"|'[^']*'|[^\s,;}\]]+)",
+    r"(?<![A-Za-z0-9_-])([\"']?[A-Za-z0-9_-]*(?:password|passphrase|secret|token|api[_-]?key|access[_-]?key|private[_-]?key|authorization|cookie|credential|dsn|url|bearer)[A-Za-z0-9_-]*[\"']?)"
+    r"(\s*[:=]\s*)(?:\"[^\"]*\"|'[^']*'|\[REDACTED\]|[^\s,;}\]]+)",
     re.IGNORECASE,
 )
 _SENSITIVE_ARGUMENT = re.compile(
     r"(?<![A-Za-z0-9_-])"
     r"([/-]{0,2}[A-Za-z0-9_-]*(?:password|passphrase|secret|token|api[_-]?key|access[_-]?key|private[_-]?key|authorization|cookie|credential|dsn|url|bearer)[A-Za-z0-9_-]*)"
     r"(\s+)"
-    r"(?:\"[^\"]*\"|'[^']*'|[^\s,;}\]]+)",
+    r"(?:\"[^\"]*\"|'[^']*'|\[REDACTED\]|[^\s,;}\]]+)",
     re.IGNORECASE,
 )
 

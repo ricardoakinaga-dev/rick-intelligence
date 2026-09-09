@@ -301,6 +301,17 @@ def test_free_form_secret_arguments_are_redacted() -> None:
     assert output.count("[REDACTED]") == 2
 
 
+def test_quoted_json_secret_keys_are_redacted() -> None:
+    adapter_module = _load("phase3_quoted_redaction", "scripts/state_of_art/phase3_runtime_adapter.py")
+    output = adapter_module.redact_runtime_value(
+        '{"password": "json-secret", "token": "json-token"}'
+    )
+
+    assert "json-secret" not in output
+    assert "json-token" not in output
+    assert output.count("[REDACTED]") == 2
+
+
 def test_blocked_payload_gets_blocking_exit_even_if_gate_returns_zero(
     adapter: ModuleType,
     monkeypatch: pytest.MonkeyPatch,
