@@ -230,12 +230,17 @@ migration or worker runtime claim is made.
 ## 11. Current candidate and final local evidence-boundary review — 2026-09-09
 
 The entry snapshot 56a76004a75ec94178e35c82eab8405b5ac74729 remains historical.
-The current pushed candidate is:
+The reviewed source implementation candidate was:
 
 - HEAD / origin/main: 7ea1f287f452ac14d6126060f5811d2fc00920a7
 - Tree: 448ac4ad0c87d868dd7bf4302e2904d7ac4dd869
 - Prompt SHA-256: 1e039f28c1ac52bc483412de2168193e24077f95dae7839e3a4f5ec5d091f301
 - Worktree: clean
+
+The documentation and control-plane reconciliation that follows is intentionally
+metadata-only; it preserves the reviewed source implementation and keeps the
+same NO-GO decision. Ignored runtime/release artifacts are regenerated after
+each checkout change and must be evaluated against the actual current HEAD.
 
 The corrected local evidence boundary now has 90 passing State-of-Art tests,
 passing compilation, control-plane, operations-static, Compose-static,

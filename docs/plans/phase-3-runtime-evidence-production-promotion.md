@@ -219,10 +219,11 @@ rollback owner and final promotion.
 
 ## Current candidate closure
 
-The current pushed candidate is 7ea1f287f452ac14d6126060f5811d2fc00920a7.
-Its local evidence boundary has 90 passing State-of-Art tests and a fresh
-independent I1 review with no material bypass found. This closes only the
-local evidence/release contract; live runtime, distributed, operational,
+The reviewed source implementation candidate was
+7ea1f287f452ac14d6126060f5811d2fc00920a7. Its local evidence boundary has
+90 passing State-of-Art tests and a fresh independent I1 review with no
+material bypass found. The subsequent documentation/control-plane
+reconciliation is metadata-only; live runtime, distributed, operational,
 provider/corpus, frontend-runtime, supply-chain and human-approval gates
 remain open, so no Triple AAA claim is made.
 

@@ -17,7 +17,7 @@ preserving the frozen Gauntlet bar, Phase 2 history and legacy repositories.
 - [x] (2026-09-09) Created the public Phase 3 plan and preserved the Phase 2 plan as historical context.
 - [x] (2026-09-09) Implement and locally verify Phase 3.1 evidence binding, required-row coverage, runtime envelopes, negative release tests, canonical conditional lanes and dynamic local-check records; fresh independent review found no local P0/P1/P2 defect.
 - [x] (2026-09-09) Implement and independently review Phase 3.2 readiness-aware Compose lifecycle, explicit local project/socket scoping, Worker A/B topology, bounded diagnostics and safe teardown parsing; live startup remains blocked externally.
-- [x] (2026-09-09) Close the corrected Phase 3.1 evidence boundary at candidate 7ea1f287f452ac14d6126060f5811d2fc00920a7; 90 local tests and a fresh independent I1 review passed, while runtime promotion remains blocked.
+  - [x] (2026-09-09) Close the corrected Phase 3.1 evidence boundary at reviewed source candidate 7ea1f287f452ac14d6126060f5811d2fc00920a7; 90 local tests and a fresh independent I1 review passed, while runtime promotion remains blocked.
 - [ ] (2026-09-09) Execute the disposable runtime; currently blocked by Docker daemon access and unresolved external authority.
 - [ ] (2026-09-09) Complete independent runtime/design/security reviews and the human Go/No-Go.
 
