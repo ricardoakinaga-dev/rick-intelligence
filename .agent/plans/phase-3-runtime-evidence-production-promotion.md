@@ -17,6 +17,7 @@ preserving the frozen Gauntlet bar, Phase 2 history and legacy repositories.
 - [x] (2026-09-09) Created the public Phase 3 plan and preserved the Phase 2 plan as historical context.
 - [x] (2026-09-09) Implement and locally verify Phase 3.1 evidence binding, required-row coverage, runtime envelopes, negative release tests, canonical conditional lanes and dynamic local-check records; fresh independent review found no local P0/P1/P2 defect.
 - [x] (2026-09-09) Implement and independently review Phase 3.2 readiness-aware Compose lifecycle, explicit local project/socket scoping, Worker A/B topology, bounded diagnostics and safe teardown parsing; live startup remains blocked externally.
+- [x] (2026-09-09) Close the corrected Phase 3.1 evidence boundary at candidate 7ea1f287f452ac14d6126060f5811d2fc00920a7; 90 local tests and a fresh independent I1 review passed, while runtime promotion remains blocked.
 - [ ] (2026-09-09) Execute the disposable runtime; currently blocked by Docker daemon access and unresolved external authority.
 - [ ] (2026-09-09) Complete independent runtime/design/security reviews and the human Go/No-Go.
 
@@ -42,6 +43,8 @@ access, so no live claim can be made.
 - 2026-09-09: Treat `LOCAL_VERIFIED` as an executed local result, not a declaration; the matrix generator records command results before assigning it.
 - 2026-09-09: Use Compose `--wait` with a bounded timeout and a fixed local socket/project; a failed start remains `NOT_READY` and emits redacted local diagnostics.
 - 2026-09-09: Record the post-fix independent review as PASS for local implementation scope and CONDITIONAL only for the unavailable Docker/runtime evidence; move the active pointer to the external runtime wait.
+
+- 2026-09-09: Record the final evidence-boundary review as PASS for exact candidate 7ea1f287f452ac14d6126060f5811d2fc00920a7; retain BLOCKED/NO-GO for all unavailable runtime and production gates.
 
 ## Outcomes & Retrospective
 
@@ -143,6 +146,13 @@ those gates. Final acceptance requires current commit/artifact bindings, no
 Critical/High finding, all mandatory capability rows `VERIFIED_RUNTIME` or
 `PROMOTABLE`, current independent review, the final report and human authority.
 
+## Current candidate closure
+
+The current candidate has the required local evidence-boundary review and
+fail-closed negative coverage, but it does not satisfy final acceptance:
+live runtime, distributed, operational, frontend-runtime, provider/corpus and
+human-approval gates remain open.
+
 ## Risks and Human Decisions
 
 The dominant risks are false promotion from stale evidence, cross-tenant
@@ -163,6 +173,10 @@ keep the capability blocked and continue only with hermetic P0 implementation
 and tests.
 
 ## Artifacts and Evidence
+
+The current independent evidence-boundary report is
+docs/reports/phase-3-evidence-boundary-independent-review-2026-09-09.md;
+runtime artifacts are regenerated under .runtime/phase-3/ and remain ignored.
 
 Entry artifacts are the exact prompt copy, current audit, public plan, this
 ExecPlan, frozen `.gauntlet/bar.json`, current CI workflows, Phase 2 plan and

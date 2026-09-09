@@ -217,6 +217,15 @@ the gates. Human decisions are required for lab secrets, provider/corpus,
 clinical or product thresholds, SLO/RPO/RTO/retention, deployment window,
 rollback owner and final promotion.
 
+## Current candidate closure
+
+The current pushed candidate is 7ea1f287f452ac14d6126060f5811d2fc00920a7.
+Its local evidence boundary has 90 passing State-of-Art tests and a fresh
+independent I1 review with no material bypass found. This closes only the
+local evidence/release contract; live runtime, distributed, operational,
+provider/corpus, frontend-runtime, supply-chain and human-approval gates
+remain open, so no Triple AAA claim is made.
+
 ## Current next action
 
 Phase 3.1 implementation and the readiness-aware Compose change are complete

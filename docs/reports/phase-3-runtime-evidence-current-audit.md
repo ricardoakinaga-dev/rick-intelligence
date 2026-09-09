@@ -226,3 +226,28 @@ independent critic's redaction finding was addressed for both object-store
 secret variable names, and a fresh post-fix review passed the local scope. Docker
 socket access remains `BLOCKED_EXTERNAL`, so no health/readiness, endpoint,
 migration or worker runtime claim is made.
+
+## 11. Current candidate and final local evidence-boundary review — 2026-09-09
+
+The entry snapshot 56a76004a75ec94178e35c82eab8405b5ac74729 remains historical.
+The current pushed candidate is:
+
+- HEAD / origin/main: 7ea1f287f452ac14d6126060f5811d2fc00920a7
+- Tree: 448ac4ad0c87d868dd7bf4302e2904d7ac4dd869
+- Prompt SHA-256: 1e039f28c1ac52bc483412de2168193e24077f95dae7839e3a4f5ec5d091f301
+- Worktree: clean
+
+The corrected local evidence boundary now has 90 passing State-of-Art tests,
+passing compilation, control-plane, operations-static, Compose-static,
+security-adversarial and whitespace checks. A fresh independent I1 review
+passed the exact candidate and found no material bypass in raw status
+authority, mandatory release-gate coverage, timestamp freshness, evidence
+configuration or diagnostic redaction. The review is preserved in
+[phase-3-evidence-boundary-independent-review-2026-09-09.md](phase-3-evidence-boundary-independent-review-2026-09-09.md).
+
+Fresh ignored evidence was regenerated against this exact candidate. The
+PostgreSQL, Redis and object/Qdrant adapters remain BLOCKED_EXTERNAL; the
+capability matrix is BLOCKED_EXTERNAL with six external blocks and three
+NOT_RUN rows; and the strict release verifier rejects the manifest with
+BLOCKED_RUNTIME_REJECTED. Therefore the promotion decision remains NO-GO and
+no Triple AAA claim is made.

@@ -14,7 +14,7 @@
   "active_execplan": ".agent/plans/phase-3-runtime-evidence-production-promotion.md",
   "active_task": "PH3-2-LAB-READINESS",
   "verification_state": "PARTIAL",
-  "repository_state": "Phase 3.1 evidence/release closure is locally verified with independent review; Phase 3.2 Compose readiness is blocked on approved Docker daemon and disposable runtime configuration; PostgreSQL, Redis, object/vector, multi-worker and live supervisor gates remain BLOCKED_EXTERNAL",
+  "repository_state": "Phase 3.1 evidence/release closure is locally verified and freshly independently reviewed at candidate 7ea1f287f452ac14d6126060f5811d2fc00920a7; 90 local tests and fail-closed negative probes pass. Phase 3.2 Compose readiness is blocked on approved Docker daemon and disposable runtime configuration; PostgreSQL, Redis, object/vector, multi-worker and live supervisor gates remain BLOCKED_EXTERNAL",
   "instruction_scope_refs": [
     ".agent/PLANS.md",
     "cvg-master-rag-v2/AGENTS.md",
@@ -23,8 +23,8 @@
     "docs/plans/phase-3-runtime-evidence-production-promotion.md"
   ],
   "last_gate_record": ".agent/gates/phase-3-2-lab-readiness-implementation-ready.json",
-  "last_event_id": "EVT-PH3-2-BLOCKED-20260909",
-  "state_revision": 235,
+  "last_event_id": "EVT-PH3-2-EVIDENCE-BOUNDARY-REVIEW-20260909",
+  "state_revision": 236,
   "next_gate": "VERIFIED",
   "active_action_id": "PH3-2-LAB-READINESS:WAIT_RUNTIME",
   "blocked_by": [
@@ -32,5 +32,5 @@
     "Disposable runtime secrets and endpoint authority are unavailable"
   ],
   "human_approval_required": [],
-  "updated_at": "2026-09-09T21:32:02Z"
+  "updated_at": "2026-09-09T23:37:10Z"
 }
