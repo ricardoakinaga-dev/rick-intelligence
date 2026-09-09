@@ -250,6 +250,14 @@ class PostgresIngestionQueue:
         collection_id = _text(collection_id, maximum=128)
         payload_json, clean_payload = _payload(payload)
         with self._session(write=True) as (_connection, cursor):
+            # Phase 2.3 takes this lock while rewriting the final legacy rows.
+            # After the rewrite, the database trigger rejects this facade's
+            # writes; the lock still prevents a scan-to-trigger race.
+            self._execute(
+                cursor,
+                "SELECT pg_advisory_xact_lock(hashtext(%s))",
+                ("rick-intelligence:jobs-canonical-rewrite",),
+            )
             self._execute(cursor, """
                 SELECT * FROM rick_ingestion_jobs
                 WHERE tenant_id=%s AND workspace_id=%s AND collection_id=%s

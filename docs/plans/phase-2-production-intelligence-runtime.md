@@ -1,10 +1,10 @@
 # Phase 2 — Production Intelligence Runtime Closure
 
-**Status:** `ACTIVE / PHASE 2.2 LOCAL IMPLEMENTATION VERIFIED`
+**Status:** `ACTIVE / PHASE 2.3 LOCAL IMPLEMENTATION VERIFIED`
 **Date:** 2026-09-08  
 **Source prompt:** [`docs/prompts/state-of-art-triple-aaa-2026-09-08.txt`](../prompts/state-of-art-triple-aaa-2026-09-08.txt)  
 **Source prompt SHA-256:** `b222cf1a52c54dc075e2f64896aab1678941371109ff3ac296f922b98dee7513`  
-**Current candidate:** `HEAD 96bc09c9d90eeb98c186addf2d65b41ed43440cd` plus the current Phase 2.2 dirty packet
+**Current candidate:** current Phase 2.3 worker-runtime packet on top of the published Phase 2.2 candidate
 
 This is the canonical Phase 2 plan and current-state audit. It is maintained
 as implementation slices advance. A row marked `PARTIAL`, `MISSING`,
@@ -272,7 +272,7 @@ local scope; it is not a production promotion.
 | P2-A03 | `.agent` / `.gauntlet` evidence control | `PARTIAL` | Existing append-only state, gate history and review artifacts | Reconcile current HEAD and add Phase 2 task/evidence records without stale PASS reuse. |
 | P2-P0-01 | Durable job contracts (`Job`, state, attempt, result, failure, lease, repository, queue, executor, scheduler) | `DONE_LOCAL_SCOPE` | `packages/jobs`, 9 focused tests, independent Phase 2.1 review and fingerprinted contract packet | Adapter parity, distributed execution and production rejection remain outside the local contract gate. |
 | P2-P0-02 | Durable queue, retries, backoff, deduplication, leasing, recovery, DLQ and replay | `DONE_LOCAL_SCOPE / BLOCKED_EXTERNAL` | `apps/worker/postgres_jobs.py`, migration `0004`, migration/adapter/static tests, ADR-022, [`phase-2-phase22-review-2026-09-09.md`](../reports/phase-2-phase22-review-2026-09-09.md), fresh I1 approval | Disposable PostgreSQL execution, multi-worker fencing, crash durability, FK/query-plan and live replay/retention evidence. |
-| P2-P0-03 | Real worker lifecycle and bounded execution | `PARTIAL` | `apps/worker/runner.py`, `postgres_runner.py`, lifecycle tests | Canonical composition, startup/readiness, resource limits, crash/restart and operational metrics. |
+| P2-P0-03 | Real worker lifecycle and bounded execution | `DONE_LOCAL_SCOPE / BLOCKED_EXTERNAL` | `apps/worker/runtime.py`, `canonical_queue.py`, `external_composition.py`, worker launcher/Docker packet, migrations `0004`/`0005`, focused runtime/entrypoint tests, [`phase-2-phase23-review-2026-09-09.md`](../reports/phase-2-phase23-review-2026-09-09.md), fresh I1 `READY_LOCAL_SCOPE` | Disposable PostgreSQL execution, crash/restart, two-worker fencing and live SIGTERM/handler isolation evidence. |
 | P2-P0-04 | Redis production capability | `PARTIAL` | `packages/locking`, HTTP/Redis seam and local health contracts | Shared Redis client/pool, TLS/auth/namespace, retry/circuit breaker and live health. |
 | P2-P0-05 | Distributed rate limiting | `PARTIAL` | `RateLimiter` protocol and bounded local/injected implementation | Redis atomic buckets, tenant/route policy, multi-replica abuse tests and production rejection of local mode. |
 | P2-P0-06 | Qdrant production runtime | `PARTIAL` | Qdrant vector/backend adapters and ACL filter contracts | Live collection/schema/migration/alias/reindex/partial-failure evidence and wiring. |
@@ -394,10 +394,28 @@ applicable independent gate can move it to `VERIFIED` or `DONE`.
 - **Scope:** compose `apps/worker` with the durable queue, handler registry,
   startup validation, readiness/liveness, bounded concurrency, heartbeat,
   cancellation and graceful shutdown.
-- **Tests:** crash/restart/resume, expired lease, two workers, cancellation,
-  handler timeout, backpressure, poison job and shutdown during processing.
-- **Gate:** worker runtime and queue evidence agree on every status and failure;
-  local worker remains accepted only in local/test mode.
+- **Implementation:** `RealWorkerRuntime` receives one explicit
+  tenant/workspace/collection `JobScope`, a frozen `OperationRegistry`, the
+  canonical `PostgresJobQueue`, finite payload/concurrency/deadline limits,
+  owner-bound cancellation, heartbeat fencing, safe failure mapping and a
+  finite shutdown report. `CanonicalIngestionQueueAdapter` is API-only and
+  preserves the scoped `QueueRecord` surface. The worker launcher performs
+  startup/readiness, installs SIGINT/SIGTERM stop handlers and ships the jobs
+  package in the image.
+- **Migration:** `0005_rewrite_legacy_jobs.sql` normalizes legacy payload
+  references, materializes bounded attempt history, projects a stable
+  `legacy_rewritten` lifecycle/outbox/audit event and rejects future legacy
+  writes after the caller switch.
+- **Local tests:** runtime backpressure, cooperative cancellation, timeout,
+  heartbeat loss, poison payload/operation, bounded shutdown, canonical API
+  translation, filename-reference decoding, readiness-marker checks, entrypoint
+  lifecycle and migration static invariants.
+- **Known boundary:** Python handlers that ignore cancellation cannot be
+  force-killed safely by a thread runtime; the implementation prevents late
+  acknowledgement and leaves process isolation as an external deployment gate.
+- **Gate:** fresh I1 review may approve the local implementation only. Crash/
+  restart/resume, expired lease, two workers, PostgreSQL DDL/concurrency and
+  live SIGTERM/handler isolation remain external evidence before promotion.
 
 ### Phase 2.4 — Redis Coordination and Distributed Rate Limits
 
@@ -629,8 +647,8 @@ or `BLOCKED_EXTERNAL` by criterion, never “State of Art / Triple AAA”.
 
 ## 18. Immediate next action
 
-The audit/bar is now frozen for the current candidate. Phase 2.2 is locally
-implemented and independently approved as a bounded slice. The next
-implementation unit is **Phase 2.3 — Real Worker Runtime**, while the
-disposable PostgreSQL migration/concurrency/crash/replay gate remains required
-external evidence before production promotion.
+The Phase 2.3 implementation packet is locally verified and independently
+approved for its bounded scope. The next implementation sequence is **Phase
+2.4 — Redis Coordination and Distributed Rate Limits**, while PostgreSQL
+execution, crash/restart, two-worker fencing, live SIGTERM and handler
+process-isolation gates remain external evidence before production promotion.

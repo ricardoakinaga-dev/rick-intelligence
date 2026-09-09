@@ -9,10 +9,15 @@ that makes missing D01/D02 decisions fail at composition time.
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Mapping
 from dataclasses import dataclass
 from importlib import import_module
 import inspect
+import os
+import re
 from threading import Thread
+from types import SimpleNamespace
+import time
 from typing import Callable
 
 from core.config import ApiSettings
@@ -25,6 +30,9 @@ class ExternalCompositionError(RuntimeError):
     def __init__(self, component: str) -> None:
         self.component = component
         super().__init__(f"external composition requires {component}")
+
+
+_COMPOSITION_REFERENCE = re.compile(r"^[A-Za-z_][A-Za-z0-9_.]*:[A-Za-z_][A-Za-z0-9_]*$")
 
 
 @dataclass(frozen=True, slots=True)
@@ -43,6 +51,44 @@ class ExternalCompositionInputs:
     password_reset_delivery: object | None = None
     worker_temp_root: str | None = None
     worker_id: str | None = None
+    worker_scope: tuple[str, str, str] | None = None
+    worker_max_concurrency: int = 4
+    worker_timeout_seconds: float = 300.0
+
+
+def load_external_providers(
+    settings: ApiSettings,
+    *,
+    reference: str | None = None,
+) -> Providers:
+    """Load and build the explicit production composition from a module hook.
+
+    The image cannot guess database, identity, broker or transport ownership.
+    A deployment supplies ``module:factory`` through ``RICK_API_COMPOSITION``;
+    the factory receives validated settings and must return
+    :class:`ExternalCompositionInputs`.  This connects the Uvicorn entrypoint
+    to the canonical graph while retaining fail-closed dependency injection.
+    """
+
+    raw_reference = (reference if reference is not None else os.getenv("RICK_API_COMPOSITION", "")).strip()
+    if not raw_reference or len(raw_reference) > 256 or _COMPOSITION_REFERENCE.fullmatch(raw_reference) is None:
+        raise ExternalCompositionError("RICK_API_COMPOSITION=module:factory")
+    module_name, factory_name = raw_reference.split(":", 1)
+    try:
+        factory = getattr(import_module(module_name), factory_name)
+    except (AttributeError, ImportError, TypeError, ValueError):
+        raise ExternalCompositionError("RICK_API_COMPOSITION factory") from None
+    if not callable(factory):
+        raise ExternalCompositionError("RICK_API_COMPOSITION factory")
+    try:
+        inputs = factory(settings)
+    except ExternalCompositionError:
+        raise
+    except Exception:
+        raise ExternalCompositionError("external provider inputs") from None
+    if not isinstance(inputs, ExternalCompositionInputs):
+        raise ExternalCompositionError("ExternalCompositionInputs")
+    return build_external_providers(settings, inputs)
 
 
 class SyncEmbeddingAdapter:
@@ -98,6 +144,30 @@ class SyncEmbeddingAdapter:
         return vectors
 
 
+def _canonical_job_result(job: object, result: object) -> JobResult:
+    """Translate either the canonical ingestion dataclass or a mapping safely."""
+
+    from rick_jobs import JobResult
+
+    result_status = result.get("status") if isinstance(result, Mapping) else getattr(result, "status", None)
+    if result_status != "published":
+        raise RuntimeError("ingestion handler returned an invalid result")
+    document_id = result.get("document_id") if isinstance(result, Mapping) else getattr(result, "document_id", None)
+    if document_id is not None and not isinstance(document_id, str):
+        raise RuntimeError("ingestion handler returned an invalid document")
+    payload = getattr(job, "payload", {})
+    output_refs = {}
+    object_key = payload.get("object_key") if isinstance(payload, Mapping) else None
+    if isinstance(object_key, str) and object_key:
+        output_refs["object_key"] = object_key
+    updated_at = getattr(job, "updated_at", 0.0)
+    return JobResult(
+        output_refs=output_refs,
+        document_id=document_id,
+        completed_at=max(time.time(), float(updated_at)),
+    )
+
+
 def build_external_providers(
     settings: ApiSettings,
     inputs: ExternalCompositionInputs,
@@ -127,6 +197,7 @@ def build_external_providers(
         raise ExternalCompositionError("Redis client and RICK_REDIS_URL")
 
     from rick_ingestion import IngestionService
+    from rick_jobs import JobResult, JobScope
     from rick_knowledge import PostgresKnowledgeStore
     from rick_locking import RedisLeaseClient
     from rick_providers import ProviderConfig, ResilientProvider, create_provider
@@ -140,17 +211,27 @@ def build_external_providers(
     # The worker distribution is placed on the process' import path by the
     # deployment image. Keeping this as a package-name boundary avoids making
     # the API source import the sibling ``apps`` namespace directly.
+    canonical_module = canonical_queue_module = runtime_module = None
     try:
         worker_module = import_module("worker")
         external_worker_module = import_module("worker.external_ingestion")
     except ImportError:
         # A flattened worker image may put its modules directly on sys.path.
         worker_module = import_module("postgres_runner")
-        queue_module = import_module("postgres_queue")
         external_worker_module = import_module("external_ingestion")
-        worker_module.PostgresIngestionQueue = queue_module.PostgresIngestionQueue
-    PostgresIngestionWorker = worker_module.PostgresIngestionWorker
-    PostgresIngestionQueue = worker_module.PostgresIngestionQueue
+        canonical_module = import_module("postgres_jobs")
+        canonical_queue_module = import_module("canonical_queue")
+        runtime_module = import_module("runtime")
+    try:
+        PostgresJobQueue = worker_module.PostgresJobQueue
+        CanonicalIngestionQueueAdapter = worker_module.CanonicalIngestionQueueAdapter
+        WorkerRuntime = worker_module.WorkerRuntime
+    except AttributeError:
+        if canonical_module is None or canonical_queue_module is None or runtime_module is None:
+            raise ExternalCompositionError("canonical worker runtime") from None
+        PostgresJobQueue = canonical_module.PostgresJobQueue
+        CanonicalIngestionQueueAdapter = canonical_queue_module.CanonicalIngestionQueueAdapter
+        WorkerRuntime = runtime_module.WorkerRuntime
     ExternalIngestionHandler = external_worker_module.ExternalIngestionHandler
 
     # Identity is supplied by the deployment policy. The type check is kept
@@ -163,11 +244,18 @@ def build_external_providers(
     ):
         raise ExternalCompositionError("password reset delivery")
 
-    queue = PostgresIngestionQueue(
+    if not isinstance(inputs.worker_scope, tuple) or len(inputs.worker_scope) != 3:
+        raise ExternalCompositionError("worker scope")
+    try:
+        worker_scope = JobScope(*inputs.worker_scope)
+    except (TypeError, ValueError) as exc:
+        raise ExternalCompositionError("worker scope") from exc
+
+    canonical_queue = PostgresJobQueue(
         inputs.connection_factory,
         max_pending=settings.max_pending_ingestion_jobs,
-        event_sink=inputs.event_sink,
     )
+    queue = CanonicalIngestionQueueAdapter(canonical_queue)
     knowledge = PostgresKnowledgeStore(
         inputs.connection_factory,
         created_by=inputs.created_by,
@@ -245,12 +333,30 @@ def build_external_providers(
         temp_root=inputs.worker_temp_root,
         created_by=inputs.created_by,
     )
-    worker = PostgresIngestionWorker(
-        queue,
-        handler,
+
+    def canonical_ingestion_handler(job, lease, *, cancelled):
+        record = SimpleNamespace(
+            job_id=str(job.job_id),
+            lease_token=str(lease.token),
+            tenant_id=job.tenant_id,
+            workspace_id=job.workspace_id,
+            collection_id=job.collection_id,
+            payload=dict(job.payload),
+        )
+        result = handler(record, lease_lost_check=cancelled)
+        return _canonical_job_result(job, result)
+
+    worker = WorkerRuntime(
+        canonical_queue,
         worker_id=inputs.worker_id or settings.worker_id,
+        scope=worker_scope,
+        handlers={"ingest": canonical_ingestion_handler, "reindex": canonical_ingestion_handler},
+        max_concurrency=inputs.worker_max_concurrency,
+        handler_timeout_seconds=inputs.worker_timeout_seconds,
         event_sink=inputs.event_sink,
     )
+    # The API composition remains lazy: the worker process calls startup before
+    # polling, while construction only wires the reviewed graph.
 
     # The queue is the durable job journal marker required by the current
     # Providers contract. It is injected-owned and is never closed by API
@@ -324,5 +430,5 @@ def build_external_providers(
 
 __all__ = [
     "ExternalCompositionError", "ExternalCompositionInputs",
-    "SyncEmbeddingAdapter", "build_external_providers",
+    "SyncEmbeddingAdapter", "build_external_providers", "load_external_providers",
 ]

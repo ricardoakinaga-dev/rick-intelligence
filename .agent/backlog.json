@@ -668,6 +668,45 @@
         "target": "infrastructure/migrations/0004_durable_jobs_contract.sql",
         "completion_signal": "A usable PostgreSQL driver/client and accessible disposable database produce current migration, concurrency, crash, replay and retention evidence"
       }
+    },
+    {
+      "id": "PH2-P0-03-REAL-WORKER-RUNTIME",
+      "title": "Implement and independently verify the canonical real worker runtime",
+      "stage": "BUILD",
+      "priority": "P0",
+      "status": "BLOCKED",
+      "origin": "Phase 2 production-intelligence runtime plan and frozen P2-P0-03 acceptance bar",
+      "dependencies": [
+        "PH2-P0-02-POSTGRES-ADAPTER"
+      ],
+      "owner": "Codex lead",
+      "acceptance_summary": "Canonical scoped worker runtime, API composition, parser bridge, migration caller switch, shutdown and fencing pass local implementation review; live runtime evidence remains separately gated.",
+      "evidence_refs": [
+        "docs/plans/phase-2-production-intelligence-runtime.md",
+        "docs/reports/phase-2-audit-2026-09-08.md",
+        "docs/reports/phase-2-phase23-review-2026-09-09.md",
+        "docs/architecture/adr/ADR-023-real-worker-runtime.md",
+        "apps/worker/runtime.py",
+        "apps/worker/canonical_queue.py",
+        "apps/worker/external_ingestion.py",
+        "apps/api/src/main.py",
+        "apps/api/src/services/external_composition.py",
+        "apps/api/src/services/postgres_ingestion.py",
+        "infrastructure/docker/worker-entrypoint.py",
+        "infrastructure/docker/api.Dockerfile",
+        "infrastructure/docker/worker.Dockerfile",
+        "infrastructure/migrations/0004_durable_jobs_contract.sql",
+        "infrastructure/migrations/0005_rewrite_legacy_jobs.sql",
+        ".agent/verification.jsonl#VER-PH2-P0-03-REAL-WORKER-RUNTIME-LOCAL-FINAL-20260909",
+        ".agent/verification.jsonl#VER-PH2-P0-03-REAL-WORKER-RUNTIME-I1-APPROVED-20260909"
+      ],
+      "next_action": {
+        "id": "PH2-P0-03-REAL-WORKER-RUNTIME:WAIT_RUNTIME",
+        "kind": "WAIT",
+        "summary": "Run real PostgreSQL migration/concurrency/recovery and live worker/supervisor gates when the controlled runtime is available",
+        "target": "infrastructure/migrations/0005_rewrite_legacy_jobs.sql",
+        "completion_signal": "A controlled disposable runtime produces current PostgreSQL, multi-worker, crash/restart, live SIGTERM and hard handler-isolation evidence"
+      }
     }
   ]
 }

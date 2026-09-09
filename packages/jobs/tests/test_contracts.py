@@ -68,6 +68,12 @@ def test_state_vocabulary_and_terminal_behavior_are_explicit() -> None:
     assert not can_transition(JobState.RUNNING, JobState.RETRYING)
 
 
+@pytest.mark.parametrize("operation", ["bad operation", "bad/operation", "", "x" * 65])
+def test_operation_uses_the_runtime_identifier_grammar(operation: str) -> None:
+    with pytest.raises(JobValidationError):
+        make_job(operation=operation)
+
+
 def test_attempt_lifecycle_is_explicit_and_serialized() -> None:
     job = queued_job()
     running = job.start_attempt(worker_id="worker-a", now=102.0)
@@ -252,6 +258,7 @@ def test_payload_is_deterministic_bounded_and_rejects_secret_or_raw_content() ->
     two = make_job(payload={"source_key": "objects/one.txt", "filename": "one.txt"})
     assert one.to_json() == two.to_json()
     assert json.loads(one.to_json())["contract_version"] == "jobs-contract-v1"
+    assert dict(make_job(payload={"byte_size": "7"}).payload) == {"byte_size": "7"}
     for unsafe in (
         {"provider_token": "do-not-store"},
         {"raw_content": "document body"},

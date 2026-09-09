@@ -1,7 +1,7 @@
 # Phase 2 audit — Production Intelligence Runtime Closure
 
 **Date:** 2026-09-09
-**Audited candidate:** `HEAD 96bc09c9d90eeb98c186addf2d65b41ed43440cd` plus the current Phase 2.2 dirty implementation packet
+**Audited candidate:** current Phase 2.3 real-worker-runtime packet on top of the published Phase 2.2 candidate
 **Source:** [`docs/prompts/state-of-art-triple-aaa-2026-09-08.txt`](../prompts/state-of-art-triple-aaa-2026-09-08.txt)  
 **Canonical plan:** [`docs/plans/phase-2-production-intelligence-runtime.md`](../plans/phase-2-production-intelligence-runtime.md)
 
@@ -18,15 +18,16 @@ of the current candidate.
 Baseline checks executed locally:
 
 - `make validate` — `PASS`; root boundaries and control plane validated with
-  10/10 checks, 30 historical files, 225 execution events and 213 verification
-  records after the Phase 2.2 review binding.
+  10/10 checks after the Phase 2.3 review binding.
 - `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=packages/jobs/src python3 -m pytest -q -p no:cacheprovider packages/jobs/tests` — `PASS`, 9 tests.
 - `PYTHONDONTWRITEBYTECODE=1 python3 -m compileall -q packages/jobs/src` — `PASS`.
-- `make jobs-test` — `PASS`, 16 tests covering the canonical PostgreSQL adapter
-  double and the 9 contract tests.
-- `make api16-worker` — `PASS`, 52 worker/API health tests.
+- `make jobs-test` — `PASS`, 34 canonical jobs/runtime tests.
+- `make api16-worker` — `PASS`, 68 worker/API health tests.
+- `make api16-root` — `PASS`, 426 API tests.
+- `make api16-domain` — `PASS`, 107 knowledge/ingestion/retrieval tests.
+- Infrastructure scripts and Docker tests — `PASS`, 36 tests.
 - `PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -q -p no:cacheprovider infrastructure/scripts/tests` — `PASS`, 23 tests including migration history divergence, rollback and schema assertions.
-- `make ops-static` — `PASS`; migration checksums report 4 files and live
+- `make ops-static` — `PASS`; migration checksums report 5 files and live
   execution remains `NOT_RUN`.
 - `git diff --check` — `PASS` for the current dirty packet.
 - No external service, provider, corpus, production-like Compose, restore,
@@ -74,13 +75,39 @@ triggers and deferred count/contiguity checks, and projects heartbeat and
 retention actions to lifecycle, outbox and audit records in the same
 transaction.
 
+## Phase 2.3 local implementation packet
+
+The Phase 2.3 slice now composes `PostgresJobQueue` with
+`RealWorkerRuntime`/`WorkerRuntime`, a frozen operation registry, bounded
+payload and concurrency limits, heartbeat and lease fencing, cooperative
+cancellation, timeout/failure mapping and finite shutdown. The API's
+`CanonicalIngestionQueueAdapter` remains a scoped compatibility facade. The
+production entrypoint is connected through the deployment-owned
+`RICK_API_COMPOSITION=module:factory` hook, while the worker launcher keeps its
+explicit composition hook and process-level health contract.
+
+Migration 0005 normalizes legacy rows, reconstructs bounded attempts, projects
+lifecycle/outbox/audit records and blocks future legacy writes. The runtime
+preserves validated upload extensions for the real parser and the durable
+upload path uses checksum-derived object keys without unsafe loser cleanup in
+an idempotency race. Contract and migration operation validation use the same
+bounded identifier grammar.
+
+The fresh I1 review returned `READY_LOCAL_SCOPE` with no reproducible local P0,
+P1 or P2 finding. The current local matrix passed 34 jobs tests, 68 worker/
+health tests, 426 API tests, 107 domain tests, 36 infrastructure tests and
+five migration checksum/static checks. This remains a local implementation
+approval: PostgreSQL execution, multi-worker fencing, crash/restart, live
+SIGTERM, handler process isolation, external stores and deployment remain
+`BLOCKED_EXTERNAL` or `NOT_RUN`.
+
 ## Consolidated matrix
 
 | Area | State | Current observation | Required next proof |
 | --- | --- | --- | --- |
 | Phase 2 plan and capability matrix | `DONE_LOCAL_SCOPE` | The canonical plan contains context, target architecture, invariants, matrix, slices, gates, rollback and exit criteria. | Keep it synchronized with each integrated slice. |
 | Durable jobs | `DONE_LOCAL_SCOPE / BLOCKED_EXTERNAL` | Phase 2.1 contract and Phase 2.2 canonical PostgreSQL adapter are independently approved for local scope; migration 0004, attempt history, outbox/audit coupling, replay/retention and focused tests are current. | Execute PostgreSQL migration/concurrency/recovery/FK/crash/replay gates and complete worker composition. |
-| Worker runtime | `PARTIAL/BLOCKED_EXTERNAL` | PostgreSQL worker has polling, heartbeat, timeout and shutdown seams; no reviewed production factory is wired. | Canonical composition, startup/readiness, crash/restart, cancellation, dead-letter and real health evidence. |
+| Worker runtime | `DONE_LOCAL_SCOPE / BLOCKED_EXTERNAL` | Phase 2.3 canonical runtime, API composition, parser bridge, migration 0005 and launcher are independently reviewed for local scope; local matrix is current. | PostgreSQL execution, crash/restart, cancellation under live leases, two-worker fencing, live SIGTERM and hard handler isolation. |
 | Redis coordination/rate limits | `PARTIAL/MISSING` | Owner-safe Redis lease adapter exists; no Redis-backed rate limiter or complete shared client policy exists. | Atomic distributed limiter, required production injection, namespace/TLS/auth/retry and multi-replica abuse tests. |
 | Qdrant | `PARTIAL` | HTTP adapter validates scopes and payloads; live operations and schema/index lifecycle are absent. | Collection/schema migration, alias/reindex, retries/circuit behavior and disposable live integration. |
 | Object storage | `PARTIAL` | Local and S3-compatible adapters cover scope/checksum/limits. | Streaming/content-addressed/retention policy, composition and live MinIO/S3 evidence. |
@@ -107,9 +134,9 @@ transaction.
 3. The preserved legacy RAG path is not a production tenant/security boundary;
    it must remain isolated or be explicitly gated before any production caller
    switch.
-4. The API process-local ingestion executor, local worker, PostgreSQL worker and
-   new generic job contract have different vocabularies until adapter
-   reconciliation is complete.
+4. The local implementation now has one reviewed canonical worker composition,
+   while the external PostgreSQL, multi-worker and supervisor gates remain
+   unexecuted.
 5. Local telemetry, prepared release manifests and file-level restore checks
    cannot establish distributed operational readiness.
 6. The visual evidence packet covers a meaningful web slice, but not cases,
@@ -120,7 +147,7 @@ transaction.
 
 ## Decision
 
-The audit result is **`CONDITIONAL / NO-GO FOR PROMOTION`**. Local implementation
-may continue under the frozen Phase 2 plan. The next implementation slice is
-Phase 2.3 worker composition; the disposable PostgreSQL gate and the remaining
-P0 runtime gates still block production promotion.
+The audit result is **`CONDITIONAL / NO-GO FOR PROMOTION`**. The Phase 2.3 local
+implementation may continue to Phase 2.4 under the frozen plan. The disposable
+PostgreSQL gate and the remaining P0 runtime gates still block production
+promotion.

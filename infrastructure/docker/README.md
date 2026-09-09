@@ -8,7 +8,7 @@ images:
 - `worker.Dockerfile` packages `apps/worker` and the same Python boundary;
   its launcher fails closed until a deployment supplies an explicit
   `RICK_WORKER_COMPOSITION=module:factory` that creates a fully injected
-  `PostgresIngestionWorker`;
+  `WorkerRuntime` with one explicit tenant/workspace/collection scope;
 - `web.Dockerfile` installs the locked `apps/web/package-lock.json`, builds
   Next.js, and starts the production server on port `3000`.
 

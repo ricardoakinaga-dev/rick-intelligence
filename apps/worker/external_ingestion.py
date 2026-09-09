@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+import base64
+import binascii
 from pathlib import Path
 import os
 import tempfile
 
+from rick_ingestion.parsers import SUPPORTED_EXTENSIONS, sanitize_display_filename
 from rick_storage import ObjectScope
 
 
@@ -87,7 +90,21 @@ class ExternalIngestionHandler:
         collection_id = _field(record, "collection_id")
         source_id = payload.get("object_source_id") or job_id
         object_key = payload.get("object_key")
-        filename = payload.get("display_filename")
+        encoded_filename = payload.get("filename_ref")
+        if encoded_filename is not None:
+            if not isinstance(encoded_filename, str) or not encoded_filename or len(encoded_filename) > 512:
+                raise ExternalIngestionError("validation_error")
+            try:
+                padding = "=" * (-len(encoded_filename) % 4)
+                filename = base64.b64decode(
+                    encoded_filename + padding,
+                    altchars=b"-_",
+                    validate=True,
+                ).decode("utf-8")
+            except (binascii.Error, ValueError, UnicodeDecodeError):
+                raise ExternalIngestionError("validation_error") from None
+        else:
+            filename = payload.get("display_filename")
         if not all(isinstance(value, str) and value.strip() for value in (job_id, tenant_id, workspace_id, collection_id, source_id, object_key, filename)):
             raise ExternalIngestionError("validation_error")
         try:
@@ -102,9 +119,17 @@ class ExternalIngestionHandler:
             raise ExternalIngestionError("storage_unavailable")
         if len(source) > self.max_bytes:
             raise ExternalIngestionError("validation_error")
-        path = self._temp_root / f"job-{job_id}.source"
+        display_filename = sanitize_display_filename(filename)
+        suffix = Path(display_filename).suffix.lower()
+        if suffix not in SUPPORTED_EXTENSIONS:
+            raise ExternalIngestionError("validation_error")
+        path: Path | None = None
         try:
-            with path.open("xb") as target:
+            descriptor, temporary_name = tempfile.mkstemp(
+                prefix="job-", suffix=suffix, dir=self._temp_root,
+            )
+            path = Path(temporary_name)
+            with os.fdopen(descriptor, "wb") as target:
                 os.chmod(path, 0o600)
                 target.write(source)
             metadata = {
@@ -126,9 +151,10 @@ class ExternalIngestionHandler:
                     tenant_id=tenant_id,
                     workspace_id=workspace_id,
                     collection_id=collection_id,
-                    display_filename=filename,
+                    display_filename=display_filename,
                     job_id=job_id,
                     publication_guard=lambda: _LeaseGuard(lease_lost_check),
+                    cancel_check=lease_lost_check,
                     document_metadata=metadata,
                 )
             elif operation == "ingest":
@@ -137,9 +163,10 @@ class ExternalIngestionHandler:
                     tenant_id=tenant_id,
                     workspace_id=workspace_id,
                     collection_id=collection_id,
-                    display_filename=filename,
+                    display_filename=display_filename,
                     job_id=job_id,
                     publication_guard=lambda: _LeaseGuard(lease_lost_check),
+                    cancel_check=lease_lost_check,
                     document_metadata=metadata,
                 )
             else:
@@ -152,7 +179,8 @@ class ExternalIngestionHandler:
             return result
         finally:
             try:
-                path.unlink(missing_ok=True)
+                if path is not None:
+                    path.unlink(missing_ok=True)
             except OSError:
                 pass
 

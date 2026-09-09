@@ -107,7 +107,7 @@ ops-backup-test:
 	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) -m pytest -q -p no:cacheprovider "$(ROOT)/infrastructure/scripts/tests/test_backup_restore.py"
 
 jobs-test:
-	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)/apps/worker:$(ROOT)/packages/jobs/src:$(ROOT)/packages/observability/src" $(PYTHON) -m pytest -q -p no:cacheprovider "$(ROOT)/apps/worker/tests/test_postgres_jobs.py" "$(ROOT)/packages/jobs/tests"
+	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)/apps/worker:$(ROOT)/packages/jobs/src:$(ROOT)/packages/observability/src" $(PYTHON) -m pytest -q -p no:cacheprovider "$(ROOT)/apps/worker/tests/test_runtime.py" "$(ROOT)/apps/worker/tests/test_canonical_queue.py" "$(ROOT)/apps/worker/tests/test_postgres_jobs.py" "$(ROOT)/packages/jobs/tests"
 
 api-dev:
 	$(PYTHON) "$(PHASE13_RUNNER)" dev
@@ -167,7 +167,7 @@ api15-professor:
 	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)/packages/contracts/src:$(ROOT)/packages/professor/src" $(PYTHON) -m pytest -q -p no:cacheprovider "$(ROOT)/packages/professor/tests"
 
 api15-root:
-	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)/apps/api/src:$(ROOT)/packages/contracts/src:$(ROOT)/packages/authorization/src:$(ROOT)/packages/identity/src:$(ROOT)/packages/observability/src:$(ROOT)/packages/knowledge/src:$(ROOT)/packages/ingestion/src:$(ROOT)/packages/retrieval/src:$(ROOT)/packages/providers/src:$(ROOT)/packages/locking/src:$(ROOT)/packages/professor/src" $(PYTHON) -m pytest -q -p no:cacheprovider "$(ROOT)/apps/api/tests"
+	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)/apps/api/src:$(ROOT)/apps/worker:$(ROOT)/packages/jobs/src:$(ROOT)/packages/contracts/src:$(ROOT)/packages/authorization/src:$(ROOT)/packages/identity/src:$(ROOT)/packages/observability/src:$(ROOT)/packages/knowledge/src:$(ROOT)/packages/ingestion/src:$(ROOT)/packages/retrieval/src:$(ROOT)/packages/providers/src:$(ROOT)/packages/locking/src:$(ROOT)/packages/professor/src" $(PYTHON) -m pytest -q -p no:cacheprovider "$(ROOT)/apps/api/tests"
 
 api15-benchmark:
 	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)/apps/api/src:$(ROOT)/packages/contracts/src:$(ROOT)/packages/authorization/src:$(ROOT)/packages/identity/src:$(ROOT)/packages/observability/src:$(ROOT)/packages/knowledge/src:$(ROOT)/packages/ingestion/src:$(ROOT)/packages/retrieval/src:$(ROOT)/packages/providers/src:$(ROOT)/packages/locking/src:$(ROOT)/packages/professor/src" $(PYTHON) "$(ROOT)/scripts/phase15/benchmark.py"
@@ -184,7 +184,7 @@ api16-worker:
 	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)/apps/worker:$(ROOT)/apps/api/src:$(ROOT)/packages/jobs/src:$(ROOT)/packages/contracts/src:$(ROOT)/packages/authorization/src:$(ROOT)/packages/identity/src:$(ROOT)/packages/observability/src:$(ROOT)/packages/knowledge/src:$(ROOT)/packages/ingestion/src:$(ROOT)/packages/retrieval/src:$(ROOT)/packages/providers/src:$(ROOT)/packages/locking/src:$(ROOT)/packages/professor/src" $(PYTHON) -m pytest -q -p no:cacheprovider "$(ROOT)/apps/worker/tests" "$(ROOT)/apps/api/tests/test_phase16_health.py"
 
 api16-root:
-	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)/apps/api/src:$(ROOT)/packages/contracts/src:$(ROOT)/packages/authorization/src:$(ROOT)/packages/identity/src:$(ROOT)/packages/observability/src:$(ROOT)/packages/knowledge/src:$(ROOT)/packages/ingestion/src:$(ROOT)/packages/retrieval/src:$(ROOT)/packages/providers/src:$(ROOT)/packages/locking/src:$(ROOT)/packages/professor/src" $(PYTHON) -m pytest -q -p no:cacheprovider "$(ROOT)/apps/api/tests"
+	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)/apps/api/src:$(ROOT)/apps/worker:$(ROOT)/packages/jobs/src:$(ROOT)/packages/contracts/src:$(ROOT)/packages/authorization/src:$(ROOT)/packages/identity/src:$(ROOT)/packages/observability/src:$(ROOT)/packages/knowledge/src:$(ROOT)/packages/ingestion/src:$(ROOT)/packages/retrieval/src:$(ROOT)/packages/providers/src:$(ROOT)/packages/locking/src:$(ROOT)/packages/professor/src" $(PYTHON) -m pytest -q -p no:cacheprovider "$(ROOT)/apps/api/tests"
 
 api16-benchmark:
 	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)/apps/api/src:$(ROOT)/packages/contracts/src:$(ROOT)/packages/knowledge/src:$(ROOT)/packages/ingestion/src:$(ROOT)/packages/retrieval/src" $(PYTHON) "$(ROOT)/scripts/phase16/benchmark.py"

@@ -30,6 +30,7 @@ MAX_METADATA_FIELDS = 32
 MAX_ATTEMPTS = 64
 
 _IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$")
+_OPERATION = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$")
 _FIELD = re.compile(r"^[a-z][a-z0-9_.:-]{0,63}$")
 _SAFE_ERROR = re.compile(r"^[a-z][a-z0-9_.:-]{0,63}$")
 _METADATA_VALUE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:/@?=&%+~,\-]{0,511}$")
@@ -46,6 +47,7 @@ _SENSITIVE_METADATA_VALUE = re.compile(
 _SAFE_METADATA_KEYS = frozenset(
     {
         "attempt_id",
+        "byte_size",
         "bytes",
         "checksum",
         "chunk_id",
@@ -201,6 +203,13 @@ def _identifier(value: object, *, field_name: str) -> str:
     result = _text(value, field_name=field_name, maximum=MAX_IDENTIFIER_LENGTH)
     if not _IDENTIFIER.fullmatch(result):
         raise JobValidationError(f"{field_name} is not a valid identifier")
+    return result
+
+
+def _operation(value: object) -> str:
+    result = _text(value, field_name="operation", maximum=MAX_OPERATION_LENGTH)
+    if not _OPERATION.fullmatch(result):
+        raise JobValidationError("operation is not a valid identifier")
     return result
 
 
@@ -460,7 +469,7 @@ class Job:
         object.__setattr__(self, "job_id", JobId(_identifier(self.job_id, field_name="job_id")))
         for name in ("tenant_id", "workspace_id", "collection_id"):
             object.__setattr__(self, name, _identifier(getattr(self, name), field_name=name))
-        object.__setattr__(self, "operation", _text(self.operation, field_name="operation", maximum=MAX_OPERATION_LENGTH))
+        object.__setattr__(self, "operation", _operation(self.operation))
         object.__setattr__(
             self,
             "idempotency_key",
@@ -921,6 +930,7 @@ class JobQueue(Protocol):
         *,
         now: float,
         expected_version: int,
+        deadline: float | None = None,
     ) -> Job: ...
 
     def fail(
@@ -939,6 +949,14 @@ class JobQueue(Protocol):
         tenant_id: str,
         workspace_id: str,
         collection_id: str,
+        now: float,
+        expected_version: int,
+    ) -> Job: ...
+
+    def cancel_lease(
+        self,
+        lease: JobLease,
+        *,
         now: float,
         expected_version: int,
     ) -> Job: ...

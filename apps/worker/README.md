@@ -31,11 +31,22 @@ distributed telemetry guarantee.
 idempotency, optimistic versions, owner-bound leases, `FOR UPDATE SKIP
 LOCKED`, durable attempt history, lifecycle outbox/audit rows, dead-letter
 replay, and bounded terminal retention. It receives a DB-API connection
-factory from the composition root and never discovers credentials itself. The
-legacy `PostgresIngestionQueue` remains a compatibility facade until the
-Phase 2.3 worker runtime is migrated. Disposable PostgreSQL concurrency and
-crash evidence is still required before this adapter is called production
-ready. Rows already present during migration and rows still written by the
-legacy facade retain a null canonical state projection; both the legacy writer
-and canonical adapter filter their own lanes, and Phase 2.3 must rewrite the
-legacy rows with attempt history before switching callers.
+factory from the composition root and never discovers credentials itself.
+
+`RealWorkerRuntime` is the Phase 2.3 process runtime. A reviewed composition
+injects one explicit `JobScope`, a bounded operation registry, concurrency and
+deadline limits, and the canonical queue directly. Startup checks the durable
+schema marker before claiming work; the launcher handles readiness, cooperative
+SIGTERM cancellation, heartbeats, owner-bound cancellation, safe failure
+mapping, and a finite shutdown deadline. `CanonicalIngestionQueueAdapter`
+keeps the API's `QueueRecord` surface scoped to tenant/workspace while the
+worker stays on canonical `Job`/`JobLease` values.
+
+Migration `0005_rewrite_legacy_jobs.sql` materializes bounded attempt history,
+records a replay-safe lifecycle/outbox/audit event, and installs a trigger that
+rejects new legacy writes. The old `PostgresIngestionQueue` remains importable
+for read compatibility during rollout, but it cannot remain a writable
+authority after that migration. Disposable PostgreSQL concurrency, crash and
+SIGTERM evidence is still required before this runtime is called production
+ready. Python handlers remain cooperative; process isolation for a handler that
+ignores cancellation is an external deployment gate.

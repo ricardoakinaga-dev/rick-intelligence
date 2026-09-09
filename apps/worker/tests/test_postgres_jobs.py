@@ -7,6 +7,7 @@ import json
 import pytest
 
 from postgres_jobs import (
+    PostgresJobCorruptionError,
     PostgresJobError,
     PostgresJobIdempotencyError,
     PostgresJobLeaseError,
@@ -24,6 +25,7 @@ from rick_jobs import (
     JobScope,
     JobState,
 )
+from postgres_jobs import _parse_result
 
 
 def _json(value: object) -> object:
@@ -34,12 +36,22 @@ def _json(value: object) -> object:
     return value
 
 
+def test_result_decoder_rejects_non_string_metadata_and_document_references() -> None:
+    with pytest.raises(PostgresJobCorruptionError):
+        _parse_result({"output_refs": {"byte_size": 7}, "completed_at": 100.0})
+    with pytest.raises(PostgresJobCorruptionError):
+        _parse_result({"output_refs": {}, "document_id": 7, "completed_at": 100.0})
+    restored = _parse_result({"output_refs": {}, "document_id": None, "completed_at": 100.0}, document_id="doc-1")
+    assert restored is not None and restored.document_id == "doc-1"
+
+
 class FakeConnection:
     def __init__(self) -> None:
         self.jobs: dict[str, dict[str, object]] = {}
         self.attempts: dict[tuple[str, int], dict[str, object]] = {}
         self.trace: list[tuple[str, tuple[object, ...]]] = []
         self.database_now = 104.0
+        self.migration_ready = True
         self.commits = 0
         self.rollbacks = 0
         self.closed = 0
@@ -71,6 +83,9 @@ class FakeCursor:
         compact = " ".join(query.lower().split())
         if compact.startswith("select 1"):
             self.rows = [{"one": 1}]
+            return
+        if compact.startswith("select version from rick_schema_migrations"):
+            self.rows = [{"version": "0005"}] if self.connection.migration_ready else []
             return
         if compact.startswith("select pg_advisory_xact_lock"):
             return
@@ -408,6 +423,37 @@ def test_enqueue_claim_heartbeat_ack_is_scoped_and_versioned() -> None:
             now=106.0,
             expected_version=running.version,
         )
+
+
+def test_claim_can_derive_locked_version_and_running_cancel_is_owner_bound() -> None:
+    queue, connection = make_queue()
+    queued = queue.enqueue(make_job(), expected_version=0)
+    running, lease = queue.claim(
+        worker_id="worker-a",
+        scope=queued.scope,
+        expected_versions={},
+        now=103.0,
+    )[0]
+
+    cancelled = queue.cancel_lease(
+        lease,
+        now=104.0,
+        expected_version=running.version,
+    )
+
+    assert cancelled.state is JobState.CANCELLED
+    assert cancelled.attempts[-1].state is JobState.CANCELLED
+    assert connection.jobs[str(cancelled.job_id)]["lease_owner"] is None
+    with pytest.raises(PostgresJobLeaseError):
+        queue.cancel_lease(lease, now=105.0, expected_version=running.version)
+
+
+def test_readiness_requires_the_phase_2_3_schema_marker() -> None:
+    queue, connection = make_queue()
+
+    assert queue.readiness_check() is True
+    connection.migration_ready = False
+    assert queue.readiness_check() is False
 
 
 def test_failure_retry_exhaustion_and_authorized_replay_preserve_scope() -> None:

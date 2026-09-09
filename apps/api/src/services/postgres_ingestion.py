@@ -9,6 +9,7 @@ all durable adapters are injected by the composition root.
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Mapping
+import base64
 import hashlib
 import inspect
 from pathlib import Path
@@ -145,6 +146,8 @@ class PostgresIngestionApplicationService:
     ) -> None:
         if queue is None or not callable(getattr(queue, "enqueue", None)):
             raise ValueError("durable queue is required")
+        if not callable(getattr(queue, "get_by_idempotency", None)):
+            raise ValueError("durable queue must expose scoped idempotency reads")
         if object_store is None or not callable(getattr(object_store, "put", None)):
             raise ValueError("object store is required")
         if isinstance(max_bytes, bool) or not isinstance(max_bytes, int) or not 1 <= max_bytes <= 50 * 1024 * 1024:
@@ -177,8 +180,9 @@ class PostgresIngestionApplicationService:
         return f"ing-{hashlib.sha256(idempotency_key.encode('utf-8')).hexdigest()[:40]}"
 
     @staticmethod
-    def _source_key(job_id: str, suffix: str) -> str:
-        return f"uploads/{job_id}{suffix.lower()}"
+    def _source_key(checksum: str) -> str:
+        digest = checksum.removeprefix("sha256:")
+        return f"uploads/{digest}"
 
     def _public_job(self, record: object) -> dict[str, object]:
         raw_status = str(_field(record, "status", "failed"))
@@ -257,45 +261,77 @@ class PostgresIngestionApplicationService:
         workspace = _required_text(workspace_id, maximum=128)
         collection = _required_text(collection_id, maximum=128)
         display_filename = sanitize_display_filename(_required_text(filename, maximum=_MAX_FILENAME))
+        filename_ref = base64.urlsafe_b64encode(display_filename.encode("utf-8")).decode("ascii")
+        if len(filename_ref) > 512:
+            raise IngestionApplicationError("validation_error")
         suffix = Path(display_filename).suffix.lower()
         if suffix not in SUPPORTED_EXTENSIONS:
             raise IngestionApplicationError("unsupported_media_type")
         if operation not in {"ingest", "reindex"}:
             raise IngestionApplicationError("validation_error")
         key = _required_text(idempotency_key or f"{operation}:{uuid.uuid4().hex}", maximum=_MAX_IDEMPOTENCY_KEY)
-        job_id = self._job_id(f"{tenant}:{workspace}:{key}")
-        source_key = self._source_key(job_id, suffix)
+        job_id = self._job_id(f"{tenant}:{workspace}:{collection}:{key}")
         data = _read_source(source, max_bytes=self.max_bytes)
+        checksum_ref = f"sha256:{hashlib.sha256(data).hexdigest()}"
+        source_key = self._source_key(checksum_ref)
         scope = ObjectScope(tenant_id=tenant, workspace_id=workspace, source_id=job_id)
+        payload = {
+            "object_key": source_key,
+            "object_source_id": job_id,
+            "filename_ref": filename_ref,
+            "operation": operation,
+            "checksum": checksum_ref,
+            "byte_size": str(len(data)),
+        }
+        if document_id:
+            payload["document_id"] = document_id
         try:
-            metadata = self.object_store.put(scope, source_key, data)
-            checksum = getattr(metadata, "checksum", None)
-            size = getattr(metadata, "size", len(data))
-            payload = {
-                "object_key": source_key,
-                "object_source_id": job_id,
-                "display_filename": display_filename,
-                "operation": operation,
-                "document_id": document_id or "",
-                "checksum": str(checksum or ""),
-                "byte_size": str(size),
-            }
-            record = self.queue.enqueue(
-                job_id=job_id,
-                idempotency_key=key,
-                payload=payload,
-                tenant_id=tenant,
-                workspace_id=workspace,
-                collection_id=collection,
-            )
+            lookup = getattr(self.queue, "get_by_idempotency", None)
+            existing = None
+            if callable(lookup):
+                existing = lookup(
+                    tenant_id=tenant,
+                    workspace_id=workspace,
+                    collection_id=collection,
+                    idempotency_key=key,
+                )
+            if existing is not None:
+                existing_payload = _field(existing, "payload", {})
+                if not isinstance(existing_payload, Mapping) or dict(existing_payload) != payload:
+                    raise IngestionApplicationError("conflict")
+                record = existing
+            else:
+                metadata = self.object_store.put(scope, source_key, data)
+                observed_checksum = str(getattr(metadata, "checksum", "") or checksum_ref)
+                try:
+                    observed_size = int(getattr(metadata, "size", len(data)))
+                except (TypeError, ValueError):
+                    raise IngestionApplicationError("storage_unavailable") from None
+                if observed_checksum != checksum_ref or observed_size != len(data):
+                    raise IngestionApplicationError("storage_unavailable")
+            if existing is None:
+                record = self.queue.enqueue(
+                    job_id=job_id,
+                    idempotency_key=key,
+                    payload=payload,
+                    tenant_id=tenant,
+                    workspace_id=workspace,
+                    collection_id=collection,
+                )
         except IngestionApplicationError:
+            # The object key is content addressed and the idempotency lookup
+            # plus enqueue are separate durable operations.  A concurrent
+            # request may have published the same object/job while this
+            # request is failing, so this boundary cannot safely determine
+            # ownership and delete the object.  Unreferenced objects are
+            # reclaimed by storage retention/GC after the durable reference
+            # window, never by a losing request.
             raise
         except Exception as exc:
-            try:
-                self.object_store.delete(scope, source_key)
-            except Exception:
-                pass
             code = getattr(exc, "code", None)
+            # See the IngestionApplicationError branch above.  In particular,
+            # never delete after a queue race: the same content-addressed
+            # object may already be referenced by the winning enqueue.
             if code == "capacity":
                 raise IngestionApplicationError("storage_unavailable") from None
             if code == "idempotency":

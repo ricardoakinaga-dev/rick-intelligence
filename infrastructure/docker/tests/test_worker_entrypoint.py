@@ -35,6 +35,27 @@ class _Worker:
         self.ran = True
 
 
+class _LifecycleWorker(_Worker):
+    def __init__(self) -> None:
+        super().__init__()
+        self.started = False
+        self.stopped = False
+        self.closed = False
+
+    def startup(self) -> None:
+        self.started = True
+
+    def readiness_check(self) -> bool:
+        return self.started
+
+    def stop(self) -> None:
+        self.stopped = True
+
+    def shutdown(self, *, timeout: float) -> None:
+        assert timeout > 0
+        self.closed = True
+
+
 class WorkerEntrypointTests(unittest.TestCase):
     def test_missing_composition_fails_closed_without_printing_environment(self) -> None:
         with patch.dict(os.environ, {}, clear=True):
@@ -57,6 +78,18 @@ class WorkerEntrypointTests(unittest.TestCase):
             with self.assertRaises(SystemExit) as raised:
                 ENTRYPOINT.main([])
         self.assertEqual(raised.exception.code, ENTRYPOINT.EXIT_CONFIGURATION)
+
+    def test_lifecycle_worker_starts_before_run_and_closes_after_run(self) -> None:
+        worker = _LifecycleWorker()
+        module = types.ModuleType("rec33_lifecycle_composition")
+        module.make_worker = lambda: worker
+        with patch.dict(sys.modules, {"rec33_lifecycle_composition": module}):
+            with patch.dict(os.environ, {ENTRYPOINT.COMPOSITION_ENV: "rec33_lifecycle_composition:make_worker"}, clear=True):
+                self.assertEqual(ENTRYPOINT.main(["--health-check"]), 0)
+                self.assertEqual(ENTRYPOINT.main([]), 0)
+        self.assertTrue(worker.started)
+        self.assertTrue(worker.ran)
+        self.assertTrue(worker.closed)
 
 
 if __name__ == "__main__":

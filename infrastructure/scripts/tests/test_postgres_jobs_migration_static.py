@@ -9,6 +9,7 @@ def test_canonical_jobs_migration_has_scope_cas_attempt_and_outbox_guards() -> N
     required_fragments = (
         "contract_state",
         "ADD COLUMN IF NOT EXISTS operation TEXT",
+        "operation ~ '^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$'",
         "contract_version",
         "max_attempts",
         "version BIGINT",

@@ -52,8 +52,10 @@ These Dockerfiles do not copy `.env` files and do not use build-time
 credentials. Provider keys, database DSNs, Redis passwords, OIDC secrets, and
 object-store keys must be injected by the runtime secret manager. The worker
 also needs a separately reviewed `RICK_WORKER_COMPOSITION=module:factory`.
-The factory owns all external client construction; the image launcher refuses
-to start without it.
+The API needs `RICK_API_COMPOSITION=module:factory`; its factory receives the
+validated `ApiSettings` and returns `ExternalCompositionInputs`. The worker and
+API factories own all external client construction; their launchers refuse to
+start without the required composition.
 
 ## 3. Capture digest and scan evidence
 

@@ -8,7 +8,7 @@ FROM ${PYTHON_IMAGE} AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PYTHONPATH=/opt/rick/apps/api/src:/opt/rick/apps/worker:/opt/rick/packages/contracts/src:/opt/rick/packages/authorization/src:/opt/rick/packages/identity/src:/opt/rick/packages/observability/src:/opt/rick/packages/knowledge/src:/opt/rick/packages/ingestion/src:/opt/rick/packages/retrieval/src:/opt/rick/packages/providers/src:/opt/rick/packages/locking/src:/opt/rick/packages/professor/src:/opt/rick/packages/storage/src
+    PYTHONPATH=/opt/rick/apps/api/src:/opt/rick/apps/worker:/opt/rick/packages/jobs/src:/opt/rick/packages/contracts/src:/opt/rick/packages/authorization/src:/opt/rick/packages/identity/src:/opt/rick/packages/observability/src:/opt/rick/packages/knowledge/src:/opt/rick/packages/ingestion/src:/opt/rick/packages/retrieval/src:/opt/rick/packages/providers/src:/opt/rick/packages/locking/src:/opt/rick/packages/professor/src:/opt/rick/packages/storage/src
 
 WORKDIR /opt/rick
 
@@ -19,6 +19,7 @@ RUN addgroup --system --gid 10001 rick \
 COPY apps/api/pyproject.toml /opt/rick/apps/api/pyproject.toml
 COPY apps/api/src /opt/rick/apps/api/src
 COPY apps/worker /opt/rick/apps/worker
+COPY packages/jobs/src /opt/rick/packages/jobs/src
 COPY packages/authorization/src /opt/rick/packages/authorization/src
 COPY packages/contracts/src /opt/rick/packages/contracts/src
 COPY packages/identity/src /opt/rick/packages/identity/src
@@ -46,6 +47,10 @@ RUN python -m pip install --no-cache-dir --disable-pip-version-check \
     && chown -R 10001:10001 /opt/rick
 
 USER 10001:10001
+
+# Production must inject a deployment-owned module:factory that returns
+# ExternalCompositionInputs; the empty default is intentionally fail-closed.
+ENV RICK_API_COMPOSITION=""
 
 EXPOSE 8000
 

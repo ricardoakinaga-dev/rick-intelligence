@@ -90,11 +90,13 @@ def factory_for(*connections):
 
 def test_enqueue_is_idempotent_and_keeps_payload_opaque():
     first = ScriptedConnection([
+        ("SELECT pg_advisory_xact_lock", [], 0),
         ("SELECT * FROM rick_ingestion_jobs", [], 0),
         ("SELECT COUNT(*)", [{"count": 0}], 0),
         ("INSERT INTO rick_ingestion_jobs", [job_row()], 1),
     ])
     replay = ScriptedConnection([
+        ("SELECT pg_advisory_xact_lock", [], 0),
         ("SELECT * FROM rick_ingestion_jobs", [job_row()], 1),
     ])
     queue = PostgresIngestionQueue(factory_for(first, replay))
@@ -111,7 +113,7 @@ def test_enqueue_is_idempotent_and_keeps_payload_opaque():
     assert created == repeated
     assert first.commits == 1 and replay.commits == 1
     assert "guide.md" not in first.cursor_instance.queries[2][0]
-    assert all("contract_state IS NULL" in query for query, _params in first.cursor_instance.queries[:2])
+    assert all("contract_state IS NULL" in query for query, _params in first.cursor_instance.queries[1:3])
 
 
 def test_claim_requires_owner_for_heartbeat_and_ack():
@@ -155,6 +157,7 @@ def test_wrong_lease_rolls_back_and_does_not_ack():
 
 def test_idempotency_conflict_is_explicit():
     connection = ScriptedConnection([
+        ("SELECT pg_advisory_xact_lock", [], 0),
         ("SELECT * FROM rick_ingestion_jobs", [job_row()], 1),
     ])
     queue = PostgresIngestionQueue(factory_for(connection))

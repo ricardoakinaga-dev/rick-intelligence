@@ -47,6 +47,41 @@ else:
         "PostgresJobNotFoundError",
     ]
 from .postgres_runner import PostgresIngestionWorker, WorkerBatchResult
+try:
+    from .canonical_queue import CanonicalIngestionQueueAdapter
+except ModuleNotFoundError as exc:  # pragma: no cover - legacy worker path
+    if exc.name != "rick_jobs":
+        raise
+    _CANONICAL_QUEUE_EXPORTS: list[str] = []
+else:
+    _CANONICAL_QUEUE_EXPORTS = ["CanonicalIngestionQueueAdapter"]
+try:
+    from .runtime import (
+        CancellationToken,
+        OperationRegistry,
+        RealWorkerRuntime,
+        RuntimeClosed,
+        RuntimeConfigurationError,
+        RuntimeHealth,
+        RuntimeMetrics,
+        RunResult,
+        ShutdownReport,
+        StartupReport,
+        StartupValidationError,
+        WorkerCancelled,
+        WorkerRuntime,
+    )
+except ModuleNotFoundError as exc:  # pragma: no cover - legacy worker path
+    if exc.name != "rick_jobs":
+        raise
+    _RUNTIME_EXPORTS: list[str] = []
+else:
+    _RUNTIME_EXPORTS = [
+        "CancellationToken", "OperationRegistry", "RealWorkerRuntime",
+        "RuntimeClosed", "RuntimeConfigurationError", "RuntimeHealth",
+        "RuntimeMetrics", "RunResult", "ShutdownReport", "StartupReport",
+        "StartupValidationError", "WorkerCancelled", "WorkerRuntime",
+    ]
 
 from .runner import (
     COMPLETED,
@@ -90,4 +125,4 @@ __all__ = [
     "PostgresQueueCapacityError", "PostgresQueueIdempotencyError",
     "PostgresQueueLeaseError", "QueueHealth",
     "PostgresIngestionWorker", "WorkerBatchResult",
-] + _CANONICAL_EXPORTS
+] + _CANONICAL_EXPORTS + _CANONICAL_QUEUE_EXPORTS + _RUNTIME_EXPORTS

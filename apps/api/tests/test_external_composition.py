@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import sys
-from types import SimpleNamespace
+from types import ModuleType, SimpleNamespace
 
 ROOT = Path(__file__).resolve().parents[3]
 STORAGE_SRC = ROOT / "packages" / "storage" / "src"
@@ -15,9 +15,17 @@ if str(STORAGE_SRC) not in sys.path:
     sys.path.insert(0, str(STORAGE_SRC))
 
 import httpx
+import pytest
 
 from core.config import ApiSettings
-from services.external_composition import ExternalCompositionInputs, build_external_providers
+import services.external_composition as external_composition
+from services.external_composition import (
+    ExternalCompositionError,
+    ExternalCompositionInputs,
+    _canonical_job_result,
+    build_external_providers,
+    load_external_providers,
+)
 
 
 class HttpTransport:
@@ -73,6 +81,7 @@ def test_external_composition_builds_the_complete_graph_without_network_io(tmp_p
         provider_client=client,
         redis_client=Redis(),
         worker_temp_root=str(tmp_path),
+        worker_scope=("tenant-a", "workspace-a", "collection-a"),
     )
 
     providers = build_external_providers(settings(), inputs)
@@ -96,6 +105,48 @@ def test_external_composition_builds_the_complete_graph_without_network_io(tmp_p
     providers.vector_store.close()
     providers.worker.close()
     providers.queue.close()
+
+
+def test_canonical_worker_accepts_ingestion_job_result_dataclass():
+    job = SimpleNamespace(payload={"object_key": "objects/source.txt"}, updated_at=10.0)
+    result = SimpleNamespace(status="published", document_id="document-1")
+
+    translated = _canonical_job_result(job, result)
+
+    assert translated.document_id == "document-1"
+    assert dict(translated.output_refs) == {"object_key": "objects/source.txt"}
+
+
+def test_external_composition_loader_requires_a_deployment_factory(monkeypatch):
+    with pytest.raises(ExternalCompositionError, match="RICK_API_COMPOSITION"):
+        load_external_providers(settings(), reference="")
+
+    inputs = ExternalCompositionInputs(
+        connection_factory=lambda: None,
+        object_store_transport=HttpTransport(),
+        identity=SimpleNamespace(production_safe=True),
+        created_by="bootstrap-user",
+    )
+    module = ModuleType("test_api_external_composition")
+    module.factory = lambda configured: inputs
+    monkeypatch.setitem(sys.modules, "test_api_external_composition", module)
+    marker = object()
+    monkeypatch.setattr(external_composition, "build_external_providers", lambda configured, received: marker)
+
+    assert load_external_providers(
+        settings(), reference="test_api_external_composition:factory",
+    ) is marker
+
+
+def test_api_entrypoint_connects_production_to_external_composition(monkeypatch):
+    import main
+
+    marker = object()
+    monkeypatch.setattr(main, "load_external_providers", lambda configured: marker)
+    monkeypatch.setattr(main, "create_app", lambda configured, providers=None: (configured, providers))
+
+    configured = settings()
+    assert main.create_entrypoint_app(configured) == (configured, marker)
 
 
 def test_external_composition_requires_delivery_for_local_reset_capability(tmp_path):

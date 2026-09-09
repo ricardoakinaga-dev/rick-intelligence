@@ -213,11 +213,17 @@ def _parse_result(value: object, *, document_id: object = None) -> JobResult | N
     raw = _json_object(value, field="result")
     if raw is None:
         return None
-    observed_document = raw.get("document_id", document_id)
+    observed_document = raw["document_id"] if "document_id" in raw else document_id
+    if observed_document is not None and not isinstance(observed_document, str):
+        raise PostgresJobCorruptionError("result.document_id violates the jobs contract")
+    if observed_document is None and document_id is not None:
+        if not isinstance(document_id, str):
+            raise PostgresJobCorruptionError("job.document_id violates the jobs contract")
+        observed_document = document_id
     try:
         return JobResult(
             output_refs=raw.get("output_refs", {}),  # type: ignore[arg-type]
-            document_id=observed_document if isinstance(observed_document, str) else None,
+            document_id=observed_document,  # type: ignore[arg-type]
             completed_at=raw["completed_at"],  # type: ignore[arg-type]
         )
     except (KeyError, TypeError, ValueError, JobContractError) as exc:
@@ -730,6 +736,7 @@ class PostgresJobQueue(JobRepository, JobQueue, JobScheduler):
         lease_guard: JobLease | None = None,
         document_id: str | None | object = _KEEP_LEASE,
         event_type: str = "transition",
+        deadline: float | None = None,
     ) -> Job:
         if isinstance(expected_version, bool) or not isinstance(expected_version, int) or expected_version < 0:
             raise PostgresJobError("invalid_input", "expected_version is invalid")
@@ -737,6 +744,8 @@ class PostgresJobQueue(JobRepository, JobQueue, JobScheduler):
             raise PostgresJobConcurrencyError("persisted job version must be expected_version + 1")
         if lease_guard is not None and not isinstance(lease_guard, JobLease):
             raise PostgresJobError("invalid_input", "lease_guard is invalid")
+        if deadline is not None:
+            deadline = _time(deadline, field="deadline")
         assignments = [
             "idempotency_key=%s",
             "operation=%s",
@@ -809,6 +818,9 @@ class PostgresJobQueue(JobRepository, JobQueue, JobScheduler):
                 " AND lease_owner=%s AND lease_until > clock_timestamp()"
             )
             params.extend((str(lease_guard.worker_id), str(lease_guard.token)))
+        if deadline is not None:
+            where += " AND clock_timestamp() < to_timestamp(%s)"
+            params.append(deadline)
         cls._execute(
             cursor,
             f"""
@@ -1000,6 +1012,45 @@ class PostgresJobQueue(JobRepository, JobQueue, JobScheduler):
                 (str(job_id), *self._scope_params(scope)),
             )
             return None if row is None else self._decode(cursor, row)
+
+    def get_for_workspace(
+        self,
+        job_id: JobId,
+        *,
+        tenant_id: str,
+        workspace_id: str,
+    ) -> Job | None:
+        """Read one canonical job without widening beyond tenant/workspace."""
+
+        if not isinstance(job_id, str) or not job_id.strip():
+            raise PostgresJobError("invalid_input", "job_id is invalid")
+        with self._session() as (_connection, cursor):
+            row = self._select_one(
+                cursor,
+                "job_id=%s AND tenant_id=%s AND workspace_id=%s",
+                (job_id, tenant_id, workspace_id),
+            )
+            return None if row is None else self._decode(cursor, row)
+
+    def list_for_workspace(
+        self,
+        *,
+        tenant_id: str,
+        workspace_id: str,
+        limit: int = 100,
+    ) -> tuple[Job, ...]:
+        """List canonical jobs within an authenticated tenant/workspace."""
+
+        if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 1_000:
+            raise PostgresJobError("invalid_input", "limit is out of range")
+        with self._session() as (_connection, cursor):
+            rows = self._select_many(
+                cursor,
+                "tenant_id=%s AND workspace_id=%s",
+                (tenant_id, workspace_id),
+                limit=limit,
+            )
+            return tuple(self._decode(cursor, row) for row in rows)
 
     def get_by_idempotency(
         self,
@@ -1196,9 +1247,12 @@ class PostgresJobQueue(JobRepository, JobQueue, JobScheduler):
             claimed: list[tuple[Job, JobLease]] = []
             for row in rows:
                 job = self._decode(cursor, row)
-                if job.job_id not in expected_versions:
-                    raise PostgresJobConcurrencyError("claim requires an expected version for every selected job")
-                expected = expected_versions[job.job_id]
+                # A worker polling a scope does not have a prior snapshot for
+                # every row. The row is already locked by this transaction, so
+                # its durable version is the safe default. Callers that hold a
+                # snapshot can still provide an expected version and retain the
+                # strict optimistic check.
+                expected = expected_versions.get(job.job_id, job.version)
                 self._check_expected(expected, job.version)
                 try:
                     running = job.start_attempt(worker_id=worker, now=now)
@@ -1344,10 +1398,15 @@ class PostgresJobQueue(JobRepository, JobQueue, JobScheduler):
         *,
         now: float,
         expected_version: int,
+        deadline: float | None = None,
     ) -> Job:
         if not isinstance(result, JobResult):
             raise PostgresJobError("invalid_input", "result is invalid")
         now = _time(now, field="now")
+        if deadline is not None:
+            deadline = _time(deadline, field="deadline")
+            if now >= deadline:
+                raise PostgresJobLeaseError("handler deadline expired")
         with self._session(write=True) as (_connection, cursor):
             _row, job = self._lock_lease(cursor, lease, expected_version=expected_version, now=now)
             try:
@@ -1363,6 +1422,7 @@ class PostgresJobQueue(JobRepository, JobQueue, JobScheduler):
                 lease_guard=lease,
                 document_id=result.document_id if result.document_id is not None else _KEEP_LEASE,
                 event_type="acknowledged",
+                deadline=deadline,
             )
 
     def fail(
@@ -1459,6 +1519,34 @@ class PostgresJobQueue(JobRepository, JobQueue, JobScheduler):
                 expected_version=expected_version,
                 from_state=job.state,
                 lease=None,
+                event_type="cancelled",
+            )
+
+    def cancel_lease(
+        self,
+        lease: JobLease,
+        *,
+        now: float,
+        expected_version: int,
+    ) -> Job:
+        """Cancel a running job only through its current owner lease."""
+
+        if not isinstance(lease, JobLease):
+            raise PostgresJobError("invalid_input", "lease is invalid")
+        now = _time(now, field="now")
+        with self._session(write=True) as (_connection, cursor):
+            _row, job = self._lock_lease(cursor, lease, expected_version=expected_version, now=now)
+            try:
+                cancelled = job.finish_attempt(JobState.CANCELLED, now=now)
+            except JobContractError as exc:
+                raise PostgresJobError("invalid_transition", str(exc)) from exc
+            return self._persist(
+                cursor,
+                cancelled,
+                expected_version=expected_version,
+                from_state=job.state,
+                lease=None,
+                lease_guard=lease,
                 event_type="cancelled",
             )
 
@@ -1597,6 +1685,23 @@ class PostgresJobQueue(JobRepository, JobQueue, JobScheduler):
         try:
             with self._session() as (_connection, cursor):
                 self._execute(cursor, "SELECT 1")
+                return self._one(cursor) is not None
+        except PostgresJobError:
+            return False
+
+    def readiness_check(self) -> bool:
+        """Require the durable schema marker before accepting work."""
+
+        try:
+            with self._session() as (_connection, cursor):
+                self._execute(
+                    cursor,
+                    """
+                    SELECT version
+                    FROM rick_schema_migrations
+                    WHERE version='0005' AND application='rick-intelligence'
+                    """,
+                )
                 return self._one(cursor) is not None
         except PostgresJobError:
             return False

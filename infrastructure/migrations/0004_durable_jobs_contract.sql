@@ -27,7 +27,7 @@ DO $$
 BEGIN
     ALTER TABLE rick_ingestion_jobs
         ADD CONSTRAINT rick_ingestion_jobs_operation_ck
-        CHECK (length(operation) BETWEEN 1 AND 64);
+        CHECK (operation ~ '^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$');
 EXCEPTION WHEN duplicate_object THEN
     NULL;
 END $$;
