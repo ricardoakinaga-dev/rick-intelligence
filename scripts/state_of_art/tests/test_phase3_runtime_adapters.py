@@ -306,10 +306,18 @@ def test_quoted_json_secret_keys_are_redacted() -> None:
     output = adapter_module.redact_runtime_value(
         '{"password": "json-secret", "token": "json-token"}'
     )
+    escaped_output = adapter_module.redact_runtime_value(
+        r'{"password": "safe \" json-escaped-secret"}'
+    )
+    escaped_argument = adapter_module.redact_runtime_value(
+        r'--password "safe \" cli-escaped-secret"'
+    )
 
     assert "json-secret" not in output
     assert "json-token" not in output
     assert output.count("[REDACTED]") == 2
+    assert "json-escaped-secret" not in escaped_output
+    assert "cli-escaped-secret" not in escaped_argument
 
 
 def test_blocked_payload_gets_blocking_exit_even_if_gate_returns_zero(
