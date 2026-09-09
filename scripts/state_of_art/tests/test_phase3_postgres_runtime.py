@@ -15,8 +15,6 @@ SPEC.loader.exec_module(adapter)
 
 
 def test_missing_database_is_wrapped_as_blocked_without_runtime_claim(monkeypatch, tmp_path: Path) -> None:
-    raw = tmp_path / "raw.json"
-
     def fake_gate(argv: list[str]) -> int:
         output = tmp_path / Path(argv[argv.index("--output") + 1])
         output.write_text(json.dumps({"status": "BLOCKED_EXTERNAL", "results": []}), encoding="utf-8")
@@ -41,7 +39,7 @@ def test_missing_database_is_wrapped_as_blocked_without_runtime_claim(monkeypatc
     assert envelope["exit_status"] == 2
     assert envelope["reviewer"]["independent"] is False
     assert (tmp_path / "evidence.json").is_file()
-    assert (tmp_path / "raw.json").is_file()
+    assert list(tmp_path.glob("raw-*.json"))
 
 
 def test_output_path_cannot_escape_repository(tmp_path: Path) -> None:

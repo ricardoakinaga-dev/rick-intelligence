@@ -13,6 +13,8 @@ from datetime import datetime, timezone
 import hashlib
 import json
 from pathlib import Path
+import re
+import uuid
 from collections.abc import Callable, Mapping, Sequence
 from typing import Any
 
@@ -42,6 +44,36 @@ def _sha256(path: Path) -> str | None:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+_SENSITIVE_KEY = re.compile(
+    r"(?:password|secret|token|api[_-]?key|access[_-]?key|authorization|cookie|credential|dsn|url)",
+    re.IGNORECASE,
+)
+_SENSITIVE_VALUE = re.compile(
+    r"(?:redis|rediss|postgres(?:ql)?|mysql|amqp|https?)://[^\s\"']+|bearer\s+[^\s\"']+",
+    re.IGNORECASE,
+)
+
+
+def _redact(value: Any, *, key: str = "") -> Any:
+    """Return a JSON-safe gate projection with secret-bearing fields removed."""
+
+    if _SENSITIVE_KEY.search(key):
+        return "[REDACTED]"
+    if isinstance(value, Mapping):
+        return {str(name): _redact(item, key=str(name)) for name, item in value.items()}
+    if isinstance(value, list):
+        return [_redact(item) for item in value]
+    if isinstance(value, str):
+        return _SENSITIVE_VALUE.sub("[REDACTED]", value)
+    if value is None or isinstance(value, (bool, int, float)):
+        return value
+    return str(value)
+
+
+def _write_json(path: Path, value: Mapping[str, Any]) -> None:
+    path.write_text(json.dumps(value, ensure_ascii=False, sort_keys=True, indent=2) + "\n", encoding="utf-8")
 
 
 def _normalize_status(raw: Mapping[str, Any], exit_status: int) -> str:
@@ -85,9 +117,12 @@ def run_gate_adapter(
 
     root = root.resolve()
     output_path = _safe_path(root, output)
-    raw_path = _safe_path(root, raw_output)
-    if output_path == raw_path:
+    raw_base_path = _safe_path(root, raw_output)
+    if output_path == raw_base_path:
         raise ValueError("envelope and raw gate output must be different files")
+    raw_path = raw_base_path.with_name(
+        f"{raw_base_path.stem}-{uuid.uuid4().hex[:12]}{raw_base_path.suffix or '.json'}"
+    )
     raw_path.parent.mkdir(parents=True, exist_ok=True)
 
     gate_args = [*argv, "--output", str(raw_path.relative_to(root))]
@@ -98,24 +133,26 @@ def run_gate_adapter(
     except Exception as exc:
         exit_status = 1
         raw_payload = _fallback_payload(type(exc).__name__)
-        if not raw_path.is_file():
-            raw_path.write_text(json.dumps(raw_payload, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+        _write_json(raw_path, raw_payload)
     else:
         try:
             raw_payload_value = json.loads(raw_path.read_text(encoding="utf-8"))
         except (OSError, UnicodeDecodeError, json.JSONDecodeError, TypeError, ValueError) as exc:
             raw_payload = _fallback_payload(type(exc).__name__)
             exit_status = 1
-            if not raw_path.is_file():
-                raw_path.write_text(json.dumps(raw_payload, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+            _write_json(raw_path, raw_payload)
         else:
-            raw_payload = raw_payload_value if isinstance(raw_payload_value, dict) else _fallback_payload("non_object_json")
+            raw_payload = _redact(raw_payload_value) if isinstance(raw_payload_value, dict) else _fallback_payload("non_object_json")
             if not isinstance(raw_payload_value, dict):
                 exit_status = 1
+            _write_json(raw_path, raw_payload)
 
     checkout = checkout_capture(root)
     observed_at = datetime.now(timezone.utc).isoformat()
     status = _normalize_status(raw_payload, exit_status)
+    if checkout.get("status") != "CLEAN" and status in {"PASS", "VERIFIED_RUNTIME", "PROMOTABLE"}:
+        status = "FAILED"
+        exit_status = 1
     if status == "BLOCKED_EXTERNAL":
         exit_status = 2
     elif status == "FAILED" and exit_status == 0:

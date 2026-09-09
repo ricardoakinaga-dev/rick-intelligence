@@ -8,7 +8,7 @@ unavailable evidence into runtime proof.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 import hashlib
 import json
 from pathlib import Path
@@ -52,6 +52,8 @@ RUNTIME_EVIDENCE_STATUSES = frozenset(
         "NOT_RUN",
     }
 )
+MAX_RUNTIME_EVIDENCE_AGE_SECONDS = 24 * 60 * 60
+MAX_RUNTIME_EVIDENCE_FUTURE_SKEW_SECONDS = 5 * 60
 
 
 class MatrixValidationError(ValueError):
@@ -495,6 +497,8 @@ def evaluate_matrix(
                         "PROMOTABLE",
                     }:
                         envelope_errors.append("promoted capability requires successful runtime status")
+                    if item["status"] == "PROMOTABLE" and runtime_record.get("production_safe") is not True:
+                        envelope_errors.append("promotable capability requires production_safe=true")
                     if not isinstance(runtime_record.get("procedure"), str) or not runtime_record["procedure"].strip():
                         envelope_errors.append("procedure")
                     if not isinstance(runtime_record.get("environment"), str) or not runtime_record["environment"].strip():
@@ -580,12 +584,27 @@ def evaluate_matrix(
                         timestamp_errors: list[str] = []
                         _validate_timestamp(observed_at, "runtime evidence observed_at", timestamp_errors)
                         envelope_errors.extend(timestamp_errors)
+                        if not timestamp_errors:
+                            observed_timestamp = datetime.fromisoformat(observed_at.replace("Z", "+00:00"))
+                            age_seconds = (
+                                datetime.now(timezone.utc)
+                                - observed_timestamp.astimezone(timezone.utc)
+                            ).total_seconds()
+                            if (
+                                age_seconds > MAX_RUNTIME_EVIDENCE_AGE_SECONDS
+                                or age_seconds < -MAX_RUNTIME_EVIDENCE_FUTURE_SKEW_SECONDS
+                            ):
+                                envelope_errors.append("observed_at is outside current evidence window")
+                                rejection_codes.add("STALE_RUNTIME_EVIDENCE_REJECTED")
                     runtime_reviewer = runtime_record.get("reviewer")
                     if (
                         not isinstance(runtime_reviewer, Mapping)
                         or not isinstance(runtime_reviewer.get("id"), str)
+                        or not runtime_reviewer["id"].strip()
                         or not isinstance(runtime_reviewer.get("kind"), str)
+                        or not runtime_reviewer["kind"].strip()
                         or not isinstance(runtime_reviewer.get("name"), str)
+                        or not runtime_reviewer["name"].strip()
                         or not isinstance(runtime_reviewer.get("independent"), bool)
                     ):
                         envelope_errors.append("reviewer")

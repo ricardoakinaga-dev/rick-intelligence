@@ -50,8 +50,6 @@ def test_blocked_gate_emits_current_commit_bound_envelope(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    raw_path = tmp_path / "raw.json"
-
     def fake_gate(argv: list[str]) -> int:
         output = tmp_path / Path(argv[argv.index("--output") + 1])
         output.write_text(
@@ -73,7 +71,7 @@ def test_blocked_gate_emits_current_commit_bound_envelope(
     assert envelope["clean_worktree"] is True
     assert envelope["reviewer"]["independent"] is False
     assert (tmp_path / "evidence.json").is_file()
-    assert raw_path.is_file()
+    assert list(tmp_path.glob("raw-*.json"))
 
 
 def test_gate_failure_is_not_normalized_to_runtime_pass(
@@ -94,6 +92,93 @@ def test_gate_failure_is_not_normalized_to_runtime_pass(
 
     assert envelope["status"] == "FAILED"
     assert envelope["exit_status"] == 1
+
+
+def test_missing_raw_output_cannot_reuse_a_stale_pass(
+    adapter: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "raw.json").write_text(
+        json.dumps({"status": "PASS", "production_safe": True}),
+        encoding="utf-8",
+    )
+
+    def fake_gate(_argv: list[str]) -> int:
+        return 0
+
+    monkeypatch.setattr(adapter, "RAW_OUTPUT", "raw.json")
+    monkeypatch.setattr(adapter, "capture_checkout", _checkout)
+    monkeypatch.setattr(_gate_module(adapter), "main", fake_gate)
+
+    envelope = adapter.run(tmp_path, output="evidence.json")
+
+    assert envelope["status"] == "FAILED"
+    assert envelope["exit_status"] == 1
+    assert envelope["production_safe"] is False
+
+
+def test_dirty_checkout_cannot_emit_a_successful_runtime_envelope(
+    adapter: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    def fake_gate(argv: list[str]) -> int:
+        output = tmp_path / Path(argv[argv.index("--output") + 1])
+        output.write_text(
+            json.dumps({"status": "PASS", "production_safe": True}),
+            encoding="utf-8",
+        )
+        return 0
+
+    monkeypatch.setattr(adapter, "RAW_OUTPUT", "raw.json")
+    monkeypatch.setattr(adapter, "capture_checkout", lambda _root: {**_checkout(_root), "status": "DIRTY"})
+    monkeypatch.setattr(_gate_module(adapter), "main", fake_gate)
+
+    envelope = adapter.run(tmp_path, output="evidence.json")
+
+    assert envelope["status"] == "FAILED"
+    assert envelope["exit_status"] == 1
+    assert envelope["freshness"] == "DIRTY_CHECKOUT"
+    assert envelope["clean_worktree"] is False
+    assert envelope["production_safe"] is False
+
+
+def test_raw_gate_payload_is_redacted_before_persistence(
+    adapter: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    secret = "super-secret-value"
+    secret_uri = f"https://user:{secret}@runtime.example.test/service"
+
+    def fake_gate(argv: list[str]) -> int:
+        output = tmp_path / Path(argv[argv.index("--output") + 1])
+        output.write_text(
+            json.dumps({
+                "status": "PASS",
+                "production_safe": True,
+                "password": secret,
+                "endpoint": secret_uri,
+                "nested": {"api_key": secret},
+            }),
+            encoding="utf-8",
+        )
+        return 0
+
+    monkeypatch.setattr(adapter, "RAW_OUTPUT", "raw.json")
+    monkeypatch.setattr(adapter, "capture_checkout", _checkout)
+    monkeypatch.setattr(_gate_module(adapter), "main", fake_gate)
+
+    envelope = adapter.run(tmp_path, output="evidence.json")
+
+    raw_path = next(tmp_path.glob("raw-*.json"))
+    raw = raw_path.read_text(encoding="utf-8")
+    assert envelope["status"] == "PASS"
+    assert envelope["production_safe"] is True
+    assert envelope["gate"]["password"] == "[REDACTED]"
+    assert secret not in raw
+    assert secret_uri not in raw
 
 
 def test_blocked_payload_gets_blocking_exit_even_if_gate_returns_zero(
@@ -131,7 +216,8 @@ def test_gate_exception_retains_sanitized_raw_diagnostic(
 
     envelope = adapter.run(tmp_path, output="evidence.json")
 
-    raw = (tmp_path / "raw.json").read_text(encoding="utf-8")
+    raw_path = next(tmp_path.glob("raw-*.json"))
+    raw = raw_path.read_text(encoding="utf-8")
     assert envelope["status"] == "FAILED"
     assert envelope["artifact_sha256"]
     assert "remote secret" not in raw

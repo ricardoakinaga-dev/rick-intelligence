@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from hashlib import sha256
 import json
 from pathlib import Path
@@ -35,6 +36,38 @@ def _raw_ref(root: Path, filename: str) -> dict[str, str]:
     return _ref(root, filename, "raw runtime gate fixture")
 
 
+def _runtime_record(
+    raw_ref: dict[str, str],
+    *,
+    status: str = "PASS",
+    production_safe: bool = False,
+    observed_at: str | None = None,
+    freshness: str = "CURRENT",
+    reviewer: dict[str, object] | None = None,
+) -> dict[str, object]:
+    return {
+        "schema_version": "state-of-art-runtime-evidence.v1",
+        "record_id": "runtime-fixture-helper-1",
+        "capability_id": "P0-TEST",
+        "status": status,
+        "commit_sha": HEAD,
+        "tree_sha": TREE,
+        "checkout_fingerprint": CHECKOUT,
+        "clean_worktree": True,
+        "environment": "fixture-runtime",
+        "procedure": "fixture runtime procedure",
+        "exit_status": 0 if status in {"PASS", "VERIFIED_RUNTIME", "PROMOTABLE"} else 2,
+        "observed_at": observed_at or datetime.now(timezone.utc).isoformat(),
+        "artifact_sha256": raw_ref["sha256"],
+        "raw_artifacts": [raw_ref],
+        "freshness": freshness,
+        "production_safe": production_safe,
+        "reviewer": reviewer or {"id": "runner", "kind": "automated", "name": "fixture runner", "independent": False},
+        "limitations": "fixture is local only",
+        "next_action": "run an independent review",
+    }
+
+
 def _fixture(tmp_path: Path) -> tuple[Path, dict[str, object], dict[str, object]]:
     (tmp_path / "audit.md").write_text("audit\n", encoding="utf-8")
     (tmp_path / "test.py").write_text("assert True\n", encoding="utf-8")
@@ -53,7 +86,7 @@ def _fixture(tmp_path: Path) -> tuple[Path, dict[str, object], dict[str, object]
         "reviewer": {"id": "fixture", "kind": "automated", "name": "fixture reviewer", "independent": False},
         "procedure": "fixture local validation",
         "exit_status": 0,
-        "observed_at": "2026-09-09T20:00:00+00:00",
+        "observed_at": datetime.now(timezone.utc).isoformat(),
         "limitations": "fixture is local only",
         "next_action": "run a real runtime fixture",
     }
@@ -188,7 +221,7 @@ def test_verified_runtime_accepts_distinct_bound_envelope_with_independent_revie
         "environment": "fixture-runtime",
         "procedure": "fixture runtime procedure",
         "exit_status": 0,
-        "observed_at": "2026-09-09T20:00:00+00:00",
+        "observed_at": datetime.now(timezone.utc).isoformat(),
         "artifact_sha256": raw_ref["sha256"],
         "raw_artifacts": [raw_ref],
         "freshness": "CURRENT",
@@ -208,6 +241,79 @@ def test_verified_runtime_accepts_distinct_bound_envelope_with_independent_revie
     assert result["rejection_codes"] == []
 
 
+def test_promotable_capability_requires_runtime_production_safety(tmp_path: Path) -> None:
+    path, payload, checkout = _fixture(tmp_path)
+    raw_ref = _raw_ref(tmp_path, "raw-not-production-safe.json")
+    runtime = tmp_path / "runtime-not-production-safe.json"
+    runtime.write_text(json.dumps(_runtime_record(raw_ref)), encoding="utf-8")
+    payload["capabilities"][0]["status"] = "PROMOTABLE"  # type: ignore[index]
+    payload["capabilities"][0]["reviewer"]["independent"] = True  # type: ignore[index]
+    payload["capabilities"][0]["runtime_evidence"] = [_ref(  # type: ignore[index]
+        tmp_path,
+        "runtime-not-production-safe.json",
+        "runtime envelope",
+    )]
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = evaluate_matrix(path, checkout, root=tmp_path, require_complete=False)
+
+    assert result["classification"] == "FAILED"
+    assert "MISSING_EVIDENCE_REJECTED" in result["rejection_codes"]
+    assert "production_safe" in result["reason"]
+
+
+def test_current_label_with_old_runtime_observed_at_is_rejected(tmp_path: Path) -> None:
+    path, payload, checkout = _fixture(tmp_path)
+    raw_ref = _raw_ref(tmp_path, "raw-old-observed-at.json")
+    runtime = tmp_path / "runtime-old-observed-at.json"
+    runtime.write_text(
+        json.dumps(_runtime_record(
+            raw_ref,
+            status="BLOCKED_EXTERNAL",
+            observed_at="2000-01-01T00:00:00+00:00",
+        )),
+        encoding="utf-8",
+    )
+    payload["capabilities"][0]["status"] = "BLOCKED_EXTERNAL"  # type: ignore[index]
+    payload["capabilities"][0]["runtime_evidence"] = [_ref(  # type: ignore[index]
+        tmp_path,
+        "runtime-old-observed-at.json",
+        "old runtime envelope",
+    )]
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = evaluate_matrix(path, checkout, root=tmp_path, require_complete=False)
+
+    assert result["classification"] == "FAILED"
+    assert "STALE_RUNTIME_EVIDENCE_REJECTED" in result["rejection_codes"]
+
+
+def test_runtime_envelope_requires_nonempty_reviewer_fields(tmp_path: Path) -> None:
+    path, payload, checkout = _fixture(tmp_path)
+    raw_ref = _raw_ref(tmp_path, "raw-empty-reviewer.json")
+    runtime = tmp_path / "runtime-empty-reviewer.json"
+    runtime.write_text(
+        json.dumps(_runtime_record(
+            raw_ref,
+            status="BLOCKED_EXTERNAL",
+            reviewer={"id": " ", "kind": "automated", "name": "fixture runner", "independent": False},
+        )),
+        encoding="utf-8",
+    )
+    payload["capabilities"][0]["status"] = "BLOCKED_EXTERNAL"  # type: ignore[index]
+    payload["capabilities"][0]["runtime_evidence"] = [_ref(  # type: ignore[index]
+        tmp_path,
+        "runtime-empty-reviewer.json",
+        "runtime envelope with empty reviewer",
+    )]
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = evaluate_matrix(path, checkout, root=tmp_path, require_complete=False)
+
+    assert result["classification"] == "FAILED"
+    assert "reviewer" in result["reason"]
+
+
 def test_blocked_runtime_envelope_is_bound_without_becoming_a_pass(tmp_path: Path) -> None:
     path, payload, checkout = _fixture(tmp_path)
     raw_ref = _raw_ref(tmp_path, "raw-blocked.json")
@@ -224,7 +330,7 @@ def test_blocked_runtime_envelope_is_bound_without_becoming_a_pass(tmp_path: Pat
         "environment": "fixture-runtime",
         "procedure": "fixture runtime procedure was not executable",
         "exit_status": 2,
-        "observed_at": "2026-09-09T20:00:00+00:00",
+        "observed_at": datetime.now(timezone.utc).isoformat(),
         "artifact_sha256": raw_ref["sha256"],
         "raw_artifacts": [raw_ref],
         "freshness": "CURRENT",
@@ -260,7 +366,7 @@ def test_runtime_envelope_wrong_tree_is_rejected(tmp_path: Path) -> None:
         "environment": "fixture-runtime",
         "procedure": "fixture runtime procedure",
         "exit_status": 0,
-        "observed_at": "2026-09-09T20:00:00+00:00",
+        "observed_at": datetime.now(timezone.utc).isoformat(),
         "artifact_sha256": raw_ref["sha256"],
         "raw_artifacts": [raw_ref],
         "freshness": "CURRENT",
@@ -295,7 +401,7 @@ def test_stale_runtime_envelope_is_rejected(tmp_path: Path) -> None:
         "environment": "fixture-runtime",
         "procedure": "fixture runtime procedure",
         "exit_status": 2,
-        "observed_at": "2026-09-09T20:00:00+00:00",
+        "observed_at": datetime.now(timezone.utc).isoformat(),
         "artifact_sha256": raw_ref["sha256"],
         "raw_artifacts": [raw_ref],
         "freshness": "STALE",
