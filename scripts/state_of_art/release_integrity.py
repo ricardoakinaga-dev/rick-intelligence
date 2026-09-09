@@ -53,6 +53,32 @@ _OPTIONAL_CONTAINERS = {
 }
 
 
+def _rejection_codes(
+    reason: str,
+    *,
+    classification: str,
+) -> list[str]:
+    """Map fail-closed reasons to stable Phase 3 rejection identifiers."""
+
+    lowered = reason.lower()
+    codes: set[str] = set()
+    if any(token in lowered for token in ("stale", "old-check")):
+        codes.add("STALE_RELEASE_EVIDENCE_REJECTED")
+    if "commit" in lowered and any(token in lowered for token in ("match", "wrong", "head")):
+        codes.add("WRONG_COMMIT_EVIDENCE_REJECTED")
+    if "hash" in lowered or "fingerprint" in lowered:
+        codes.add("WRONG_HASH_REJECTED")
+    if any(token in lowered for token in ("absent", "not run", "no mandatory", "missing")):
+        codes.add("MISSING_EVIDENCE_REJECTED")
+    if any(token in lowered for token in ("blocked", "external", "unavailable")):
+        codes.add("BLOCKED_RUNTIME_REJECTED")
+    if "not clean" in lowered or "not bound to a clean" in lowered or "dirty" in lowered:
+        codes.add("DIRTY_RELEASE_EVIDENCE_REJECTED")
+    if classification == NOT_RUN and not codes:
+        codes.add("MISSING_EVIDENCE_REJECTED")
+    return sorted(codes)
+
+
 def _sha256_bytes(value: bytes) -> str:
     return hashlib.sha256(value).hexdigest()
 
@@ -565,6 +591,22 @@ def _evaluate_typed_manifest(
     else:
         result["classification"] = PASS
         result["reason"] = "typed manifest, artifact hashes and mandatory gates are valid"
+    rejection_codes = set(_rejection_codes(
+        str(result.get("reason", "")),
+        classification=str(result["classification"]),
+    ))
+    for gate in manifest.gates:
+        if gate.result == "BLOCKED_EXTERNAL":
+            rejection_codes.add("BLOCKED_RUNTIME_REJECTED")
+        elif gate.result == "NOT_RUN":
+            rejection_codes.add("MISSING_EVIDENCE_REJECTED")
+        elif gate.result == "STALE":
+            rejection_codes.add("STALE_RELEASE_EVIDENCE_REJECTED")
+        elif gate.result == "INVALID":
+            rejection_codes.add("WRONG_HASH_REJECTED")
+        elif gate.result == "FAIL":
+            rejection_codes.add("FAILED_RUNTIME_REJECTED")
+    result["rejection_codes"] = sorted(rejection_codes)
     result["gate_results"] = [
         {"gate_id": gate.gate_id, "result": gate.result} for gate in manifest.gates
     ]
@@ -588,6 +630,7 @@ def evaluate_evidence(
             {
                 "classification": NOT_RUN,
                 "reason": "required release evidence file is absent",
+                "rejection_codes": ["MISSING_EVIDENCE_REJECTED"],
             }
         )
         return result
@@ -599,6 +642,7 @@ def evaluate_evidence(
             {
                 "classification": FAIL,
                 "reason": f"evidence is not readable JSON: {exc}",
+                "rejection_codes": [],
             }
         )
         return result
@@ -607,6 +651,7 @@ def evaluate_evidence(
             {
                 "classification": FAIL,
                 "reason": "evidence root must be a JSON object",
+                "rejection_codes": [],
             }
         )
         return result
@@ -655,6 +700,10 @@ def evaluate_evidence(
     else:
         result["classification"] = PASS
         result["reason"] = "current checkout identity and mandatory evidence are valid"
+    result["rejection_codes"] = _rejection_codes(
+        str(result.get("reason", "")),
+        classification=str(result["classification"]),
+    )
     if warnings:
         result["warnings"] = warnings
     result["observations"] = [
@@ -711,6 +760,10 @@ def run_gate(
         {
             "id": "worktree_sentinel",
             **{key: value for key, value in sentinel.items() if key != "name"},
+            "rejection_codes": _rejection_codes(
+                str(sentinel.get("reason", "")),
+                classification=str(sentinel.get("classification", "")),
+            ),
         }
     )
 
@@ -758,6 +811,15 @@ def run_gate(
     for evidence in evidence_results:
         warnings.extend(evidence.get("warnings", []))
 
+    rejection_codes = sorted(
+        {
+            code
+            for criterion in criteria
+            for code in criterion.get("rejection_codes", [])
+            if isinstance(code, str)
+        }
+    )
+
     return {
         "schema_version": "state-of-art-release-integrity.v1",
         "gate": "release-integrity",
@@ -800,6 +862,7 @@ def run_gate(
         "criteria": criteria,
         "errors": errors,
         "warnings": warnings,
+        "rejection_codes": rejection_codes,
     }
 
 

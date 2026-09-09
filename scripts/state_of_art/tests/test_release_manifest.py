@@ -103,6 +103,36 @@ class ReleaseManifestTests(unittest.TestCase):
         self.assertEqual(result["classification"], release_integrity.FAIL)
         self.assertIn("artifact hash does not match", result["reason"])
 
+    def test_WRONG_HASH_REJECTED(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="release-manifest-") as directory:
+            path, checkout = self._fixture(directory)
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            payload["gates"][0]["artifact_hash"] = "d" * 64
+            path.write_text(json.dumps(payload), encoding="utf-8")
+            result = release_integrity.evaluate_evidence(path, checkout, root=Path(directory))
+
+        self.assertEqual(result["classification"], release_integrity.FAIL)
+        self.assertIn("bound to the wrong artifact hash", result["reason"])
+        self.assertIn("WRONG_HASH_REJECTED", result["rejection_codes"])
+
+    def test_STALE_RELEASE_EVIDENCE_REJECTED(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="release-manifest-") as directory:
+            path, checkout = self._fixture(directory, gate_result="STALE")
+            result = release_integrity.evaluate_evidence(path, checkout, root=Path(directory))
+
+        self.assertEqual(result["classification"], release_integrity.FAIL)
+        self.assertIn("fixture-gate=STALE", result["reason"])
+        self.assertIn("STALE_RELEASE_EVIDENCE_REJECTED", result["rejection_codes"])
+
+    def test_missing_referenced_evidence_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="release-manifest-") as directory:
+            path, checkout = self._fixture(directory)
+            (Path(directory) / "evidence.md").unlink()
+            result = release_integrity.evaluate_evidence(path, checkout, root=Path(directory))
+
+        self.assertEqual(result["classification"], release_integrity.FAIL)
+        self.assertIn("referenced file is absent", result["reason"])
+
     def test_blocked_gate_cannot_be_reported_as_pass(self) -> None:
         with tempfile.TemporaryDirectory(prefix="release-manifest-") as directory:
             path, checkout = self._fixture(directory, gate_result="BLOCKED_EXTERNAL", status="BLOCKED_EXTERNAL")
@@ -110,6 +140,7 @@ class ReleaseManifestTests(unittest.TestCase):
 
         self.assertEqual(result["classification"], release_integrity.FAIL)
         self.assertIn("manifest status is BLOCKED_EXTERNAL", result["reason"])
+        self.assertIn("BLOCKED_RUNTIME_REJECTED", result["rejection_codes"])
 
     def test_wrong_commit_binding_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory(prefix="release-manifest-") as directory:
@@ -121,6 +152,18 @@ class ReleaseManifestTests(unittest.TestCase):
 
         self.assertEqual(result["classification"], release_integrity.FAIL)
         self.assertIn("commit binding does not match", result["reason"])
+
+    def test_WRONG_COMMIT_EVIDENCE_REJECTED(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="release-manifest-") as directory:
+            path, checkout = self._fixture(directory)
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            payload["gates"][0]["commit_sha"] = "d" * 40
+            path.write_text(json.dumps(payload), encoding="utf-8")
+            result = release_integrity.evaluate_evidence(path, checkout, root=Path(directory))
+
+        self.assertEqual(result["classification"], release_integrity.FAIL)
+        self.assertIn("bound to the wrong commit", result["reason"])
+        self.assertIn("WRONG_COMMIT_EVIDENCE_REJECTED", result["rejection_codes"])
 
 
 if __name__ == "__main__":

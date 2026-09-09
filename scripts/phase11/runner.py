@@ -11,6 +11,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable, Sequence
 
@@ -27,6 +28,41 @@ GENERATED_COMPONENT_ARTIFACTS = (
     PROFESSOR / "test/artifacts/phase-0.6-provider-contract.json",
     FRONTEND / "next-env.d.ts",
 )
+LOCAL_DOCKER_HOST = "unix:///var/run/docker.sock"
+COMPOSE_WAIT_TIMEOUT_DEFAULT = 180
+COMPOSE_RUNTIME_DIR = ROOT / ".runtime/phase-3/compose"
+COMPOSE_REQUIRED_SERVICES = frozenset(
+    {
+        "postgres",
+        "redis",
+        "qdrant",
+        "object-store",
+        "jaeger",
+        "otel-collector",
+        "metrics",
+        "api",
+        "worker",
+        "worker-b",
+        "web",
+    }
+)
+COMPOSE_ENV_REMOVE = (
+    "DOCKER_HOST",
+    "DOCKER_CONTEXT",
+    "DOCKER_TLS_VERIFY",
+    "DOCKER_CERT_PATH",
+    "DOCKER_API_VERSION",
+    "COMPOSE_FILE",
+    "COMPOSE_PROJECT_NAME",
+)
+COMPOSE_PROJECTS = {
+    "docker-compose.dev.yml": "rick-intelligence-dev",
+    "docker-compose.staging.yml": "rick-intelligence-staging",
+}
+COMPOSE_ENV_EXAMPLES = {
+    "docker-compose.dev.yml": "infrastructure/compose/.env.dev.example",
+    "docker-compose.staging.yml": "infrastructure/compose/.env.staging.example",
+}
 
 
 def _command_text(command: Sequence[str]) -> str:
@@ -39,9 +75,12 @@ def run_case(
     *,
     cwd: Path = ROOT,
     env_updates: dict[str, str] | None = None,
+    env_remove: Iterable[str] = (),
     timeout: int = 600,
 ) -> bool:
     environment = os.environ.copy()
+    for name in env_remove:
+        environment.pop(name, None)
     if env_updates:
         environment.update(env_updates)
     print(f"==> {label}: {_command_text(command)}", flush=True)
@@ -61,6 +100,180 @@ def run_case(
         return False
     print(f"<== {label}: exit {completed.returncode}", flush=True)
     return completed.returncode == 0
+
+
+def _compose_project(compose: Path) -> str:
+    relative = compose.relative_to(ROOT).as_posix()
+    return COMPOSE_PROJECTS.get(relative, "rick-intelligence-local")
+
+
+def _compose_environment(source: dict[str, str] | None = None) -> dict[str, str]:
+    environment = dict(os.environ if source is None else source)
+    for name in COMPOSE_ENV_REMOVE:
+        environment.pop(name, None)
+    environment["COMPOSE_INTERACTIVE_NO_CLI"] = "1"
+    environment["COMPOSE_MENU"] = "0"
+    return environment
+
+
+def _compose_command(
+    compose: Path,
+    *arguments: str,
+    env_file: Path | None = None,
+) -> list[str]:
+    """Build a local-only command scoped to the selected Compose project."""
+
+    relative = compose.relative_to(ROOT).as_posix()
+    command = [
+        "docker",
+        "--host",
+        LOCAL_DOCKER_HOST,
+        "compose",
+        "--project-name",
+        _compose_project(compose),
+    ]
+    if env_file is not None:
+        command.extend(("--env-file", env_file.relative_to(ROOT).as_posix()))
+    command.extend(("--file", relative, *arguments))
+    return command
+
+
+def _compose_fallback_env_file(compose: Path) -> Path | None:
+    relative = compose.relative_to(ROOT).as_posix()
+    raw_path = COMPOSE_ENV_EXAMPLES.get(relative)
+    if raw_path is None:
+        return None
+    path = ROOT / raw_path
+    return path if path.is_file() else None
+
+
+def _compose_capture(
+    label: str,
+    command: Sequence[str],
+    *,
+    timeout: int = 120,
+) -> tuple[bool, str]:
+    """Run a diagnostic/config command without echoing potentially sensitive output."""
+
+    environment = _compose_environment()
+    print(f"==> {label}: {_command_text(command)}", flush=True)
+    try:
+        completed = subprocess.run(
+            list(command),
+            cwd=ROOT,
+            env=environment,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            check=False,
+            timeout=timeout,
+        )
+    except FileNotFoundError:
+        print(f"<== {label}: NOT AVAILABLE (missing executable)", file=sys.stderr, flush=True)
+        return False, ""
+    except subprocess.TimeoutExpired:
+        print(f"<== {label}: TIMEOUT after {timeout}s", file=sys.stderr, flush=True)
+        return False, ""
+    print(f"<== {label}: exit {completed.returncode}", flush=True)
+    return completed.returncode == 0, completed.stdout or ""
+
+
+def _compose_wait_timeout() -> int:
+    raw = os.environ.get("RICK_COMPOSE_WAIT_TIMEOUT", str(COMPOSE_WAIT_TIMEOUT_DEFAULT)).strip()
+    try:
+        timeout = int(raw)
+    except ValueError as exc:
+        raise ValueError("RICK_COMPOSE_WAIT_TIMEOUT must be an integer number of seconds") from exc
+    if not 1 <= timeout <= 1800:
+        raise ValueError("RICK_COMPOSE_WAIT_TIMEOUT must be between 1 and 1800 seconds")
+    return timeout
+
+
+def _validate_compose_before_start(compose: Path) -> bool:
+    if not run_case(
+        "root compose config validation",
+        _compose_command(compose, "config", "--quiet"),
+        env_remove=COMPOSE_ENV_REMOVE,
+        timeout=120,
+    ):
+        return False
+    ok, output = _compose_capture(
+        "root compose service inventory",
+        _compose_command(compose, "config", "--services"),
+    )
+    if not ok:
+        return False
+    services = {line.strip() for line in output.splitlines() if line.strip()}
+    missing = sorted(COMPOSE_REQUIRED_SERVICES - services)
+    if missing:
+        print(
+            "<== root compose service inventory: missing required services: "
+            + ", ".join(missing),
+            file=sys.stderr,
+            flush=True,
+        )
+        return False
+    return True
+
+
+def _redact_diagnostic_output(value: str) -> str:
+    redacted = value
+    for name in (
+        "POSTGRES_PASSWORD",
+        "REDIS_PASSWORD",
+        "QDRANT_API_KEY",
+        "MINIO_ROOT_PASSWORD",
+        "LLM_API_KEY",
+        "RICK_QDRANT_API_KEY",
+        "OBJECT_STORE_ACCESS_KEY_ID",
+        "OBJECT_STORE_SECRET_ACCESS_KEY",
+        "RICK_OBJECT_STORE_SECRET_ACCESS_KEY",
+    ):
+        secret = os.environ.get(name, "")
+        if len(secret) >= 8:
+            redacted = redacted.replace(secret, "[REDACTED]")
+    return redacted
+
+
+def _collect_compose_diagnostics(compose: Path) -> Path | None:
+    """Persist bounded local diagnostics after a failed start without claiming readiness."""
+
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ") + f"-{os.getpid()}"
+    directory = COMPOSE_RUNTIME_DIR / stamp
+    try:
+        directory.mkdir(parents=True, exist_ok=False)
+        (directory / "metadata.txt").write_text(
+            "compose=" + compose.relative_to(ROOT).as_posix() + "\n"
+            + "project=" + _compose_project(compose) + "\n"
+            + "captured_at=" + datetime.now(timezone.utc).isoformat() + "\n",
+            encoding="utf-8",
+        )
+        for name, arguments in (
+            ("ps.txt", ("ps", "--all")),
+            ("logs.txt", ("logs", "--no-color", "--timestamps", "--tail", "200")),
+        ):
+            environment = _compose_environment()
+            try:
+                completed = subprocess.run(
+                    _compose_command(compose, *arguments),
+                    cwd=ROOT,
+                    env=environment,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    check=False,
+                    timeout=30,
+                )
+                content = _redact_diagnostic_output(completed.stdout or "")
+            except (FileNotFoundError, subprocess.TimeoutExpired) as exc:
+                content = f"diagnostic unavailable: {type(exc).__name__}\n"
+            target = directory / name
+            target.write_text(content, encoding="utf-8")
+            target.chmod(0o600)
+        return directory.relative_to(ROOT)
+    except OSError as exc:
+        print(f"Could not collect local Compose diagnostics: {exc}", file=sys.stderr, flush=True)
+        return None
 
 
 def run_cases(cases: Iterable[tuple[str, Sequence[str], Path, dict[str, str] | None, int]]) -> bool:
@@ -420,11 +633,65 @@ def mode_compose(action: str) -> int:
     if not shutil.which("docker"):
         print("NOT_AVAILABLE: Docker is required for the root compose lifecycle.", file=sys.stderr)
         return 2
-    compose_action = "up" if action == "dev" else action
-    command = ["docker", "compose", "-f", str(compose.relative_to(ROOT)), compose_action]
-    if action == "up":
-        command.append("-d")
-    return 0 if run_case(f"root compose {action}", command) else 1
+    if action in {"dev", "up"}:
+        try:
+            wait_timeout = _compose_wait_timeout()
+        except ValueError as error:
+            print(f"NOT_READY: {error}", file=sys.stderr)
+            return 2
+        if not _validate_compose_before_start(compose):
+            print("NOT_READY: Compose configuration is not ready; no services were started.", file=sys.stderr)
+            return 1
+        command = _compose_command(
+            compose,
+            "up",
+            "--detach",
+            "--wait",
+            "--wait-timeout",
+            str(wait_timeout),
+            "--remove-orphans",
+        )
+        started = run_case(
+            f"root compose {action}",
+            command,
+            env_remove=COMPOSE_ENV_REMOVE,
+            timeout=wait_timeout + 120,
+        )
+        if started:
+            return 0
+        diagnostics = _collect_compose_diagnostics(compose)
+        suffix = f" Diagnostics: {diagnostics}." if diagnostics else ""
+        print(
+            "NOT_READY: required Compose services did not reach running/healthy state."
+            + suffix,
+            file=sys.stderr,
+        )
+        return 1
+    if action == "down":
+        command = _compose_command(
+            compose,
+            "down",
+            "--remove-orphans",
+            "--timeout",
+            "30",
+            env_file=_compose_fallback_env_file(compose),
+        )
+    else:
+        command = _compose_command(
+            compose,
+            "logs",
+            "--no-color",
+            "--timestamps",
+            "--tail",
+            "200",
+            env_file=_compose_fallback_env_file(compose),
+        )
+    return 0 if run_case(
+        f"root compose {action}",
+        command,
+        env_remove=COMPOSE_ENV_REMOVE,
+        timeout=120,
+    ) else 1
 
 
 MODES = {

@@ -226,6 +226,42 @@ services:
       retries: 12
     networks: [private]
 
+  worker-b:
+    <<: *service-hardening
+    image: ${RICK_WORKER_IMAGE:?supply an immutable worker image reference}
+    environment:
+      RICK_ENV: production
+      RICK_EXTERNAL_DATABASE_DSN: ${RICK_EXTERNAL_DATABASE_DSN:?inject the development database DSN}
+      RICK_REDIS_URL: ${RICK_REDIS_URL:?inject the development Redis URL}
+      RICK_QDRANT_URL: http://qdrant:6333
+      RICK_QDRANT_COLLECTION: ${RICK_QDRANT_COLLECTION:?set the Qdrant collection}
+      RICK_QDRANT_API_KEY: ${QDRANT_API_KEY:?inject the Qdrant API key}
+      RICK_OBJECT_STORE_ENDPOINT: http://object-store:9000
+      RICK_OBJECT_STORE_BUCKET: ${RICK_OBJECT_STORE_BUCKET:?set the object-store bucket}
+      RICK_OBJECT_STORE_REGION: ${RICK_OBJECT_STORE_REGION:?set the object-store region}
+      RICK_OBJECT_STORE_ACCESS_KEY_ID: ${MINIO_ROOT_USER:?inject the object-store access key}
+      RICK_OBJECT_STORE_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:?inject the object-store secret}
+      RICK_WORKER_COMPOSITION: ${RICK_WORKER_COMPOSITION:?supply the reviewed worker module:factory composition}
+      RICK_WORKER_ID: ${RICK_WORKER_ID_B:?set a unique second worker identity}
+      OTEL_SERVICE_NAME: rick-worker-b
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${RICK_OTEL_ENDPOINT:?set the collector endpoint}
+      OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_METRICS_EXPORTER: otlp
+      OTEL_LOGS_EXPORTER: none
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      qdrant: {condition: service_healthy}
+      object-store: {condition: service_healthy}
+      otel-collector: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "python", "/opt/rick/docker/worker-entrypoint.py", "--health-check"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    networks: [private]
+
   web:
     <<: *service-hardening
     image: ${RICK_WEB_IMAGE:?supply an immutable web image reference}

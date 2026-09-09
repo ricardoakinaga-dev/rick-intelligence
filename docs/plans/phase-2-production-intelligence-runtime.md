@@ -768,6 +768,21 @@ integrated candidate:
 Until these criteria are met, the honest status is `ACTIVE`, `CONDITIONAL`
 or `BLOCKED_EXTERNAL` by criterion, never “State of Art / Triple AAA”.
 
+## Phase 3 continuation — 2026-09-09
+
+The Phase 2 implementation and evidence remain historical inputs to the new
+runtime-promotion program. The exact Phase 3 prompt, current entry audit and
+public execution plan are now recorded at:
+
+- [`docs/reports/phase-3-runtime-evidence-current-audit.md`](../reports/phase-3-runtime-evidence-current-audit.md)
+- [`docs/plans/phase-3-runtime-evidence-production-promotion.md`](phase-3-runtime-evidence-production-promotion.md)
+- [living Phase 3 ExecPlan](../../.agent/plans/phase-3-runtime-evidence-production-promotion.md)
+
+Phase 3 starts with CI/release-evidence closure and keeps all unavailable
+external runtime capabilities explicitly blocked. Nothing in this continuation
+changes the Phase 2 historical verdict or turns local adapter evidence into a
+production claim.
+
 ## 18. Immediate next action
 
 The local P2.7.1–P2.7.8 implementation slices, final 18-section report,

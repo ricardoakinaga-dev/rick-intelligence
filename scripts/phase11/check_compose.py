@@ -21,6 +21,7 @@ REQUIRED_SERVICES = {
     "metrics",
     "api",
     "worker",
+    "worker-b",
     "web",
 }
 COMPOSES = (

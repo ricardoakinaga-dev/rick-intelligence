@@ -206,6 +206,42 @@ services:
       retries: 12
     networks: [private]
 
+  worker-b:
+    <<: *service-hardening
+    image: ${RICK_WORKER_IMAGE:?inject the exact immutable worker image digest}
+    environment:
+      RICK_ENV: production
+      RICK_EXTERNAL_DATABASE_DSN: ${RICK_EXTERNAL_DATABASE_DSN:?inject through the secret manager}
+      RICK_REDIS_URL: ${RICK_REDIS_URL:?inject the managed Redis URL}
+      RICK_QDRANT_URL: ${RICK_QDRANT_URL:?inject the managed Qdrant URL}
+      RICK_QDRANT_COLLECTION: ${RICK_QDRANT_COLLECTION:?inject the versioned Qdrant collection}
+      RICK_QDRANT_API_KEY: ${QDRANT_API_KEY:?inject through the secret manager}
+      RICK_OBJECT_STORE_ENDPOINT: ${RICK_OBJECT_STORE_ENDPOINT:?inject the private object-store endpoint}
+      RICK_OBJECT_STORE_BUCKET: ${RICK_OBJECT_STORE_BUCKET:?inject the object-store bucket}
+      RICK_OBJECT_STORE_REGION: ${RICK_OBJECT_STORE_REGION:?inject the object-store region}
+      RICK_OBJECT_STORE_ACCESS_KEY_ID: ${OBJECT_STORE_ACCESS_KEY_ID:?inject through the secret manager}
+      RICK_OBJECT_STORE_SECRET_ACCESS_KEY: ${OBJECT_STORE_SECRET_ACCESS_KEY:?inject through the secret manager}
+      RICK_WORKER_COMPOSITION: ${RICK_WORKER_COMPOSITION:?inject the reviewed worker module:factory composition}
+      RICK_WORKER_ID: ${RICK_WORKER_ID_B:?inject a unique second worker identity}
+      OTEL_SERVICE_NAME: rick-worker-b
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${RICK_OTEL_ENDPOINT:?inject the collector endpoint}
+      OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_METRICS_EXPORTER: otlp
+      OTEL_LOGS_EXPORTER: none
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      qdrant: {condition: service_healthy}
+      object-store: {condition: service_healthy}
+      otel-collector: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "python", "/opt/rick/docker/worker-entrypoint.py", "--health-check"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    networks: [private]
+
   web:
     <<: *service-hardening
     image: ${RICK_WEB_IMAGE:?inject the exact immutable web image digest}

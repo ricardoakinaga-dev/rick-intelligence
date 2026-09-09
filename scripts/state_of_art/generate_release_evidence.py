@@ -51,6 +51,7 @@ DEFAULT_ARTIFACTS = (
     "Makefile",
     "README.md",
     "docs/prompts/state-of-art-triple-aaa-2026-09-09.txt",
+    "docs/prompts/phase-3-runtime-evidence-production-promotion-2026-09-09.txt",
     "apps/api/pyproject.toml",
     "apps/api/src/app.py",
     "apps/api/src/services/external_composition.py",
@@ -65,6 +66,9 @@ DEFAULT_ARTIFACTS = (
     "docker-compose.staging.yml",
     "docs/architecture/release-integrity.md",
     "docs/plans/phase-2-production-intelligence-runtime.md",
+    "docs/plans/phase-3-runtime-evidence-production-promotion.md",
+    ".agent/plans/phase-3-runtime-evidence-production-promotion.md",
+    "docs/reports/phase-3-runtime-evidence-current-audit.md",
     "docs/reports/phase-2-current-gap-audit.md",
     "docs/reports/phase-2-release-integrity-implementation-2026-09-09.md",
     "docs/reports/phase-2-canonical-compose-2026-09-09.md",
@@ -76,6 +80,10 @@ DEFAULT_ARTIFACTS = (
     "docs/progress/phase-2-final-report.md",
     "infrastructure/compose/otel-collector-config.yaml",
     "infrastructure/compose/prometheus.yml",
+    "infrastructure/compose/README.md",
+    "infrastructure/compose/.env.dev.example",
+    "infrastructure/compose/.env.staging.example",
+    "docs/operations/deployment.md",
     "infrastructure/docker/api.Dockerfile",
     "infrastructure/docker/worker.Dockerfile",
     "infrastructure/migrations/0006_document_lineage_contract.sql",
@@ -87,14 +95,22 @@ DEFAULT_ARTIFACTS = (
     "packages/locking/pyproject.toml",
     "scripts/phase11/check_adversarial_corpus.py",
     "scripts/phase11/check_compose.py",
+    "scripts/phase11/runner.py",
+    "scripts/phase11/test_compose_lifecycle.py",
     "scripts/phase11/object_qdrant_runtime_gate.py",
     "scripts/phase11/postgres_runtime_gate.py",
+    "scripts/state_of_art/run_phase3_postgres.py",
+    "scripts/state_of_art/tests/test_phase3_postgres_runtime.py",
     "scripts/phase11/redis_runtime_gate.py",
     "scripts/state_of_art/triple_aaa_verify.py",
     "tests/security/rag_adversarial/corpus.jsonl",
     "scripts/state_of_art/release_integrity.py",
     "scripts/state_of_art/release_manifest.py",
     "scripts/state_of_art/generate_release_evidence.py",
+    "scripts/state_of_art/phase3_evidence.py",
+    "scripts/state_of_art/generate_phase3_evidence.py",
+    "scripts/state_of_art/phase3_lane.py",
+    "scripts/state_of_art/tests/test_phase3_evidence.py",
 )
 REQUIRED_GATES = (
     "architecture",
@@ -207,7 +223,7 @@ def generate_manifest(
         independent=False,
     )
     timestamp = _commit_timestamp(root)
-    audit_path = "docs/reports/phase-2-current-gap-audit.md"
+    audit_path = "docs/reports/phase-3-runtime-evidence-current-audit.md"
     release_evidence = (
         _evidence_ref(root, "docs/architecture/release-integrity.md", "release integrity policy"),
         _evidence_ref(root, audit_path, "current candidate gap audit"),

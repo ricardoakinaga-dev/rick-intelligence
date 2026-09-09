@@ -707,6 +707,73 @@
         "target": "infrastructure/migrations/0005_rewrite_legacy_jobs.sql",
         "completion_signal": "A controlled disposable runtime produces current PostgreSQL, multi-worker, crash/restart, live SIGTERM and hard handler-isolation evidence"
       }
+    },
+    {
+      "id": "PH3-1-CI-RELEASE-CLOSURE",
+      "title": "Close canonical Phase 3 CI and commit-bound release evidence",
+      "stage": "BUILD",
+      "priority": "P0",
+      "status": "DONE",
+      "origin": "Supplied Phase 3 runtime-evidence and production-promotion prompt; entry audit completed against frozen HEAD",
+      "dependencies": [],
+      "owner": "Codex lead",
+      "acceptance_summary": "Typed capability records and release manifests bind every claim to the exact commit and artifact digest, and explicit stale, wrong-commit, wrong-hash, missing-evidence and blocked-runtime cases fail closed across canonical CI lanes",
+      "evidence_refs": [
+        "docs/prompts/phase-3-runtime-evidence-production-promotion-2026-09-09.txt",
+        "docs/reports/phase-3-runtime-evidence-current-audit.md",
+        "docs/plans/phase-3-runtime-evidence-production-promotion.md",
+        ".agent/plans/phase-3-runtime-evidence-production-promotion.md",
+        ".agent/gates/phase-3-1-implementation-ready.json",
+        ".agent/verification.jsonl#VER-PH3-1-LOCAL-FINAL-20260909",
+        ".agent/verification.jsonl#VER-PH3-1-I1-POST-FIX-20260909",
+        ".github/workflows/quality.yml",
+        "Makefile"
+      ],
+      "next_action": {
+        "id": "PH3-1-CI-RELEASE-CLOSURE:REOPEN",
+        "kind": "REOPEN",
+        "summary": "Reopen Phase 3.1 evidence closure if a contrary binding, lane or release-integrity finding emerges",
+        "target": "scripts/state_of_art/phase3_evidence.py",
+        "completion_signal": "A new concrete matrix, artifact, CI or release-integrity defect requires a scoped correction"
+      }
+    },
+    {
+      "id": "PH3-2-LAB-READINESS",
+      "title": "Implement deterministic disposable integration-lab readiness",
+      "stage": "BUILD",
+      "priority": "P0",
+      "status": "BLOCKED",
+      "origin": "Phase 3.2 ordered milestone from the supplied runtime-evidence and production-promotion prompt",
+      "dependencies": [
+        "PH3-1-CI-RELEASE-CLOSURE"
+      ],
+      "owner": "Codex lead",
+      "acceptance_summary": "Canonical dev/staging Compose renders the required 11-service topology, make up validates inventory and waits for health/readiness, failure diagnostics are bounded/redacted, and make down is project-scoped and volume-preserving; live startup remains external evidence",
+      "evidence_refs": [
+        "docs/prompts/phase-3-runtime-evidence-production-promotion-2026-09-09.txt",
+        "docs/reports/phase-3-runtime-evidence-current-audit.md",
+        "docs/plans/phase-3-runtime-evidence-production-promotion.md",
+        ".agent/plans/phase-3-runtime-evidence-production-promotion.md",
+        ".agent/gates/phase-3-2-lab-readiness-implementation-ready.json",
+        "scripts/phase11/runner.py",
+        "scripts/phase11/test_compose_lifecycle.py",
+        "scripts/phase11/check_compose.py",
+        "docker-compose.dev.yml",
+        "docker-compose.staging.yml",
+        "infrastructure/compose/README.md"
+      ],
+      "next_action": {
+        "id": "PH3-2-LAB-READINESS:WAIT_RUNTIME",
+        "kind": "WAIT",
+        "summary": "Wait for an approved disposable Docker daemon and private runtime configuration before executing make up/down",
+        "target": "scripts/phase11/runner.py",
+        "completion_signal": "An approved daemon and disposable secrets are available, then make up/down produces current readiness and teardown evidence"
+      },
+      "blocked_by": [
+        "Docker daemon access to /var/run/docker.sock is denied in the current session",
+        "Disposable runtime secrets and endpoint authority are unavailable"
+      ],
+      "reason": "The local Compose implementation is independently reviewed, but live startup, readiness probes and teardown cannot be executed without approved external runtime access"
     }
   ]
 }

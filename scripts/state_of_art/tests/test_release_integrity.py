@@ -63,6 +63,17 @@ class ReleaseIntegrityTests(unittest.TestCase):
 
         self.assertEqual(result["classification"], release_integrity.NOT_RUN)
 
+    def test_MISSING_EVIDENCE_REJECTED(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="release-integrity-") as directory:
+            path = Path(directory) / "missing-release-evidence.json"
+            result = release_integrity.evaluate_evidence(path, self._checkout(), root=Path(directory))
+
+        self.assertTrue(result["required"])
+        self.assertNotEqual(result["classification"], release_integrity.PASS)
+        self.assertEqual(result["classification"], release_integrity.NOT_RUN)
+        self.assertEqual(result["reason"], "required release evidence file is absent")
+        self.assertEqual(result["rejection_codes"], ["MISSING_EVIDENCE_REJECTED"])
+
     def test_required_not_run_is_not_run(self) -> None:
         payload = self._valid_payload()
         payload["checks"] = [
@@ -87,6 +98,24 @@ class ReleaseIntegrityTests(unittest.TestCase):
 
         self.assertEqual(result["classification"], release_integrity.FAIL)
         self.assertIn("HEAD does not match", result["reason"])
+
+    def test_BLOCKED_RUNTIME_REJECTED(self) -> None:
+        payload = self._valid_payload()
+        payload["runtime_dependencies"] = [
+            {
+                "name": "postgresql",
+                "required": True,
+                "status": "BLOCKED",
+            }
+        ]
+        with tempfile.TemporaryDirectory(prefix="release-integrity-") as directory:
+            path = self._write_evidence(directory, payload)
+            result = release_integrity.evaluate_evidence(path, self._checkout(), root=Path(directory))
+
+        self.assertEqual(result["classification"], release_integrity.FAIL)
+        self.assertIn("BLOCKED", result["reason"])
+        self.assertIn("failing or stale result", result["reason"])
+        self.assertIn("BLOCKED_RUNTIME_REJECTED", result["rejection_codes"])
 
     def test_fingerprint_mismatch_rejects_evidence_as_fail(self) -> None:
         payload = self._valid_payload()
@@ -113,6 +142,15 @@ class ReleaseIntegrityTests(unittest.TestCase):
 
         self.assertEqual(result["classification"], release_integrity.FAIL)
         self.assertIn("stale", result["reason"])
+
+    def test_dirty_sentinel_exposes_stable_rejection_code(self) -> None:
+        before = {"available": True, "fingerprint": "1" * 64, "status": "DIRTY"}
+
+        result = release_integrity.classify_worktree_sentinel(before, before, require_clean=True)
+
+        assert "DIRTY_RELEASE_EVIDENCE_REJECTED" in release_integrity._rejection_codes(
+            result["reason"], classification=result["classification"]
+        )
 
     def test_worktree_sentinel_rejects_mutation_and_dirty_release_checkout(self) -> None:
         before = {

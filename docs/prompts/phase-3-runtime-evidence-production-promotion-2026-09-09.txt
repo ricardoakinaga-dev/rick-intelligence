@@ -1,0 +1,1571 @@
+Você é o Principal Engineer, Software Architect, SRE, Security Engineer, Distributed Systems Engineer, AI Platform Engineer e Verification Lead responsável por elevar o repositório:
+
+https://github.com/ricardoakinaga-dev/rick-intelligence
+
+do estado atual de:
+
+STATE_OF_ART_CANDIDATE
+
+para:
+
+STATE OF ART
+→ AAA
+→ TRIPLE_AAA
+
+com qualidade comprovada por evidência executável.
+
+Este trabalho NÃO é uma reescrita.
+
+O RICK Intelligence já possui uma arquitetura tecnicamente muito forte. O objetivo agora é fechar os gaps restantes de:
+
+* runtime real;
+* integração distribuída;
+* PostgreSQL;
+* Redis;
+* Qdrant;
+* object storage;
+* multi-worker fencing;
+* durable ingestion;
+* observabilidade distribuída;
+* multi-tenancy E2E;
+* disaster recovery;
+* restore;
+* chaos;
+* soak;
+* performance;
+* supply chain;
+* frontend runtime evidence;
+* release promotion.
+
+A regra central desta modernização é:
+
+DO NOT ADD MORE ARCHITECTURE BEFORE PROVING THE RUNTIME.
+
+======================================================================
+
+1. ESTADO ATUAL A SER PRESERVADO
+   ======================================================================
+
+Antes de qualquer mudança, audite o HEAD atual da branch main.
+
+O projeto já possui ou começou a possuir:
+
+* Phase 2 — Production Intelligence Runtime Closure;
+* architecture brownfield;
+* legacy preservation;
+* explicit contracts;
+* adapters;
+* differential verification;
+* dependency boundaries;
+* packages/jobs;
+* canonical durable job contracts;
+* PostgreSQL durable queue adapter;
+* RealWorkerRuntime;
+* leases;
+* heartbeats;
+* cancellation;
+* retry/backoff;
+* dead-letter/replay seams;
+* Redis coordination;
+* distributed rate-limit capability;
+* Qdrant production seams;
+* ObjectStore abstraction;
+* Evidence Engine;
+* EvidenceBundle;
+* EvidenceValidator;
+* Decision Layer;
+* Professor reasoning boundary;
+* multi-tenant authorization;
+* security threat model;
+* adversarial RAG corpus baseline;
+* frontend Next.js/TypeScript/Playwright;
+* .agent / .gauntlet control plane;
+* canonical quality workflow;
+* release evidence generation;
+* make postgres-runtime;
+* make redis-runtime;
+* make object-qdrant-runtime;
+* make triple-aaa-verify.
+
+Preserve o que está correto.
+
+Não faça rewrite geral.
+
+======================================================================
+2. CLASSIFICAÇÃO ATUAL
+======================
+
+Considere o estado aproximado:
+
+Architecture: 98/100
+Implementation quality: 96/100
+Verification engineering: 97/100
+Security structure: 96/100
+Production evidence maturity: ~56/100
+
+A classificação atual correta é:
+
+STATE_OF_ART_CANDIDATE
+
+Não promova para STATE_OF_ART, AAA ou TRIPLE_AAA enquanto mandatory gates estiverem:
+
+NOT_RUN
+BLOCKED_EXTERNAL
+FAILED
+STALE
+
+======================================================================
+3. PRIMEIRA ENTREGA
+===================
+
+NÃO comece implementando.
+
+Primeiro:
+
+1. Audite o HEAD atual.
+2. Leia README, docs, ADRs, .agent, .gauntlet, workflows, apps, packages, infrastructure, tests, scripts e Makefile.
+3. Compare o estado atual com este blueprint.
+4. Crie:
+
+docs/reports/phase-3-runtime-evidence-current-audit.md
+
+5. Atualize:
+
+docs/plans/phase-2-production-intelligence-runtime.md
+
+se necessário.
+
+6. Crie um plano formal:
+
+docs/plans/phase-3-runtime-evidence-production-promotion.md
+
+======================================================================
+4. NOVA FASE
+============
+
+Formalizar:
+
+PHASE 3 — RUNTIME EVIDENCE & PRODUCTION PROMOTION
+
+Objetivo:
+
+demonstrar que a plataforma continua correta sob condições reais e de falha.
+
+A Phase 3 não é uma fase de feature expansion.
+
+É uma fase de:
+
+integration
+verification
+resilience
+operations
+promotion
+
+======================================================================
+5. CAPABILITY MATRIX
+====================
+
+Criar uma matriz com estados:
+
+DONE_LOCAL_SCOPE
+LOCAL_VERIFIED
+VERIFIED_RUNTIME
+PARTIAL
+MISSING
+BLOCKED_EXTERNAL
+FAILED
+PROMOTABLE
+
+Para cada capability registrar:
+
+* código;
+* testes;
+* runtime evidence;
+* commit SHA;
+* artifact hash;
+* environment;
+* reviewer;
+* limitations;
+* next action.
+
+======================================================================
+6. CI VERDE COMO PRIMEIRO GATE
+==============================
+
+Antes de runtime externo, garantir que o canonical quality workflow:
+
+.github/workflows/quality.yml
+
+ou equivalente,
+
+esteja correto e execute:
+
+FAST
+UNIT
+CONTRACT
+RAG_EVAL
+FRONTEND
+SUPPLY_CHAIN
+RELEASE
+
+Todos os mandatory local gates devem passar no mesmo commit.
+
+Não considerar workflow existente como evidence.
+
+Somente workflow executado e associado ao commit pode ser:
+
+PASS.
+
+======================================================================
+7. RELEASE INTEGRITY
+====================
+
+Validar completamente:
+
+release evidence generation
+commit binding
+artifact hashing
+stale evidence rejection
+wrong commit rejection
+missing evidence rejection
+blocked gate rejection
+
+Garantir que:
+
+release-evidence.json
+
+continue gerado em runtime/CI e não seja artifact self-referential.
+
+Criar teste explícito:
+
+STALE_RELEASE_EVIDENCE_REJECTED
+
+WRONG_COMMIT_EVIDENCE_REJECTED
+
+WRONG_HASH_REJECTED
+
+======================================================================
+8. PRODUCTION-LIKE INTEGRATION LAB
+==================================
+
+Criar ambiente descartável real com:
+
+PostgreSQL
+Redis
+Qdrant
+S3-compatible object storage
+API
+Worker A
+Worker B
+Web
+OTel Collector
+
+Opcionalmente:
+
+Prometheus
+Jaeger/Tempo
+MinIO
+
+A composição deve ser canônica e reproduzível.
+
+======================================================================
+9. CANONICAL COMPOSE
+====================
+
+Validar e concluir:
+
+docker-compose.dev.yml
+docker-compose.staging.yml
+
+ou equivalentes existentes.
+
+O stack deve conter healthchecks reais.
+
+make up
+
+deve:
+
+* validar configuração;
+* subir serviços;
+* esperar readiness;
+* falhar fechado se serviço obrigatório não ficar ready.
+
+make down deve ser seguro e idempotente.
+
+======================================================================
+10. POSTGRESQL LIVE GATE
+========================
+
+Executar:
+
+make postgres-runtime
+
+contra PostgreSQL real descartável.
+
+Testar:
+
+migration from empty
+migration from previous version
+migration idempotency
+constraints
+indexes
+query plans
+SKIP LOCKED ou equivalente
+duplicate enqueue
+idempotency conflicts
+version conflicts
+retry
+dead-letter
+replay
+retention
+transaction rollback
+crash before commit
+crash after commit
+
+======================================================================
+11. MULTI-WORKER GAUNTLET
+=========================
+
+Este é um mandatory gate.
+
+Subir:
+
+Worker A
+Worker B
+
+contra a mesma queue PostgreSQL.
+
+Testar:
+
+same job cannot be processed twice
+same job cannot be acknowledged twice
+lost lease cannot ACK
+expired lease is reclaimable
+stale worker cannot publish
+worker crash does not corrupt state
+worker restart can recover work
+heartbeat loss causes safe fencing
+duplicate delivery remains idempotent
+
+Criar teste obrigatório:
+
+STALE_WORKER_ACK_REJECTION
+
+======================================================================
+12. WORKER CRASH MATRIX
+=======================
+
+Executar crashes em:
+
+after claim
+after heartbeat
+during handler
+before result write
+during result transaction
+after transaction
+before publish
+after publish
+
+Capturar:
+
+job state
+lease state
+attempt count
+audit
+outbox
+publication result
+
+======================================================================
+13. PROCESS ISOLATION
+=====================
+
+Se ainda não existir, implementar:
+
+ProcessIsolatedExecutor
+
+para operations:
+
+PARSER
+UNTRUSTED
+CPU_BOUND
+EXTERNAL_TOOL
+HIGH_RISK
+
+Permitir:
+
+hard timeout
+process kill
+bounded stdout
+bounded stderr
+memory/process constraints quando suportados
+
+Não substituir o RealWorkerRuntime inteiro.
+
+Adicionar como capability opcional.
+
+======================================================================
+14. REDIS LIVE GATE
+===================
+
+Executar:
+
+make redis-runtime
+
+contra Redis real.
+
+Testar:
+
+auth
+TLS configuration
+namespace isolation
+tenant isolation
+reconnect
+timeouts
+circuit breaker
+lease behavior
+rate limit
+shared rate limit across replicas
+
+======================================================================
+15. MULTI-REPLICA RATE LIMIT TEST
+=================================
+
+Subir:
+
+API Replica A
+API Replica B
+
+contra o mesmo Redis.
+
+Executar requests alternados.
+
+Garantir:
+
+rate limit is global
+
+e não:
+
+limit per process.
+
+Adicionar mandatory test:
+
+RATE_LIMIT_MULTI_REPLICA_BYPASS_REJECTED
+
+======================================================================
+16. OBJECT STORAGE LIVE GATE
+============================
+
+Executar S3-compatible service real.
+
+Testar:
+
+private bucket
+scoped credentials
+TLS capability
+PUT
+HEAD
+GET
+DELETE
+checksum
+streaming
+size bounds
+tenant isolation
+workspace isolation
+idempotent put
+retention
+version semantics
+
+Adicionar restore test.
+
+======================================================================
+17. QDRANT LIVE GATE
+====================
+
+Executar Qdrant real.
+
+Testar:
+
+collection creation
+schema
+payload constraints
+tenant filter
+workspace filter
+collection filter
+index creation
+alias swap
+reindex
+zero-downtime index switch
+partial failure
+timeout
+retry
+circuit breaker
+delete
+rebuild
+restore
+
+Qdrant deve permanecer:
+
+REBUILDABLE PROJECTION
+
+======================================================================
+18. DURABLE INGESTION GOLDEN PATH
+=================================
+
+Criar o:
+
+RICK GOLDEN RUNTIME PATH
+
+UPLOAD
+→ OBJECT STORE
+→ POSTGRES JOB
+→ WORKER
+→ EXTRACT
+→ NORMALIZE
+→ CHUNK
+→ EMBED
+→ QDRANT
+→ VERIFY
+→ PUBLISH
+→ RETRIEVE
+→ EVIDENCE
+→ PROFESSOR
+→ DECISION
+→ RESPONSE
+
+Esse fluxo deve ser reproducível.
+
+======================================================================
+19. INGESTION CRASH MATRIX
+==========================
+
+Testar crash em:
+
+after upload
+after object persistence
+after queue enqueue
+after extraction
+after normalization
+after chunking
+after embeddings
+during Qdrant indexing
+before verify
+after verify
+before publish
+after publish
+
+Garantir:
+
+failed new version never replaces last known-good published version.
+
+======================================================================
+20. DOCUMENT LINEAGE
+====================
+
+Garantir persistência de:
+
+document_id
+document_version
+ingestion_version
+parser_version
+chunker_version
+embedding_model
+embedding_version
+index_version
+checksum
+object_ref
+created_at
+verified_at
+published_at
+
+Evidence deve apontar exatamente para uma versão.
+
+======================================================================
+21. EVIDENCE RUNTIME CLOSURE
+============================
+
+Executar fluxo real:
+
+retrieval
+→ authorization
+→ Evidence issuance
+→ Evidence validation
+→ Professor
+→ citation binding
+→ claim support
+→ Decision
+
+Adicionar mandatory negatives:
+
+FORGED_EVIDENCE_ID_REJECTED
+
+CROSS_TENANT_EVIDENCE_REJECTED
+
+STALE_DOCUMENT_VERSION_REJECTED
+
+WRONG_CHECKSUM_REJECTED
+
+UNKNOWN_CHUNK_REJECTED
+
+======================================================================
+22. CITATION VERIFICATION
+=========================
+
+Formalizar claim-to-evidence support.
+
+Separar:
+
+retrieval relevance
+citation validity
+claim support
+answer faithfulness
+
+Métricas mínimas:
+
+citation_precision
+citation_recall
+citation_completeness
+unsupported_claim_rate
+
+Decision Layer deve reagir.
+
+======================================================================
+23. DECISION POLICY GAUNTLET
+============================
+
+Testar:
+
+ANSWER
+RETRIEVE_AGAIN
+ASK_FOR_CLARIFICATION
+ABSTAIN
+ESCALATE
+
+com casos positivos e negativos.
+
+High-risk domain should prefer conservative behavior.
+
+Não introduzir diagnóstico automatizado sem domain approval.
+
+======================================================================
+24. PROVIDER LIVE GATE
+======================
+
+Executar um provider OpenAI-compatible real ou servidor local controlado.
+
+Validar:
+
+health
+capabilities
+streaming
+cancel
+timeout
+429
+500
+retry
+circuit breaker
+context window
+tools
+JSON support
+
+Testar graceful fallback apenas onde explicitamente permitido.
+
+======================================================================
+25. LOCAL MODEL COMPATIBILITY
+=============================
+
+Adicionar integration test com pelo menos uma implementação OpenAI-compatible local, por exemplo:
+
+llama.cpp
+Ollama
+vLLM
+
+se disponível.
+
+Não hardcode vendor-specific behavior sem necessidade.
+
+======================================================================
+26. MULTI-TENANCY E2E
+=====================
+
+Criar tenants:
+
+Tenant A
+Tenant B
+
+Executar full-stack attack matrix cobrindo:
+
+identity
+sessions
+documents
+object storage
+jobs
+PostgreSQL
+Redis keys
+rate limits
+Qdrant
+retrieval
+Evidence
+Decision
+chat history
+audit
+
+Critério:
+
+Tenant A cannot observe Tenant B resources or metadata.
+
+======================================================================
+27. RAG ADVERSARIAL GAUNTLET
+============================
+
+Expandir ataques:
+
+ignore previous instructions
+system override
+data exfiltration
+fake citations
+cross-tenant instructions
+tool injection
+prompt injection
+encoded injection
+malicious Markdown
+malicious HTML
+retrieval poisoning
+
+Retrieved content deve permanecer:
+
+UNTRUSTED DATA
+
+======================================================================
+28. FILE INGESTION ADVERSARIAL GAUNTLET
+=======================================
+
+Executar corpus seguro contendo:
+
+fake MIME
+path traversal filename
+malformed PDF
+huge metadata
+oversized page count
+deep archive
+bounded zip bomb
+polyglot file
+invalid unicode
+parser hang
+decompression expansion
+
+Usar sandbox/process isolation.
+
+======================================================================
+29. DISTRIBUTED OBSERVABILITY
+=============================
+
+Implementar e provar OpenTelemetry E2E.
+
+Trace esperado:
+
+HTTP request
+→ auth
+→ authorization
+→ retrieval
+→ Redis/Qdrant
+→ queue
+→ worker
+→ storage
+→ provider
+→ Evidence
+→ Decision
+
+Validar propagation.
+
+======================================================================
+30. OBSERVABILITY REDACTION
+===========================
+
+Garantir que traces/logs/metrics não contenham:
+
+tokens
+passwords
+provider keys
+authorization headers
+raw sensitive clinical text desnecessário
+
+Criar negative tests.
+
+======================================================================
+31. METRICS
+===========
+
+Coletar:
+
+API latency p50/p95/p99
+error rate
+queue depth
+worker active
+worker retries
+dead-letter count
+Redis latency
+Qdrant latency
+retrieval latency
+provider latency
+TTFT
+tokens/sec
+ingestion latency
+embedding throughput
+publication failures
+citation support rate
+abstention rate
+
+======================================================================
+32. SLO VALIDATION
+==================
+
+Atualizar:
+
+docs/operations/slo.md
+
+Distinguir:
+
+development measurements
+staging measurements
+production SLO
+
+Nunca usar local benchmark como production evidence.
+
+======================================================================
+33. DISASTER RECOVERY GAUNTLET
+==============================
+
+Criar ambiente isolado.
+
+Executar:
+
+seed
+backup
+destroy
+restore
+rebuild
+verify
+
+Cobrir:
+
+PostgreSQL
+object storage
+Qdrant
+jobs
+audit
+Evidence lineage
+
+Redis pode ser reconstruído se arquitetura assim definir.
+
+======================================================================
+34. RPO / RTO
+=============
+
+Medir:
+
+RPO
+RTO
+
+Não apenas documentar.
+
+Registrar resultados observados.
+
+Criar:
+
+docs/reports/disaster-recovery-runtime-evidence.md
+
+======================================================================
+35. CHAOS GAUNTLET
+==================
+
+Executar:
+
+kill worker
+kill Redis
+restart Redis
+kill Qdrant
+restart Qdrant
+PostgreSQL outage
+S3 outage
+provider timeout
+provider 429
+provider 500
+network latency
+connection reset
+
+Validar:
+
+no silent corruption
+no duplicate publication
+bounded retries
+correct circuit breaker
+safe recovery
+
+======================================================================
+36. SOAK TEST
+=============
+
+Criar:
+
+short soak
+extended soak
+
+Short soak para CI/manual.
+
+Extended soak para staging.
+
+Monitorar:
+
+memory leaks
+connection leaks
+queue growth
+latency drift
+retry storms
+thread/process leaks
+worker starvation
+
+======================================================================
+37. PERFORMANCE GAUNTLET
+========================
+
+Cenários mínimos:
+
+1 concurrent
+10 concurrent
+50 concurrent
+100 concurrent
+
+Separar:
+
+API
+retrieval
+chat
+ingestion
+worker throughput
+
+Registrar:
+
+p50
+p95
+p99
+throughput
+error rate
+CPU
+RAM
+queue depth
+
+======================================================================
+38. PERFORMANCE BUDGETS
+=======================
+
+Definir thresholds apenas após baseline reproduzível.
+
+Não criar thresholds arbitrários.
+
+Guardar:
+
+environment
+CPU
+RAM
+versions
+dataset
+commit
+date
+
+======================================================================
+39. RAG EVALUATION
+==================
+
+Expandir eval harness.
+
+Métricas:
+
+Recall@K
+MRR
+nDCG
+reranker_gain
+answer_relevance
+faithfulness
+citation_precision
+citation_recall
+citation_completeness
+unsupported_claim_rate
+abstention_accuracy
+
+Versionar dataset e baseline.
+
+======================================================================
+40. ADVANCED RETRIEVAL
+======================
+
+Somente após runtime closure.
+
+Qualquer implementação de:
+
+HyDE
+multi-query
+query decomposition
+MMR
+parent-child retrieval
+
+deve ser:
+
+feature-flagged
+off by default
+benchmarked against baseline
+
+Sem ganho medido, não promover.
+
+======================================================================
+41. FRONTEND RUNTIME EVIDENCE
+=============================
+
+Executar frontend contra API real do integration lab.
+
+Cobrir:
+
+login
+chat
+documents
+sources
+upload
+job status
+errors
+offline
+stream interruption
+permission denied
+provider unavailable
+worker unavailable
+
+======================================================================
+42. RESPONSIVE MATRIX
+=====================
+
+Capturar:
+
+375
+768
+1440
+
+em estados reais.
+
+Não usar apenas fixtures.
+
+======================================================================
+43. ACCESSIBILITY GAUNTLET
+==========================
+
+Validar:
+
+axe
+keyboard navigation
+focus order
+screen reader
+zoom
+contrast
+reduced motion
+touch target sizes
+
+Fresh independent reviewer obrigatório.
+
+======================================================================
+44. VISUAL INDEPENDENT REVIEW
+=============================
+
+Executar visual critic independente.
+
+Critic deve tentar rejeitar.
+
+Nenhuma unresolved HIGH finding antes de promoção.
+
+======================================================================
+45. SUPPLY CHAIN CLOSURE
+========================
+
+Adicionar e executar:
+
+SBOM
+secret scan
+dependency audit
+container scan
+license check
+artifact checksum
+
+Ferramentas possíveis:
+
+Syft
+Grype
+Trivy
+Gitleaks
+pip-audit
+npm audit
+CodeQL
+
+Evitar redundância.
+
+======================================================================
+46. IMAGE SIGNING
+=================
+
+Se registry autorizado estiver disponível:
+
+sign container images.
+
+Registrar digest.
+
+Releases devem ser vinculadas a:
+
+commit
+image digest
+SBOM
+evidence manifest
+
+======================================================================
+47. CONTAINER HARDENING
+=======================
+
+Validar runtime:
+
+non-root
+read-only root filesystem quando possível
+dropped Linux capabilities
+minimal base
+healthchecks
+tmpfs para temporários
+no embedded secrets
+
+Static configuration não basta.
+
+Rodar container e verificar.
+
+======================================================================
+48. CANONICAL QUALITY WORKFLOW
+==============================
+
+Expandir canonical workflow com lanes explícitas:
+
+FAST
+UNIT
+CONTRACT
+INTEGRATION
+SECURITY
+RAG_EVAL
+FRONTEND
+SUPPLY_CHAIN
+RUNTIME
+PERFORMANCE
+CHAOS
+RELEASE
+
+Nem toda lane precisa rodar em todo PR.
+
+Usar:
+
+PR-safe lanes
+nightly/manual runtime lanes
+release gates
+
+======================================================================
+49. NIGHTLY / MANUAL RUNTIME
+============================
+
+Criar workflow manual ou scheduled para:
+
+PostgreSQL integration
+Redis integration
+Qdrant
+S3
+multi-worker
+chaos
+soak
+
+Sem secrets em forks/PRs não confiáveis.
+
+======================================================================
+50. FINAL PROMOTION GATE
+========================
+
+make triple-aaa-verify
+
+deve evoluir para agregar todos os mandatory gates.
+
+Status:
+
+0 = all mandatory passed
+1 = failed
+2 = blocked external
+
+Não converter BLOCKED em PASS.
+
+======================================================================
+51. INDEPENDENT REVIEWS
+=======================
+
+Obter fresh independent reviews para:
+
+Architecture
+Security
+Runtime
+Database
+Observability
+Recovery
+RAG
+Frontend
+Operations
+
+Builder não pode aprovar o próprio trabalho.
+
+======================================================================
+52. CRITIC MODE
+===============
+
+O reviewer deve procurar:
+
+race conditions
+stale evidence
+scope bypass
+tenant leakage
+unsafe fallback
+retry storm
+deadlock
+lost update
+duplicate publication
+orphan objects
+stale Qdrant state
+missing audit event
+weak rollback
+hidden single-process assumption
+
+======================================================================
+53. FINAL EVIDENCE MANIFEST
+===========================
+
+Cada gate final deve registrar:
+
+gate_id
+commit_sha
+artifact_digest
+command
+environment
+dependency versions
+timestamp
+result
+limitations
+reviewer
+evidence files
+
+======================================================================
+54. CLASSIFICATION ENGINE
+=========================
+
+Classificação deve ser derivada automaticamente:
+
+DEVELOPMENT
+ADVANCED_ENGINEERING
+STATE_OF_ART_CANDIDATE
+STATE_OF_ART
+AAA
+TRIPLE_AAA
+
+Nunca escolhida manualmente.
+
+======================================================================
+55. PROMOTION RULES
+===================
+
+STATE_OF_ART exige:
+
+architecture
+security
+contracts
+unit
+integration
+runtime core
+observability
+release integrity
+
+AAA exige adicionalmente:
+
+multi-worker
+multi-tenant
+DR
+performance
+frontend/accessibility
+supply chain
+independent reviews
+
+TRIPLE_AAA exige adicionalmente:
+
+chaos
+soak
+restore
+distributed failure evidence
+full runtime evidence
+zero unresolved Critical/High
+promotion packet sealed
+
+======================================================================
+56. ZERO CRITICAL/HIGH RULE
+===========================
+
+Nenhum Critical ou High finding pode permanecer aberto.
+
+Medium só pode permanecer se:
+
+documentado
+accepted risk
+owner
+expiry/review date
+
+======================================================================
+57. DOCUMENTATION
+=================
+
+Atualizar:
+
+README.md
+docs/architecture/
+docs/operations/
+docs/security/
+docs/evaluation/
+docs/reports/
+docs/progress/
+
+Documentação deve refletir estado real.
+
+======================================================================
+58. FINAL REPORT
+================
+
+Gerar:
+
+docs/reports/state-of-art-triple-aaa-promotion-report.md
+
+Estrutura:
+
+1. Executive Summary
+2. Candidate Commit
+3. Architecture Status
+4. Runtime Status
+5. PostgreSQL Evidence
+6. Redis Evidence
+7. Object Storage Evidence
+8. Qdrant Evidence
+9. Multi-worker Evidence
+10. Ingestion Evidence
+11. Evidence/Decision Evidence
+12. Security Results
+13. Multi-tenancy Results
+14. Observability Results
+15. Disaster Recovery
+16. Chaos
+17. Soak
+18. Performance
+19. Frontend
+20. Accessibility
+21. Supply Chain
+22. Independent Reviews
+23. Remaining Risks
+24. Blocked External Gates
+25. Final Score
+26. Promotion Decision
+
+======================================================================
+59. SCORECARD
+=============
+
+Pontuar:
+
+Architecture
+Modularity
+Jobs
+Worker
+PostgreSQL
+Redis
+Qdrant
+Object Storage
+Ingestion
+Retrieval
+Evidence
+Decision
+Professor
+Security
+Multi-tenancy
+Observability
+Resilience
+Disaster Recovery
+Performance
+Frontend
+Accessibility
+CI/CD
+Supply Chain
+Documentation
+Production Readiness
+
+Não inflar nota.
+
+======================================================================
+60. TARGET
+==========
+
+Alvo mínimo para recomendação:
+
+Architecture >= 97
+Security >= 97
+Runtime >= 96
+Resilience >= 96
+Observability >= 95
+Infrastructure >= 95
+Production Readiness >= 95
+Overall >= 96
+
+======================================================================
+61. ANTI-GAMING
+===============
+
+Proibido:
+
+remover teste que falha
+reduzir threshold para passar
+trocar integration por mock
+fabricar log
+fabricar screenshot
+fabricar reviewer
+fabricar benchmark
+marcar NOT_RUN como PASS
+marcar BLOCKED_EXTERNAL como PASS
+silenciar erro
+usar unsafe fallback em production
+declarar State of Art no README sem gate
+
+======================================================================
+62. PRIORIDADE
+==============
+
+P0:
+
+1. CI green no commit atual
+2. PostgreSQL live gate
+3. multi-worker fencing
+4. Redis live gate
+5. object storage live gate
+6. Qdrant live gate
+7. durable ingestion E2E
+8. full runtime smoke
+
+P1:
+9. multi-tenancy E2E
+10. distributed observability
+11. DR/restore
+12. chaos
+13. soak
+14. performance
+15. supply chain
+16. frontend runtime evidence
+17. accessibility
+18. independent reviews
+
+P2:
+19. advanced retrieval
+20. confidence calibration
+21. new providers
+22. extra polish
+
+Não executar P2 enquanto P0/P1 críticos estiverem abertos.
+
+======================================================================
+63. IMPLEMENTATION SLICES
+=========================
+
+Sugestão:
+
+Phase 3.1 CI & Release Closure
+Phase 3.2 PostgreSQL Runtime
+Phase 3.3 Multi-worker Fencing
+Phase 3.4 Redis Multi-replica
+Phase 3.5 S3 + Qdrant Runtime
+Phase 3.6 Golden Ingestion Path
+Phase 3.7 Multi-tenancy Gauntlet
+Phase 3.8 Distributed Observability
+Phase 3.9 DR & Restore
+Phase 3.10 Chaos
+Phase 3.11 Soak & Performance
+Phase 3.12 Frontend & Accessibility
+Phase 3.13 Supply Chain
+Phase 3.14 Independent Final Review
+Phase 3.15 Promotion
+
+======================================================================
+64. DEFINITION OF DONE
+======================
+
+O trabalho só está completo quando:
+
+* commit está limpo;
+* canonical CI passou;
+* release evidence é válida;
+* PostgreSQL real foi testado;
+* Redis real foi testado;
+* Qdrant real foi testado;
+* object storage real foi testado;
+* 2 workers passaram fencing;
+* ingestion E2E passou;
+* multi-tenancy E2E passou;
+* observability E2E passou;
+* DR/restore passou;
+* chaos passou;
+* soak passou;
+* performance foi medida;
+* frontend real passou;
+* accessibility passou;
+* supply chain passou;
+* independent reviews passaram;
+* zero Critical/High aberto;
+* final evidence packet foi selado.
+
+======================================================================
+65. PRINCÍPIOS
+==============
+
+Sempre preferir:
+
+evidence > assertion
+runtime proof > static claim
+contracts > hidden coupling
+fail closed > silent fallback
+durability > convenience
+tenant isolation > convenience
+bounded behavior > unlimited behavior
+recovery > optimism
+observability > guessing
+reproducibility > manual success
+small verified slices > giant rewrite
+
+======================================================================
+66. PRIMEIRA AÇÃO
+=================
+
+Sua primeira ação agora é:
+
+1. congelar o HEAD atual;
+2. gerar phase-3-runtime-evidence-current-audit.md;
+3. identificar gates P0/P1/P2;
+4. verificar canonical CI;
+5. criar Phase 3 plan;
+6. só então começar Phase 3.1.
+
+A meta não é produzir mais código.
+
+A meta é transformar:
+
+EXCELLENT ARCHITECTURE
+
+em:
+
+PROVEN RESILIENT INTELLIGENCE PLATFORM.
+
+Somente declare:
+
+TRIPLE_AAA
+
+quando os gates provarem isso.
