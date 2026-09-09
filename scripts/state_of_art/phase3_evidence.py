@@ -52,6 +52,19 @@ RUNTIME_EVIDENCE_STATUSES = frozenset(
         "NOT_RUN",
     }
 )
+RAW_GATE_STATUSES = frozenset(
+    {
+        "PASS",
+        "FAIL",
+        "FAILED",
+        "BLOCKED_EXTERNAL",
+        "PARTIAL",
+        "MISSING",
+        "NOT_RUN",
+        "VERIFIED_RUNTIME",
+        "PROMOTABLE",
+    }
+)
 MAX_RUNTIME_EVIDENCE_AGE_SECONDS = 24 * 60 * 60
 MAX_RUNTIME_EVIDENCE_FUTURE_SKEW_SECONDS = 5 * 60
 
@@ -258,6 +271,10 @@ def parse_matrix(value: Any, *, require_complete: bool = False) -> dict[str, Any
     except MatrixValidationError as exc:
         errors.extend(exc.errors)
         generated_at = ""
+    else:
+        generated_at_errors: list[str] = []
+        _validate_timestamp(generated_at, "matrix.generated_at", generated_at_errors)
+        errors.extend(generated_at_errors)
     capabilities_raw = value.get("capabilities")
     capabilities: list[dict[str, Any]] = []
     if not isinstance(capabilities_raw, Sequence) or isinstance(capabilities_raw, (str, bytes, bytearray)):
@@ -388,6 +405,16 @@ def evaluate_matrix(
     failures: list[str] = []
     rejection_codes: set[str] = set()
     evaluation_time = datetime.now(timezone.utc)
+    generated_at = datetime.fromisoformat(matrix["generated_at"].replace("Z", "+00:00"))
+    generated_age_seconds = (
+        evaluation_time - generated_at.astimezone(timezone.utc)
+    ).total_seconds()
+    if (
+        generated_age_seconds > MAX_RUNTIME_EVIDENCE_AGE_SECONDS
+        or generated_age_seconds < -MAX_RUNTIME_EVIDENCE_FUTURE_SKEW_SECONDS
+    ):
+        failures.append("matrix generated_at is outside current evidence window")
+        rejection_codes.add("STALE_RUNTIME_EVIDENCE_REJECTED")
     candidate = matrix["candidate"]
     expected_head = str(checkout.get("head") or "").lower()
     expected_tree = str(checkout.get("tree") or "").lower()
@@ -623,6 +650,24 @@ def evaluate_matrix(
                                 ):
                                     envelope_errors.append(f"raw_artifacts[{raw_index}].gate_status")
                                     rejection_codes.add("MISSING_EVIDENCE_REJECTED")
+                                else:
+                                    raw_status = raw_payload["status"]
+                                    expected_raw_statuses = {
+                                        "PASS": {"PASS"},
+                                        "VERIFIED_RUNTIME": {"PASS", "VERIFIED_RUNTIME"},
+                                        "PROMOTABLE": {"PASS", "PROMOTABLE"},
+                                        "FAILED": {"FAIL", "FAILED"},
+                                        "BLOCKED_EXTERNAL": {"BLOCKED_EXTERNAL"},
+                                        "PARTIAL": {"PARTIAL"},
+                                        "MISSING": {"MISSING"},
+                                        "NOT_RUN": {"NOT_RUN"},
+                                    }.get(str(runtime_status), set())
+                                    if raw_status not in RAW_GATE_STATUSES:
+                                        envelope_errors.append(f"raw_artifacts[{raw_index}].unsupported_gate_status")
+                                        rejection_codes.add("MISSING_EVIDENCE_REJECTED")
+                                    elif raw_status not in expected_raw_statuses:
+                                        envelope_errors.append(f"raw_artifacts[{raw_index}].status_mismatch")
+                                        rejection_codes.add("MISSING_EVIDENCE_REJECTED")
                         if (
                             isinstance(artifact_digest, str)
                             and raw_digests

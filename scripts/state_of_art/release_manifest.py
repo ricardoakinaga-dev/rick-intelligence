@@ -19,6 +19,35 @@ from typing import Any, Literal
 SHA1_RE = re.compile(r"^[0-9a-f]{40}$", re.IGNORECASE)
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$", re.IGNORECASE)
 MANIFEST_SCHEMA = "state-of-art-release-evidence.v2"
+REQUIRED_GATES = (
+    "architecture",
+    "security",
+    "contracts",
+    "unit",
+    "integration",
+    "multi-worker",
+    "multi-tenant",
+    "redis",
+    "postgresql",
+    "qdrant",
+    "object-storage",
+    "ingestion-e2e",
+    "evidence",
+    "citation",
+    "decision",
+    "observability",
+    "dr",
+    "restore",
+    "chaos",
+    "soak",
+    "performance",
+    "frontend-e2e",
+    "accessibility",
+    "visual",
+    "supply-chain",
+    "release-integrity",
+    "independent-reviews",
+)
 GateStatus = Literal["PASS", "FAIL", "BLOCKED_EXTERNAL", "NOT_RUN", "STALE", "INVALID"]
 ManifestStatus = Literal["PASS", "FAIL", "BLOCKED_EXTERNAL", "NOT_RUN"]
 
@@ -357,6 +386,12 @@ class ReleaseEvidenceManifest:
             errors.append("manifest must contain at least one artifact fingerprint")
         if not self.gates:
             errors.append("manifest must contain at least one gate result")
+        present_gate_ids = {item.gate_id for item in self.gates}
+        missing_gate_ids = [gate_id for gate_id in REQUIRED_GATES if gate_id not in present_gate_ids]
+        if missing_gate_ids:
+            errors.append(
+                "manifest is missing mandatory gate results: " + ", ".join(missing_gate_ids)
+            )
         if not self.reviewers:
             errors.append("manifest must contain at least one reviewer reference")
         if len({item.path for item in self.artifacts}) != len(self.artifacts):

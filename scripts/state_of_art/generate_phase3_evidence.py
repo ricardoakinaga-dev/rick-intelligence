@@ -21,9 +21,11 @@ try:
         evaluate_matrix,
         parse_matrix,
     )
+    from scripts.state_of_art.phase3_runtime_adapter import redact_runtime_value
     from scripts.state_of_art.release_integrity import capture_checkout
 except ImportError:  # pragma: no cover - direct script execution fallback.
     from phase3_evidence import MATRIX_SCHEMA, RUNTIME_EVIDENCE_STATUSES, build_capability, evaluate_matrix, parse_matrix
+    from phase3_runtime_adapter import redact_runtime_value
     from release_integrity import capture_checkout
 
 
@@ -34,6 +36,12 @@ AUDIT_PATH = "docs/reports/phase-3-runtime-evidence-current-audit.md"
 PUBLIC_PLAN_PATH = "docs/plans/phase-3-runtime-evidence-production-promotion.md"
 EXECP_PLAN_PATH = ".agent/plans/phase-3-runtime-evidence-production-promotion.md"
 LOCAL_CHECK_DIR = ".runtime/phase-3/local-checks"
+
+
+def _redacted_tail(value: str) -> str:
+    """Keep local-check diagnostics useful without persisting secrets."""
+
+    return str(redact_runtime_value(value))[-4000:]
 
 
 def _file_hash(root: Path, path: str) -> str:
@@ -294,8 +302,8 @@ def build_matrix(root: Path, *, environment: str = "local-hermetic") -> dict[str
                             "label": label,
                             "command": list(command),
                             "exit_status": completed.returncode,
-                            "stdout": (completed.stdout or "")[-4000:],
-                            "stderr": (completed.stderr or "")[-4000:],
+                            "stdout": _redacted_tail(completed.stdout or ""),
+                            "stderr": _redacted_tail(completed.stderr or ""),
                         }
                     )
                 except (OSError, subprocess.TimeoutExpired) as exc:

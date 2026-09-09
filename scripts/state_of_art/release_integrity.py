@@ -25,10 +25,11 @@ try:  # Package import for tests; script-directory fallback for direct execution
     from scripts.state_of_art.release_manifest import (
         MANIFEST_SCHEMA,
         ManifestValidationError,
+        REQUIRED_GATES,
         ReleaseEvidenceManifest,
     )
 except ImportError:  # pragma: no cover - exercised by the workflow's direct script call.
-    from release_manifest import MANIFEST_SCHEMA, ManifestValidationError, ReleaseEvidenceManifest
+    from release_manifest import MANIFEST_SCHEMA, ManifestValidationError, REQUIRED_GATES, ReleaseEvidenceManifest
 
 
 ROOT = Path(__file__).resolve().parents[2]

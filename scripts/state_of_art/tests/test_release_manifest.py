@@ -15,6 +15,7 @@ from scripts.state_of_art.release_manifest import (
     CommitBinding,
     EvidenceRef,
     GateResult,
+    REQUIRED_GATES,
     ReleaseEvidenceManifest,
     ReviewerRef,
     artifact_set_digest,
@@ -49,17 +50,20 @@ class ReleaseManifestTests(unittest.TestCase):
             sha256=sha256(evidence_path.read_bytes()).hexdigest(),
             description="fixture evidence",
         )
-        gate = GateResult(
-            gate_id="fixture-gate",
-            commit_sha=self.HEAD,
-            artifact_hash=artifact_set_digest((artifact,)),
-            command=("fixture", "gate"),
-            environment="test",
-            timestamp=observed_at,
-            result=gate_result,  # type: ignore[arg-type]
-            limitations=("fixture is not a production run",) if gate_result != "PASS" else (),
-            reviewer=reviewer,
-            evidence_paths=(evidence,),
+        gates = tuple(
+            GateResult(
+                gate_id=gate_id,
+                commit_sha=self.HEAD,
+                artifact_hash=artifact_set_digest((artifact,)),
+                command=("fixture", "gate", gate_id),
+                environment="test",
+                timestamp=observed_at,
+                result=gate_result,  # type: ignore[arg-type]
+                limitations=("fixture is not a production run",) if gate_result != "PASS" else (),
+                reviewer=reviewer,
+                evidence_paths=(evidence,),
+            )
+            for gate_id in REQUIRED_GATES
         )
         manifest = ReleaseEvidenceManifest(
             schema_version="state-of-art-release-evidence.v2",
@@ -74,7 +78,7 @@ class ReleaseManifestTests(unittest.TestCase):
                 clean_worktree=True,
             ),
             artifacts=(artifact,),
-            gates=(gate,),
+            gates=gates,
             reviewers=(reviewer,),
             limitations=("fixture only",),
         )
@@ -137,6 +141,17 @@ class ReleaseManifestTests(unittest.TestCase):
         self.assertEqual(result["classification"], release_integrity.FAIL)
         self.assertIn("current evidence window", result["reason"])
 
+    def test_missing_mandatory_gate_set_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="release-manifest-") as directory:
+            path, checkout = self._fixture(directory)
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            payload["gates"] = payload["gates"][:-1]
+            path.write_text(json.dumps(payload), encoding="utf-8")
+            result = release_integrity.evaluate_evidence(path, checkout, root=Path(directory))
+
+        self.assertEqual(result["classification"], release_integrity.FAIL)
+        self.assertIn("missing mandatory gate results", result["reason"])
+
     def test_WRONG_HASH_REJECTED(self) -> None:
         with tempfile.TemporaryDirectory(prefix="release-manifest-") as directory:
             path, checkout = self._fixture(directory)
@@ -155,7 +170,7 @@ class ReleaseManifestTests(unittest.TestCase):
             result = release_integrity.evaluate_evidence(path, checkout, root=Path(directory))
 
         self.assertEqual(result["classification"], release_integrity.FAIL)
-        self.assertIn("fixture-gate=STALE", result["reason"])
+        self.assertIn("architecture=STALE", result["reason"])
         self.assertIn("STALE_RELEASE_EVIDENCE_REJECTED", result["rejection_codes"])
 
     def test_missing_referenced_evidence_is_rejected(self) -> None:

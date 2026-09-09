@@ -26,6 +26,7 @@ try:
         CommitBinding,
         EvidenceRef,
         GateResult,
+        REQUIRED_GATES,
         ReleaseEvidenceManifest,
         ReviewerRef,
         artifact_set_digest,
@@ -37,6 +38,7 @@ except ImportError:  # pragma: no cover - direct script execution fallback.
         CommitBinding,
         EvidenceRef,
         GateResult,
+        REQUIRED_GATES,
         ReleaseEvidenceManifest,
         ReviewerRef,
         artifact_set_digest,
@@ -112,37 +114,6 @@ DEFAULT_ARTIFACTS = (
     "scripts/state_of_art/phase3_lane.py",
     "scripts/state_of_art/tests/test_phase3_evidence.py",
 )
-REQUIRED_GATES = (
-    "architecture",
-    "security",
-    "contracts",
-    "unit",
-    "integration",
-    "multi-worker",
-    "multi-tenant",
-    "redis",
-    "postgresql",
-    "qdrant",
-    "object-storage",
-    "ingestion-e2e",
-    "evidence",
-    "citation",
-    "decision",
-    "observability",
-    "dr",
-    "restore",
-    "chaos",
-    "soak",
-    "performance",
-    "frontend-e2e",
-    "accessibility",
-    "visual",
-    "supply-chain",
-    "release-integrity",
-    "independent-reviews",
-)
-
-
 def _run(root: Path, command: Sequence[str]) -> tuple[str, int | None, str]:
     try:
         completed = subprocess.run(

@@ -85,6 +85,12 @@ def _redact(value: Any, *, key: str = "") -> Any:
     return str(value)
 
 
+def redact_runtime_value(value: Any) -> Any:
+    """Redact secret-bearing values before they are persisted as evidence."""
+
+    return _redact(value)
+
+
 def _write_json(path: Path, value: Mapping[str, Any]) -> None:
     path.write_text(json.dumps(value, ensure_ascii=False, sort_keys=True, indent=2) + "\n", encoding="utf-8")
 

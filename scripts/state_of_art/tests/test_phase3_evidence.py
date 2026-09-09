@@ -108,7 +108,7 @@ def _fixture(tmp_path: Path) -> tuple[Path, dict[str, object], dict[str, object]
     }
     payload: dict[str, object] = {
         "schema_version": MATRIX_SCHEMA,
-        "generated_at": "2026-09-09T20:00:00+00:00",
+        "generated_at": datetime.now(timezone.utc).isoformat(),
         "environment": "test",
         "source_prompt": "audit.md",
         "source_prompt_sha256": sha256((tmp_path / "audit.md").read_bytes()).hexdigest(),
@@ -151,6 +151,27 @@ def test_wrong_commit_matrix_is_rejected(tmp_path: Path) -> None:
 
     assert result["classification"] == "FAILED"
     assert "WRONG_COMMIT_EVIDENCE_REJECTED" in result["rejection_codes"]
+
+
+def test_stale_matrix_generated_at_is_rejected(tmp_path: Path) -> None:
+    path, payload, checkout = _fixture(tmp_path)
+    payload["generated_at"] = "2000-01-01T00:00:00+00:00"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = evaluate_matrix(path, checkout, root=tmp_path, require_complete=False)
+
+    assert result["classification"] == "FAILED"
+    assert "STALE_RUNTIME_EVIDENCE_REJECTED" in result["rejection_codes"]
+
+
+def test_local_check_diagnostics_are_redacted_before_persistence() -> None:
+    rendered = generate_phase3_evidence._redacted_tail(
+        "DATABASE_URL=postgresql://user:super-secret@example.invalid/db token=another-secret"
+    )
+
+    assert "super-secret" not in rendered
+    assert "another-secret" not in rendered
+    assert "[REDACTED]" in rendered
 
 
 def test_unavailable_checkout_is_rejected_even_when_identity_fields_match(tmp_path: Path) -> None:
@@ -323,7 +344,7 @@ def test_explicit_production_safe_promotable_capability_classifies_promotable(tm
 
 def test_runtime_envelope_requires_checkout_sentinel(tmp_path: Path) -> None:
     path, payload, checkout = _fixture(tmp_path)
-    raw_ref = _raw_ref(tmp_path, "raw-no-sentinel.json")
+    raw_ref = _raw_ref(tmp_path, "raw-no-sentinel.json", status="BLOCKED_EXTERNAL")
     runtime = tmp_path / "runtime-no-sentinel.json"
     runtime_record = _runtime_record(raw_ref, status="BLOCKED_EXTERNAL")
     del runtime_record["checkout_sentinel"]
@@ -344,7 +365,7 @@ def test_runtime_envelope_requires_checkout_sentinel(tmp_path: Path) -> None:
 
 def test_current_label_with_old_runtime_observed_at_is_rejected(tmp_path: Path) -> None:
     path, payload, checkout = _fixture(tmp_path)
-    raw_ref = _raw_ref(tmp_path, "raw-old-observed-at.json")
+    raw_ref = _raw_ref(tmp_path, "raw-old-observed-at.json", status="BLOCKED_EXTERNAL")
     runtime = tmp_path / "runtime-old-observed-at.json"
     runtime.write_text(
         json.dumps(_runtime_record(
@@ -381,7 +402,7 @@ def test_old_capability_observed_at_is_rejected_even_with_current_runtime_envelo
 
 def test_runtime_envelope_requires_nonempty_reviewer_fields(tmp_path: Path) -> None:
     path, payload, checkout = _fixture(tmp_path)
-    raw_ref = _raw_ref(tmp_path, "raw-empty-reviewer.json")
+    raw_ref = _raw_ref(tmp_path, "raw-empty-reviewer.json", status="BLOCKED_EXTERNAL")
     runtime = tmp_path / "runtime-empty-reviewer.json"
     runtime.write_text(
         json.dumps(_runtime_record(
@@ -463,6 +484,30 @@ def test_non_json_raw_artifact_is_rejected_even_when_hash_matches(tmp_path: Path
     assert result["classification"] == "FAILED"
     assert "MISSING_EVIDENCE_REJECTED" in result["rejection_codes"]
     assert "raw_artifacts" in result["reason"]
+
+
+def test_raw_gate_status_must_match_runtime_envelope(tmp_path: Path) -> None:
+    path, payload, checkout = _fixture(tmp_path)
+    raw_ref = _raw_ref(tmp_path, "raw-status-mismatch.json", status="FAIL")
+    runtime = tmp_path / "runtime-status-mismatch.json"
+    runtime.write_text(
+        json.dumps(_runtime_record(raw_ref, production_safe=True)),
+        encoding="utf-8",
+    )
+    payload["capabilities"][0]["status"] = "PROMOTABLE"  # type: ignore[index]
+    payload["capabilities"][0]["reviewer"]["independent"] = True  # type: ignore[index]
+    payload["capabilities"][0]["runtime_evidence"] = [_ref(  # type: ignore[index]
+        tmp_path,
+        "runtime-status-mismatch.json",
+        "runtime envelope with mismatched raw gate status",
+    )]
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = evaluate_matrix(path, checkout, root=tmp_path, require_complete=False)
+
+    assert result["classification"] == "FAILED"
+    assert "status_mismatch" in result["reason"]
+    assert "MISSING_EVIDENCE_REJECTED" in result["rejection_codes"]
 
 
 def test_missing_raw_artifact_is_rejected(tmp_path: Path) -> None:
