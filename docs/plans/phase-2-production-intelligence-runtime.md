@@ -1,13 +1,13 @@
 # Phase 2 — Production Intelligence Runtime Closure
 
-**Status:** `ACTIVE / PLAN AND AUDIT COMPLETE BEFORE BUILD`  
+**Status:** `ACTIVE / PHASE 2.2 LOCAL IMPLEMENTATION VERIFIED`
 **Date:** 2026-09-08  
 **Source prompt:** [`docs/prompts/state-of-art-triple-aaa-2026-09-08.txt`](../prompts/state-of-art-triple-aaa-2026-09-08.txt)  
 **Source prompt SHA-256:** `b222cf1a52c54dc075e2f64896aab1678941371109ff3ac296f922b98dee7513`  
-**Current candidate:** `HEAD 841a3dd` (`main`, synchronized with `origin/main` at audit start)
+**Current candidate:** `HEAD 96bc09c9d90eeb98c186addf2d65b41ed43440cd` plus the current Phase 2.2 dirty packet
 
-This is the canonical Phase 2 plan and current-state audit. It is deliberately
-written before Phase 2.1 implementation. A row marked `PARTIAL`, `MISSING`,
+This is the canonical Phase 2 plan and current-state audit. It is maintained
+as implementation slices advance. A row marked `PARTIAL`, `MISSING`,
 `BLOCKED`, or `NOT RUN` is not a production claim and cannot be promoted by
 the existence of this document.
 
@@ -270,8 +270,8 @@ local scope; it is not a production promotion.
 | P2-A01 | Architecture audit and preservation map | `PARTIAL` | README, migration map, ADR-001..020, dependency-boundary checks | This plan freezes the Phase 2 target; independent architecture review remains. |
 | P2-A02 | Phase 2 plan and implementation slices | `DONE` | This file, prompt hash and matrix | Keep it current as contracts/evidence change. |
 | P2-A03 | `.agent` / `.gauntlet` evidence control | `PARTIAL` | Existing append-only state, gate history and review artifacts | Reconcile current HEAD and add Phase 2 task/evidence records without stale PASS reuse. |
-| P2-P0-01 | Durable job contracts (`Job`, state, attempt, result, failure, lease, repository, queue, executor, scheduler) | `PARTIAL` | `apps/worker/durable_queue.py`, `postgres_queue.py`, ingestion contracts/tests | Canonical `packages/jobs` contract, state vocabulary, adapter parity and production rejection. |
-| P2-P0-02 | Durable queue, retries, backoff, deduplication, leasing, recovery, DLQ and replay | `PARTIAL` | SQLite lease/retry/dead-letter tests and PostgreSQL queue implementation | Disposable PostgreSQL execution, multi-worker fencing, poison-job policy and replay evidence. |
+| P2-P0-01 | Durable job contracts (`Job`, state, attempt, result, failure, lease, repository, queue, executor, scheduler) | `DONE_LOCAL_SCOPE` | `packages/jobs`, 9 focused tests, independent Phase 2.1 review and fingerprinted contract packet | Adapter parity, distributed execution and production rejection remain outside the local contract gate. |
+| P2-P0-02 | Durable queue, retries, backoff, deduplication, leasing, recovery, DLQ and replay | `DONE_LOCAL_SCOPE / BLOCKED_EXTERNAL` | `apps/worker/postgres_jobs.py`, migration `0004`, migration/adapter/static tests, ADR-022, [`phase-2-phase22-review-2026-09-09.md`](../reports/phase-2-phase22-review-2026-09-09.md), fresh I1 approval | Disposable PostgreSQL execution, multi-worker fencing, crash durability, FK/query-plan and live replay/retention evidence. |
 | P2-P0-03 | Real worker lifecycle and bounded execution | `PARTIAL` | `apps/worker/runner.py`, `postgres_runner.py`, lifecycle tests | Canonical composition, startup/readiness, resource limits, crash/restart and operational metrics. |
 | P2-P0-04 | Redis production capability | `PARTIAL` | `packages/locking`, HTTP/Redis seam and local health contracts | Shared Redis client/pool, TLS/auth/namespace, retry/circuit breaker and live health. |
 | P2-P0-05 | Distributed rate limiting | `PARTIAL` | `RateLimiter` protocol and bounded local/injected implementation | Redis atomic buckets, tenant/route policy, multi-replica abuse tests and production rejection of local mode. |
@@ -383,8 +383,11 @@ applicable independent gate can move it to `VERIFIED` or `DONE`.
   strategy, recoverable expiry, dead-letter/replay tooling and retention.
 - **Tests:** migration from empty/prior versions, history divergence, FK
   cross-scope rejection, concurrent claim, duplicate delivery, crash before/
-  after commit and replay.
-- **Gate:** disposable PostgreSQL integration PASS; otherwise `BLOCKED_EXTERNAL`.
+  after commit and replay. The local packet covers the migration runner,
+  static DDL invariants, scoped fake adapter paths, replay and retention
+  projection; live PostgreSQL execution remains unrun.
+- **Gate:** the local I1 review is `APPROVE` for this implementation scope;
+  the disposable PostgreSQL integration gate remains `BLOCKED_EXTERNAL`.
 
 ### Phase 2.3 — Real Worker Runtime
 
@@ -626,8 +629,8 @@ or `BLOCKED_EXTERNAL` by criterion, never “State of Art / Triple AAA”.
 
 ## 18. Immediate next action
 
-The audit/bar is now frozen for the current candidate. The next implementation
-unit is **Phase 2.1 — Durable Job Contracts**, owned sequentially because the
-job state and serialized envelope are shared by the queue, worker, ingestion,
-observability and API. Its completion must be followed by an independent
-contract/runtime critic before Phase 2.2 begins.
+The audit/bar is now frozen for the current candidate. Phase 2.2 is locally
+implemented and independently approved as a bounded slice. The next
+implementation unit is **Phase 2.3 — Real Worker Runtime**, while the
+disposable PostgreSQL migration/concurrency/crash/replay gate remains required
+external evidence before production promotion.

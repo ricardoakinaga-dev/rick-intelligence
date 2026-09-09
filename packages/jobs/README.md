@@ -6,10 +6,10 @@ failures, results, owner-bound leases, and structural interfaces for queues,
 repositories, executors and schedulers.
 
 The package contains no database, Redis, broker, filesystem or vendor client.
-It does not provide durability by itself. The existing SQLite queue remains a
-development/test adapter and the PostgreSQL queue remains an integration
-adapter until each implements this contract and passes the Phase 2 runtime
-gates.
+It does not provide durability by itself. The SQLite queue remains a
+development/test adapter. `apps/worker.PostgresJobQueue` is the reviewed
+PostgreSQL implementation seam, but it remains a local implementation claim
+until disposable PostgreSQL locking, migration, crash and replay gates pass.
 
 ## Contract
 

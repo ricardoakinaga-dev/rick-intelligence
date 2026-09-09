@@ -252,8 +252,9 @@ class PostgresIngestionQueue:
         with self._session(write=True) as (_connection, cursor):
             self._execute(cursor, """
                 SELECT * FROM rick_ingestion_jobs
-                WHERE tenant_id=%s AND idempotency_key=%s FOR UPDATE
-            """, (tenant_id, idempotency_key))
+                WHERE tenant_id=%s AND workspace_id=%s AND collection_id=%s
+                  AND idempotency_key=%s AND contract_state IS NULL FOR UPDATE
+            """, (tenant_id, workspace_id, collection_id, idempotency_key))
             existing = self._one(cursor)
             if existing:
                 record = self._decode(existing)
@@ -261,7 +262,7 @@ class PostgresIngestionQueue:
                     raise PostgresQueueIdempotencyError()
                 replay = True
             else:
-                self._execute(cursor, "SELECT COUNT(*) AS count FROM rick_ingestion_jobs WHERE status IN ('queued','leased','processing')")
+                self._execute(cursor, "SELECT COUNT(*) AS count FROM rick_ingestion_jobs WHERE contract_state IS NULL AND status IN ('queued','leased','processing')")
                 count_row = self._one(cursor)
                 if int((count_row or {}).get("count", 0)) >= self.max_pending:
                     raise PostgresQueueCapacityError()
@@ -293,7 +294,7 @@ class PostgresIngestionQueue:
             SET status = CASE WHEN attempts >= %s THEN 'dead' ELSE 'queued' END,
                 lease_until = NULL, lease_owner = NULL,
                 last_error_code = 'lease_expired', updated_at = NOW()
-            WHERE status IN ('leased','processing') AND lease_until IS NOT NULL AND lease_until <= NOW()
+            WHERE contract_state IS NULL AND status IN ('leased','processing') AND lease_until IS NOT NULL AND lease_until <= clock_timestamp()
         """, (self.max_attempts,))
         return max(0, int(getattr(cursor, "rowcount", 0) or 0))
 
@@ -305,7 +306,7 @@ class PostgresIngestionQueue:
             recovered = self._recover_expired(cursor)
             self._execute(cursor, """
                 SELECT job_id FROM rick_ingestion_jobs
-                WHERE status='queued' AND available_at <= NOW()
+                WHERE contract_state IS NULL AND status='queued' AND available_at <= clock_timestamp()
                 ORDER BY created_at, job_id
                 LIMIT %s FOR UPDATE SKIP LOCKED
             """, (limit,))
@@ -318,9 +319,9 @@ class PostgresIngestionQueue:
                 self._execute(cursor, """
                     UPDATE rick_ingestion_jobs
                     SET status='leased', attempts=attempts+1,
-                        lease_until=NOW() + (%s * INTERVAL '1 second'),
+                        lease_until=clock_timestamp() + (%s * INTERVAL '1 second'),
                         lease_owner=%s, updated_at=NOW()
-                    WHERE job_id=%s AND status='queued'
+                    WHERE job_id=%s AND contract_state IS NULL AND status='queued'
                     RETURNING *
                 """, (self.lease_seconds, owner, job_id))
                 row = self._one(cursor)
@@ -339,9 +340,9 @@ class PostgresIngestionQueue:
         with self._session(write=True) as (_connection, cursor):
             self._execute(cursor, """
                 UPDATE rick_ingestion_jobs
-                SET lease_until=NOW() + (%s * INTERVAL '1 second'), updated_at=NOW()
-                WHERE job_id=%s AND status IN ('leased','processing')
-                  AND lease_owner=%s AND lease_until > NOW()
+                SET lease_until=clock_timestamp() + (%s * INTERVAL '1 second'), updated_at=NOW()
+                WHERE job_id=%s AND contract_state IS NULL AND status IN ('leased','processing')
+                  AND lease_owner=%s AND lease_until > clock_timestamp()
                 RETURNING *
             """, (self.lease_seconds, job_id, lease_token))
             row = self._one(cursor)
@@ -360,8 +361,8 @@ class PostgresIngestionQueue:
             self._execute(cursor, """
                 UPDATE rick_ingestion_jobs
                 SET status='processing', updated_at=NOW()
-                WHERE job_id=%s AND status='leased' AND lease_owner=%s
-                  AND lease_until > NOW()
+                WHERE job_id=%s AND contract_state IS NULL AND status='leased' AND lease_owner=%s
+                  AND lease_until > clock_timestamp()
                 RETURNING *
             """, (job_id, lease_token))
             row = self._one(cursor)
@@ -388,8 +389,8 @@ class PostgresIngestionQueue:
             self._execute(cursor, """
                 UPDATE rick_ingestion_jobs
                 SET document_id=%s, updated_at=NOW()
-                WHERE job_id=%s AND status='processing' AND lease_owner=%s
-                  AND lease_until > NOW()
+                WHERE job_id=%s AND contract_state IS NULL AND status='processing' AND lease_owner=%s
+                  AND lease_until > clock_timestamp()
                 RETURNING *
             """, (document_id, job_id, lease_token))
             row = self._one(cursor)
@@ -408,7 +409,7 @@ class PostgresIngestionQueue:
         lease_token = _text(lease_token, maximum=256)
         error = _text(error, maximum=64).lower()
         with self._session(write=True) as (_connection, cursor):
-            self._execute(cursor, "SELECT * FROM rick_ingestion_jobs WHERE job_id=%s AND lease_owner=%s AND status IN ('leased','processing') FOR UPDATE", (job_id, lease_token))
+            self._execute(cursor, "SELECT * FROM rick_ingestion_jobs WHERE job_id=%s AND contract_state IS NULL AND lease_owner=%s AND status IN ('leased','processing') AND lease_until > clock_timestamp() FOR UPDATE", (job_id, lease_token))
             row = self._one(cursor)
             if row is None:
                 raise PostgresQueueLeaseError()
@@ -421,13 +422,15 @@ class PostgresIngestionQueue:
                 available = self.backoff_seconds * (2 ** max(0, attempts - 1))
             self._execute(cursor, """
                 UPDATE rick_ingestion_jobs
-                SET status=%s, available_at=COALESCE(NOW() + (%s * INTERVAL '1 second'), available_at),
+                SET status=%s, available_at=COALESCE(clock_timestamp() + (%s * INTERVAL '1 second'), available_at),
                     lease_until=NULL, lease_owner=NULL, last_error_code=%s, updated_at=NOW()
-                WHERE job_id=%s RETURNING *
-            """, (status, available, error, job_id))
+                WHERE job_id=%s AND contract_state IS NULL
+                  AND status IN ('leased','processing') AND lease_owner=%s
+                  AND lease_until > clock_timestamp() RETURNING *
+            """, (status, available, error, job_id, lease_token))
             result_row = self._one(cursor)
             if result_row is None:
-                raise PostgresQueueError()
+                raise PostgresQueueLeaseError()
             result = self._decode(result_row)
         self._emit("worker.queue.dead" if status == "dead" else "worker.queue.failed",
                    job_ref=opaque_ref(job_id), status=result.status, attempts=result.attempts, error=error)
@@ -442,7 +445,8 @@ class PostgresIngestionQueue:
             self._execute(cursor, """
                 UPDATE rick_ingestion_jobs
                 SET status=%s, lease_until=NULL, lease_owner=NULL, updated_at=NOW()
-                WHERE job_id=%s AND status IN ('leased','processing') AND lease_owner=%s
+                WHERE job_id=%s AND contract_state IS NULL AND status IN ('leased','processing')
+                  AND lease_owner=%s AND lease_until > clock_timestamp()
                 RETURNING *
             """, (status, job_id, lease_token))
             row = self._one(cursor)
@@ -478,9 +482,9 @@ class PostgresIngestionQueue:
             )
         with self._session(write=True) as (_connection, cursor):
             if lease_token:
-                self._execute(cursor, "UPDATE rick_ingestion_jobs SET status='cancelled', lease_until=NULL, lease_owner=NULL, updated_at=NOW() WHERE job_id=%s AND status IN ('queued','leased','processing') AND (status='queued' OR lease_owner=%s)" + scope_clause + " RETURNING *", (job_id, lease_token, *scope_params))
+                self._execute(cursor, "UPDATE rick_ingestion_jobs SET status='cancelled', lease_until=NULL, lease_owner=NULL, updated_at=NOW() WHERE job_id=%s AND contract_state IS NULL AND status IN ('queued','leased','processing') AND (status='queued' OR (lease_owner=%s AND lease_until > clock_timestamp()))" + scope_clause + " RETURNING *", (job_id, lease_token, *scope_params))
             else:
-                self._execute(cursor, "UPDATE rick_ingestion_jobs SET status='cancelled', lease_until=NULL, lease_owner=NULL, updated_at=NOW() WHERE job_id=%s AND status='queued'" + scope_clause + " RETURNING *", (job_id, *scope_params))
+                self._execute(cursor, "UPDATE rick_ingestion_jobs SET status='cancelled', lease_until=NULL, lease_owner=NULL, updated_at=NOW() WHERE job_id=%s AND contract_state IS NULL AND status='queued'" + scope_clause + " RETURNING *", (job_id, *scope_params))
             row = self._one(cursor)
             if row is None:
                 raise PostgresQueueLeaseError()
@@ -498,12 +502,12 @@ class PostgresIngestionQueue:
         job_id = _text(job_id, maximum=128)
         if (tenant_id is None) != (workspace_id is None):
             raise PostgresQueueError("invalid_input")
-        where = "job_id=%s"
+        where = "contract_state IS NULL AND job_id=%s"
         params: tuple[object, ...] = (job_id,)
         if tenant_id is not None:
             tenant_id = _text(tenant_id, maximum=128)
             workspace_id = _text(workspace_id, maximum=128)
-            where = "job_id=%s AND tenant_id=%s AND workspace_id=%s"
+            where = "contract_state IS NULL AND job_id=%s AND tenant_id=%s AND workspace_id=%s"
             params = (job_id, tenant_id, workspace_id)
         with self._session() as (_connection, cursor):
             self._execute(cursor, f"SELECT * FROM rick_ingestion_jobs WHERE {where} LIMIT 1", params)
@@ -528,6 +532,7 @@ class PostgresIngestionQueue:
         query = "SELECT * FROM rick_ingestion_jobs"
         params: list[object] = []
         clauses: list[str] = []
+        clauses.append("contract_state IS NULL")
         if tenant_id is not None:
             clauses.extend(("tenant_id=%s", "workspace_id=%s"))
             params.extend((_text(tenant_id, maximum=128), _text(workspace_id, maximum=128)))

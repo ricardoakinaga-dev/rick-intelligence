@@ -111,6 +111,7 @@ def test_enqueue_is_idempotent_and_keeps_payload_opaque():
     assert created == repeated
     assert first.commits == 1 and replay.commits == 1
     assert "guide.md" not in first.cursor_instance.queries[2][0]
+    assert all("contract_state IS NULL" in query for query, _params in first.cursor_instance.queries[:2])
 
 
 def test_claim_requires_owner_for_heartbeat_and_ack():
@@ -137,6 +138,7 @@ def test_claim_requires_owner_for_heartbeat_and_ack():
     assert published.status == "published"
     assert published.terminal
     assert "FOR UPDATE SKIP LOCKED" in claim.cursor_instance.queries[1][0]
+    assert all("contract_state IS NULL" in query for query, _params in claim.cursor_instance.queries)
 
 
 def test_wrong_lease_rolls_back_and_does_not_ack():

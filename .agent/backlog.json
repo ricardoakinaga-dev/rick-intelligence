@@ -639,6 +639,35 @@
         "target": "packages/jobs/src/rick_jobs/contracts.py",
         "completion_signal": "A concrete adapter-differential or runtime finding requires a scoped contract correction"
       }
+    },
+    {
+      "id": "PH2-P0-02-POSTGRES-ADAPTER",
+      "title": "Implement and independently verify the canonical PostgreSQL jobs adapter",
+      "stage": "BUILD",
+      "priority": "P0",
+      "status": "BLOCKED",
+      "origin": "Phase 2 production-intelligence runtime plan and frozen P2-P0-02 acceptance bar",
+      "dependencies": [
+        "PH2-P0-01-JOBS-CONTRACT"
+      ],
+      "owner": "Codex lead",
+      "acceptance_summary": "Scoped durable queue, migration, lease fencing, attempt history, replay, retention and lifecycle projections pass local implementation review; live PostgreSQL evidence remains separately gated.",
+      "evidence_refs": [
+        "docs/plans/phase-2-production-intelligence-runtime.md",
+        "docs/reports/phase-2-audit-2026-09-08.md",
+        "docs/reports/phase-2-phase22-review-2026-09-09.md",
+        "docs/architecture/adr/ADR-022-postgres-jobs-adapter.md",
+        "apps/worker/postgres_jobs.py",
+        "infrastructure/migrations/0004_durable_jobs_contract.sql",
+        ".agent/verification.jsonl#VER-PH2-P0-02-POSTGRES-ADAPTER-I1-APPROVED-20260909"
+      ],
+      "next_action": {
+        "id": "PH2-P0-02-POSTGRES-ADAPTER:WAIT_RUNTIME",
+        "kind": "WAIT",
+        "summary": "Run the disposable PostgreSQL migration, locking, crash, FK, replay and retention gate when the environment is available",
+        "target": "infrastructure/migrations/0004_durable_jobs_contract.sql",
+        "completion_signal": "A usable PostgreSQL driver/client and accessible disposable database produce current migration, concurrency, crash, replay and retention evidence"
+      }
     }
   ]
 }

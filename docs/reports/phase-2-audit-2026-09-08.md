@@ -1,7 +1,7 @@
 # Phase 2 audit — Production Intelligence Runtime Closure
 
-**Date:** 2026-09-08  
-**Audited candidate:** `HEAD 841a3dd59dcbef07418f6afec47214299e1e3dbd` plus the current untracked Phase 2 plan/prompt artifacts  
+**Date:** 2026-09-09
+**Audited candidate:** `HEAD 96bc09c9d90eeb98c186addf2d65b41ed43440cd` plus the current Phase 2.2 dirty implementation packet
 **Source:** [`docs/prompts/state-of-art-triple-aaa-2026-09-08.txt`](../prompts/state-of-art-triple-aaa-2026-09-08.txt)  
 **Canonical plan:** [`docs/plans/phase-2-production-intelligence-runtime.md`](../plans/phase-2-production-intelligence-runtime.md)
 
@@ -18,12 +18,17 @@ of the current candidate.
 Baseline checks executed locally:
 
 - `make validate` — `PASS`; root boundaries and control plane validated with
-  10/10 checks, 30 historical files, 220 execution events and 211 verification
-  records.
+  10/10 checks, 30 historical files, 225 execution events and 213 verification
+  records after the Phase 2.2 review binding.
 - `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=packages/jobs/src python3 -m pytest -q -p no:cacheprovider packages/jobs/tests` — `PASS`, 9 tests.
 - `PYTHONDONTWRITEBYTECODE=1 python3 -m compileall -q packages/jobs/src` — `PASS`.
-- `git diff --check` — `PASS` for the new Phase 2 plan, prompt copy, jobs
-  package and ADR.
+- `make jobs-test` — `PASS`, 16 tests covering the canonical PostgreSQL adapter
+  double and the 9 contract tests.
+- `make api16-worker` — `PASS`, 52 worker/API health tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -q -p no:cacheprovider infrastructure/scripts/tests` — `PASS`, 23 tests including migration history divergence, rollback and schema assertions.
+- `make ops-static` — `PASS`; migration checksums report 4 files and live
+  execution remains `NOT_RUN`.
+- `git diff --check` — `PASS` for the current dirty packet.
 - No external service, provider, corpus, production-like Compose, restore,
   chaos, soak or assistive-technology run was performed in this audit.
 
@@ -41,12 +46,40 @@ reconstruction and metadata rejection.
 This is a local contract approval only. No adapter, database, broker, worker,
 recovery, observability or production promotion claim follows from it.
 
+## Phase 2.2 local implementation packet
+
+The bounded local slice adds `PostgresJobQueue` as the canonical adapter while
+preserving the legacy facade for the Phase 2.3 worker migration. Migration
+0004 keeps `rick_ingestion_jobs` as the authority, archives the empty competing
+0001 queue table, adds the operation/state/version/result/failure/lease fields,
+replaces tenant-wide idempotency with complete scope, enforces composite job to
+document scope, records bounded attempt history, and creates lifecycle
+outbox/event/audit coupling. Adapter mutations use scope predicates, advisory
+serialization for scoped producers, optimistic versions, owner-bound lease
+fencing, expiry recovery, explicit retry/DLQ transitions, authorized replay
+clones and bounded terminal pruning.
+
+The local packet is not a PostgreSQL execution gate. No disposable PostgreSQL
+driver/container is available in the current environment, so row locks,
+transaction isolation, FK rejection, query plans, concurrent producers,
+two-worker claims and crash-before/after-commit behavior remain `NOT_RUN` or
+`BLOCKED_EXTERNAL`.
+
+The fresh I1 review in [`phase-2-phase22-review-2026-09-09.md`](phase-2-phase22-review-2026-09-09.md)
+approved the exact local packet with no remaining P0/P1/P2 finding. The packet
+keeps pre-existing and newly written legacy rows in a NULL canonical-state
+lane, fences the legacy and canonical writers separately, uses
+`clock_timestamp()` for lease decisions, protects attempt history with SQL
+triggers and deferred count/contiguity checks, and projects heartbeat and
+retention actions to lifecycle, outbox and audit records in the same
+transaction.
+
 ## Consolidated matrix
 
 | Area | State | Current observation | Required next proof |
 | --- | --- | --- | --- |
 | Phase 2 plan and capability matrix | `DONE_LOCAL_SCOPE` | The canonical plan contains context, target architecture, invariants, matrix, slices, gates, rollback and exit criteria. | Keep it synchronized with each integrated slice. |
-| Durable jobs | `DONE_LOCAL_CONTRACT / PARTIAL_RUNTIME` | Local SQLite and PostgreSQL queue implementations have bounded idempotency/lease behavior; the Phase 2.1 adapter-neutral `rick_jobs` contract is independently approved for its local bar. | Integrate adapters, normalize state vocabulary, execute PostgreSQL concurrency/recovery and multi-worker tests. |
+| Durable jobs | `DONE_LOCAL_SCOPE / BLOCKED_EXTERNAL` | Phase 2.1 contract and Phase 2.2 canonical PostgreSQL adapter are independently approved for local scope; migration 0004, attempt history, outbox/audit coupling, replay/retention and focused tests are current. | Execute PostgreSQL migration/concurrency/recovery/FK/crash/replay gates and complete worker composition. |
 | Worker runtime | `PARTIAL/BLOCKED_EXTERNAL` | PostgreSQL worker has polling, heartbeat, timeout and shutdown seams; no reviewed production factory is wired. | Canonical composition, startup/readiness, crash/restart, cancellation, dead-letter and real health evidence. |
 | Redis coordination/rate limits | `PARTIAL/MISSING` | Owner-safe Redis lease adapter exists; no Redis-backed rate limiter or complete shared client policy exists. | Atomic distributed limiter, required production injection, namespace/TLS/auth/retry and multi-replica abuse tests. |
 | Qdrant | `PARTIAL` | HTTP adapter validates scopes and payloads; live operations and schema/index lifecycle are absent. | Collection/schema migration, alias/reindex, retries/circuit behavior and disposable live integration. |
@@ -88,7 +121,6 @@ recovery, observability or production promotion claim follows from it.
 ## Decision
 
 The audit result is **`CONDITIONAL / NO-GO FOR PROMOTION`**. Local implementation
-may continue under the frozen Phase 2 plan. The next required implementation
-slice is Phase 2.2 adapter integration into the existing queue/worker seams;
-no P2 retrieval experiment or production label is justified before P0 runtime
-closure.
+may continue under the frozen Phase 2 plan. The next implementation slice is
+Phase 2.3 worker composition; the disposable PostgreSQL gate and the remaining
+P0 runtime gates still block production promotion.

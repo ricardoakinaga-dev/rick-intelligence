@@ -64,9 +64,44 @@ def apply(directory: Path, dsn: str) -> int:
                    checksum TEXT NOT NULL, application TEXT NOT NULL)"""
             )
             cursor.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", ("rick-intelligence:migrations",))
+            cursor.execute(
+                "SELECT version, checksum, application "
+                "FROM rick_schema_migrations ORDER BY version"
+            )
+            applied_rows = cursor.fetchall()
+            applied: dict[str, tuple[str, str]] = {}
+            for applied_row in applied_rows:
+                if len(applied_row) < 3:
+                    raise RuntimeError("migration history row is malformed")
+                applied_version, applied_checksum, application = applied_row[:3]
+                if application != APPLICATION:
+                    raise RuntimeError(
+                        f"migration history application mismatch for {applied_version}"
+                    )
+                if applied_version in applied:
+                    raise RuntimeError(f"duplicate migration history version {applied_version}")
+                applied[applied_version] = (applied_checksum, application)
+            local_versions = {version for version, _path, _digest in rows}
+            unknown = sorted(set(applied) - local_versions)
+            if unknown:
+                raise RuntimeError(
+                    "migration history contains unknown version(s): " + ", ".join(unknown)
+                )
+            ordered_versions = [version for version, _path, _digest in rows]
+            if applied:
+                highest_applied = max(applied)
+                missing_prior = [
+                    version
+                    for version in ordered_versions
+                    if version <= highest_applied and version not in applied
+                ]
+                if missing_prior:
+                    raise RuntimeError(
+                        "migration history has a gap before "
+                        f"{highest_applied}: {', '.join(missing_prior)}"
+                    )
             for version, path, digest in rows:
-                cursor.execute("SELECT checksum FROM rick_schema_migrations WHERE version=%s", (version,))
-                current = cursor.fetchone()
+                current = applied.get(version)
                 if current and current[0] != digest:
                     raise RuntimeError(f"checksum mismatch for migration {version}")
                 if current:

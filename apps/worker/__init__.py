@@ -24,6 +24,28 @@ from .postgres_queue import (
     PostgresQueueLeaseError,
     QueueHealth,
 )
+try:
+    from .postgres_jobs import (
+        PostgresCanonicalJobQueue,
+        PostgresJobConcurrencyError,
+        PostgresJobCorruptionError,
+        PostgresJobError,
+        PostgresJobIdempotencyError,
+        PostgresJobLeaseError,
+        PostgresJobNotFoundError,
+        PostgresJobQueue,
+    )
+except ModuleNotFoundError as exc:  # pragma: no cover - legacy worker path
+    if exc.name != "rick_jobs":
+        raise
+    _CANONICAL_EXPORTS: list[str] = []
+else:
+    _CANONICAL_EXPORTS = [
+        "PostgresCanonicalJobQueue", "PostgresJobQueue", "PostgresJobError",
+        "PostgresJobConcurrencyError", "PostgresJobCorruptionError",
+        "PostgresJobIdempotencyError", "PostgresJobLeaseError",
+        "PostgresJobNotFoundError",
+    ]
 from .postgres_runner import PostgresIngestionWorker, WorkerBatchResult
 
 from .runner import (
@@ -68,4 +90,4 @@ __all__ = [
     "PostgresQueueCapacityError", "PostgresQueueIdempotencyError",
     "PostgresQueueLeaseError", "QueueHealth",
     "PostgresIngestionWorker", "WorkerBatchResult",
-]
+] + _CANONICAL_EXPORTS

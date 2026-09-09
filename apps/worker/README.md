@@ -25,3 +25,17 @@ wired to the API telemetry ring separately. An external broker or reviewed
 database deployment is required for multi-instance production operation. The
 local worker event streams are therefore bounded composition seams, not a
 distributed telemetry guarantee.
+
+`PostgresJobQueue` is the canonical `rick_jobs` adapter. It uses the existing
+`rick_ingestion_jobs` authority, the `0004` contract migration, scoped
+idempotency, optimistic versions, owner-bound leases, `FOR UPDATE SKIP
+LOCKED`, durable attempt history, lifecycle outbox/audit rows, dead-letter
+replay, and bounded terminal retention. It receives a DB-API connection
+factory from the composition root and never discovers credentials itself. The
+legacy `PostgresIngestionQueue` remains a compatibility facade until the
+Phase 2.3 worker runtime is migrated. Disposable PostgreSQL concurrency and
+crash evidence is still required before this adapter is called production
+ready. Rows already present during migration and rows still written by the
+legacy facade retain a null canonical state projection; both the legacy writer
+and canonical adapter filter their own lanes, and Phase 2.3 must rewrite the
+legacy rows with attempt history before switching callers.
