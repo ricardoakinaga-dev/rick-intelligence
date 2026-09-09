@@ -40,6 +40,18 @@ REQUIRED_CAPABILITY_IDS = frozenset(
     | {"P2-01"}
 )
 RUNTIME_EVIDENCE_SCHEMA = "state-of-art-runtime-evidence.v1"
+RUNTIME_EVIDENCE_STATUSES = frozenset(
+    {
+        "PASS",
+        "VERIFIED_RUNTIME",
+        "PROMOTABLE",
+        "PARTIAL",
+        "MISSING",
+        "BLOCKED_EXTERNAL",
+        "FAILED",
+        "NOT_RUN",
+    }
+)
 
 
 class MatrixValidationError(ValueError):
@@ -450,18 +462,39 @@ def evaluate_matrix(
                     envelope_errors: list[str] = []
                     if runtime_record.get("schema_version") != RUNTIME_EVIDENCE_SCHEMA:
                         envelope_errors.append("schema_version")
-                    if runtime_record.get("record_id") in {None, ""}:
+                    if not isinstance(runtime_record.get("record_id"), str) or not runtime_record["record_id"].strip():
                         envelope_errors.append("record_id")
                     if runtime_record.get("capability_id") != capability_id:
                         envelope_errors.append("capability_id")
-                    if runtime_record.get("status") not in {"PASS", "VERIFIED_RUNTIME", "PROMOTABLE"}:
+                    runtime_status = runtime_record.get("status")
+                    if runtime_status not in RUNTIME_EVIDENCE_STATUSES:
                         envelope_errors.append("status")
                     runtime_commit = runtime_record.get("commit_sha")
                     if not isinstance(runtime_commit, str) or runtime_commit.lower() != candidate["commit_sha"]:
                         envelope_errors.append("commit_sha")
                         rejection_codes.add("WRONG_COMMIT_EVIDENCE_REJECTED")
-                    if runtime_record.get("exit_status") != 0:
+                    runtime_tree = runtime_record.get("tree_sha")
+                    if not isinstance(runtime_tree, str) or runtime_tree.lower() != candidate["tree_sha"]:
+                        envelope_errors.append("tree_sha")
+                        rejection_codes.add("WRONG_COMMIT_EVIDENCE_REJECTED")
+                    runtime_fingerprint = runtime_record.get("checkout_fingerprint")
+                    if (
+                        not isinstance(runtime_fingerprint, str)
+                        or runtime_fingerprint.lower() != candidate["checkout_fingerprint"]
+                    ):
+                        envelope_errors.append("checkout_fingerprint")
+                        rejection_codes.add("WRONG_COMMIT_EVIDENCE_REJECTED")
+                    runtime_exit_status = runtime_record.get("exit_status")
+                    if type(runtime_exit_status) is not int or runtime_exit_status < 0:
                         envelope_errors.append("exit_status")
+                    if runtime_status in {"PASS", "VERIFIED_RUNTIME", "PROMOTABLE"} and runtime_exit_status != 0:
+                        envelope_errors.append("successful status requires exit_status=0")
+                    if item["status"] in {"VERIFIED_RUNTIME", "PROMOTABLE"} and runtime_status not in {
+                        "PASS",
+                        "VERIFIED_RUNTIME",
+                        "PROMOTABLE",
+                    }:
+                        envelope_errors.append("promoted capability requires successful runtime status")
                     if not isinstance(runtime_record.get("procedure"), str) or not runtime_record["procedure"].strip():
                         envelope_errors.append("procedure")
                     observed_at = runtime_record.get("observed_at")
@@ -477,6 +510,7 @@ def evaluate_matrix(
                         or not isinstance(runtime_reviewer.get("id"), str)
                         or not isinstance(runtime_reviewer.get("kind"), str)
                         or not isinstance(runtime_reviewer.get("name"), str)
+                        or not isinstance(runtime_reviewer.get("independent"), bool)
                     ):
                         envelope_errors.append("reviewer")
                     if envelope_errors:

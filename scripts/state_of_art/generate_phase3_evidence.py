@@ -16,13 +16,14 @@ from typing import Any
 try:
     from scripts.state_of_art.phase3_evidence import (
         MATRIX_SCHEMA,
+        RUNTIME_EVIDENCE_STATUSES,
         build_capability,
         evaluate_matrix,
         parse_matrix,
     )
     from scripts.state_of_art.release_integrity import capture_checkout
 except ImportError:  # pragma: no cover - direct script execution fallback.
-    from phase3_evidence import MATRIX_SCHEMA, build_capability, evaluate_matrix, parse_matrix
+    from phase3_evidence import MATRIX_SCHEMA, RUNTIME_EVIDENCE_STATUSES, build_capability, evaluate_matrix, parse_matrix
     from release_integrity import capture_checkout
 
 
@@ -106,6 +107,7 @@ def _capability_definitions() -> tuple[dict[str, Any], ...]:
             "status": "BLOCKED_EXTERNAL",
             "code_tests": ["infrastructure/migrations/0004_durable_jobs_contract.sql", "apps/worker/postgres_jobs.py", "scripts/phase11/postgres_runtime_gate.py", "scripts/state_of_art/run_phase3_postgres.py"],
             "artifacts": common + [("scripts/phase11/postgres_runtime_gate.py", "PostgreSQL runtime gate"), ("scripts/state_of_art/run_phase3_postgres.py", "Phase 3 commit-bound PostgreSQL evidence adapter")],
+            "runtime_evidence": [(".runtime/phase-3/postgres-runtime-evidence.json", "PostgreSQL runtime evidence envelope")],
             "limitations": "No live PostgreSQL DSN or client runtime is available for migration, lock, concurrency or crash evidence; the Phase 3 adapter remains a blocked diagnostic.",
             "next_action": "Execute the disposable Postgres migration/concurrency/recovery matrix and bind the resulting envelope to an independent review.",
         },
@@ -251,8 +253,27 @@ def build_matrix(root: Path, *, environment: str = "local-hermetic") -> dict[str
     for definition in _capability_definitions():
         status = definition["status"]
         artifact_paths = list(definition["artifacts"])
+        runtime_paths: list[tuple[str, str]] = []
         local_checks = tuple(definition.get("local_checks", ()))
         check_results: list[dict[str, Any]] = []
+        runtime_observation: dict[str, Any] | None = None
+        for runtime_path, runtime_description in definition.get("runtime_evidence", ()):
+            runtime_target = root / runtime_path
+            if not runtime_target.is_file():
+                continue
+            runtime_paths.append((runtime_path, runtime_description))
+            try:
+                runtime_observation = json.loads(runtime_target.read_text(encoding="utf-8"))
+            except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+                runtime_observation = None
+            if isinstance(runtime_observation, dict) and runtime_observation.get("status") in {
+                "PASS",
+                "VERIFIED_RUNTIME",
+                "PROMOTABLE",
+            }:
+                if status == "BLOCKED_EXTERNAL":
+                    status = "PARTIAL"
+                break
         if local_checks:
             for label, command in local_checks:
                 try:
@@ -323,6 +344,18 @@ def build_matrix(root: Path, *, environment: str = "local-hermetic") -> dict[str
             exit_status = 0
             procedure = "local structural, static or hermetic verification procedure"
         limitations = definition["limitations"]
+        if runtime_paths:
+            runtime_status = runtime_observation.get("status") if isinstance(runtime_observation, dict) else None
+            if runtime_status in RUNTIME_EVIDENCE_STATUSES:
+                raw_exit_status = runtime_observation.get("exit_status")
+                exit_status = raw_exit_status if type(raw_exit_status) is int and raw_exit_status >= 0 else None
+                procedure = (
+                    "attached runtime evidence envelope observation; independent review is required before promotion"
+                )
+            else:
+                procedure = "attached runtime evidence path could not be parsed as a valid envelope"
+                exit_status = None
+            limitations += " Runtime evidence is attached only as a commit-bound observation; independent review is required for runtime promotion."
         if local_checks and status == "FAILED":
             limitations += " One or more required local checks returned non-zero; the row is not locally verified."
         capabilities.append(
@@ -339,6 +372,7 @@ def build_matrix(root: Path, *, environment: str = "local-hermetic") -> dict[str
                 reviewer=reviewer,
                 limitations=limitations,
                 next_action=definition["next_action"],
+                runtime_paths=runtime_paths,
                 procedure=procedure,
                 exit_status=exit_status,
                 observed_at=observed_at,

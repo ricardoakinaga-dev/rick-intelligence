@@ -175,10 +175,15 @@ def test_verified_runtime_accepts_distinct_bound_envelope_with_independent_revie
         "capability_id": "P0-TEST",
         "status": "PASS",
         "commit_sha": HEAD,
+        "tree_sha": TREE,
+        "checkout_fingerprint": CHECKOUT,
+        "environment": "fixture-runtime",
         "procedure": "fixture runtime procedure",
         "exit_status": 0,
         "observed_at": "2026-09-09T20:00:00+00:00",
         "reviewer": {"id": "runner", "kind": "automated", "name": "fixture runner", "independent": False},
+        "limitations": "fixture is local only",
+        "next_action": "run an independent review",
     }), encoding="utf-8")
     payload["capabilities"][0]["status"] = "VERIFIED_RUNTIME"  # type: ignore[index]
     payload["capabilities"][0]["reviewer"]["independent"] = True  # type: ignore[index]
@@ -189,6 +194,65 @@ def test_verified_runtime_accepts_distinct_bound_envelope_with_independent_revie
 
     assert result["classification"] == "PROMOTABLE"
     assert result["rejection_codes"] == []
+
+
+def test_blocked_runtime_envelope_is_bound_without_becoming_a_pass(tmp_path: Path) -> None:
+    path, payload, checkout = _fixture(tmp_path)
+    runtime = tmp_path / "runtime-blocked.json"
+    runtime.write_text(json.dumps({
+        "schema_version": "state-of-art-runtime-evidence.v1",
+        "record_id": "runtime-fixture-blocked-1",
+        "capability_id": "P0-TEST",
+        "status": "BLOCKED_EXTERNAL",
+        "commit_sha": HEAD,
+        "tree_sha": TREE,
+        "checkout_fingerprint": CHECKOUT,
+        "environment": "fixture-runtime",
+        "procedure": "fixture runtime procedure was not executable",
+        "exit_status": 2,
+        "observed_at": "2026-09-09T20:00:00+00:00",
+        "reviewer": {"id": "runner", "kind": "automated", "name": "fixture runner", "independent": False},
+        "limitations": "fixture dependency is unavailable",
+        "next_action": "provide the dependency",
+    }), encoding="utf-8")
+    payload["capabilities"][0]["status"] = "BLOCKED_EXTERNAL"  # type: ignore[index]
+    payload["capabilities"][0]["runtime_evidence"] = [_ref(tmp_path, "runtime-blocked.json", "blocked runtime envelope")]  # type: ignore[index]
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = evaluate_matrix(path, checkout, root=tmp_path, require_complete=False)
+
+    assert result["classification"] == "BLOCKED_EXTERNAL"
+    assert "BLOCKED_RUNTIME_REJECTED" in result["rejection_codes"]
+    assert "MISSING_EVIDENCE_REJECTED" not in result["rejection_codes"]
+
+
+def test_runtime_envelope_wrong_tree_is_rejected(tmp_path: Path) -> None:
+    path, payload, checkout = _fixture(tmp_path)
+    runtime = tmp_path / "runtime-wrong-tree.json"
+    runtime.write_text(json.dumps({
+        "schema_version": "state-of-art-runtime-evidence.v1",
+        "record_id": "runtime-fixture-wrong-tree-1",
+        "capability_id": "P0-TEST",
+        "status": "PASS",
+        "commit_sha": HEAD,
+        "tree_sha": "d" * 40,
+        "checkout_fingerprint": CHECKOUT,
+        "environment": "fixture-runtime",
+        "procedure": "fixture runtime procedure",
+        "exit_status": 0,
+        "observed_at": "2026-09-09T20:00:00+00:00",
+        "reviewer": {"id": "runner", "kind": "automated", "name": "fixture runner", "independent": False},
+        "limitations": "fixture is local only",
+        "next_action": "run an independent review",
+    }), encoding="utf-8")
+    payload["capabilities"][0]["status"] = "PARTIAL"  # type: ignore[index]
+    payload["capabilities"][0]["runtime_evidence"] = [_ref(tmp_path, "runtime-wrong-tree.json", "wrong tree envelope")]  # type: ignore[index]
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = evaluate_matrix(path, checkout, root=tmp_path, require_complete=False)
+
+    assert result["classification"] == "FAILED"
+    assert "WRONG_COMMIT_EVIDENCE_REJECTED" in result["rejection_codes"]
 
 
 def test_verify_missing_matrix_returns_nonzero(tmp_path: Path) -> None:
