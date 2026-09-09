@@ -6,6 +6,7 @@ import { Activity, BookOpen, ChevronRight, CircleUserRound, ClipboardCheck, LogO
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
 import { useSession } from "@/components/session-provider";
 import { Button, Spinner, StatusPill } from "@/components/ui";
+import { NetworkStatus } from "@/components/network-status";
 import { presentRole } from "@/lib/presentation";
 import { hasAdminReadAccess, hasPermission } from "@/lib/permissions";
 
@@ -107,7 +108,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     };
   }, [mobileOpen, mobileViewport]);
 
-  if (pathname === "/login") return <>{logoutNotice}{children}</>;
+  if (pathname === "/login") return <><NetworkStatus />{logoutNotice}{children}</>;
   if (!ready || !session) return <>{logoutNotice}<div className="app-loading"><Spinner label="Validando sua sessão" /><p>Validando sua identidade e as permissões do espaço de trabalho.</p></div></>;
 
   const adminNav = { href: "/admin", label: "Administração", caption: "Controles operacionais", icon: ShieldCheck, permission: "audit.read" };
@@ -156,6 +157,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       {mobileOpen ? <button className="scrim" aria-label="Fechar menu lateral" onClick={() => setMobileOpen(false)} /> : null}
       <div className="workspace">
         <header className="topbar"><div className="topbar-leading"><button ref={mobileMenuRef} className="icon-button mobile-menu" onClick={openMobileNavigation} aria-label="Abrir navegação" aria-expanded={mobileOpen} aria-controls="product-navigation"><Menu size={19} /></button><div className="breadcrumb"><span>RICK Intelligence</span><ChevronRight size={14} /><strong>{current.label}</strong></div></div><div className="topbar-trailing"><span className="session-context" role="group" aria-label={`Espaço de trabalho ${session.workspace_id}; função ${presentRole(session.canonical_role || session.role)}`}><strong>{session.workspace_id}</strong><small>{presentRole(session.canonical_role || session.role)}</small></span><StatusPill tone="accent"><span className="session-status-full">Sessão protegida</span><span className="session-status-short" aria-hidden="true">Protegida</span></StatusPill><span className="topbar-divider" /><span className="role-label">{presentRole(session.canonical_role || session.role)}</span></div></header>
+        <NetworkStatus />
         <main key={JSON.stringify([session.session_id, session.user_id, session.tenant_id, session.workspace_id, session.role, session.canonical_role])} id="main-content" className="main-content">{logoutNotice}{children}</main>
       </div>
     </div>

@@ -110,6 +110,10 @@ test("resumes a conversation, keeps turns together, and expands citations", asyn
     const sidebar = page.getByRole("complementary", { name: "Conversas" });
     await expect(sidebar.getByRole("button", { name: "Fechar conversas", exact: true })).toBeFocused();
     await expect(sidebar.getByRole("button", { name: "Protocolo de biossegurança", exact: true })).toBeVisible();
+    await page.keyboard.press("Shift+Tab");
+    await expect(sidebar.getByRole("button", { name: "Protocolo de biossegurança", exact: true })).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(sidebar.getByRole("button", { name: "Fechar conversas", exact: true })).toBeFocused();
     await page.keyboard.press("Escape");
     await expect(conversationDrawer).toBeFocused();
   } else {
@@ -198,4 +202,90 @@ test("offers a history permission state and a cancellable request at the target 
   await expect(page.locator('[role="status"]').filter({ hasText: "Consulta cancelada" })).toBeVisible();
   await expect(page.getByLabel("Pergunta", { exact: true })).toHaveValue("Preciso cancelar esta consulta.");
   releasePending.current?.();
+});
+
+test("keeps the draft editable while offline and recovers when the connection returns", async ({ page }, testInfo) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "onLine", { configurable: true, get: () => false });
+  });
+  await mockSession(page);
+  await mockConversations(page, { items: [] });
+  let chatRequests = 0;
+  await page.route("**/api/v1/chat", async (route) => {
+    chatRequests += 1;
+    await json(route, {
+      conversation_id: "conv-online-again",
+      message_id: "msg-online-again",
+      answer: "A conexão voltou e a consulta foi concluída.",
+      citations: [],
+      metadata: { evidence_status: "NO_EVIDENCE" },
+    });
+  });
+
+  await page.goto("/app/chat");
+  await expect(page.locator('[data-network-state="offline"]')).toBeVisible();
+  const composer = page.getByLabel("Pergunta", { exact: true });
+  const submit = page.getByRole("button", { name: "Consultar", exact: true });
+  await composer.fill("Quais fontes posso revisar offline?");
+  await expect(page.getByText("Consulta pausada sem conexão.", { exact: false })).toBeVisible();
+  await expect(submit).toBeDisabled();
+  await page.screenshot({ path: testInfo.outputPath("offline-state.png"), fullPage: true, animations: "disabled" });
+  await composer.press("Enter");
+  await expect(composer).toHaveValue("Quais fontes posso revisar offline?");
+  expect(chatRequests).toBe(0);
+
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, "onLine", { configurable: true, get: () => true });
+    window.dispatchEvent(new Event("online"));
+  });
+  await expect(page.locator('[data-network-state="offline"]')).toHaveCount(0);
+  await expect(submit).toBeEnabled();
+  await submit.click();
+  await expect(page.getByText("A conexão voltou e a consulta foi concluída.", { exact: true })).toBeVisible();
+  expect(chatRequests).toBe(1);
+});
+
+test("preserves a partial stream as explicitly non-final and retries the same question", async ({ page }, testInfo) => {
+  await mockSession(page);
+  await mockConversations(page, { items: [] });
+  let attempts = 0;
+  await page.route("**/api/v1/chat", async (route) => {
+    attempts += 1;
+    if (attempts === 1) {
+      await route.fulfill({
+        status: 200,
+        contentType: "text/event-stream",
+        body: [
+          `data: ${JSON.stringify({ type: "start", conversation_id: "conv-partial", message_id: "msg-partial" })}`,
+          "",
+          `data: ${JSON.stringify({ type: "delta", conversation_id: "conv-partial", message_id: "msg-partial", delta: "Trecho parcial recebido." })}`,
+          "",
+        ].join("\n"),
+      });
+      return;
+    }
+    await json(route, {
+      conversation_id: "conv-partial",
+      message_id: "msg-recovered",
+      answer: "Resposta recuperada depois da interrupção.",
+      citations: [],
+      metadata: { evidence_status: "NO_EVIDENCE" },
+    });
+  });
+
+  await page.goto("/app/chat");
+  const composer = page.getByLabel("Pergunta", { exact: true });
+  await composer.fill("Quais fontes sustentam esta hipótese?");
+  await page.getByRole("button", { name: "Consultar", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Resposta interrompida", exact: true })).toBeFocused();
+  await expect(page.getByText("Trecho parcial recebido.", { exact: true })).toBeVisible();
+  await expect(page.getByText("Resposta interrompida · não finalizada", { exact: true })).toBeVisible();
+  await expect(page.getByText("não foi marcado como resposta concluída", { exact: false })).toBeVisible();
+  await expect(composer).toHaveValue("Quais fontes sustentam esta hipótese?");
+  await page.screenshot({ path: testInfo.outputPath("interrupted-stream.png"), fullPage: true, animations: "disabled" });
+
+  await page.getByRole("button", { name: "Tentar novamente", exact: true }).click();
+  await expect(page.getByText("Resposta recuperada depois da interrupção.", { exact: true })).toBeVisible();
+  await expect(page.getByText("Trecho parcial recebido.", { exact: true })).toHaveCount(0);
+  expect(attempts).toBe(2);
 });

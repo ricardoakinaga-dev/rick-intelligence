@@ -16,6 +16,8 @@ boundary.
 - root `/admin` boundary for the next operational slice;
 - keyboard-visible focus, reduced motion, loading, empty, error and permission
   states.
+- offline connection status, draft preservation, and explicitly non-final
+  interrupted chat streams with retry.
 
 ## Commands
 

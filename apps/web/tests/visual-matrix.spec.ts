@@ -20,6 +20,16 @@ async function prepare(page: Page, state: string, route: string) {
   const long = state.endsWith("long-content");
   await page.route("**/api/v1/auth/me", request => request.fulfill(login ? { status: 401, json: denied } : { json: { ...identity, ...(state === "custom-admin-denied" ? { role: "VETERINARIAN", canonical_role: "VETERINARIAN", permissions: ["chat.query"] } : {}) } }));
   await page.route("**/api/v1/auth/login", request => request.fulfill({ status: 401, json: denied }));
+  if (state.startsWith("custom-chat-")) {
+    await page.route("**/api/v1/conversations**", request => {
+      const routeRequest = request.request();
+      const url = new URL(routeRequest.url());
+      if (routeRequest.method() === "GET" && url.pathname === "/api/v1/conversations" && url.searchParams.get("limit") === "50") {
+        return request.fulfill({ json: { items: [], total: 0 } });
+      }
+      return request.continue();
+    });
+  }
   await page.route("**/api/v1/collections?**", request => request.fulfill({ json: { items: [{ collection_id: "referencias", title: "Referências", workspace_id: "default" }], total: 1 } }));
   await page.route("**/api/v1/documents?**", request => {
     if (state === "custom-workbench-loading") return;

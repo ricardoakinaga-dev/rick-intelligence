@@ -17,6 +17,7 @@ import {
   Sparkles,
   Square,
   UserRound,
+  WifiOff,
   X,
 } from "lucide-react";
 import {
@@ -33,6 +34,7 @@ import {
 import { useSession } from "@/components/session-provider";
 import { Button, Spinner, StatusPill } from "@/components/ui";
 import { ApiError } from "@/lib/api";
+import { useOnlineStatus } from "@/lib/network";
 import {
   chatAdapter,
   type ChatCitation,
@@ -58,6 +60,7 @@ type PendingAssistant = {
   id: string;
   answer: string;
   citations: ChatCitation[];
+  state?: "streaming" | "interrupted";
 };
 
 type NormalizedError = {
@@ -150,6 +153,12 @@ function placeholderConversation(conversationId: string, workspaceId: string): C
 
 function normalizeError(cause: unknown): NormalizedError {
   if (cause instanceof ApiError) {
+    if (cause.code === "network_unavailable") {
+      return { status: cause.status, code: cause.code, message: "A conexão com a API foi perdida. Verifique sua rede e tente novamente." };
+    }
+    if (cause.code === "incomplete_response") {
+      return { status: cause.status, code: cause.code, message: "A resposta foi interrompida antes da conclusão. Tente novamente para consultar as fontes outra vez." };
+    }
     return { status: cause.status, code: cause.code, message: cause.message };
   }
   if (cause instanceof Error && cause.name === "AbortError") {
@@ -316,6 +325,7 @@ function MessageBubble({ message, onCopy }: { message: WorkspaceMessage; onCopy:
 
 export function ChatWorkspace() {
   const { session } = useSession();
+  const online = useOnlineStatus();
   const workspaceId = session?.workspace_id || "default";
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [sidebarState, setSidebarState] = useState<SidebarState>("loading");
@@ -348,6 +358,7 @@ export function ChatWorkspace() {
   const requestErrorRef = useRef<HTMLHeadingElement>(null);
   const mobileToolbarRef = useRef<HTMLButtonElement>(null);
   const mobileCloseRef = useRef<HTMLButtonElement>(null);
+  const wasMobileSidebarOpen = useRef(false);
 
   useEffect(() => {
     activeIdRef.current = activeId;
@@ -480,20 +491,32 @@ export function ChatWorkspace() {
   }, [openConversation, startNewConversation]);
 
   useLayoutEffect(() => {
+    const wasOpen = wasMobileSidebarOpen.current;
     if (mobileSidebarOpen) mobileCloseRef.current?.focus({ preventScroll: true });
-    else if (mobileCloseRef.current === document.activeElement) mobileToolbarRef.current?.focus({ preventScroll: true });
+    else if (wasOpen) mobileToolbarRef.current?.focus({ preventScroll: true });
+    wasMobileSidebarOpen.current = mobileSidebarOpen;
   }, [mobileSidebarOpen]);
 
-  useEffect(() => {
+  const handleMobileSidebarKeyDown = (event: KeyboardEvent<HTMLElement>) => {
     if (!mobileSidebarOpen) return;
-    const onKeyDown = (event: globalThis.KeyboardEvent) => {
-      if (event.key !== "Escape") return;
+    if (event.key === "Escape") {
       event.preventDefault();
       setMobileSidebarOpen(false);
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [mobileSidebarOpen]);
+      return;
+    }
+    if (event.key !== "Tab") return;
+    const focusable = Array.from(event.currentTarget.querySelectorAll<HTMLElement>("button:not(:disabled):not([tabindex='-1']), a[href], input:not(:disabled):not([tabindex='-1']), select:not(:disabled):not([tabindex='-1']), textarea:not(:disabled):not([tabindex='-1'])"));
+    if (!focusable.length) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
 
   useEffect(() => {
     const list = messageListRef.current;
@@ -522,6 +545,11 @@ export function ChatWorkspace() {
   const sendMessage = useCallback(async (question: string, options?: { retry?: boolean }) => {
     const trimmed = question.trim();
     if (!session || !trimmed || requestRef.current.kind === "loading") return;
+    if (!online) {
+      setDraft(trimmed);
+      setFocusIntent("composer");
+      return;
+    }
     const previous = options?.retry && (requestRef.current.kind === "error" || requestRef.current.kind === "cancelled")
       ? requestRef.current
       : null;
@@ -549,7 +577,10 @@ export function ChatWorkspace() {
     }
     setDraft("");
     setCopyNotice(null);
-    setPendingAssistant({ id: makeClientId("assistant"), answer: "", citations: [] });
+    const pendingAssistantId = makeClientId("assistant");
+    let streamedAnswer = "";
+    let streamedCitations: ChatCitation[] = [];
+    setPendingAssistant({ id: pendingAssistantId, answer: "", citations: [], state: "streaming" });
     requestRef.current = nextRequest;
     setRequest(nextRequest);
     const operation = ++sendOperation.current;
@@ -560,17 +591,17 @@ export function ChatWorkspace() {
     const onEvent = (event: ChatStreamEvent) => {
       if (operation !== sendOperation.current) return;
       if (event.type === "delta" && event.delta) {
-        setPendingAssistant((current) => current ? { ...current, answer: `${current.answer}${event.delta}` } : current);
+        streamedAnswer += event.delta;
+        setPendingAssistant((current) => current ? { ...current, answer: streamedAnswer } : current);
       }
       if (event.type === "citation") {
-        setPendingAssistant((current) => current ? { ...current, citations: appendCitation(current.citations, event.citation) } : current);
+        streamedCitations = appendCitation(streamedCitations, event.citation);
+        setPendingAssistant((current) => current ? { ...current, citations: streamedCitations } : current);
       }
       if (event.type === "completion") {
-        setPendingAssistant((current) => current ? {
-          ...current,
-          answer: event.answer ?? current.answer,
-          citations: (event.citations || []).reduce(appendCitation, current.citations),
-        } : current);
+        streamedAnswer = event.answer ?? streamedAnswer;
+        streamedCitations = (event.citations || []).reduce(appendCitation, streamedCitations);
+        setPendingAssistant((current) => current ? { ...current, answer: streamedAnswer, citations: streamedCitations } : current);
       }
     };
 
@@ -629,6 +660,8 @@ export function ChatWorkspace() {
         setFocusIntent("composer");
       } else {
         const error = normalizeError(cause);
+        const hasPartialResponse = Boolean(streamedAnswer.trim() || streamedCitations.length);
+        setPendingAssistant(hasPartialResponse ? { id: pendingAssistantId, answer: streamedAnswer, citations: streamedCitations, state: "interrupted" } : null);
         const failed: RequestState = { ...nextRequest, kind: "error", error };
         setMessages((current) => current.map((message) => message.id === userMessageId ? { ...message, status: "failed" as const } : message));
         requestRef.current = failed;
@@ -639,7 +672,7 @@ export function ChatWorkspace() {
     } finally {
       if (operation === sendOperation.current) sendAbortRef.current = null;
     }
-  }, [activeSummary, session, workspaceId]);
+  }, [activeSummary, online, session, workspaceId]);
 
   const cancelRequest = useCallback((event: ReactMouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
@@ -682,7 +715,11 @@ export function ChatWorkspace() {
   const hasHistory = conversations.length > 0;
   const requestError = request.kind === "error" ? request.error : null;
   const requestIsForbidden = Boolean(requestError?.status === 403);
+  const requestIsOffline = requestError?.code === "network_unavailable";
+  const requestIsInterrupted = requestError?.code === "incomplete_response";
   const isArchived = activeSummary?.status === "archived";
+  const pendingIsInterrupted = pendingAssistant?.state === "interrupted";
+  const submitDisabled = inputDisabled || !draft.trim() || !online;
 
   return (
     <div className={styles.root}>
@@ -703,9 +740,9 @@ export function ChatWorkspace() {
       </div>
 
       <div className={styles.shell}>
-        <aside id="conversation-sidebar" className={`${styles.sidebar} ${mobileSidebarOpen ? styles.sidebarOpen : ""}`} aria-label="Conversas" data-open={mobileSidebarOpen}>
+        <aside id="conversation-sidebar" onKeyDown={handleMobileSidebarKeyDown} className={`${styles.sidebar} ${mobileSidebarOpen ? styles.sidebarOpen : ""}`} aria-label="Conversas" data-open={mobileSidebarOpen}>
           <div className={styles.sidebarHeader}>
-            <div><span className="eyebrow">Navegar</span><h2>Conversas</h2></div>
+            <div><span className="eyebrow">Navegar</span><h2 id="conversation-sidebar-title">Conversas</h2></div>
             <Button ref={mobileCloseRef} type="button" variant="ghost" className={styles.mobileClose} onClick={() => setMobileSidebarOpen(false)} aria-label="Fechar conversas"><X size={18} /></Button>
           </div>
           <Button type="button" className={styles.newConversation} onClick={startNewConversation} disabled={request.kind === "loading"}><Plus size={16} />Nova conversa</Button>
@@ -798,16 +835,17 @@ export function ChatWorkspace() {
               <div className={styles.messageStack}>
                 {messages.map((message) => <MessageBubble key={message.id} message={message} onCopy={(content) => void copyAnswer(content)} />)}
                 {pendingAssistant ? (
-                  <article className={`${styles.message} ${styles.assistantMessage} ${styles.streamingMessage}`} aria-label="Resposta provisória em andamento" aria-live="polite">
-                    <div className={styles.messageHeader}><span className={styles.messageAuthor}><span className={`${styles.messageAvatar} ${styles.assistantAvatar}`} aria-hidden="true"><Bot size={15} /></span><strong>RICK</strong></span><span className={styles.streamingLabel}>Resposta provisória · {pendingAssistant.answer ? "validando fontes…" : "consultando fontes…"}</span></div>
+                  <article className={`${styles.message} ${styles.assistantMessage} ${styles.streamingMessage} ${pendingIsInterrupted ? styles.interruptedMessage : ""}`} aria-label={pendingIsInterrupted ? "Resposta interrompida" : "Resposta provisória em andamento"} aria-live={pendingIsInterrupted ? undefined : "polite"}>
+                    <div className={styles.messageHeader}><span className={styles.messageAuthor}><span className={`${styles.messageAvatar} ${styles.assistantAvatar}`} aria-hidden="true"><Bot size={15} /></span><strong>RICK</strong></span><span className={pendingIsInterrupted ? styles.interruptedLabel : styles.streamingLabel}>{pendingIsInterrupted ? "Resposta interrompida · não finalizada" : `Resposta provisória · ${pendingAssistant.answer ? "validando fontes…" : "consultando fontes…"}`}</span></div>
                     <div className={styles.messageContent}>{pendingAssistant.answer || <span className={styles.typingDots} aria-label="Gerando resposta"><i /><i /><i /></span>}</div>
                     {pendingAssistant.citations.length ? <CitationList citations={pendingAssistant.citations} messageId={pendingAssistant.id} /> : null}
+                    {pendingIsInterrupted ? <p className={styles.interruptedNote} role="status">Este conteúdo parcial não foi marcado como resposta concluída nem deve ser usado sem uma nova consulta.</p> : null}
                   </article>
                 ) : null}
                 {request.kind === "error" ? (
                   <div className={`${styles.requestNotice} ${requestIsForbidden ? styles.forbiddenNotice : ""}`} role="alert">
                     <div className={styles.requestNoticeIcon}>{requestIsForbidden ? <ShieldCheck size={18} /> : <CircleAlert size={18} />}</div>
-                    <div><h3 ref={requestErrorRef} tabIndex={-1}>{requestIsForbidden ? "Acesso negado à consulta" : "Não foi possível concluir a consulta"}</h3><p>{requestError?.message || "Tente novamente mantendo a pergunta para o corpus."}</p></div>
+                    <div><h3 ref={requestErrorRef} tabIndex={-1}>{requestIsForbidden ? "Acesso negado à consulta" : requestIsOffline ? "Sem conexão para concluir a consulta" : requestIsInterrupted ? "Resposta interrompida" : "Não foi possível concluir a consulta"}</h3><p>{requestError?.message || "Tente novamente mantendo a pergunta para o corpus."}</p></div>
                     <div className={styles.requestActions}><Button type="button" variant="secondary" onClick={retryRequest}>Tentar novamente</Button><Button type="button" variant="ghost" onClick={startNewConversation}>Nova conversa</Button></div>
                   </div>
                 ) : request.kind === "cancelled" ? (
@@ -835,6 +873,7 @@ export function ChatWorkspace() {
 
           <div className={styles.composerArea}>
             {isArchived ? <div className={styles.archivedNotice} role="status"><Archive size={15} />Esta conversa está arquivada e não aceita novas perguntas.</div> : null}
+            {!online ? <div className={styles.composerOffline} role="alert" aria-live="assertive"><WifiOff size={15} aria-hidden="true" /><span><strong>Consulta pausada sem conexão.</strong> A pergunta continua editável; você poderá enviá-la quando a rede voltar.</span></div> : null}
             <form className={styles.composer} onSubmit={submit} aria-label="Enviar consulta">
               <label htmlFor="chat-message">Pergunta</label>
               <div className={`${styles.composerBox} ${request.kind === "loading" ? styles.composerBusy : ""}`}>
@@ -856,7 +895,7 @@ export function ChatWorkspace() {
                   {request.kind === "loading" ? (
                     <Button type="button" variant="danger" onClick={cancelRequest}><Square size={14} fill="currentColor" />Cancelar</Button>
                   ) : (
-                    <Button type="submit" disabled={inputDisabled || !draft.trim()}><Send size={15} />Consultar</Button>
+                    <Button type="submit" disabled={submitDisabled}><Send size={15} />Consultar</Button>
                   )}
                 </div>
               </div>

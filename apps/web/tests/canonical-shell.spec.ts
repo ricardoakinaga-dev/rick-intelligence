@@ -45,6 +45,13 @@ test("keeps navigation keyboard safe at every viewport", async ({ page }) => {
   await page.getByRole("button", { name: "Entrar" }).click();
   await expect(page).toHaveURL(/\/app$/);
   await expect(page.getByRole("heading", { name: "Seu espaço de evidências." })).toBeVisible();
+  const skipLink = page.getByRole("link", { name: "Pular para o conteúdo", exact: true });
+  await expect(skipLink).toHaveCSS("opacity", "0");
+  await page.keyboard.press("Tab");
+  await expect(skipLink).toBeFocused();
+  await expect(skipLink).toHaveCSS("opacity", "1");
+  await page.keyboard.press("Enter");
+  await expect(page).toHaveURL(/#main-content$/);
   const menu = page.getByRole("button", { name: "Abrir navegação" });
 
   if ((await menu.count()) === 0) {
