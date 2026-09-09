@@ -5,6 +5,7 @@ from __future__ import annotations
 import threading
 import time
 from dataclasses import dataclass
+import os
 from typing import Callable
 
 from rick_locking.client import LeaseClient, OwnerFactory
@@ -17,6 +18,8 @@ from rick_locking.validation import (
 )
 
 Clock = Callable[[], float]
+_LOCAL_ENVIRONMENTS = frozenset({"test", "testing", "development", "dev", "local"})
+_DEPLOYED_ENVIRONMENTS = frozenset({"production", "prod", "live", "staging"})
 
 
 @dataclass(slots=True)
@@ -63,8 +66,16 @@ class InMemoryLeaseStore:
     key or delete a replacement owner's lease.
     """
 
-    def __init__(self, clock: Clock | None = None) -> None:
+    production_safe = False
+    backend_kind = "memory"
+
+    def __init__(self, clock: Clock | None = None, *, mode: str = "test") -> None:
+        if mode not in _LOCAL_ENVIRONMENTS or os.environ.get(
+            "RICK_ENV", ""
+        ).strip().lower() in _DEPLOYED_ENVIRONMENTS:
+            raise ValueError("in-memory lease store is local-only")
         self._clock = clock or time.monotonic
+        self.mode = mode
         self._entries: dict[str, _Entry] = {}
         self._lock = threading.RLock()
 
@@ -222,13 +233,24 @@ class InMemoryLeaseClient(LeaseClient):
         clock: Clock | None = None,
         owner_factory: OwnerFactory | None = None,
         cleanup_timeout: float = 2.0,
+        mode: str = "test",
     ) -> None:
-        actual_store = store if store is not None else InMemoryLeaseStore(clock=clock)
+        if mode not in _LOCAL_ENVIRONMENTS or os.environ.get(
+            "RICK_ENV", ""
+        ).strip().lower() in _DEPLOYED_ENVIRONMENTS:
+            raise ValueError("in-memory lease client is local-only")
+        actual_store = (
+            store
+            if store is not None
+            else InMemoryLeaseStore(clock=clock, mode=mode)
+        )
         kwargs: dict[str, object] = {"cleanup_timeout": cleanup_timeout}
         if owner_factory is not None:
             kwargs["owner_factory"] = owner_factory
         super().__init__(actual_store, **kwargs)
         self.store = actual_store
+        self.production_safe = False
+        self.backend_kind = "memory"
 
 
 InMemoryClient = InMemoryLeaseClient

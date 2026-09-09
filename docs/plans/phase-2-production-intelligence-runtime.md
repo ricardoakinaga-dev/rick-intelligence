@@ -1,10 +1,10 @@
 # Phase 2 — Production Intelligence Runtime Closure
 
-**Status:** `ACTIVE / PHASE 2.3 LOCAL IMPLEMENTATION VERIFIED`
-**Date:** 2026-09-08  
+**Status:** `ACTIVE / PHASE 2.4–2.11 LOCAL CAPABILITY PACKET VERIFIED / EXTERNAL GATES BLOCKED`
+**Date:** 2026-09-09  
 **Source prompt:** [`docs/prompts/state-of-art-triple-aaa-2026-09-08.txt`](../prompts/state-of-art-triple-aaa-2026-09-08.txt)  
 **Source prompt SHA-256:** `b222cf1a52c54dc075e2f64896aab1678941371109ff3ac296f922b98dee7513`  
-**Current candidate:** current Phase 2.3 worker-runtime packet on top of the published Phase 2.2 candidate
+**Current candidate:** local Phase 2.4–2.11 capability packet on top of the published Phase 2.3 candidate; exact command evidence is bound in `.agent/verification.jsonl`
 
 This is the canonical Phase 2 plan and current-state audit. It is maintained
 as implementation slices advance. A row marked `PARTIAL`, `MISSING`,
@@ -269,32 +269,32 @@ local scope; it is not a production promotion.
 | --- | --- | --- | --- | --- |
 | P2-A01 | Architecture audit and preservation map | `PARTIAL` | README, migration map, ADR-001..020, dependency-boundary checks | This plan freezes the Phase 2 target; independent architecture review remains. |
 | P2-A02 | Phase 2 plan and implementation slices | `DONE` | This file, prompt hash and matrix | Keep it current as contracts/evidence change. |
-| P2-A03 | `.agent` / `.gauntlet` evidence control | `PARTIAL` | Existing append-only state, gate history and review artifacts | Reconcile current HEAD and add Phase 2 task/evidence records without stale PASS reuse. |
+| P2-A03 | `.agent` / `.gauntlet` evidence control | `PARTIAL / CURRENT LOCAL CHECK` | Append-only state, gate history, current local capability verification and review artifacts | Reconcile the post-commit HEAD; external evidence and promotion remain open. |
 | P2-P0-01 | Durable job contracts (`Job`, state, attempt, result, failure, lease, repository, queue, executor, scheduler) | `DONE_LOCAL_SCOPE` | `packages/jobs`, 9 focused tests, independent Phase 2.1 review and fingerprinted contract packet | Adapter parity, distributed execution and production rejection remain outside the local contract gate. |
 | P2-P0-02 | Durable queue, retries, backoff, deduplication, leasing, recovery, DLQ and replay | `DONE_LOCAL_SCOPE / BLOCKED_EXTERNAL` | `apps/worker/postgres_jobs.py`, migration `0004`, migration/adapter/static tests, ADR-022, [`phase-2-phase22-review-2026-09-09.md`](../reports/phase-2-phase22-review-2026-09-09.md), fresh I1 approval | Disposable PostgreSQL execution, multi-worker fencing, crash durability, FK/query-plan and live replay/retention evidence. |
 | P2-P0-03 | Real worker lifecycle and bounded execution | `DONE_LOCAL_SCOPE / BLOCKED_EXTERNAL` | `apps/worker/runtime.py`, `canonical_queue.py`, `external_composition.py`, worker launcher/Docker packet, migrations `0004`/`0005`, focused runtime/entrypoint tests, [`phase-2-phase23-review-2026-09-09.md`](../reports/phase-2-phase23-review-2026-09-09.md), fresh I1 `READY_LOCAL_SCOPE` | Disposable PostgreSQL execution, crash/restart, two-worker fencing and live SIGTERM/handler isolation evidence. |
-| P2-P0-04 | Redis production capability | `PARTIAL` | `packages/locking`, HTTP/Redis seam and local health contracts | Shared Redis client/pool, TLS/auth/namespace, retry/circuit breaker and live health. |
-| P2-P0-05 | Distributed rate limiting | `PARTIAL` | `RateLimiter` protocol and bounded local/injected implementation | Redis atomic buckets, tenant/route policy, multi-replica abuse tests and production rejection of local mode. |
-| P2-P0-06 | Qdrant production runtime | `PARTIAL` | Qdrant vector/backend adapters and ACL filter contracts | Live collection/schema/migration/alias/reindex/partial-failure evidence and wiring. |
+| P2-P0-04 | Redis production capability | `PARTIAL / LOCAL VERIFIED` | `packages/locking`, validated Redis settings, bounded pool, TLS/auth/namespace, retry/circuit breaker, lease/rate-limit health seams and focused tests | Live Redis readiness, failover and multi-worker evidence. |
+| P2-P0-05 | Distributed rate limiting | `PARTIAL / LOCAL VERIFIED` | Atomic Redis bucket/request-marker script, async route wiring, fail-closed errors, production capability marker and local negative tests | Live Redis abuse/reconnect/multi-replica evidence. |
+| P2-P0-06 | Qdrant production runtime | `PARTIAL / LOCAL VERIFIED` | Bounded Qdrant transport retries, circuit breaker, schema/alias/index seams, ACL filter contracts and focused tests | Live collection/schema/migration/alias/reindex/partial-failure evidence. |
 | P2-P0-07 | Private S3-compatible object storage | `PARTIAL` | `ObjectStore`, local and S3-compatible adapters with checksum/limits | Composition, private auth, streaming/retention/delete policy and authorized integration. |
 | P2-P0-08 | Durable ingestion `UPLOAD→VERIFY→PUBLISH` | `PARTIAL` | Local journal, lineage fields, bounded worker and lifecycle routes | External DB/object/vector transaction choreography, version retention and recovery drill. |
-| P2-P0-09 | Canonical API/Web/Worker/Redis/Qdrant/Object root stack | `PARTIAL` | Compose reference/integration files, Dockerfiles, static checks | `make up`/health/smoke/teardown on disposable services; no unsafe defaults. |
+| P2-P0-09 | Canonical API/Web/Worker/Redis/Qdrant/Object root stack | `PARTIAL / LOCAL VERIFIED` | Guarded dev/staging Compose files, image dependency wiring, Dockerfiles and static config checks | `make up`/health/smoke/teardown on disposable services; no unsafe defaults. |
 | P2-P0-10 | Container hardening and reproducible images | `PARTIAL` | Multi-service Dockerfiles, release manifest and static checks | Digest pinning, non-root/read-only verification, vulnerability/SBOM/signature evidence. |
-| P2-P1-01 | Core hybrid retrieval with authorization and evidence | `PARTIAL` | `packages/retrieval`, ACL tests, local eval and provenance contracts | Live projection/freshness/latency and integrated citation verification. |
+| P2-P1-01 | Core hybrid retrieval with authorization and evidence | `PARTIAL / LOCAL VERIFIED` | `packages/retrieval`, ACL tests, local eval, document-version provenance, bounded Qdrant resilience and evidence gate | Live projection/freshness/latency and integrated citation verification. |
 | P2-P1-02 | Query analysis and feature-flagged advanced retrieval | `MISSING` | No complete evaluated decomposition/multi-query/HyDE/MMR subsystem | Add one strategy at a time with baseline delta and safe flags; no hype promotion. |
 | P2-P1-03 | Confidence semantics/calibration | `PARTIAL` | Existing retrieval quality/confidence fields and local scoring | Ensure non-probabilistic scores are named honestly; calibration dataset/Brier/ECE is P2. |
-| P2-P1-04 | Formal Evidence/EvidenceBundle/EvidenceValidator | `PARTIAL` | Evidence DTOs and Professor evidence gates | One server-generated bundle/validator contract across retrieval, provider and API. |
-| P2-P1-05 | Citation verification and unsupported-claim policy | `PARTIAL` | Citation metadata and weak/no-evidence local states | Claim-to-text support checks, precision/recall/completeness and abstain/retrieve-again path. |
-| P2-P1-06 | Explicit intelligence decision layer | `MISSING` | Decision behavior is distributed through local orchestration/routes | Add `ANSWER`, `RETRIEVE_AGAIN`, `ASK_FOR_CLARIFICATION`, `ABSTAIN`, `ESCALATE` contract and tests. |
+| P2-P1-04 | Formal Evidence/EvidenceBundle/EvidenceValidator | `DONE_LOCAL_SCOPE / BLOCKED_EXTERNAL` | Server-issued immutable evidence, scope/checksum/version validation, bundle contract and Professor gate | Integrated provider/citation acceptance and external corpus evidence. |
+| P2-P1-05 | Citation verification and unsupported-claim policy | `PARTIAL / LOCAL VERIFIED` | Provenance-bound citation fields, malformed/forged evidence rejection and no-evidence decision path | Claim-to-text support metrics, approved corpus and integrated citation review. |
+| P2-P1-06 | Explicit intelligence decision layer | `DONE_LOCAL_SCOPE / BLOCKED_EXTERNAL` | Deterministic `ANSWER`, `RETRIEVE_AGAIN`, `ASK_FOR_CLARIFICATION`, `ABSTAIN`, `ESCALATE` contract, policy ordering and tests | Domain-approved policy, calibrated evaluation and integrated production evidence. |
 | P2-P1-07 | Professor reasoning plane | `PARTIAL` | `packages/professor` evidence-gated orchestration and provider adapter | Separate retrieval/reasoning/tool/response/citation/verification budgets at public boundary. |
 | P2-P1-08 | Common resilient provider contract | `PARTIAL` | Typed provider, OpenAI-compatible adapter, deterministic provider and resilience | Complete capabilities/health/cancellation/streaming/limits and live failure matrix. |
 | P2-P1-09 | Local OpenAI-compatible model support | `PARTIAL` | Provider endpoint configuration and compatibility route | Capability negotiation and disposable llama.cpp/vLLM/Ollama-compatible test. |
 | P2-P1-10 | End-to-end multi-tenancy | `PARTIAL` | Tenant-aware identity/authorization/retrieval/local storage negatives | External DB/object/vector/job/audit/cache/rate-limit cross-tenant matrix. |
-| P2-P1-11 | Formal threat model | `MISSING` | Existing security decisions and route/file tests | Create `docs/security/threat-model.md` with assets, actors, trust boundaries, abuse cases and residual risk. |
+| P2-P1-11 | Formal threat model | `DONE_LOCAL_SCOPE` | `docs/security/threat-model.md`, trust-boundary inventory and residual-risk register | Fresh independent security review and runtime adversarial evidence. |
 | P2-P1-12 | RAG security | `PARTIAL` | ACL and prompt/evidence boundaries in local Professor/retrieval paths | Adversarial corpus, untrusted-data policy, poisoning/exfiltration/tool-injection negatives. |
-| P2-P1-13 | File-ingestion security | `PARTIAL` | Bounded uploads, MIME/path/size checks and object-store negatives | Magic bytes, archive/page/decompression limits, parser timeout/isolation and malicious corpus. |
+| P2-P1-13 | File-ingestion security | `PARTIAL / LOCAL VERIFIED` | Magic/MIME/path/archive/page/decompression limits, safe errors, process-isolated parser runner and timeout tests | Malicious corpus, cgroup enforcement and external ingestion/recovery evidence. |
 | P2-P1-14 | Distributed observability | `PARTIAL` | Redacted events, correlation IDs, local metrics and bounded spans | OTel-compatible traces/metrics/logs through API/retrieval/provider/worker/storage/Redis/Qdrant. |
-| P2-P1-15 | SLI/SLO and alert definitions | `MISSING` | Local metrics and runbooks, no canonical `docs/operations/slo.md` | Define local/staging/production SLOs, burn alerts and collector evidence. |
+| P2-P1-15 | SLI/SLO and alert definitions | `PARTIAL` | Canonical `docs/operations/slo.md`, bounded local metrics and alert/runbook definitions | Collector, alert delivery and live SLO/soak evidence. |
 | P2-P1-16 | Disaster recovery and restore drills | `PARTIAL` | File-level backup/reconciliation contract and runbook | Service-level backup/restore, RPO/RTO and tenant-negative smoke on isolated restore. |
 | P2-P1-17 | Canonical CI/CD quality lanes | `PARTIAL` | Phase workflows and release-integrity workflow | Add one laneed quality workflow, artifact retention, timeouts, permissions and drift checks. |
 | P2-P1-18 | `app.py` composition root/API contract | `PARTIAL` | `create_app`, middleware/routes/lifecycle and OpenAPI checks | Keep composition root thin, deterministic OpenAPI, contract/error/permission/idempotency examples. |
@@ -304,7 +304,7 @@ local scope; it is not a production promotion.
 | P2-P1-22 | Reproducible performance benchmark | `PARTIAL` | Phase 1.5/1.6 local benchmarks and web timings | API/retrieval/provider/worker p50/p95/p99 at declared workloads; separate production status. |
 | P2-P1-23 | Soak test | `MISSING` | No current prolonged continuous runtime artifact | Add bounded isolated soak with leak/queue/latency observations. |
 | P2-P1-24 | Chaos/fault injection | `MISSING` | Static failure contracts exist; no runtime drill | Add kill/restart/timeout/storage/provider partial-failure tests with recovery evidence. |
-| P2-P1-25 | RAG evaluation harness | `PARTIAL` | `docs/evaluation/packs`, retrieval evaluator and local baseline | Add complete answer/citation/abstention metrics and CI regression against approved data. |
+| P2-P1-25 | RAG evaluation harness | `PARTIAL / LOCAL VERIFIED` | Offline synthetic retrieval pack, deterministic evaluator, evidence/decision negatives and explicit blocked-provider status | Complete answer/citation/abstention metrics and CI regression against approved data. |
 | P2-P1-26 | Veterinary golden-set framework | `PARTIAL / BLOCKED_EXTERNAL` | Safe non-clinical pack schema and clinical boundary | External domain owner/corpus/licence/thresholds are required for clinical evidence. |
 | P2-P1-27 | Clinical safety boundary | `PARTIAL` | Closed-by-default case route and risk-aware documentation | Keep high-risk policies conservative; domain approval and corpus evidence remain open. |
 | P2-P1-28 | Append-oriented auditability | `PARTIAL` | Local audit/redaction/retention and API context contracts | Durable external sink, mutation/audit transaction coupling and retention/restore evidence. |
@@ -647,8 +647,9 @@ or `BLOCKED_EXTERNAL` by criterion, never “State of Art / Triple AAA”.
 
 ## 18. Immediate next action
 
-The Phase 2.3 implementation packet is locally verified and independently
-approved for its bounded scope. The next implementation sequence is **Phase
-2.4 — Redis Coordination and Distributed Rate Limits**, while PostgreSQL
-execution, crash/restart, two-worker fencing, live SIGTERM and handler
-process-isolation gates remain external evidence before production promotion.
+The Phase 2.4–2.11 capability packet is locally implemented and verified for
+its bounded scope. The next action remains `REC-05:WAIT_RUNTIME`: run the
+controlled disposable PostgreSQL/Redis/Qdrant/object-store stack, then exercise
+startup, readiness, crash/restart, two-worker fencing, live SIGTERM, parser
+resource enforcement, restore, load and recovery gates. No local result in this
+packet promotes the product to production or Triple AAA status.

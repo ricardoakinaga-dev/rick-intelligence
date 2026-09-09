@@ -47,11 +47,14 @@ class ExternalCompositionInputs:
     provider_transport: object | None = None
     provider_client: object | None = None
     redis_client: object | None = None
+    rate_limiter: object | None = None
+    lease: object | None = None
     event_sink: object | None = None
     password_reset_delivery: object | None = None
     worker_temp_root: str | None = None
     worker_id: str | None = None
     worker_scope: tuple[str, str, str] | None = None
+    parser_runner: object | None = None
     worker_max_concurrency: int = 4
     worker_timeout_seconds: float = 300.0
 
@@ -195,8 +198,18 @@ def build_external_providers(
         raise ExternalCompositionError("RICK_QDRANT_URL")
     if not settings.redis_url or inputs.redis_client is None:
         raise ExternalCompositionError("Redis client and RICK_REDIS_URL")
+    rate_limiter = inputs.rate_limiter
+    if (
+        rate_limiter is None
+        or getattr(rate_limiter, "production_safe", False) is not True
+        or getattr(rate_limiter, "backend_kind", None) != "redis"
+        or not callable(getattr(rate_limiter, "allow", None))
+        or not callable(getattr(rate_limiter, "health_check", None))
+        or not callable(getattr(rate_limiter, "readiness_check", None))
+    ):
+        raise ExternalCompositionError("production-safe distributed rate limiter")
 
-    from rick_ingestion import IngestionService
+    from rick_ingestion import IngestionService, ProcessParserRunner
     from rick_jobs import JobResult, JobScope
     from rick_knowledge import PostgresKnowledgeStore
     from rick_locking import RedisLeaseClient
@@ -246,6 +259,13 @@ def build_external_providers(
 
     if not isinstance(inputs.worker_scope, tuple) or len(inputs.worker_scope) != 3:
         raise ExternalCompositionError("worker scope")
+    parser_runner = inputs.parser_runner or ProcessParserRunner()
+    if (
+        getattr(parser_runner, "production_safe", False) is not True
+        or getattr(parser_runner, "process_isolated", False) is not True
+        or not callable(getattr(parser_runner, "run", None))
+    ):
+        raise ExternalCompositionError("process-isolated parser runner")
     try:
         worker_scope = JobScope(*inputs.worker_scope)
     except (TypeError, ValueError) as exc:
@@ -309,13 +329,28 @@ def build_external_providers(
         embeddings=embeddings,
         backend=QdrantBackend(vectors),
     )
-    lease = RedisLeaseClient(inputs.redis_client, close_client=False)
+    lease = inputs.lease
+    if lease is None and settings.environment == "production":
+        raise ExternalCompositionError("production-safe Redis lease")
+    if lease is None:
+        lease = RedisLeaseClient(inputs.redis_client, close_client=False)
+    if settings.environment == "production" and (
+        getattr(lease, "production_safe", False) is not True
+        or getattr(lease, "backend_kind", None) != "redis"
+        or not callable(getattr(lease, "acquire_owned", None))
+        or not callable(getattr(lease, "renew_owned", None))
+        or not callable(getattr(lease, "release_owned", None))
+        or not callable(getattr(lease, "health_check", None))
+        or not callable(getattr(lease, "readiness_check", None))
+    ):
+        raise ExternalCompositionError("production-safe Redis lease")
     professor = ProfessorChatBackend(retrieval=retrieval, provider=provider, lease=lease)
     canonical_ingestion = IngestionService(
         knowledge=knowledge,
         vectors=vectors,
         embeddings=embeddings,
         max_jobs=settings.max_pending_ingestion_jobs,
+        parser_runner=parser_runner,
     )
     ingestion = PostgresIngestionApplicationService(
         queue=queue,
@@ -380,6 +415,7 @@ def build_external_providers(
         "postgres": probe(knowledge.health_check),
         "qdrant": probe(vectors.health_check),
         "queue": probe(queue.health_check),
+        "redis": probe(rate_limiter.readiness_check),
     }
     # Register checks at the same names used by the production lifecycle. A
     # component without an explicit probe remains not-ready through the
@@ -418,6 +454,7 @@ def build_external_providers(
         retrieval=retrieval,
         provider=provider,
         lease=lease,
+        rate_limiter=rate_limiter,
         professor=professor,
         ingestion=ingestion,
         worker=worker,

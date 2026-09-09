@@ -12,7 +12,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 from core.errors import ApiError, envelope
-from core.rate_limit import InMemoryRateLimiter, check_rate_limit, ensure_rate_limiter
+from core.rate_limit import InMemoryRateLimiter, check_rate_limit_async, ensure_rate_limiter
 from core.streaming import ClosingStreamingRoute, closing_stream
 from dependencies.identity import require_authenticated
 from dependencies.services import get_providers
@@ -49,22 +49,26 @@ def _chat_rate_key(session) -> str:
     return hashlib.sha256(identity.encode("utf-8")).hexdigest()
 
 
-def _rate_allowed(providers, key: str) -> bool:
+async def _rate_allowed(providers, key: str) -> bool:
     limiter = _chat_rate_limiter(providers)
     try:
-        return check_rate_limit(limiter, key, limit_per_min=providers.settings.chat_rate_limit_per_min)
+        return await check_rate_limit_async(
+            limiter,
+            key,
+            limit_per_min=providers.settings.chat_rate_limit_per_min,
+        )
     except TypeError as exc:
         raise ApiError("internal_error") from exc
 
 
-def _chat_rate_allowed(providers, session) -> bool:
-    return _rate_allowed(providers, _chat_rate_key(session))
+async def _chat_rate_allowed(providers, session) -> bool:
+    return await _rate_allowed(providers, _chat_rate_key(session))
 
 
-def _compat_rate_allowed(providers, api_key: str) -> bool:
+async def _compat_rate_allowed(providers, api_key: str) -> bool:
     """Apply the same bounded limiter to API-key compatibility traffic."""
     key = hashlib.sha256(f"compat:{api_key}".encode("utf-8")).hexdigest()
-    return _rate_allowed(providers, key)
+    return await _rate_allowed(providers, key)
 
 
 def _service(request: Request) -> ChatApplicationService:
@@ -137,7 +141,7 @@ def _page_response(payload: dict, store: object, page_method: str):
 @router.post("/api/v1/chat", response_model=ChatResponse)
 async def chat(payload: ChatRequest, request: Request, session=Depends(require_authenticated)):
     providers = get_providers(request)
-    if not _chat_rate_allowed(providers, session):
+    if not await _chat_rate_allowed(providers, session):
         request_id = getattr(request.state, "request_id", "unknown")
         return JSONResponse(
             status_code=429,

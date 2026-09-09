@@ -404,17 +404,23 @@ def mode_validate() -> int:
 
 
 def mode_compose(action: str) -> int:
-    compose = ROOT / ("docker-compose.dev.yml" if action == "dev" else "docker-compose.yml")
+    configured_file = os.environ.get("RICK_COMPOSE_FILE", "docker-compose.dev.yml").strip()
+    compose = (ROOT / configured_file).resolve()
+    try:
+        compose.relative_to(ROOT)
+    except ValueError:
+        print("NOT_READY: RICK_COMPOSE_FILE must remain inside the repository root.", file=sys.stderr)
+        return 2
     if action == "down" and not compose.is_file():
-        print("NOT_APPLICABLE: no canonical root compose stack exists in Phase 1.1; no external state changed.")
+        print("NOT_APPLICABLE: no canonical root compose stack is configured; no external state changed.")
         return 0
     if not compose.is_file():
-        print(f"NOT_READY: {compose.name} is intentionally deferred until the canonical apps exist.", file=sys.stderr)
+        print(f"NOT_READY: {compose.name} is unavailable; no external state changed.", file=sys.stderr)
         return 2
     if not shutil.which("docker"):
         print("NOT_AVAILABLE: Docker is required for the root compose lifecycle.", file=sys.stderr)
         return 2
-    command = ["docker", "compose", "-f", compose.name, action]
+    command = ["docker", "compose", "-f", str(compose.relative_to(ROOT)), action]
     if action == "up":
         command.append("-d")
     return 0 if run_case(f"root compose {action}", command) else 1

@@ -12,6 +12,7 @@ from rick_retrieval import (
     RetrievalEngine,
     RetrievalOptions,
     compute_confidence,
+    retrieval_quality_score,
     rrf_fusion,
     sparse_hash,
     sparse_overlap_score,
@@ -119,8 +120,10 @@ def test_context_budget_and_evidence_shape():
 
 
 def test_confidence_bounds():
-    assert 0.0 <= compute_confidence({"dense_score": 0.8, "sparse_score": 0.5, "score": 0.03}, "mastite bovina") <= 1.0
-    assert compute_confidence({"dense_score": 0.0, "sparse_score": 0.0, "score": 0.0}) == 0.0
+    item = {"dense_score": 0.8, "sparse_score": 0.5, "score": 0.03}
+    assert 0.0 <= retrieval_quality_score(item, "mastite bovina") <= 1.0
+    assert compute_confidence(item, "mastite bovina") == retrieval_quality_score(item, "mastite bovina")
+    assert retrieval_quality_score({"dense_score": 0.0, "sparse_score": 0.0, "score": 0.0}) == 0.0
 
 
 def test_disk_fallback_enforces_identical_acl():

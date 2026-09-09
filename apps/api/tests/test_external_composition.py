@@ -44,6 +44,40 @@ class Redis:
         return True
 
 
+class RateLimiter:
+    production_safe = True
+    backend_kind = "redis"
+
+    async def allow(self, *args, **kwargs):
+        return True
+
+    async def readiness_check(self):
+        return True
+
+    async def health_check(self):
+        return True
+
+
+class Lease:
+    production_safe = True
+    backend_kind = "redis"
+
+    async def acquire_owned(self, *args, **kwargs):
+        return True
+
+    async def renew_owned(self, *args, **kwargs):
+        return True
+
+    async def release_owned(self, *args, **kwargs):
+        return True
+
+    async def readiness_check(self):
+        return True
+
+    async def health_check(self):
+        return True
+
+
 def settings():
     return ApiSettings(
         environment="production",
@@ -80,6 +114,8 @@ def test_external_composition_builds_the_complete_graph_without_network_io(tmp_p
         qdrant_transport=HttpTransport(),
         provider_client=client,
         redis_client=Redis(),
+        rate_limiter=RateLimiter(),
+        lease=Lease(),
         worker_temp_root=str(tmp_path),
         worker_scope=("tenant-a", "workspace-a", "collection-a"),
     )
@@ -161,6 +197,8 @@ def test_external_composition_requires_delivery_for_local_reset_capability(tmp_p
         created_by="bootstrap-user",
         qdrant_transport=HttpTransport(),
         redis_client=Redis(),
+        rate_limiter=RateLimiter(),
+        lease=Lease(),
         worker_temp_root=str(tmp_path),
     )
 

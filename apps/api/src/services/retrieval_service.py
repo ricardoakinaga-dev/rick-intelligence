@@ -18,7 +18,7 @@ from rick_retrieval import (
     InMemoryBackend,
     RetrievalEngine,
     RetrievalOptions,
-    compute_confidence,
+    retrieval_quality_score,
 )
 from rick_contracts.rag import EvidenceDto, RetrievalResultDto
 
@@ -157,6 +157,7 @@ class RetrievalApplicationService:
                 "title": payload.get("title", ""), "page_start": payload.get("page_start"),
                 "page_end": payload.get("page_end", payload.get("page_start")),
                 "section": payload.get("section"), "checksum": payload.get("checksum", ""),
+                "document_version": payload.get("document_version", ""),
             })
         self.engine.attach_index(chunks)
         self._indexed = True
@@ -175,13 +176,17 @@ class RetrievalApplicationService:
         for raw in result.evidence:
             item = dict(raw)
             payload = self._provenance.get(str(item.get("chunk_id", "")), {})
-            for field in ("source", "title", "section", "checksum"):
+            for field in ("source", "title", "section", "checksum", "document_version"):
                 if not item.get(field) and payload.get(field):
                     item[field] = payload[field]
             for field in ("page_start", "page_end"):
                 if item.get(field) is None and payload.get(field) is not None:
                     item[field] = payload[field]
-            item["confidence_score"] = compute_confidence(item, result.query)
+            quality = retrieval_quality_score(item, result.query)
+            item["retrieval_quality_score"] = quality
+            # Legacy clients still consume this field; the contract docs make
+            # clear that it is the same uncalibrated ranking signal.
+            item["confidence_score"] = quality
             # Tenant is an authorization boundary, not public source
             # provenance. Preserve it in the internal DTO until the final
             # consumer validates scope; HTTP projections still omit it.

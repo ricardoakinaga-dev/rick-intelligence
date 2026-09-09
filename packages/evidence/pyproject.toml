@@ -1,0 +1,9 @@
+[project]
+name = "rick-evidence"
+version = "1.0.0"
+description = "Server-issued, scope-bound evidence and citation validation contracts"
+requires-python = ">=3.12"
+dependencies = ["pydantic==2.6.1"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

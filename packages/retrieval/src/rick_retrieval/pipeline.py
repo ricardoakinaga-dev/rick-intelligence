@@ -55,8 +55,13 @@ def _has_minimal_support(query: str, text: str) -> bool:
     return bool(non_numeric.intersection({t for t in text_terms if not t.isdigit()}))
 
 
-def compute_confidence(item: dict, query: str | None = None) -> float:
-    """Human-readable confidence blend (mirror of validated semantics)."""
+def retrieval_quality_score(item: dict, query: str | None = None) -> float:
+    """Return a bounded ranking quality signal, never a probability.
+
+    The value combines retrieval signals and lexical support. It is useful for
+    ordering and policy thresholds, but it has no calibrated probabilistic
+    interpretation until a separately versioned calibration dataset exists.
+    """
     dense = max(0.0, min(1.0, float(item.get("dense_score", 0.0) or 0.0)))
     sparse = max(0.0, min(1.0, math.tanh(float(item.get("sparse_score", 0.0) or 0.0) / 4.0)))
     rrf = max(0.0, min(1.0, math.tanh(float(item.get("score", 0.0) or 0.0) * 30.0)))
@@ -78,6 +83,17 @@ def compute_confidence(item: dict, query: str | None = None) -> float:
     else:
         score += rrf * 0.10
     return max(0.0, min(1.0, score))
+
+
+def compute_confidence(item: dict, query: str | None = None) -> float:
+    """Compatibility alias for the pre-v1.5 retrieval quality helper.
+
+    Existing Professor and legacy callers still use this name. New code must
+    use retrieval_quality_score; neither name represents calibrated
+    probability.
+    """
+
+    return retrieval_quality_score(item, query)
 
 
 def dedupe_candidates(candidates: list[dict]) -> list[dict]:
@@ -167,8 +183,13 @@ class RetrievalEngine:
                  and ("*" in allowed_set or (c.get("collection_id") or "rag_phase0") in allowed_set)]
         fused = dedupe_candidates(fused)
         for item in fused:
-            item["confidence_score"] = compute_confidence(item, normalized)
-        fused.sort(key=lambda i: (float(i.get("confidence_score", 0.0) or 0.0),
+            quality = retrieval_quality_score(item, normalized)
+            item["retrieval_quality_score"] = quality
+            # Preserve the old serialized field while callers migrate. The
+            # contract and docs identify this as a ranking signal, not a
+            # calibrated confidence probability.
+            item["confidence_score"] = quality
+        fused.sort(key=lambda i: (float(i.get("retrieval_quality_score", 0.0) or 0.0),
                                   float(i.get("score", 0.0) or 0.0)), reverse=True)
         if options.rerank:
             fused = self.reranker.rerank(normalized, fused)
@@ -202,6 +223,7 @@ class RetrievalEngine:
                 "page_end": item.get("page_end", item.get("page_start")),
                 "section": item.get("section"),
                 "checksum": item.get("checksum") or "",
+                "document_version": item.get("document_version") or None,
                 "score": float(item.get("score", 0.0) or 0.0),
                 "rank": rank,
                 "dense_score": float(item.get("dense_score", 0.0) or 0.0),

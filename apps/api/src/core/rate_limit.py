@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections import defaultdict, deque
 import math
+import inspect
 import threading
 import time
 from typing import Any, Protocol
@@ -60,6 +61,8 @@ class DistributedRateLimiter:
             raise ValueError("rate-limit window must be a positive finite number")
         self._backend = backend
         self.window_seconds = float(window_seconds)
+        self.production_safe = False
+        self.backend_kind = "distributed"
 
     def check(self, key: str, *, limit_per_min: int) -> bool:
         """Atomically count a request and fail closed if the backend is unsafe."""
@@ -129,13 +132,83 @@ def check_rate_limit(limiter: Any, key: str, *, limit_per_min: int) -> bool:
     check = getattr(limiter, "check", None)
     if callable(check):
         try:
-            return bool(check(key, limit_per_min=limit_per_min))
+            result = check(key, limit_per_min=limit_per_min)
         except TypeError:
-            return bool(check(key, limit_per_min))
+            result = check(key, limit_per_min)
+        if inspect.isawaitable(result):
+            close = getattr(result, "close", None)
+            if callable(close):
+                close()
+            raise TypeError("asynchronous rate limiter requires check_rate_limit_async()")
+        return bool(result)
     allow = getattr(limiter, "allow", None)
     if callable(allow):
         try:
-            return bool(allow(key, limit_per_min=limit_per_min))
+            result = allow(key, limit_per_min=limit_per_min)
         except TypeError:
-            return bool(allow(key, limit_per_min))
+            result = allow(key, limit_per_min)
+        if inspect.isawaitable(result):
+            close = getattr(result, "close", None)
+            if callable(close):
+                close()
+            raise TypeError("asynchronous rate limiter requires check_rate_limit_async()")
+        return bool(result)
     raise TypeError("configured rate limiter must expose check() or allow()")
+
+
+async def check_rate_limit_async(
+    limiter: Any,
+    key: str,
+    *,
+    limit_per_min: int,
+    request_id: str | None = None,
+) -> bool:
+    """Evaluate sync and async limiter ports without treating coroutines as truthy.
+
+    The async package-owned Redis limiter uses allow(limit=...) while the
+    local API limiter uses check(limit_per_min=...). This adapter keeps the
+    route policy single-sourced and rejects malformed capabilities.
+    """
+
+    allow = getattr(limiter, "allow", None)
+    if callable(allow):
+        try:
+            result = allow(
+                key,
+                limit=limit_per_min,
+                window_seconds=60.0,
+                request_id=request_id,
+            )
+        except TypeError:
+            try:
+                result = allow(key, limit=limit_per_min)
+            except TypeError:
+                result = allow(key, limit_per_min)
+        if inspect.isawaitable(result):
+            result = await result
+        return bool(result)
+
+    check = getattr(limiter, "check", None)
+    if callable(check):
+        try:
+            result = check(key, limit_per_min=limit_per_min)
+        except TypeError:
+            result = check(key, limit_per_min)
+        if inspect.isawaitable(result):
+            result = await result
+        return bool(result)
+    raise TypeError("configured rate limiter must expose check() or allow()")
+
+
+def is_production_rate_limiter(limiter: object) -> bool:
+    """Return whether a limiter carries an explicit distributed capability mark."""
+
+    return (
+        limiter is not None
+        and getattr(limiter, "production_safe", False) is True
+        and getattr(limiter, "backend_kind", None) in {"redis", "distributed"}
+        and (
+            callable(getattr(limiter, "allow", None))
+            or callable(getattr(limiter, "check", None))
+        )
+    )

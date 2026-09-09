@@ -9,27 +9,27 @@
   },
   "upload_ms": {
     "n": 30,
-    "p50": 1.62,
-    "p95": 2.522,
-    "p99": 2.616,
-    "min": 1.379,
-    "max": 2.616
+    "p50": 1.907,
+    "p95": 2.658,
+    "p99": 3.542,
+    "min": 1.537,
+    "max": 3.542
   },
   "enqueue_ms": {
     "n": 30,
-    "p50": 0.21,
-    "p95": 0.328,
-    "p99": 0.411,
-    "min": 0.166,
-    "max": 0.411
+    "p50": 0.22,
+    "p95": 0.292,
+    "p99": 0.478,
+    "min": 0.163,
+    "max": 0.478
   },
   "retrieval_ms": {
     "n": 30,
-    "p50": 10.223,
-    "p95": 13.636,
-    "p99": 27.432,
-    "min": 9.405,
-    "max": 27.432
+    "p50": 10.497,
+    "p95": 13.075,
+    "p99": 24.464,
+    "min": 9.32,
+    "max": 24.464
   },
   "ttft_ms": {
     "status": "NOT_APPLICABLE",
@@ -43,10 +43,10 @@
     "status": "OBSERVED",
     "unit": "bytes",
     "method": "procfs_rss_and_vmhwm_or_resource_maxrss",
-    "rss_before_bytes": 37761024,
-    "rss_after_bytes": 40353792,
-    "rss_delta_bytes": 2592768,
-    "peak_rss_bytes": 40398848,
+    "rss_before_bytes": 38641664,
+    "rss_after_bytes": 41443328,
+    "rss_delta_bytes": 2801664,
+    "peak_rss_bytes": 41971712,
     "scope": "entire benchmark process; not an isolated request allocation"
   },
   "cost": {

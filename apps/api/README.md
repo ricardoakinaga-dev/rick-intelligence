@@ -43,7 +43,7 @@ The ring and executor remain process-local, bounded and non-distributed.
 ## Local start
 
 ```bash
-PYTHONPATH=apps/api/src:apps/worker:packages/jobs/src:packages/contracts/src:packages/authorization/src:packages/identity/src:packages/observability/src:packages/knowledge/src:packages/ingestion/src:packages/retrieval/src:packages/providers/src:packages/locking/src:packages/professor/src \
+PYTHONPATH=apps/api/src:apps/worker:packages/jobs/src:packages/contracts/src:packages/authorization/src:packages/identity/src:packages/observability/src:packages/knowledge/src:packages/ingestion/src:packages/retrieval/src:packages/providers/src:packages/locking/src:packages/professor/src:packages/evidence/src:packages/decision/src \
   python3 -m uvicorn main:app --app-dir apps/api/src --port 8000
 # or
 make api-dev

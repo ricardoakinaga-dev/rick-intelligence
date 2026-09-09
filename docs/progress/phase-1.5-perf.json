@@ -9,46 +9,46 @@
   },
   "retrieval_ms": {
     "n": 30,
-    "p50": 0.601,
-    "p95": 0.83,
-    "p99": 0.922,
-    "min": 0.492,
-    "max": 0.922
+    "p50": 0.521,
+    "p95": 0.725,
+    "p99": 0.754,
+    "min": 0.478,
+    "max": 0.754
   },
   "professor_ms": {
     "n": 30,
-    "p50": 1.249,
-    "p95": 1.815,
-    "p99": 1.893,
-    "min": 1.021,
-    "max": 1.893
+    "p50": 1.261,
+    "p95": 1.557,
+    "p99": 1.56,
+    "min": 1.169,
+    "max": 1.56
   },
   "ttft_ms": {
     "status": "OBSERVED",
     "n": 30,
-    "p50": 1.193,
-    "p95": 1.51,
-    "p99": 1.563,
-    "min": 0.996,
-    "max": 1.563
+    "p50": 1.491,
+    "p95": 2.098,
+    "p99": 2.485,
+    "min": 1.28,
+    "max": 2.485
   },
   "completion_ms": {
     "status": "OBSERVED",
     "n": 30,
-    "p50": 1.401,
-    "p95": 1.732,
-    "p99": 1.765,
-    "min": 1.132,
-    "max": 1.765
+    "p50": 1.662,
+    "p95": 2.336,
+    "p99": 2.708,
+    "min": 1.426,
+    "max": 2.708
   },
   "memory": {
     "status": "OBSERVED",
     "unit": "bytes",
     "method": "procfs_rss_and_vmhwm_or_resource_maxrss",
-    "rss_before_bytes": 51249152,
-    "rss_after_bytes": 51798016,
-    "rss_delta_bytes": 548864,
-    "peak_rss_bytes": 51798016,
+    "rss_before_bytes": 51400704,
+    "rss_after_bytes": 53678080,
+    "rss_delta_bytes": 2277376,
+    "peak_rss_bytes": 53678080,
     "scope": "entire benchmark process; not an isolated request allocation"
   },
   "cost": {
@@ -83,7 +83,7 @@
     "iterations": 10,
     "iterations_completed": 10,
     "failures": 0,
-    "duration_ms": 13.49,
+    "duration_ms": 15.654,
     "invariants": [
       "all completions retained APPROVED_EVIDENCE",
       "no external dependency was contacted"

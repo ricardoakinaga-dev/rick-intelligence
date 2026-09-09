@@ -20,6 +20,7 @@ _READINESS_PROVIDER_COMPONENTS = {
     "qdrant": "vector_store",
     "queue": "queue",
     "redis": "redis",
+    "rate_limiter": "redis",
     "retrieval": "retrieval",
     "storage": "storage",
     "vector-store": "vector_store",

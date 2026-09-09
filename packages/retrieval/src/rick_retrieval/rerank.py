@@ -2,8 +2,8 @@
 
 BM25FReranker mirrors the validated local reranker: IDF over candidates,
 k1=1.5 b=0.75 avgdl=200, field weights body 1.0 / filename 0.3 / tags 0.2,
-positional decay on body, geometric-mean blend with confidence, original-score
-tie-break. Deterministic, no external calls.
+positional decay on body, geometric-mean blend with retrieval quality, and an
+original-score tie-break. Deterministic, no external calls.
 """
 
 from __future__ import annotations
@@ -51,11 +51,11 @@ class BM25FReranker:
             new_cand = dict(cand)
             new_cand["original_score"] = cand.get("score", 0.0)
             new_cand["bm25f_score"] = bm25f
-            confidence = cand.get("confidence_score", 0.0) or 0.0
-            if confidence > 0 and bm25f > 0:
-                new_cand["score"] = (confidence * bm25f) ** 0.5
+            quality = cand.get("retrieval_quality_score", cand.get("confidence_score", 0.0)) or 0.0
+            if quality > 0 and bm25f > 0:
+                new_cand["score"] = (quality * bm25f) ** 0.5
             else:
-                new_cand["score"] = max(confidence, bm25f)
+                new_cand["score"] = max(quality, bm25f)
             scored.append(new_cand)
         scored.sort(key=lambda x: (x.get("score", 0.0), x.get("original_score", 0.0)), reverse=True)
         return scored
@@ -117,8 +117,8 @@ class ModelReranker:
         for cand, vec in zip(candidates, cand_vecs):
             sim = _cosine(query_vec, vec)
             new_cand = dict(cand)
-            confidence = cand.get("confidence_score", 0.0) or 0.0
-            new_cand["score"] = (confidence * sim) ** 0.5 if confidence > 0 and sim > 0 else max(confidence, sim)
+            quality = cand.get("retrieval_quality_score", cand.get("confidence_score", 0.0)) or 0.0
+            new_cand["score"] = (quality * sim) ** 0.5 if quality > 0 and sim > 0 else max(quality, sim)
             scored.append(new_cand)
         scored.sort(key=lambda x: x.get("score", 0.0), reverse=True)
         return scored

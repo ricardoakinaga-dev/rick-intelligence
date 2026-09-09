@@ -16,6 +16,7 @@ from rick_retrieval.qdrant import (  # noqa: E402
     QdrantBoundsError,
     QdrantClosedError,
     QdrantConfigurationError,
+    QdrantCircuitOpenError,
     QdrantHttpVectorStore,
     QdrantLimits,
     QdrantMalformedResponseError,
@@ -219,6 +220,134 @@ def test_timeout_and_status_errors_are_typed_and_redacted(handler, error_type) -
     assert secret not in repr(caught.value)
     if isinstance(caught.value, QdrantStatusError):
         assert caught.value.status_code == 503
+
+
+def test_transient_qdrant_failures_retry_with_bounded_backoff() -> None:
+    responses: list[object] = [
+        HttpResponse(503, b"temporary"),
+        HttpResponse(200, b"healthy"),
+    ]
+    transport = FakeTransport(lambda *_: responses.pop(0))
+    delays: list[float] = []
+    store = QdrantHttpVectorStore(
+        base_url="http://qdrant.test",
+        collection="rag_phase0",
+        transport=transport,
+        max_attempts=2,
+        retry_backoff_seconds=0.25,
+        sleeper=delays.append,
+    )
+
+    assert store.health().ok is True
+    assert len(transport.requests) == 2
+    assert delays == [0.25]
+
+
+def test_qdrant_circuit_fails_closed_and_allows_one_recovery_probe() -> None:
+    now = [0.0]
+    responses: list[object] = [
+        TimeoutError("secret=must-not-leak"),
+        HttpResponse(200, b"healthy"),
+    ]
+    transport = FakeTransport(lambda *_: (_ for _ in ()).throw(responses.pop(0))
+                              if isinstance(responses[0], BaseException)
+                              else responses.pop(0))
+    store = QdrantHttpVectorStore(
+        base_url="http://qdrant.test",
+        collection="rag_phase0",
+        transport=transport,
+        max_attempts=1,
+        circuit_failure_threshold=1,
+        circuit_reset_seconds=10,
+        clock=lambda: now[0],
+    )
+
+    with pytest.raises(QdrantTimeoutError):
+        store.health()
+    assert store.circuit_open is True
+    with pytest.raises(QdrantCircuitOpenError):
+        store.health()
+    assert len(transport.requests) == 1
+
+    now[0] = 10.0
+    assert store.health().ok is True
+    assert store.circuit_open is False
+    assert len(transport.requests) == 2
+
+
+def test_collection_schema_index_and_alias_operations_are_bounded() -> None:
+    def handler(method: str, url: str, headers: Mapping[str, str], content: bytes) -> HttpResponse:
+        if method == "GET" and url.endswith("/collections/rag_phase0"):
+            return _json_response(
+                {
+                    "result": {
+                        "status": "green",
+                        "optimizer_status": "ok",
+                        "vectors_count": 12,
+                        "points_count": 12,
+                    }
+                }
+            )
+        if method == "PUT" and url.endswith("/collections/rag_phase0"):
+            body = json.loads(content)
+            assert body == {"vectors": {"dense": {"distance": "Cosine", "size": 1536}}}
+            return _json_response({"result": True})
+        if method == "PUT" and url.endswith("/collections/rag_phase0/index"):
+            body = json.loads(content)
+            assert body == {"field_name": "tenant_id", "field_schema": "keyword", "wait": True}
+            return _json_response({"result": True})
+        if method == "GET" and url.endswith("/aliases"):
+            return _json_response(
+                {"result": [{"alias_name": "rag_current", "collection_name": "rag_phase0"}]}
+            )
+        if method == "POST" and url.endswith("/collections/aliases"):
+            body = json.loads(content)
+            assert body == {
+                "actions": [
+                    {"action": "delete_alias", "alias_name": "rag_current"},
+                    {
+                        "action": "create_alias",
+                        "alias_name": "rag_current",
+                        "collection_name": "rag_phase1",
+                    },
+                ]
+            }
+            return _json_response({"result": True})
+        raise AssertionError(f"unexpected route {method} {url}")
+
+    transport = FakeTransport(handler)
+    store = QdrantHttpVectorStore(
+        base_url="http://qdrant.test",
+        collection="rag_phase0",
+        transport=transport,
+    )
+
+    info = store.collection_info()
+    assert info.status == "green" and info.points_count == 12
+    assert store.create_collection(vector_dimensions=1536) is True
+    assert store.create_payload_index(field_name="tenant_id") is True
+    assert store.list_aliases()[0].collection_name == "rag_phase0"
+    assert store.replace_alias(
+        alias_name="rag_current",
+        collection_name="rag_phase1",
+        old_collection_name="rag_phase0",
+    ) is True
+
+
+def test_collection_operations_reject_unsafe_inputs_before_http() -> None:
+    transport = FakeTransport(lambda *_: pytest.fail("invalid control operation must not probe Qdrant"))
+    store = QdrantHttpVectorStore(
+        base_url="http://qdrant.test",
+        collection="rag_phase0",
+        transport=transport,
+    )
+    with pytest.raises(QdrantBoundsError):
+        store.create_collection(vector_dimensions=20_000)
+    with pytest.raises(QdrantValidationError):
+        store.create_payload_index(field_name="tenant_id\nsecret")
+    with pytest.raises(QdrantValidationError):
+        store.replace_alias(alias_name="rag_current", collection_name="rag_current")
+    assert transport.requests == []
 
 
 def test_malformed_and_oversized_success_responses_are_safe_errors() -> None:

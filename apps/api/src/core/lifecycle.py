@@ -373,6 +373,7 @@ def build_readiness_checks(providers: object) -> dict[str, object]:
             ("job_journal", "job_journal", True),
             ("queue", "queue", True),
             ("object_store", "object_store", True),
+            ("redis", "rate_limiter", True),
         )
     for name, attribute_name, required in selected_components:
         component = storage if name == "storage" else getattr(providers, attribute_name, None)

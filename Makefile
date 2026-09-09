@@ -18,14 +18,14 @@ help:
 	@printf '%s\n' 'RICK Intelligence root commands:'
 	@printf '%s\n' '  make bootstrap        prepare preserved runtimes and lockfile installs'
 	@printf '%s\n' '  make validate         verify skeleton, contracts, boundaries, and history'
-	@printf '%s\n' '  make dev              guarded until canonical root apps exist'
+	@printf '%s\n' '  make dev              guarded canonical development compose lifecycle'
 	@printf '%s\n' '  make test-fast        focused preserved-component regression checks'
 	@printf '%s\n' '  make test             all available component tests and frontend smoke'
 	@printf '%s\n' '  make test-integration disposable loopback integration probes'
 	@printf '%s\n' '  make lint             root/static/frontend lint checks'
 	@printf '%s\n' '  make typecheck        TypeScript compiler and Python compilation checks'
 	@printf '%s\n' '  make build            preserved Professor/frontend/Python build checks'
-	@printf '%s\n' '  make up|down|logs     guarded root compose lifecycle commands'
+	@printf '%s\n' '  make up|down|logs     guarded dev compose lifecycle (RICK_COMPOSE_FILE selects another file)'
 	@printf '%s\n' '  make ci               validate + fast tests + lint + typecheck + build'
 	@printf '%s\n' '  make eval             deterministic non-live Phase 0.5 plumbing evaluation'
 	@printf '%s\n' '  make eval-retrieval   offline retrieval/ACL/provenance evaluation fixture'
@@ -167,10 +167,10 @@ api15-professor:
 	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)/packages/contracts/src:$(ROOT)/packages/professor/src" $(PYTHON) -m pytest -q -p no:cacheprovider "$(ROOT)/packages/professor/tests"
 
 api15-root:
-	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)/apps/api/src:$(ROOT)/apps/worker:$(ROOT)/packages/jobs/src:$(ROOT)/packages/contracts/src:$(ROOT)/packages/authorization/src:$(ROOT)/packages/identity/src:$(ROOT)/packages/observability/src:$(ROOT)/packages/knowledge/src:$(ROOT)/packages/ingestion/src:$(ROOT)/packages/retrieval/src:$(ROOT)/packages/providers/src:$(ROOT)/packages/locking/src:$(ROOT)/packages/professor/src" $(PYTHON) -m pytest -q -p no:cacheprovider "$(ROOT)/apps/api/tests"
+	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)/apps/api/src:$(ROOT)/apps/worker:$(ROOT)/packages/jobs/src:$(ROOT)/packages/contracts/src:$(ROOT)/packages/authorization/src:$(ROOT)/packages/identity/src:$(ROOT)/packages/observability/src:$(ROOT)/packages/knowledge/src:$(ROOT)/packages/ingestion/src:$(ROOT)/packages/retrieval/src:$(ROOT)/packages/providers/src:$(ROOT)/packages/locking/src:$(ROOT)/packages/professor/src:$(ROOT)/packages/evidence/src:$(ROOT)/packages/decision/src" $(PYTHON) -m pytest -q -p no:cacheprovider "$(ROOT)/apps/api/tests"
 
 api15-benchmark:
-	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)/apps/api/src:$(ROOT)/packages/contracts/src:$(ROOT)/packages/authorization/src:$(ROOT)/packages/identity/src:$(ROOT)/packages/observability/src:$(ROOT)/packages/knowledge/src:$(ROOT)/packages/ingestion/src:$(ROOT)/packages/retrieval/src:$(ROOT)/packages/providers/src:$(ROOT)/packages/locking/src:$(ROOT)/packages/professor/src" $(PYTHON) "$(ROOT)/scripts/phase15/benchmark.py"
+	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)/apps/api/src:$(ROOT)/packages/contracts/src:$(ROOT)/packages/authorization/src:$(ROOT)/packages/identity/src:$(ROOT)/packages/observability/src:$(ROOT)/packages/knowledge/src:$(ROOT)/packages/ingestion/src:$(ROOT)/packages/retrieval/src:$(ROOT)/packages/providers/src:$(ROOT)/packages/locking/src:$(ROOT)/packages/professor/src:$(ROOT)/packages/evidence/src:$(ROOT)/packages/decision/src" $(PYTHON) "$(ROOT)/scripts/phase15/benchmark.py"
 
 api15-verify:
 	$(PYTHON) "$(ROOT)/scripts/phase15/verify.py"
@@ -181,10 +181,10 @@ api16-domain:
 	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)/packages/knowledge/src:$(ROOT)/packages/ingestion/src:$(ROOT)/packages/retrieval/src" $(PYTHON) -m pytest -q -p no:cacheprovider "$(ROOT)/packages/knowledge/tests" "$(ROOT)/packages/ingestion/tests" "$(ROOT)/packages/retrieval/tests"
 
 api16-worker:
-	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)/apps/worker:$(ROOT)/apps/api/src:$(ROOT)/packages/jobs/src:$(ROOT)/packages/contracts/src:$(ROOT)/packages/authorization/src:$(ROOT)/packages/identity/src:$(ROOT)/packages/observability/src:$(ROOT)/packages/knowledge/src:$(ROOT)/packages/ingestion/src:$(ROOT)/packages/retrieval/src:$(ROOT)/packages/providers/src:$(ROOT)/packages/locking/src:$(ROOT)/packages/professor/src" $(PYTHON) -m pytest -q -p no:cacheprovider "$(ROOT)/apps/worker/tests" "$(ROOT)/apps/api/tests/test_phase16_health.py"
+	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)/apps/worker:$(ROOT)/apps/api/src:$(ROOT)/packages/jobs/src:$(ROOT)/packages/contracts/src:$(ROOT)/packages/authorization/src:$(ROOT)/packages/identity/src:$(ROOT)/packages/observability/src:$(ROOT)/packages/knowledge/src:$(ROOT)/packages/ingestion/src:$(ROOT)/packages/retrieval/src:$(ROOT)/packages/providers/src:$(ROOT)/packages/locking/src:$(ROOT)/packages/professor/src:$(ROOT)/packages/evidence/src:$(ROOT)/packages/decision/src" $(PYTHON) -m pytest -q -p no:cacheprovider "$(ROOT)/apps/worker/tests" "$(ROOT)/apps/api/tests/test_phase16_health.py"
 
 api16-root:
-	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)/apps/api/src:$(ROOT)/apps/worker:$(ROOT)/packages/jobs/src:$(ROOT)/packages/contracts/src:$(ROOT)/packages/authorization/src:$(ROOT)/packages/identity/src:$(ROOT)/packages/observability/src:$(ROOT)/packages/knowledge/src:$(ROOT)/packages/ingestion/src:$(ROOT)/packages/retrieval/src:$(ROOT)/packages/providers/src:$(ROOT)/packages/locking/src:$(ROOT)/packages/professor/src" $(PYTHON) -m pytest -q -p no:cacheprovider "$(ROOT)/apps/api/tests"
+	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)/apps/api/src:$(ROOT)/apps/worker:$(ROOT)/packages/jobs/src:$(ROOT)/packages/contracts/src:$(ROOT)/packages/authorization/src:$(ROOT)/packages/identity/src:$(ROOT)/packages/observability/src:$(ROOT)/packages/knowledge/src:$(ROOT)/packages/ingestion/src:$(ROOT)/packages/retrieval/src:$(ROOT)/packages/providers/src:$(ROOT)/packages/locking/src:$(ROOT)/packages/professor/src:$(ROOT)/packages/evidence/src:$(ROOT)/packages/decision/src" $(PYTHON) -m pytest -q -p no:cacheprovider "$(ROOT)/apps/api/tests"
 
 api16-benchmark:
 	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)/apps/api/src:$(ROOT)/packages/contracts/src:$(ROOT)/packages/knowledge/src:$(ROOT)/packages/ingestion/src:$(ROOT)/packages/retrieval/src" $(PYTHON) "$(ROOT)/scripts/phase16/benchmark.py"

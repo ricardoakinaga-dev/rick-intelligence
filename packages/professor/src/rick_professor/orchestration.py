@@ -77,6 +77,7 @@ class _TrustedEvidence:
     page_start: int | None
     page_end: int | None
     checksum: str | None
+    document_version: str | None
     confidence: float
     score: float = 0.0
     rank: int = 0
@@ -97,6 +98,7 @@ class _TrustedEvidence:
             "page_start": self.page_start,
             "page_end": self.page_end,
             "checksum": self.checksum or "",
+            "document_version": self.document_version,
             "score": self.score,
             "rank": self.rank,
             "dense_score": self.dense_score,
@@ -137,6 +139,24 @@ def _retrieved_items(value: object) -> list[object]:
     if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
         return list(value)
     return []
+
+
+def _retrieval_decision_metadata(value: object) -> dict[str, str | int | float | bool | None]:
+    """Keep only safe decision facts returned by an application retrieval gate."""
+
+    payload = _as_mapping(value)
+    if payload is None:
+        return {}
+    metadata = payload.get("metadata")
+    if not isinstance(metadata, Mapping):
+        return {}
+    allowed = {"decision_action", "decision_reason", "decision_attempt", "evidence_bundle_id"}
+    result: dict[str, str | int | float | bool | None] = {}
+    for key in allowed:
+        value = metadata.get(key)
+        if isinstance(value, (str, int, float, bool)) or value is None:
+            result[key] = value
+    return result
 
 
 def _bounded_float(value: object) -> float | None:
@@ -243,6 +263,7 @@ def _trusted_evidence(
                 page_start=_safe_page(item.get("page_start")),
                 page_end=_safe_page(item.get("page_end")),
                 checksum=_safe_optional_string(item.get("checksum"), max_chars=256) or "",
+                document_version=_safe_optional_string(item.get("document_version"), max_chars=128),
                 confidence=_fallback_confidence(item),
                 score=_bounded_float(item.get("score")) or 0.0,
                 rank=_safe_page(item.get("rank")) or 0,
@@ -451,11 +472,12 @@ class ProfessorOrchestrator:
         except Exception:
             return self._failed(request, "retrieval_failed")
 
+        decision_metadata = _retrieval_decision_metadata(retrieval_result)
         evidence = _trusted_evidence(_retrieved_items(retrieval_result), request.retrieval_context, self.limits)
         if not evidence:
-            return self._static(request, "NO_EVIDENCE", _NO_EVIDENCE_ANSWER, evidence)
+            return self._static(request, "NO_EVIDENCE", _NO_EVIDENCE_ANSWER, evidence, metadata=decision_metadata)
         if max(item.confidence for item in evidence) < self.limits.approved_confidence:
-            return self._static(request, "WEAK_EVIDENCE", _WEAK_EVIDENCE_ANSWER, evidence)
+            return self._static(request, "WEAK_EVIDENCE", _WEAK_EVIDENCE_ANSWER, evidence, metadata=decision_metadata)
 
         messages = _build_messages(request, evidence, self.limits)
         try:
@@ -468,11 +490,11 @@ class ProfessorOrchestrator:
         except asyncio.CancelledError:
             raise
         except Exception:
-            return self._failed(request, "provider_failed", evidence)
+            return self._failed(request, "provider_failed", evidence, metadata=decision_metadata)
 
         answer, citations, invalid = self._citations(completion.content, evidence)
         if invalid:
-            return self._static(request, "CITATION_INVALID", _INVALID_CITATION_ANSWER, evidence)
+            return self._static(request, "CITATION_INVALID", _INVALID_CITATION_ANSWER, evidence, metadata=decision_metadata)
         return ProfessorResponse(
             conversation_id=request.conversation_id,
             answer=answer,
@@ -480,6 +502,7 @@ class ProfessorOrchestrator:
             citations=citations,
             evidence=[item.response_dict() for item in evidence],
             metadata={
+                **decision_metadata,
                 "evidence_count": len(evidence),
                 "provider_model": completion.model[:128],
                 "finish_reason": completion.finish_reason,
@@ -741,12 +764,13 @@ class ProfessorOrchestrator:
             yield {"kind": "final", "response": self._failed(request, "retrieval_failed")}
             return
 
+        decision_metadata = _retrieval_decision_metadata(retrieval_result)
         evidence = _trusted_evidence(_retrieved_items(retrieval_result), request.retrieval_context, self.limits)
         if not evidence:
-            yield {"kind": "final", "response": self._static(request, "NO_EVIDENCE", _NO_EVIDENCE_ANSWER, evidence)}
+            yield {"kind": "final", "response": self._static(request, "NO_EVIDENCE", _NO_EVIDENCE_ANSWER, evidence, metadata=decision_metadata)}
             return
         if max(item.confidence for item in evidence) < self.limits.approved_confidence:
-            yield {"kind": "final", "response": self._static(request, "WEAK_EVIDENCE", _WEAK_EVIDENCE_ANSWER, evidence)}
+            yield {"kind": "final", "response": self._static(request, "WEAK_EVIDENCE", _WEAK_EVIDENCE_ANSWER, evidence, metadata=decision_metadata)}
             return
 
         messages = _build_messages(request, evidence, self.limits)
@@ -761,18 +785,18 @@ class ProfessorOrchestrator:
                 yield {"kind": "delta", "delta": completion.content}
                 answer, citations, invalid = self._citations(completion.content, evidence)
                 if invalid:
-                    yield {"kind": "final", "response": self._static(request, "CITATION_INVALID", _INVALID_CITATION_ANSWER, evidence)}
+                    yield {"kind": "final", "response": self._static(request, "CITATION_INVALID", _INVALID_CITATION_ANSWER, evidence, metadata=decision_metadata)}
                     return
                 yield {"kind": "final", "response": ProfessorResponse(
                     conversation_id=request.conversation_id, answer=answer,
                     evidence_status="APPROVED_EVIDENCE", citations=citations,
                     evidence=[item.response_dict() for item in evidence],
-                    metadata={"evidence_count": len(evidence), "provider_model": completion.model[:128], "finish_reason": completion.finish_reason},
+                    metadata={**decision_metadata, "evidence_count": len(evidence), "provider_model": completion.model[:128], "finish_reason": completion.finish_reason},
                 )}
             except asyncio.CancelledError:
                 raise
             except Exception:
-                yield {"kind": "final", "response": self._failed(request, "provider_failed", evidence)}
+                yield {"kind": "final", "response": self._failed(request, "provider_failed", evidence, metadata=decision_metadata)}
             return
 
         content_parts: list[str] = []
@@ -795,12 +819,12 @@ class ProfessorOrchestrator:
         except asyncio.CancelledError:
             raise
         except Exception:
-            yield {"kind": "final", "response": self._failed(request, "provider_failed", evidence)}
+            yield {"kind": "final", "response": self._failed(request, "provider_failed", evidence, metadata=decision_metadata)}
             return
 
         content = "".join(content_parts).strip()
         if not content or not model:
-            yield {"kind": "final", "response": self._failed(request, "provider_failed", evidence)}
+            yield {"kind": "final", "response": self._failed(request, "provider_failed", evidence, metadata=decision_metadata)}
             return
         try:
             completion = ChatCompletionResult(
@@ -809,16 +833,16 @@ class ProfessorOrchestrator:
             )
             answer, citations, invalid = self._citations(completion.content, evidence)
         except Exception:
-            yield {"kind": "final", "response": self._failed(request, "provider_failed", evidence)}
+            yield {"kind": "final", "response": self._failed(request, "provider_failed", evidence, metadata=decision_metadata)}
             return
         if invalid:
-            yield {"kind": "final", "response": self._static(request, "CITATION_INVALID", _INVALID_CITATION_ANSWER, evidence)}
+            yield {"kind": "final", "response": self._static(request, "CITATION_INVALID", _INVALID_CITATION_ANSWER, evidence, metadata=decision_metadata)}
             return
         yield {"kind": "final", "response": ProfessorResponse(
             conversation_id=request.conversation_id, answer=answer,
             evidence_status="APPROVED_EVIDENCE", citations=citations,
             evidence=[item.response_dict() for item in evidence],
-            metadata={"evidence_count": len(evidence), "provider_model": completion.model[:128], "finish_reason": completion.finish_reason},
+            metadata={**decision_metadata, "evidence_count": len(evidence), "provider_model": completion.model[:128], "finish_reason": completion.finish_reason},
         )}
 
     async def _retrieve(self, request: ProfessorRequest) -> object:
@@ -847,13 +871,15 @@ class ProfessorOrchestrator:
         status: str,
         answer: str,
         evidence: Sequence[_TrustedEvidence],
+        *,
+        metadata: Mapping[str, str | int | float | bool | None] | None = None,
     ) -> ProfessorResponse:
         return ProfessorResponse(
             conversation_id=request.conversation_id,
             answer=answer[: self.limits.max_answer_chars],
             evidence_status=status,  # type: ignore[arg-type]
             evidence=[item.response_dict() for item in evidence],
-            metadata={"evidence_count": len(evidence)},
+            metadata={**dict(metadata or {}), "evidence_count": len(evidence)},
         )
 
     def _failed(
@@ -861,13 +887,15 @@ class ProfessorOrchestrator:
         request: ProfessorRequest,
         stage: str,
         evidence: Sequence[_TrustedEvidence] = (),
+        *,
+        metadata: Mapping[str, str | int | float | bool | None] | None = None,
     ) -> ProfessorResponse:
         return ProfessorResponse(
             conversation_id=request.conversation_id,
             answer=_GENERATION_FAILED_ANSWER,
             evidence_status="GENERATION_FAILED",
             evidence=[item.response_dict() for item in evidence],
-            metadata={"failure_stage": stage, "evidence_count": len(evidence)},
+            metadata={**dict(metadata or {}), "failure_stage": stage, "evidence_count": len(evidence)},
         )
 
     def _citations(

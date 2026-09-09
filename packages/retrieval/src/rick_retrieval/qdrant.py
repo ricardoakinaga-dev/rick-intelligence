@@ -17,9 +17,11 @@ from __future__ import annotations
 import json
 import math
 import re
+import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Protocol, TypeAlias
+from threading import Lock
+from typing import Any, Callable, Protocol, TypeAlias
 from urllib.parse import urlsplit
 
 
@@ -36,6 +38,10 @@ MAX_PAYLOAD_BYTES = 64 * 1024
 MAX_QUERY_BYTES = 256 * 1024
 MAX_REQUEST_BYTES = 4 * 1024 * 1024
 MAX_RESPONSE_BYTES = 1_000_000
+MAX_REQUEST_ATTEMPTS = 5
+MAX_RETRY_BACKOFF_SECONDS = 5.0
+MAX_CIRCUIT_FAILURES = 10
+MAX_CIRCUIT_RESET_SECONDS = 300.0
 
 # Public aliases make the size policy discoverable without coupling callers to
 # a private implementation name.
@@ -86,6 +92,7 @@ _SAFE_ERROR_DETAILS = frozenset(
         "transport_failure",
         "malformed_response",
         "response_too_large",
+        "circuit_open",
         "closed",
     }
 )
@@ -170,6 +177,15 @@ class QdrantResponseTooLargeError(QdrantError):
 
     def __init__(self, operation: str) -> None:
         super().__init__(operation, detail="response_too_large")
+
+
+class QdrantCircuitOpenError(QdrantError):
+    """The dependency circuit is open after repeated transient failures."""
+
+    code = "qdrant_circuit_open"
+
+    def __init__(self, operation: str) -> None:
+        super().__init__(operation, detail="circuit_open")
 
 
 # Common short names for callers that do not need the longer class spelling.
@@ -263,6 +279,25 @@ class QdrantHealth:
 
     def __bool__(self) -> bool:
         return self.ok
+
+
+@dataclass(frozen=True, slots=True)
+class QdrantCollectionInfo:
+    """Bounded collection metadata returned by the Qdrant control plane."""
+
+    collection: str
+    status: str
+    optimizer_status: str | bool | None = None
+    vectors_count: int | None = None
+    points_count: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class QdrantAlias:
+    """Validated alias mapping; raw Qdrant metadata never crosses the boundary."""
+
+    alias_name: str
+    collection_name: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -374,6 +409,12 @@ class QdrantHttpVectorStore:
         max_query_results: int | None = None,
         max_payload_bytes: int | None = None,
         max_response_bytes: int | None = None,
+        max_attempts: int = 3,
+        retry_backoff_seconds: float = 0.05,
+        circuit_failure_threshold: int = 3,
+        circuit_reset_seconds: float = 15.0,
+        sleeper: Callable[[float], None] | None = None,
+        clock: Callable[[], float] | None = None,
     ) -> None:
         self._base_url = _validate_base_url(base_url)
         self.collection = _validate_collection_name(collection)
@@ -411,6 +452,16 @@ class QdrantHttpVectorStore:
             )
         selected_limits.validate()
         self.limits = selected_limits
+        self._max_attempts = _validate_attempts(max_attempts)
+        self._retry_backoff_seconds = _validate_retry_backoff(retry_backoff_seconds)
+        self._circuit_failure_threshold = _validate_circuit_failures(circuit_failure_threshold)
+        self._circuit_reset_seconds = _validate_circuit_reset(circuit_reset_seconds)
+        self._sleeper = sleeper or time.sleep
+        self._clock = clock or time.monotonic
+        self._circuit_lock = Lock()
+        self._consecutive_failures = 0
+        self._circuit_opened_at: float | None = None
+        self._probe_in_flight = False
         self._transport = _coerce_transport(transport)
         self._closed = False
 
@@ -425,6 +476,13 @@ class QdrantHttpVectorStore:
     @property
     def closed(self) -> bool:
         return self._closed
+
+    @property
+    def circuit_open(self) -> bool:
+        """Whether new calls are currently blocked by the dependency circuit."""
+
+        with self._circuit_lock:
+            return self._circuit_is_open_locked()
 
     def __enter__(self) -> "QdrantHttpVectorStore":
         self._ensure_open("enter")
@@ -459,6 +517,145 @@ class QdrantHttpVectorStore:
 
     # Explicit alias for callers that name the operation as a check.
     health_check = health
+
+    def collection_info(self) -> QdrantCollectionInfo:
+        """Read validated status and bounded counters for the active collection."""
+
+        operation = "collection_info"
+        self._ensure_open(operation)
+        response = self._request("GET", self._collection_path(""), operation=operation)
+        parsed = self._decode_json(response.content, operation)
+        if not isinstance(parsed, Mapping) or not isinstance(parsed.get("result"), Mapping):
+            raise QdrantMalformedResponseError(operation)
+        result = parsed["result"]
+        status = result.get("status")
+        if not isinstance(status, str) or not status or len(status) > 64:
+            raise QdrantMalformedResponseError(operation)
+        optimizer_status = result.get("optimizer_status")
+        if optimizer_status is not None and not isinstance(optimizer_status, (str, bool)):
+            raise QdrantMalformedResponseError(operation)
+        counts: dict[str, int | None] = {}
+        for name in ("vectors_count", "points_count"):
+            value = result.get(name)
+            if value is not None and (type(value) is not int or value < 0):
+                raise QdrantMalformedResponseError(operation)
+            counts[name] = value
+        return QdrantCollectionInfo(
+            collection=self.collection,
+            status=status,
+            optimizer_status=optimizer_status,
+            vectors_count=counts["vectors_count"],
+            points_count=counts["points_count"],
+        )
+
+    def create_collection(self, *, vector_dimensions: int, distance: str = "Cosine") -> bool:
+        """Create the named collection with the canonical dense vector schema.
+
+        Creation is explicit and idempotency is delegated to Qdrant. Existing
+        collections are never deleted or silently altered by this method.
+        """
+
+        operation = "create_collection"
+        self._ensure_open(operation)
+        if type(vector_dimensions) is not int or not 1 <= vector_dimensions <= self.limits.max_vector_dimensions:
+            raise QdrantBoundsError(operation, limit=True)
+        if not isinstance(distance, str) or distance not in {"Cosine", "Dot", "Euclid", "Manhattan"}:
+            raise QdrantValidationError(operation)
+        body = self._encode_json(
+            {"vectors": {_DENSE_VECTOR_NAME: {"size": vector_dimensions, "distance": distance}}},
+            operation,
+            max_bytes=self.limits.max_query_bytes,
+        )
+        response = self._request(
+            "PUT",
+            self._collection_path(""),
+            operation=operation,
+            content=body,
+        )
+        _require_acknowledged_result(self._decode_json(response.content, operation), operation)
+        return True
+
+    def create_payload_index(self, *, field_name: str, field_schema: str = "keyword") -> bool:
+        """Create one bounded payload index used by ACL/retrieval filters."""
+
+        operation = "create_payload_index"
+        self._ensure_open(operation)
+        checked_field = _validate_field_name(field_name, operation)
+        if field_schema not in {"keyword", "integer", "float", "bool", "datetime", "text", "uuid"}:
+            raise QdrantValidationError(operation)
+        body = self._encode_json(
+            {"field_name": checked_field, "field_schema": field_schema, "wait": True},
+            operation,
+            max_bytes=self.limits.max_query_bytes,
+        )
+        response = self._request(
+            "PUT",
+            self._collection_path("/index"),
+            operation=operation,
+            content=body,
+        )
+        _require_acknowledged_result(self._decode_json(response.content, operation), operation)
+        return True
+
+    def list_aliases(self) -> tuple[QdrantAlias, ...]:
+        """Return validated alias mappings for zero-downtime index switches."""
+
+        operation = "list_aliases"
+        self._ensure_open(operation)
+        response = self._request("GET", "/aliases", operation=operation)
+        parsed = self._decode_json(response.content, operation)
+        if not isinstance(parsed, Mapping) or not isinstance(parsed.get("result"), list):
+            raise QdrantMalformedResponseError(operation)
+        aliases: list[QdrantAlias] = []
+        for raw in parsed["result"]:
+            if not isinstance(raw, Mapping):
+                raise QdrantMalformedResponseError(operation)
+            try:
+                alias_name = _validate_collection_name(raw.get("alias_name"))
+                collection_name = _validate_collection_name(raw.get("collection_name"))
+            except QdrantConfigurationError:
+                raise QdrantMalformedResponseError(operation) from None
+            aliases.append(QdrantAlias(alias_name=alias_name, collection_name=collection_name))
+            if len(aliases) > self.limits.max_collection_filters:
+                raise QdrantBoundsError(operation, limit=True)
+        return tuple(aliases)
+
+    def replace_alias(
+        self,
+        *,
+        alias_name: str,
+        collection_name: str,
+        old_collection_name: str | None = None,
+    ) -> bool:
+        """Atomically apply a bounded delete/create alias action batch.
+
+        The optional old collection is included in the operation only when the
+        caller has a current alias observation. The caller must verify that
+        observation immediately before the request; Qdrant applies the action
+        batch atomically, and the method never deletes a collection.
+        """
+
+        operation = "replace_alias"
+        self._ensure_open(operation)
+        alias = _validate_collection_name(alias_name)
+        target = _validate_collection_name(collection_name)
+        if alias == target:
+            raise QdrantValidationError(operation)
+        if old_collection_name is not None:
+            old = _validate_collection_name(old_collection_name)
+            if old == target:
+                raise QdrantValidationError(operation)
+            observed = {item.alias_name: item.collection_name for item in self.list_aliases()}
+            if observed.get(alias) != old:
+                raise QdrantValidationError(operation)
+            actions: list[dict[str, str]] = [{"action": "delete_alias", "alias_name": alias}]
+        else:
+            actions = []
+        actions.append({"action": "create_alias", "alias_name": alias, "collection_name": target})
+        body = self._encode_json({"actions": actions}, operation, max_bytes=self.limits.max_query_bytes)
+        response = self._request("POST", "/collections/aliases", operation=operation, content=body)
+        _require_acknowledged_result(self._decode_json(response.content, operation), operation)
+        return True
 
     def upsert_points(self, points: list[dict[str, Any]] | Sequence[Mapping[str, object]]) -> int:
         """Upsert bounded points using the named ``dense`` vector."""
@@ -828,38 +1025,102 @@ class QdrantHttpVectorStore:
         content: bytes = b"",
     ) -> HttpResponse:
         self._ensure_open(operation)
+        self._acquire_circuit(operation)
         headers = {
             "accept": "application/json",
             "content-type": "application/json",
         }
         if self._api_key is not None:
             headers["api-key"] = self._api_key
-        timed_out = False
-        transport_failed = False
-        response: object | None = None
-        try:
-            response = self._transport.request(
-                method,
-                f"{self._base_url}{path}",
-                headers=headers,
-                content=content,
-                timeout=self._timeout,
-            )
-        except QdrantError:
-            raise
-        except Exception as exc:
-            timed_out = _looks_like_timeout(exc)
-            transport_failed = not timed_out
-        if timed_out:
-            raise QdrantTimeoutError(operation)
-        if transport_failed:
-            raise QdrantTransportError(operation)
-        normalized = _normalize_response(response, operation)
-        if len(normalized.content) > self.limits.max_response_bytes:
-            raise QdrantResponseTooLargeError(operation)
-        if not 200 <= normalized.status_code <= 299:
-            raise QdrantStatusError(operation, normalized.status_code)
-        return normalized
+        last_error: QdrantError | None = None
+        for attempt in range(self._max_attempts):
+            try:
+                response = self._transport.request(
+                    method,
+                    f"{self._base_url}{path}",
+                    headers=headers,
+                    content=content,
+                    timeout=self._timeout,
+                )
+            except QdrantTimeoutError as exc:
+                last_error = exc
+            except QdrantTransportError as exc:
+                last_error = exc
+            except QdrantError:
+                # Validation, malformed response and lifecycle errors are
+                # contract failures. Retrying them would hide a bug and can
+                # amplify an unsafe request.
+                self._clear_circuit_probe()
+                raise
+            except Exception as exc:
+                last_error = QdrantTimeoutError(operation) if _looks_like_timeout(exc) else QdrantTransportError(operation)
+            else:
+                try:
+                    normalized = _normalize_response(response, operation)
+                    if len(normalized.content) > self.limits.max_response_bytes:
+                        raise QdrantResponseTooLargeError(operation)
+                except QdrantError:
+                    self._clear_circuit_probe()
+                    raise
+                if 200 <= normalized.status_code <= 299:
+                    self._record_circuit_success()
+                    return normalized
+                last_error = QdrantStatusError(operation, normalized.status_code)
+                if not _retryable_status(normalized.status_code):
+                    self._clear_circuit_probe()
+                    raise last_error
+
+            if attempt + 1 < self._max_attempts:
+                self._sleep_before_retry(attempt)
+                continue
+            self._record_circuit_failure()
+            assert last_error is not None
+            raise last_error
+
+        # The loop always returns or raises. Keep a typed guard for static
+        # analyzers and future edits to the retry policy.
+        raise QdrantTransportError(operation)
+
+    def _acquire_circuit(self, operation: str) -> None:
+        with self._circuit_lock:
+            if self._circuit_opened_at is None:
+                return
+            now = self._clock()
+            if now - self._circuit_opened_at < self._circuit_reset_seconds:
+                raise QdrantCircuitOpenError(operation)
+            # One bounded half-open probe is allowed. Other concurrent callers
+            # fail closed until it completes, so a recovery storm cannot
+            # overload the dependency.
+            if self._probe_in_flight:
+                raise QdrantCircuitOpenError(operation)
+            self._probe_in_flight = True
+
+    def _record_circuit_success(self) -> None:
+        with self._circuit_lock:
+            self._consecutive_failures = 0
+            self._circuit_opened_at = None
+            self._probe_in_flight = False
+
+    def _record_circuit_failure(self) -> None:
+        with self._circuit_lock:
+            self._probe_in_flight = False
+            self._consecutive_failures += 1
+            if self._consecutive_failures >= self._circuit_failure_threshold:
+                self._circuit_opened_at = self._clock()
+
+    def _clear_circuit_probe(self) -> None:
+        with self._circuit_lock:
+            self._probe_in_flight = False
+
+    def _sleep_before_retry(self, attempt: int) -> None:
+        delay = min(self._retry_backoff_seconds * (2**attempt), MAX_RETRY_BACKOFF_SECONDS)
+        if delay > 0:
+            self._sleeper(delay)
+
+    def _circuit_is_open_locked(self) -> bool:
+        if self._circuit_opened_at is None:
+            return False
+        return self._clock() - self._circuit_opened_at < self._circuit_reset_seconds
 
     def _encode_json(self, value: object, operation: str, *, max_bytes: int) -> bytes:
         try:
@@ -952,6 +1213,36 @@ def _validate_timeout(value: float) -> float:
     return converted
 
 
+def _validate_attempts(value: object) -> int:
+    if type(value) is not int or not 1 <= value <= MAX_REQUEST_ATTEMPTS:
+        raise QdrantConfigurationError()
+    return value
+
+
+def _validate_retry_backoff(value: object) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise QdrantConfigurationError()
+    converted = float(value)
+    if not math.isfinite(converted) or converted < 0 or converted > MAX_RETRY_BACKOFF_SECONDS:
+        raise QdrantConfigurationError()
+    return converted
+
+
+def _validate_circuit_failures(value: object) -> int:
+    if type(value) is not int or not 1 <= value <= MAX_CIRCUIT_FAILURES:
+        raise QdrantConfigurationError()
+    return value
+
+
+def _validate_circuit_reset(value: object) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise QdrantConfigurationError()
+    converted = float(value)
+    if not math.isfinite(converted) or converted <= 0 or converted > MAX_CIRCUIT_RESET_SECONDS:
+        raise QdrantConfigurationError()
+    return converted
+
+
 def _validate_api_key(value: str | None) -> str | None:
     if value is None:
         return None
@@ -976,6 +1267,10 @@ def _validate_id(value: object, operation: str) -> str:
     if any(ord(char) < 0x20 or ord(char) == 0x7F for char in value):
         raise QdrantValidationError(operation)
     return value
+
+
+def _validate_field_name(value: object, operation: str) -> str:
+    return _validate_id(value, operation)
 
 
 def _validate_vector(value: object, operation: str, max_dimensions: int) -> list[float]:
@@ -1060,6 +1355,10 @@ def _looks_like_timeout(error: BaseException) -> bool:
     return "timeout" in type(error).__name__.lower()
 
 
+def _retryable_status(status_code: int) -> bool:
+    return status_code in {408, 425, 429} or 500 <= status_code <= 599
+
+
 # The primary name is intentionally explicit; aliases ease migration from
 # callers that use adapter/HTTP capitalization without introducing another
 # implementation.
@@ -1081,6 +1380,9 @@ __all__ = [
     "QdrantBoundsError",
     "QdrantClosedError",
     "QdrantConfigurationError",
+    "QdrantCircuitOpenError",
+    "QdrantAlias",
+    "QdrantCollectionInfo",
     "QdrantDeleteResult",
     "QdrantDependencyError",
     "QdrantError",

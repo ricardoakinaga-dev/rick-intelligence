@@ -8,7 +8,7 @@ FROM ${PYTHON_IMAGE} AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PYTHONPATH=/opt/rick/apps/api/src:/opt/rick/apps/worker:/opt/rick/packages/jobs/src:/opt/rick/packages/contracts/src:/opt/rick/packages/authorization/src:/opt/rick/packages/identity/src:/opt/rick/packages/observability/src:/opt/rick/packages/knowledge/src:/opt/rick/packages/ingestion/src:/opt/rick/packages/retrieval/src:/opt/rick/packages/providers/src:/opt/rick/packages/locking/src:/opt/rick/packages/professor/src:/opt/rick/packages/storage/src
+    PYTHONPATH=/opt/rick/apps/api/src:/opt/rick/apps/worker:/opt/rick/packages/jobs/src:/opt/rick/packages/contracts/src:/opt/rick/packages/authorization/src:/opt/rick/packages/identity/src:/opt/rick/packages/observability/src:/opt/rick/packages/knowledge/src:/opt/rick/packages/ingestion/src:/opt/rick/packages/retrieval/src:/opt/rick/packages/providers/src:/opt/rick/packages/locking/src:/opt/rick/packages/professor/src:/opt/rick/packages/evidence/src:/opt/rick/packages/decision/src:/opt/rick/packages/storage/src
 
 WORKDIR /opt/rick
 
@@ -28,6 +28,8 @@ COPY packages/knowledge/src /opt/rick/packages/knowledge/src
 COPY packages/locking/src /opt/rick/packages/locking/src
 COPY packages/observability/src /opt/rick/packages/observability/src
 COPY packages/professor/src /opt/rick/packages/professor/src
+COPY packages/evidence/src /opt/rick/packages/evidence/src
+COPY packages/decision/src /opt/rick/packages/decision/src
 COPY packages/providers/src /opt/rick/packages/providers/src
 COPY packages/retrieval/src /opt/rick/packages/retrieval/src
 COPY packages/storage/src /opt/rick/packages/storage/src
@@ -42,6 +44,8 @@ RUN python -m pip install --no-cache-dir --disable-pip-version-check \
       "httpx==0.27.0" \
       "anyio==4.15.0" \
       "PyJWT==2.7.0" \
+      "pdfplumber==0.10.3" \
+      "python-docx==1.1.0" \
     && python -m compileall -q /opt/rick/apps/api/src /opt/rick/apps/worker /opt/rick/packages \
     && find /opt/rick -type d -name __pycache__ -prune -exec rm -rf {} + \
     && chown -R 10001:10001 /opt/rick

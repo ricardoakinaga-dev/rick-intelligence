@@ -9,6 +9,7 @@ from rick_retrieval.pipeline import (
     compute_confidence,
     dedupe_candidates,
     normalize_query,
+    retrieval_quality_score,
 )
 from rick_retrieval.qdrant import (
     HttpResponse,
@@ -16,6 +17,9 @@ from rick_retrieval.qdrant import (
     QdrantBoundsError,
     QdrantClosedError,
     QdrantConfigurationError,
+    QdrantCircuitOpenError,
+    QdrantAlias,
+    QdrantCollectionInfo,
     QdrantDeleteResult,
     QdrantDependencyError,
     QdrantError,
@@ -65,7 +69,8 @@ __all__ = [
     "DiskFallbackBackend", "EmbeddingProvider", "InMemoryBackend",
     "InMemoryVectorStore", "ModelReranker", "QdrantBackend", "Reranker",
     "HttpResponse", "HttpTransport", "QdrantBoundsError", "QdrantClosedError",
-    "QdrantConfigurationError", "QdrantDeleteResult", "QdrantDependencyError",
+    "QdrantConfigurationError", "QdrantCircuitOpenError", "QdrantAlias",
+    "QdrantCollectionInfo", "QdrantDeleteResult", "QdrantDependencyError",
     "QdrantError", "QdrantHealth",
     "QdrantHttpVectorStore", "QdrantLimits", "QdrantMalformedResponseError",
     "QdrantSearchHit", "QdrantStatusError", "QdrantTimeoutError",
@@ -75,5 +80,5 @@ __all__ = [
     "SQLiteVectorStoreError", "SQLiteVectorStoreValidationError",
     "compute_confidence", "content_query_terms", "dedupe_candidates",
     "normalize_query", "rrf_fusion", "sparse_hash", "sparse_overlap_score",
-    "sparse_vector", "tokenize_terms",
+    "retrieval_quality_score", "sparse_vector", "tokenize_terms",
 ]

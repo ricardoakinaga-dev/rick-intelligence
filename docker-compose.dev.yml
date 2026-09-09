@@ -1,0 +1,185 @@
+# Canonical production-shaped development stack.
+#
+# Every application image, credential, composition factory and external
+# connection is explicit. Copy infrastructure/compose/.env.dev.example to an
+# ignored .env file, replace every placeholder, and render this file before
+# starting it. The stack is intentionally fail-closed when a value is absent.
+name: rick-intelligence-dev
+
+x-service-hardening: &service-hardening
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  init: true
+
+services:
+  postgres:
+    image: postgres:16.4-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?set a disposable development database name}
+      POSTGRES_USER: ${POSTGRES_USER:?set a disposable development database user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?inject a disposable development password}
+    ports:
+      - 127.0.0.1:15432:5432
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [private]
+
+  redis:
+    image: redis:7.4-alpine
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?inject a disposable development password}
+    command:
+      - sh
+      - -c
+      - exec redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD"
+    ports:
+      - 127.0.0.1:16379:6379
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "REDISCLI_AUTH=\"$$REDIS_PASSWORD\" redis-cli ping | grep -q PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [private]
+
+  qdrant:
+    image: qdrant/qdrant:v1.12.5
+    environment:
+      QDRANT__SERVICE__API_KEY: ${QDRANT_API_KEY:?inject a disposable development API key}
+    ports:
+      - 127.0.0.1:16333:6333
+    volumes:
+      - qdrant-data:/qdrant/storage
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'wget --header="api-key: $$QDRANT__SERVICE__API_KEY" -q -O- http://127.0.0.1:6333/healthz >/dev/null'
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [private]
+
+  object-store:
+    image: minio/minio:RELEASE.2025-02-28T09-55-16Z
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?inject a disposable development access key}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?inject a disposable development secret}
+    ports:
+      - 127.0.0.1:19000:9000
+      - 127.0.0.1:19001:9001
+    volumes:
+      - object-data:/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - mc alias set local http://127.0.0.1:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD" >/dev/null 2>&1 && mc ready local
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks: [private]
+
+  api:
+    <<: *service-hardening
+    image: ${RICK_API_IMAGE:?supply an immutable API image reference}
+    environment:
+      RICK_ENV: production
+      RICK_IDENTITY_MODE: production
+      RICK_API_CHAT_BACKEND: professor
+      RICK_API_COMPOSITION: ${RICK_API_COMPOSITION:?supply the reviewed module:factory composition}
+      RICK_EXTERNAL_DATABASE_DSN: ${RICK_EXTERNAL_DATABASE_DSN:?inject the development database DSN}
+      RICK_REDIS_URL: ${RICK_REDIS_URL:?inject the development Redis URL}
+      RICK_QDRANT_URL: http://qdrant:6333
+      RICK_QDRANT_COLLECTION: ${RICK_QDRANT_COLLECTION:?set the Qdrant collection}
+      RICK_QDRANT_API_KEY: ${QDRANT_API_KEY:?inject the Qdrant API key}
+      RICK_OBJECT_STORE_ENDPOINT: http://object-store:9000
+      RICK_OBJECT_STORE_BUCKET: ${RICK_OBJECT_STORE_BUCKET:?set the object-store bucket}
+      RICK_OBJECT_STORE_REGION: ${RICK_OBJECT_STORE_REGION:?set the object-store region}
+      RICK_OBJECT_STORE_ACCESS_KEY_ID: ${MINIO_ROOT_USER:?inject the object-store access key}
+      RICK_OBJECT_STORE_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:?inject the object-store secret}
+      RICK_LOCKER_BASE_URL: ${RICK_LOCKER_BASE_URL:?supply the reviewed lease boundary}
+      LLM_API_KEY: ${LLM_API_KEY:?inject a development provider key}
+      LLM_BASE_URL: ${LLM_BASE_URL:?set the reviewed provider endpoint}
+      LLM_MODEL: ${LLM_MODEL:?set the reviewed chat model}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:?set the reviewed embedding model}
+      CORS_ALLOWED_ORIGINS: http://localhost:13000
+      SESSION_COOKIE_SECURE: "true"
+      SESSION_COOKIE_SAMESITE: strict
+    ports:
+      - 127.0.0.1:18000:8000
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      qdrant: {condition: service_healthy}
+      object-store: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=4).read()\""]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    networks: [private, edge]
+
+  worker:
+    <<: *service-hardening
+    image: ${RICK_WORKER_IMAGE:?supply an immutable worker image reference}
+    environment:
+      RICK_ENV: production
+      RICK_EXTERNAL_DATABASE_DSN: ${RICK_EXTERNAL_DATABASE_DSN:?inject the development database DSN}
+      RICK_REDIS_URL: ${RICK_REDIS_URL:?inject the development Redis URL}
+      RICK_QDRANT_URL: http://qdrant:6333
+      RICK_QDRANT_COLLECTION: ${RICK_QDRANT_COLLECTION:?set the Qdrant collection}
+      RICK_QDRANT_API_KEY: ${QDRANT_API_KEY:?inject the Qdrant API key}
+      RICK_OBJECT_STORE_ENDPOINT: http://object-store:9000
+      RICK_OBJECT_STORE_BUCKET: ${RICK_OBJECT_STORE_BUCKET:?set the object-store bucket}
+      RICK_OBJECT_STORE_REGION: ${RICK_OBJECT_STORE_REGION:?set the object-store region}
+      RICK_OBJECT_STORE_ACCESS_KEY_ID: ${MINIO_ROOT_USER:?inject the object-store access key}
+      RICK_OBJECT_STORE_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:?inject the object-store secret}
+      RICK_WORKER_COMPOSITION: ${RICK_WORKER_COMPOSITION:?supply the reviewed worker module:factory composition}
+      RICK_WORKER_ID: ${RICK_WORKER_ID:?set a unique worker identity}
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      qdrant: {condition: service_healthy}
+      object-store: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "python", "/opt/rick/docker/worker-entrypoint.py", "--health-check"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    networks: [private]
+
+  web:
+    <<: *service-hardening
+    image: ${RICK_WEB_IMAGE:?supply an immutable web image reference}
+    environment:
+      RICK_API_INTERNAL_URL: http://api:8000
+      NODE_ENV: production
+    ports:
+      - 127.0.0.1:13000:3000
+    depends_on:
+      api: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:3000/login >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    networks: [edge, private]
+
+volumes:
+  postgres-data: {name: rick-intelligence-dev-postgres}
+  redis-data: {name: rick-intelligence-dev-redis}
+  qdrant-data: {name: rick-intelligence-dev-qdrant}
+  object-data: {name: rick-intelligence-dev-objects}
+
+networks:
+  private:
+    internal: true
+  edge: {}

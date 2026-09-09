@@ -23,9 +23,14 @@ from typing import Any, Callable, Mapping, Protocol
 from rick_ingestion.chunking import CHUNKER_VERSION, RecursiveChunkingStrategy
 from rick_ingestion.jobs import DEFAULT_MAX_JOBS, IngestionJob, is_retryable
 from rick_ingestion.parsers import (
+    DEFAULT_PARSER_LIMITS,
+    DEFAULT_PARSER_TIMEOUT_SECONDS,
     PARSER_VERSION,
+    ParserLimits,
+    ParserRunner,
     ParseError,
     checksum_file,
+    execute_parser,
     parser_for,
     sanitize_display_filename,
     validate_file,
@@ -170,7 +175,10 @@ class IngestionService:
     def __init__(self, *, knowledge, vectors: VectorStore, embeddings: EmbeddingProvider,
                  events: IngestionEvents | None = None,
                  chunker=None, embedding_version: str = "emb-v1",
-                 max_jobs: int = DEFAULT_MAX_JOBS) -> None:
+                 max_jobs: int = DEFAULT_MAX_JOBS,
+                 parser_limits: ParserLimits | None = None,
+                 parser_runner: ParserRunner | None = None,
+                 parser_timeout_seconds: float | None = None) -> None:
         if isinstance(max_jobs, bool) or not isinstance(max_jobs, int) or not 0 < max_jobs <= 1024:
             raise ValueError("max_jobs is out of range")
         self.knowledge = knowledge
@@ -180,6 +188,16 @@ class IngestionService:
         self.chunker = chunker or RecursiveChunkingStrategy()
         self.embedding_version = embedding_version
         self.max_jobs = max_jobs
+        if parser_limits is not None and not isinstance(parser_limits, ParserLimits):
+            raise ValueError("parser_limits must be ParserLimits")
+        self.parser_limits = parser_limits
+        self.parser_runner = parser_runner
+        self.parser_timeout_seconds = (
+            parser_timeout_seconds
+            if parser_timeout_seconds is not None
+            else (parser_limits.parser_timeout_seconds if parser_limits is not None
+                  else DEFAULT_PARSER_TIMEOUT_SECONDS)
+        )
         self._jobs: dict[str, IngestionJob] = {}
         self._lock = RLock()
         # Local compensations operate on whole documents, so overlapping
@@ -454,14 +472,15 @@ class IngestionService:
                correlation_id: str | None = None, job_id: str | None = None,
                cancel_check: Callable[[], bool] | None = None,
                publication_guard: Callable[[], object] | None = None,
-               document_metadata: Mapping[str, object] | None = None) -> IngestionJob:
+               document_metadata: Mapping[str, object] | None = None,
+               declared_mime: str | None = None) -> IngestionJob:
         with self._operation_lock:
             return self._ingest(
                 path, workspace_id=workspace_id, collection_id=collection_id,
                 tenant_id=tenant_id, display_filename=display_filename,
                 request_id=request_id, correlation_id=correlation_id, job_id=job_id,
                 cancel_check=cancel_check, publication_guard=publication_guard,
-                document_metadata=document_metadata,
+                document_metadata=document_metadata, declared_mime=declared_mime,
             )
 
     def _ingest(self, path: Path, *, workspace_id: str, collection_id: str,
@@ -470,7 +489,8 @@ class IngestionService:
                 job_id: str | None = None,
                 cancel_check: Callable[[], bool] | None = None,
                 publication_guard: Callable[[], object] | None = None,
-                document_metadata: Mapping[str, object] | None = None) -> IngestionJob:
+                document_metadata: Mapping[str, object] | None = None,
+                declared_mime: str | None = None) -> IngestionJob:
         tenant_id = normalize_tenant_id(tenant_id)
         collection_id = normalize_collection_id(collection_id)
         safe_document_metadata = _safe_document_metadata(document_metadata)
@@ -500,7 +520,16 @@ class IngestionService:
         try:
             self.events.emit({**base_event, "type": "ingestion.start", "stage": "validating"})
             advance("validating", progress=0.05)
-            validate_file(path)
+            if self.parser_limits is None and declared_mime is None:
+                # Preserve the historical validator call shape for narrow
+                # adapters that replace it in an embedding application.
+                validate_file(path)
+            else:
+                validate_file(
+                    path,
+                    limits=self.parser_limits or DEFAULT_PARSER_LIMITS,
+                    declared_mime=declared_mime,
+                )
             self._checkpoint(job, cancel_check)
             checksum = checksum_file(path)
             document_id = document_id_for_content(
@@ -537,8 +566,18 @@ class IngestionService:
 
             advance("parsing", progress=0.15)
             heartbeat()
-            parsed = parser_for(path, pdf_heartbeat=heartbeat).parse(
-                path, workspace_id=workspace_id
+            if self.parser_limits is None:
+                # Preserve the historical parser factory call shape for
+                # integrations that replace it with a narrow test adapter.
+                parser = parser_for(path, pdf_heartbeat=heartbeat)
+            else:
+                parser = parser_for(path, pdf_heartbeat=heartbeat, limits=self.parser_limits)
+            parsed = execute_parser(
+                parser,
+                path,
+                workspace_id=workspace_id,
+                runner=self.parser_runner,
+                timeout_seconds=self.parser_timeout_seconds,
             )
 
             advance("chunking", progress=0.35)

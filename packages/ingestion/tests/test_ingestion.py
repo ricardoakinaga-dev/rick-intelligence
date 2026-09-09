@@ -328,6 +328,22 @@ def test_malformed_and_unsupported_fail_safely(tmp_path):
     assert job2.status != "published"
 
 
+def test_pipeline_enforces_optional_declared_mime(tmp_path):
+    service = _service()
+    target = _doc(tmp_path / "payload.txt", "ordinary text")
+
+    job = service.ingest(
+        target,
+        workspace_id="w",
+        collection_id="rag_phase0",
+        tenant_id="default",
+        declared_mime="application/pdf",
+    )
+
+    assert job.status == "failed"
+    assert job.error_code == "unsupported_media_type"
+
+
 class _FixedEmbedding:
     model = "fixture"
     dimensions = 2

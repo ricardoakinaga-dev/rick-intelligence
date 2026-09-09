@@ -79,13 +79,21 @@ class EvidenceDto(StrictContractModel):
     page_end: int | None = Field(default=None, ge=0)
     section: str | None = None
     checksum: str = Field(default="", max_length=256)
+    document_version: str | None = Field(default=None, min_length=1, max_length=128)
     score: float = 0.0
     rank: int = Field(default=0, ge=0, le=1_000_000)
     dense_score: float = 0.0
     sparse_score: float = 0.0
+    # Bounded ranking quality signal. This is intentionally separate from a
+    # calibrated probability; confidence_score remains for legacy wire
+    # compatibility until its consumers migrate.
+    retrieval_quality_score: float = 0.0
     confidence_score: float = 0.0
 
-    @field_validator("score", "dense_score", "sparse_score", "confidence_score", mode="before")
+    @field_validator(
+        "score", "dense_score", "sparse_score", "retrieval_quality_score", "confidence_score",
+        mode="before",
+    )
     @classmethod
     def finite_score(cls, value: object) -> float:
         if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(float(value)):

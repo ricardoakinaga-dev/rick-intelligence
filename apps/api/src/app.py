@@ -348,7 +348,7 @@ def create_app(settings: ApiSettings | None = None, providers: Providers | None 
         required = [
             "identity", "chat_backend", "knowledge", "vector_store", "retrieval",
             "ingestion", "worker", "audit_sink", "chat_history", "job_journal",
-            "queue", "object_store",
+            "queue", "object_store", "rate_limiter",
         ]
         if settings.chat_backend_mode == "professor" or not settings.use_legacy_adapters:
             required.extend(("provider", "lease"))
@@ -360,6 +360,20 @@ def create_app(settings: ApiSettings | None = None, providers: Providers | None 
                 "Production API composition incomplete; required external components missing: "
                 + ", ".join(missing)
             )
+        from core.rate_limit import is_production_rate_limiter
+        from rick_locking import RedisConfigurationError, validate_production_capability
+
+        if not is_production_rate_limiter(getattr(providers, "rate_limiter", None)):
+            raise RuntimeError(
+                "Production API requires an explicitly marked distributed rate limiter."
+            )
+        try:
+            validate_production_capability(getattr(providers, "rate_limiter", None))
+            validate_production_capability(getattr(providers, "lease", None))
+        except RedisConfigurationError as exc:
+            raise RuntimeError(
+                "Production API requires explicitly marked Redis coordination capabilities."
+            ) from exc
 
     if providers is None:
         from services.audit import InMemoryAuditSink

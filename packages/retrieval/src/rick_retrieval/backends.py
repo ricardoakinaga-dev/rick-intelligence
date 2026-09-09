@@ -137,6 +137,7 @@ class QdrantBackend:
                         "page_end": payload.get("page_end"),
                         "section": payload.get("section"),
                         "checksum": payload.get("checksum", ""),
+                        "document_version": payload.get("document_version"),
                         "score": score,
                     })
                 return dense[:limit], []
@@ -176,7 +177,16 @@ class QdrantBackend:
                 dense.append({"chunk_id": payload["chunk_id"], "document_id": payload.get("document_id"),
                               "tenant_id": payload.get("tenant_id"),
                               "workspace_id": payload.get("workspace_id"), "text": payload.get("text", ""),
-                              "collection_id": payload.get("collection_id"), "score": score})
+                              "collection_id": payload.get("collection_id"),
+                              "document_version": payload.get("document_version"),
+                              "source": payload.get("source", ""),
+                              "document_filename": payload.get("document_filename", payload.get("source", "")),
+                              "title": payload.get("title", ""),
+                              "page_start": payload.get("page_start"),
+                              "page_end": payload.get("page_end"),
+                              "section": payload.get("section"),
+                              "checksum": payload.get("checksum", ""),
+                              "score": score})
         # A backend can return duplicate points across scoped calls; stable
         # point identity wins, then score determines the final top-k.
         deduped: dict[str, dict] = {}

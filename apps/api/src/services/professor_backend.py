@@ -7,7 +7,8 @@ provider retry policy.
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator, Sequence
+from collections.abc import AsyncIterator, Mapping, Sequence
+import inspect
 
 from rick_contracts.chat import Citation
 from rick_contracts.professor import ProfessorRequest
@@ -59,6 +60,235 @@ class ProviderChatAdapter:
         return iterate()
 
 
+class EvidenceDecisionGate:
+    """Issue authoritative evidence before the Professor sees retrieval output.
+
+    Retrieval remains responsible for ranking and ACL filtering. This adapter
+    adds the server-issued evidence bundle and deterministic decision policy at
+    the application seam, so caller-provided evidence IDs never become trusted
+    by the Professor. A low quality result gets one bounded retrieval retry;
+    every other non-answer decision is returned as an empty evidence set.
+    """
+
+    def __init__(self, retrieval) -> None:
+        from rick_decision import (
+            DecisionAction,
+            DecisionInput,
+            DecisionLayer,
+            DecisionPolicy,
+            DomainRisk,
+            IntentClarity,
+            UserIntent,
+        )
+        from rick_evidence import EvidenceBundle, EvidenceScope, EvidenceValidator
+
+        self.retrieval = retrieval
+        self._DecisionAction = DecisionAction
+        self._DecisionInput = DecisionInput
+        self._DecisionPolicy = DecisionPolicy
+        self._DomainRisk = DomainRisk
+        self._IntentClarity = IntentClarity
+        self._UserIntent = UserIntent
+        self._EvidenceBundle = EvidenceBundle
+        self._EvidenceScope = EvidenceScope
+        self.validator = EvidenceValidator(max_bundle_items=8)
+        self.decision_layer = DecisionLayer(evidence_validator=self.validator)
+
+    @staticmethod
+    def _mapping(value: object) -> Mapping[str, object]:
+        if isinstance(value, Mapping):
+            return value
+        dump = getattr(value, "model_dump", None)
+        if callable(dump):
+            result = dump()
+            if isinstance(result, Mapping):
+                return result
+        return {}
+
+    @staticmethod
+    async def _call(target, **kwargs):
+        result = target(**kwargs)
+        return await result if inspect.isawaitable(result) else result
+
+    def _decision_input(
+        self,
+        *,
+        context: Mapping[str, object],
+        bundle: object | None,
+        evidence_count: int,
+        retrieval_quality: float,
+        attempt: int,
+    ):
+        tenant_id = context.get("tenant_id") if bundle is not None else None
+        workspace_id = context.get("workspace_id") if bundle is not None else None
+        collection_id = getattr(bundle, "collection_id", None) if bundle is not None else None
+        return self._DecisionInput(
+            evidence_bundle=bundle,
+            tenant_id=tenant_id,
+            workspace_id=workspace_id,
+            collection_id=collection_id,
+            retrieval_quality=max(0.0, min(1.0, float(retrieval_quality))),
+            evidence_count=evidence_count,
+            citation_support=1.0 if bundle is not None else 0.0,
+            # This is an availability signal for the already composed typed
+            # provider port. It is not presented as a model confidence score.
+            provider_confidence_signal=1.0,
+            domain_risk=self._DomainRisk.LOW,
+            user_intent=self._UserIntent(
+                intent_code="grounded_query",
+                clarity=self._IntentClarity.CLEAR,
+            ),
+            policy=self._DecisionPolicy(
+                min_retrieval_quality=0.50,
+                min_citation_support=1.0,
+                min_provider_confidence_signal=0.0,
+                max_retrieval_attempts=1,
+            ),
+            retrieval_attempt=attempt,
+            retrieval_available=True,
+        )
+
+    def _issue_candidates(
+        self,
+        *,
+        query: str,
+        context: Mapping[str, object],
+        candidates: Sequence[object],
+    ) -> tuple[list[dict[str, object]], object | None, float]:
+        tenant_id = context.get("tenant_id")
+        workspace_id = context.get("workspace_id")
+        allowed = context.get("allowed_collection_ids")
+        if not (
+            isinstance(tenant_id, str)
+            and isinstance(workspace_id, str)
+            and isinstance(allowed, list)
+            and allowed
+        ):
+            return [], None, 0.0
+
+        # EvidenceBundle is deliberately single-collection. Deterministically
+        # select the first authorized collection returned by retrieval and keep
+        # other authorized collections for a separate request/turn.
+        selected_collection: str | None = None
+        issued: list[object] = []
+        normalized: list[dict[str, object]] = []
+        quality_values: list[float] = []
+        for raw in candidates:
+            candidate = dict(self._mapping(raw))
+            collection_id = candidate.get("collection_id")
+            if not isinstance(collection_id, str) or not collection_id:
+                continue
+            if "*" not in allowed and collection_id not in allowed:
+                continue
+            if selected_collection is None:
+                selected_collection = collection_id
+            if collection_id != selected_collection:
+                continue
+            try:
+                evidence = self.validator.issue(
+                    candidate,
+                    scope=self._EvidenceScope(
+                        tenant_id=tenant_id,
+                        workspace_id=workspace_id,
+                        collection_id=selected_collection,
+                    ),
+                )
+            except Exception:
+                # Missing or malformed provenance is not a reason to trust a
+                # legacy identifier. It is simply excluded from generation.
+                continue
+            candidate.update(
+                {
+                    "evidence_id": evidence.evidence_id,
+                    "document_version": evidence.document_version,
+                    "source": evidence.source,
+                    "checksum": evidence.checksum,
+                    "retrieval_quality_score": candidate.get(
+                        "retrieval_quality_score", candidate.get("confidence_score", 0.0)
+                    ),
+                }
+            )
+            normalized.append(candidate)
+            issued.append(evidence)
+            raw_quality = candidate.get("retrieval_quality_score", 0.0)
+            try:
+                quality = float(raw_quality)
+            except (TypeError, ValueError):
+                quality = 0.0
+            if quality == quality and quality not in (float("inf"), float("-inf")):
+                quality_values.append(max(0.0, min(1.0, quality)))
+            if len(normalized) >= 8:
+                break
+
+        if selected_collection is None or not issued:
+            return [], None, 0.0
+        scope = self._EvidenceScope(
+            tenant_id=tenant_id,
+            workspace_id=workspace_id,
+            collection_id=selected_collection,
+        )
+        bundle = self._EvidenceBundle.build_from_scope(
+            scope=scope,
+            query=query,
+            evidence=issued,
+        )
+        return normalized, bundle, max(quality_values or [0.0])
+
+    async def retrieve(self, *, query: str, context: dict) -> dict[str, object]:
+        target = getattr(self.retrieval, "retrieve", None)
+        if not callable(target):
+            raise TypeError("retrieval dependency has no retrieve callable")
+        last_payload: dict[str, object] = {"evidence": []}
+        last_decision = None
+        for attempt in range(2):
+            raw_result = await self._call(target, query=query, context=context)
+            payload = dict(self._mapping(raw_result))
+            raw_evidence = payload.get("evidence", [])
+            candidates = (
+                list(raw_evidence)
+                if isinstance(raw_evidence, Sequence)
+                and not isinstance(raw_evidence, (str, bytes, bytearray))
+                else []
+            )
+            normalized, bundle, quality = self._issue_candidates(
+                query=query,
+                context=context,
+                candidates=candidates,
+            )
+            decision_input = self._decision_input(
+                context=context,
+                bundle=bundle,
+                evidence_count=len(normalized),
+                retrieval_quality=quality,
+                attempt=attempt,
+            )
+            decision = self.decision_layer.decide(decision_input)
+            last_payload = payload
+            last_decision = decision
+            if decision.action is not self._DecisionAction.RETRIEVE_AGAIN:
+                break
+
+        raw_metadata = last_payload.get("metadata")
+        metadata = dict(raw_metadata) if isinstance(raw_metadata, Mapping) else {}
+        if last_decision is not None:
+            metadata.update(
+                {
+                    "decision_action": last_decision.action.value,
+                    "decision_reason": last_decision.reason_code,
+                    "decision_attempt": last_decision.retrieval_attempt,
+                    "evidence_bundle_id": last_decision.evidence_bundle_id,
+                }
+            )
+        if last_decision is not None and last_decision.action is self._DecisionAction.ANSWER:
+            last_payload["evidence"] = normalized
+            last_payload["selected_count"] = len(normalized)
+        else:
+            last_payload["evidence"] = []
+            last_payload["selected_count"] = 0
+        last_payload["metadata"] = metadata
+        return last_payload
+
+
 class OwnedLeaseAdapter:
     """Expose the Professor owner-token port over a root LeaseClient.
 
@@ -90,10 +320,11 @@ class ProfessorChatBackend:
 
     def __init__(self, *, retrieval, provider, lease=None, limits: ProfessorLimits | None = None) -> None:
         self.retrieval = retrieval
+        self.evidence_gate = EvidenceDecisionGate(retrieval)
         self.provider = ProviderChatAdapter(provider)
         self.lease = OwnedLeaseAdapter(lease) if lease is not None else None
         self.orchestrator = ProfessorOrchestrator(
-            retrieval=retrieval,
+            retrieval=self.evidence_gate,
             chat_provider=self.provider,
             lease_manager=self.lease,
             limits=limits,

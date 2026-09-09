@@ -55,6 +55,31 @@ class _ProductionDependency:
     def readiness_check(self):
         return True
 
+    def health_check(self):
+        return True
+
+
+class _ProductionRateLimiter(_ProductionDependency):
+    production_safe = True
+    backend_kind = "redis"
+
+    async def allow(self, *args, **kwargs):
+        return True
+
+
+class _ProductionLease(_ProductionDependency):
+    production_safe = True
+    backend_kind = "redis"
+
+    async def acquire_owned(self, *args, **kwargs):
+        return True
+
+    async def renew_owned(self, *args, **kwargs):
+        return True
+
+    async def release_owned(self, *args, **kwargs):
+        return True
+
 
 def _production_client(**overrides) -> TestClient:
     values = {
@@ -82,6 +107,8 @@ def _production_client(**overrides) -> TestClient:
         job_journal=_ProductionDependency(),
         queue=_ProductionDependency(),
         object_store=_ProductionDependency(),
+        rate_limiter=_ProductionRateLimiter(),
+        lease=_ProductionLease(),
     )
     return TestClient(create_app(settings, providers), base_url="https://testserver", raise_server_exceptions=False)
 

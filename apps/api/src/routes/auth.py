@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 from fastapi.responses import JSONResponse
 
 from core.errors import ApiError, envelope
-from core.rate_limit import check_rate_limit, ensure_rate_limiter
+from core.rate_limit import check_rate_limit_async, ensure_rate_limiter
 from core.security import resolve_session_cookie
 from dependencies.identity import get_current_session, require_authenticated
 from dependencies.services import get_providers
@@ -34,7 +34,7 @@ def _recovery_rate_limiter(providers):
     return ensure_rate_limiter(providers)
 
 
-def _recovery_rate_allowed(providers, request: Request, payload: RecoveryRequest) -> bool:
+async def _recovery_rate_allowed(providers, request: Request, payload: RecoveryRequest) -> bool:
     # Hash the composite key so email, tenant and network identity never enter
     # limiter diagnostics or a future shared backend as raw PII.
     client_host = request.client.host if request.client else ""
@@ -48,7 +48,7 @@ def _recovery_rate_allowed(providers, request: Request, payload: RecoveryRequest
     )
     key = hashlib.sha256(raw_key.encode("utf-8")).hexdigest()
     try:
-        return check_rate_limit(
+        return await check_rate_limit_async(
             _recovery_rate_limiter(providers),
             key,
             limit_per_min=providers.settings.recovery_rate_limit_per_min,
@@ -97,7 +97,7 @@ def _public_session(snapshot) -> dict:
     }
 
 
-def _login_rate_allowed(providers, request: Request, payload: LoginRequest) -> bool:
+async def _login_rate_allowed(providers, request: Request, payload: LoginRequest) -> bool:
     """Apply login throttling through the app-owned limiter boundary.
 
     Identity implementations may be external and are not allowed to define a
@@ -119,7 +119,7 @@ def _login_rate_allowed(providers, request: Request, payload: LoginRequest) -> b
     )
     key = hashlib.sha256(raw_key.encode("utf-8")).hexdigest()
     try:
-        allowed = check_rate_limit(
+        allowed = await check_rate_limit_async(
             ensure_rate_limiter(providers),
             key,
             limit_per_min=providers.settings.login_rate_limit_per_min,
@@ -132,10 +132,10 @@ def _login_rate_allowed(providers, request: Request, payload: LoginRequest) -> b
 
 
 @router.post("/api/v1/auth/login")
-def login(payload: LoginRequest, request: Request, response: Response):
+async def login(payload: LoginRequest, request: Request, response: Response):
     providers = get_providers(request)
     identity = providers.identity
-    _login_rate_allowed(providers, request, payload)
+    await _login_rate_allowed(providers, request, payload)
     try:
         result = identity.login(  # type: ignore[union-attr]
             email=payload.email, password=payload.password, tenant_id=payload.tenant_id,
@@ -201,9 +201,9 @@ def get_session(session=Depends(require_authenticated)):
 
 
 @router.post("/api/v1/auth/recovery")
-def recovery(payload: RecoveryRequest, request: Request):
+async def recovery(payload: RecoveryRequest, request: Request):
     providers = get_providers(request)
-    if not _recovery_rate_allowed(providers, request, payload):
+    if not await _recovery_rate_allowed(providers, request, payload):
         return _recovery_response(request)
     issue = getattr(providers.identity, "issue_password_reset", None)
     if callable(issue):
@@ -214,9 +214,9 @@ def recovery(payload: RecoveryRequest, request: Request):
 
 
 @router.post("/api/v1/auth/request-password-reset")
-def request_reset(payload: RecoveryRequest, request: Request):
+async def request_reset(payload: RecoveryRequest, request: Request):
     providers = get_providers(request)
-    if not _recovery_rate_allowed(providers, request, payload):
+    if not await _recovery_rate_allowed(providers, request, payload):
         return _recovery_response(request)
     issue = getattr(providers.identity, "issue_password_reset", None)
     if callable(issue):

@@ -90,7 +90,7 @@ def list_models(request: Request):
 async def chat_completions(payload: CompatRequest, request: Request):
     presented_key = _check_api_key(request)
     providers = get_providers(request)
-    if not _compat_rate_allowed(providers, presented_key):
+    if not await _compat_rate_allowed(providers, presented_key):
         request_id = getattr(request.state, "request_id", "unknown")
         return JSONResponse(
             status_code=429,
