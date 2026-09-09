@@ -152,6 +152,29 @@ def test_missing_checkout_identity_cannot_emit_a_successful_runtime_envelope(
     assert envelope["production_safe"] is False
 
 
+def test_missing_raw_digest_cannot_emit_a_successful_runtime_envelope(
+    adapter: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    def fake_gate(argv: list[str]) -> int:
+        output = tmp_path / Path(argv[argv.index("--output") + 1])
+        output.write_text(json.dumps({"status": "PASS", "production_safe": True}), encoding="utf-8")
+        return 0
+
+    monkeypatch.setattr(adapter, "RAW_OUTPUT", "raw.json")
+    monkeypatch.setattr(adapter, "capture_checkout", _checkout)
+    monkeypatch.setattr(_gate_module(adapter), "main", fake_gate)
+    monkeypatch.setitem(adapter.run_gate_adapter.__globals__, "_sha256", lambda _path: None)
+
+    envelope = adapter.run(tmp_path, output="evidence.json")
+
+    assert envelope["status"] == "FAILED"
+    assert envelope["exit_status"] == 1
+    assert envelope["artifact_sha256"] is None
+    assert envelope["production_safe"] is False
+
+
 def test_checkout_mutation_during_gate_is_rejected(
     adapter: ModuleType,
     monkeypatch: pytest.MonkeyPatch,

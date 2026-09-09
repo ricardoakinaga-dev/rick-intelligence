@@ -10,7 +10,7 @@ turns an unavailable Docker/service/provider path into production evidence.
 from __future__ import annotations
 
 import argparse
-from datetime import datetime
+from datetime import datetime, timezone
 import hashlib
 import json
 import os
@@ -36,22 +36,13 @@ DEFAULT_EVIDENCE = ("docs/progress/release-evidence.json",)
 DEFAULT_TIMEOUT_SECONDS = 120
 SHA1_RE = re.compile(r"^[0-9a-f]{40}$", re.IGNORECASE)
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$", re.IGNORECASE)
+MAX_EVIDENCE_AGE_SECONDS = 24 * 60 * 60
+MAX_EVIDENCE_FUTURE_SKEW_SECONDS = 5 * 60
 
 PASS = "PASS"
 FAIL = "FAIL"
 NOT_RUN = "NOT_RUN"
 CLASSIFICATIONS = {PASS, FAIL, NOT_RUN}
-
-_STATUS_KEYS = ("classification", "status", "result", "outcome", "decision")
-_REQUIRED_CONTAINERS = {"checks", "criteria", "gates", "results", "commands", "steps"}
-_OPTIONAL_CONTAINERS = {
-    "external_dependencies",
-    "live_dependencies",
-    "live_production",
-    "production",
-    "runtime_dependencies",
-}
-
 
 def _rejection_codes(
     reason: str,
@@ -353,138 +344,6 @@ def classify_worktree_sentinel(
     }
 
 
-def _normalise_status(value: Any) -> str | None:
-    if not isinstance(value, str):
-        return None
-    normalised = value.strip().upper().replace("-", "_").replace(" ", "_")
-    if normalised in {"PASS", "PASSED", "SUCCESS", "SUCCEEDED", "CLEAN"}:
-        return PASS
-    if normalised in {
-        "FAIL",
-        "FAILED",
-        "ERROR",
-        "BLOCKED",
-        "STALE",
-        "INVALID",
-        "UNKNOWN",
-        "PARTIAL",
-        "INCOMPLETE",
-        "IN_PROGRESS",
-        "PENDING",
-    }:
-        return FAIL
-    if normalised in {"NOT_RUN", "NOTRUN", "UNAVAILABLE", "NOT_AVAILABLE", "SKIPPED"}:
-        return NOT_RUN
-    return None
-
-
-def _collect_statuses(
-    value: Any,
-    *,
-    path: str = "evidence",
-    required: bool = True,
-    observations: list[dict[str, Any]] | None = None,
-) -> list[dict[str, Any]]:
-    if observations is None:
-        observations = []
-    if isinstance(value, Mapping):
-        local_required = bool(value.get("required", required))
-        for key in _STATUS_KEYS:
-            if key not in value:
-                continue
-            classification = _normalise_status(value[key])
-            if classification:
-                observations.append(
-                    {
-                        "path": f"{path}.{key}",
-                        "classification": classification,
-                        "required": local_required,
-                        "raw": value[key],
-                    }
-                )
-        if isinstance(value.get("passed"), bool):
-            observations.append(
-                {
-                    "path": f"{path}.passed",
-                    "classification": PASS if value["passed"] else FAIL,
-                    "required": local_required,
-                    "raw": value["passed"],
-                }
-            )
-        if isinstance(value.get("exit_code"), int) and "command" in value:
-            observations.append(
-                {
-                    "path": f"{path}.exit_code",
-                    "classification": PASS if value["exit_code"] == 0 else FAIL,
-                    "required": local_required,
-                    "raw": value["exit_code"],
-                }
-            )
-        for key, child in value.items():
-            if key in _STATUS_KEYS or key in {"passed", "exit_code", "required"}:
-                continue
-            if key in _REQUIRED_CONTAINERS:
-                _collect_statuses(
-                    child,
-                    path=f"{path}.{key}",
-                    required=local_required,
-                    observations=observations,
-                )
-            elif key in _OPTIONAL_CONTAINERS:
-                _collect_statuses(
-                    child,
-                    path=f"{path}.{key}",
-                    required=False,
-                    observations=observations,
-                )
-        return observations
-    if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
-        for index, child in enumerate(value):
-            _collect_statuses(
-                child,
-                path=f"{path}[{index}]",
-                required=required,
-                observations=observations,
-            )
-    return observations
-
-
-def _normalise_fingerprint(value: Any) -> str | None:
-    if not isinstance(value, str):
-        return None
-    candidate = value.strip()
-    if candidate.lower().startswith("sha256:"):
-        candidate = candidate[7:]
-    return candidate.lower() if SHA256_RE.fullmatch(candidate) else None
-
-
-def _identity_objects(payload: Mapping[str, Any]) -> list[Mapping[str, Any]]:
-    objects: list[Mapping[str, Any]] = [payload]
-    for key in ("checkout", "git", "identity", "fingerprint"):
-        child = payload.get(key)
-        if isinstance(child, Mapping):
-            objects.append(child)
-    return objects
-
-
-def _extract_identity(payload: Mapping[str, Any]) -> tuple[str | None, str | None]:
-    head: str | None = None
-    fingerprint: str | None = None
-    for candidate in _identity_objects(payload):
-        if head is None:
-            for key in ("HEAD", "head", "commit_sha", "commit"):
-                raw_head = candidate.get(key)
-                if isinstance(raw_head, str) and SHA1_RE.fullmatch(raw_head.strip()):
-                    head = raw_head.strip().lower()
-                    break
-        if fingerprint is None:
-            for key in ("checkout_fingerprint", "checkout", "fingerprint"):
-                fingerprint = _normalise_fingerprint(candidate.get(key))
-                if fingerprint:
-                    break
-    return head, fingerprint
-
-
 def _safe_evidence_path(root: Path, raw_path: str) -> tuple[Path | None, str | None]:
     candidate = Path(raw_path)
     resolved = (candidate if candidate.is_absolute() else root / candidate).resolve()
@@ -512,6 +371,17 @@ def _validate_timestamp(value: str, field: str, failures: list[str]) -> None:
         return
     if timestamp.tzinfo is None:
         failures.append(f"{field} must include a timezone")
+
+
+def _validate_current_timestamp(value: str, field: str, failures: list[str]) -> None:
+    before = len(failures)
+    _validate_timestamp(value, field, failures)
+    if len(failures) != before:
+        return
+    timestamp = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    age_seconds = (datetime.now(timezone.utc) - timestamp.astimezone(timezone.utc)).total_seconds()
+    if age_seconds > MAX_EVIDENCE_AGE_SECONDS or age_seconds < -MAX_EVIDENCE_FUTURE_SKEW_SECONDS:
+        failures.append(f"{field} is outside the current evidence window")
 
 
 def _evaluate_typed_manifest(
@@ -555,7 +425,7 @@ def _evaluate_typed_manifest(
         failures.append("manifest commit binding does not match this checkout fingerprint")
     if checkout.get("status") != "CLEAN" or not binding.clean_worktree:
         failures.append("manifest is not bound to a clean release checkout")
-    _validate_timestamp(manifest.generated_at, "manifest.generated_at", failures)
+    _validate_current_timestamp(manifest.generated_at, "manifest.generated_at", failures)
 
     manifest_relative = path.relative_to(root).as_posix() if path.is_relative_to(root) else ""
 
@@ -581,7 +451,7 @@ def _evaluate_typed_manifest(
     for index, artifact in enumerate(manifest.artifacts):
         check_file(artifact.path, artifact.sha256, f"artifacts[{index}]")
     for gate in manifest.gates:
-        _validate_timestamp(gate.timestamp, f"gate {gate.gate_id}.timestamp", failures)
+        _validate_current_timestamp(gate.timestamp, f"gate {gate.gate_id}.timestamp", failures)
         for index, evidence in enumerate(gate.evidence_paths):
             check_file(evidence.path, evidence.sha256, f"gate {gate.gate_id}.evidence_paths[{index}]")
 
@@ -667,71 +537,14 @@ def evaluate_evidence(
     if payload.get("schema_version") == MANIFEST_SCHEMA:
         return _evaluate_typed_manifest(path, payload, checkout, root=root)
 
-    observed_head, observed_fingerprint = _extract_identity(payload)
-    expected_head = checkout.get("head")
-    expected_fingerprint = checkout.get("fingerprint")
-    checkout_errors = checkout.get("errors")
-    failures: list[str] = []
-    not_run: list[str] = []
-    warnings: list[str] = []
-    if (
-        checkout.get("available") is not True
-        or not isinstance(checkout_errors, Sequence)
-        or isinstance(checkout_errors, (str, bytes, bytearray))
-        or bool(checkout_errors)
-        or not expected_head
-        or not expected_fingerprint
-    ):
-        not_run.append("current checkout identity is unavailable")
-    else:
-        if observed_head is None:
-            failures.append("evidence has no full HEAD")
-        elif observed_head != expected_head:
-            failures.append("evidence HEAD does not match this checkout")
-        if observed_fingerprint is None:
-            failures.append("evidence has no valid checkout fingerprint")
-        elif observed_fingerprint != str(expected_fingerprint).lower():
-            failures.append("evidence fingerprint does not match this checkout")
-
-    observations = _collect_statuses(payload)
-    required_observations = [item for item in observations if item["required"]]
-    if not required_observations:
-        failures.append("evidence has no mandatory PASS/FAIL/NOT_RUN classification")
-    for observation in observations:
-        label = f"{observation['path']}={observation['raw']}"
-        if observation["classification"] == FAIL:
-            failures.append(f"evidence contains a failing or stale result: {label}")
-        elif observation["classification"] == NOT_RUN:
-            if observation["required"]:
-                not_run.append(f"mandatory evidence was not run: {label}")
-            else:
-                warnings.append(f"optional evidence was not run: {label}")
-
-    if failures:
-        result["classification"] = FAIL
-        result["reason"] = "; ".join(failures)
-    elif not_run:
-        result["classification"] = NOT_RUN
-        result["reason"] = "; ".join(not_run)
-    else:
-        result["classification"] = PASS
-        result["reason"] = "current checkout identity and mandatory evidence are valid"
-    result["rejection_codes"] = _rejection_codes(
-        str(result.get("reason", "")),
-        classification=str(result["classification"]),
-    )
-    if warnings:
-        result["warnings"] = warnings
-    result["observations"] = [
+    result.update(
         {
-            "path": item["path"],
-            "classification": item["classification"],
-            "required": item["required"],
+            "classification": NOT_RUN,
+            "reason": "legacy release evidence schema is not promotion eligible; regenerate state-of-art-release-evidence.v2",
+            "rejection_codes": ["MISSING_EVIDENCE_REJECTED"],
         }
-        for item in observations
-    ]
+    )
     return result
-
 
 def _overall_classification(criteria: Sequence[Mapping[str, Any]]) -> str:
     if any(item.get("classification") == FAIL for item in criteria):

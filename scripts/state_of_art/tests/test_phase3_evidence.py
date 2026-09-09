@@ -30,9 +30,12 @@ def _ref(root: Path, path: str, description: str) -> dict[str, str]:
     }
 
 
-def _raw_ref(root: Path, filename: str) -> dict[str, str]:
+def _raw_ref(root: Path, filename: str, *, status: str = "PASS") -> dict[str, str]:
     path = root / filename
-    path.write_text(f"raw runtime fixture: {filename}\n", encoding="utf-8")
+    path.write_text(
+        json.dumps({"schema_version": "fixture-runtime-gate.v1", "status": status, "results": []}) + "\n",
+        encoding="utf-8",
+    )
     return _ref(root, filename, "raw runtime gate fixture")
 
 
@@ -295,6 +298,29 @@ def test_promotable_capability_requires_runtime_production_safety(tmp_path: Path
     assert "production_safe" in result["reason"]
 
 
+def test_explicit_production_safe_promotable_capability_classifies_promotable(tmp_path: Path) -> None:
+    path, payload, checkout = _fixture(tmp_path)
+    raw_ref = _raw_ref(tmp_path, "raw-production-safe.json")
+    runtime = tmp_path / "runtime-production-safe.json"
+    runtime.write_text(
+        json.dumps(_runtime_record(raw_ref, production_safe=True)),
+        encoding="utf-8",
+    )
+    payload["capabilities"][0]["status"] = "PROMOTABLE"  # type: ignore[index]
+    payload["capabilities"][0]["reviewer"]["independent"] = True  # type: ignore[index]
+    payload["capabilities"][0]["runtime_evidence"] = [_ref(  # type: ignore[index]
+        tmp_path,
+        "runtime-production-safe.json",
+        "production-safe runtime envelope",
+    )]
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = evaluate_matrix(path, checkout, root=tmp_path, require_complete=False)
+
+    assert result["classification"] == "PROMOTABLE"
+    assert result["rejection_codes"] == []
+
+
 def test_runtime_envelope_requires_checkout_sentinel(tmp_path: Path) -> None:
     path, payload, checkout = _fixture(tmp_path)
     raw_ref = _raw_ref(tmp_path, "raw-no-sentinel.json")
@@ -381,7 +407,7 @@ def test_runtime_envelope_requires_nonempty_reviewer_fields(tmp_path: Path) -> N
 
 def test_blocked_runtime_envelope_is_bound_without_becoming_a_pass(tmp_path: Path) -> None:
     path, payload, checkout = _fixture(tmp_path)
-    raw_ref = _raw_ref(tmp_path, "raw-blocked.json")
+    raw_ref = _raw_ref(tmp_path, "raw-blocked.json", status="BLOCKED_EXTERNAL")
     runtime = tmp_path / "runtime-blocked.json"
     runtime.write_text(json.dumps({
         "schema_version": "state-of-art-runtime-evidence.v1",
@@ -415,6 +441,48 @@ def test_blocked_runtime_envelope_is_bound_without_becoming_a_pass(tmp_path: Pat
     assert result["classification"] == "BLOCKED_EXTERNAL"
     assert "BLOCKED_RUNTIME_REJECTED" in result["rejection_codes"]
     assert "MISSING_EVIDENCE_REJECTED" not in result["rejection_codes"]
+
+
+def test_non_json_raw_artifact_is_rejected_even_when_hash_matches(tmp_path: Path) -> None:
+    path, payload, checkout = _fixture(tmp_path)
+    raw = tmp_path / "raw-non-json.json"
+    raw.write_text("not-json\n", encoding="utf-8")
+    raw_ref = _ref(tmp_path, "raw-non-json.json", "malformed raw gate output")
+    runtime = tmp_path / "runtime-non-json-raw.json"
+    runtime.write_text(json.dumps(_runtime_record(raw_ref, status="BLOCKED_EXTERNAL")), encoding="utf-8")
+    payload["capabilities"][0]["status"] = "BLOCKED_EXTERNAL"  # type: ignore[index]
+    payload["capabilities"][0]["runtime_evidence"] = [_ref(  # type: ignore[index]
+        tmp_path,
+        "runtime-non-json-raw.json",
+        "runtime envelope with malformed raw artifact",
+    )]
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = evaluate_matrix(path, checkout, root=tmp_path, require_complete=False)
+
+    assert result["classification"] == "FAILED"
+    assert "MISSING_EVIDENCE_REJECTED" in result["rejection_codes"]
+    assert "raw_artifacts" in result["reason"]
+
+
+def test_missing_raw_artifact_is_rejected(tmp_path: Path) -> None:
+    path, payload, checkout = _fixture(tmp_path)
+    raw_ref = _raw_ref(tmp_path, "raw-missing.json")
+    runtime = tmp_path / "runtime-missing-raw.json"
+    runtime.write_text(json.dumps(_runtime_record(raw_ref, status="BLOCKED_EXTERNAL")), encoding="utf-8")
+    (tmp_path / "raw-missing.json").unlink()
+    payload["capabilities"][0]["status"] = "BLOCKED_EXTERNAL"  # type: ignore[index]
+    payload["capabilities"][0]["runtime_evidence"] = [_ref(  # type: ignore[index]
+        tmp_path,
+        "runtime-missing-raw.json",
+        "runtime envelope with missing raw artifact",
+    )]
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = evaluate_matrix(path, checkout, root=tmp_path, require_complete=False)
+
+    assert result["classification"] == "FAILED"
+    assert "MISSING_EVIDENCE_REJECTED" in result["rejection_codes"]
 
 
 def test_runtime_envelope_wrong_tree_is_rejected(tmp_path: Path) -> None:
@@ -460,7 +528,7 @@ def test_runtime_envelope_wrong_tree_is_rejected(tmp_path: Path) -> None:
 
 def test_stale_runtime_envelope_is_rejected(tmp_path: Path) -> None:
     path, payload, checkout = _fixture(tmp_path)
-    raw_ref = _raw_ref(tmp_path, "raw-stale.json")
+    raw_ref = _raw_ref(tmp_path, "raw-stale.json", status="BLOCKED_EXTERNAL")
     runtime = tmp_path / "runtime-stale.json"
     runtime.write_text(json.dumps({
         "schema_version": "state-of-art-runtime-evidence.v1",

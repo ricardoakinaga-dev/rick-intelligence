@@ -50,13 +50,14 @@ class ReleaseIntegrityTests(unittest.TestCase):
             },
         }
 
-    def test_current_evidence_passes_while_optional_live_evidence_is_not_run(self) -> None:
+    def test_legacy_evidence_is_not_promotion_eligible(self) -> None:
         with tempfile.TemporaryDirectory(prefix="release-integrity-") as directory:
             path = self._write_evidence(directory, self._valid_payload())
             result = release_integrity.evaluate_evidence(path, self._checkout(), root=Path(directory))
 
-        self.assertEqual(result["classification"], release_integrity.PASS)
-        self.assertTrue(any("optional evidence was not run" in warning for warning in result["warnings"]))
+        self.assertEqual(result["classification"], release_integrity.NOT_RUN)
+        self.assertIn("legacy release evidence schema is not promotion eligible", result["reason"])
+        self.assertEqual(result["rejection_codes"], ["MISSING_EVIDENCE_REJECTED"])
 
     def test_missing_evidence_is_not_run(self) -> None:
         with tempfile.TemporaryDirectory(prefix="release-integrity-") as directory:
@@ -91,17 +92,17 @@ class ReleaseIntegrityTests(unittest.TestCase):
 
         self.assertEqual(result["classification"], release_integrity.NOT_RUN)
 
-    def test_head_mismatch_rejects_evidence_as_fail(self) -> None:
+    def test_legacy_head_mismatch_cannot_be_promoted(self) -> None:
         payload = self._valid_payload()
         payload["HEAD"] = "c" * 40
         with tempfile.TemporaryDirectory(prefix="release-integrity-") as directory:
             path = self._write_evidence(directory, payload)
             result = release_integrity.evaluate_evidence(path, self._checkout(), root=Path(directory))
 
-        self.assertEqual(result["classification"], release_integrity.FAIL)
-        self.assertIn("HEAD does not match", result["reason"])
+        self.assertEqual(result["classification"], release_integrity.NOT_RUN)
+        self.assertIn("legacy release evidence schema is not promotion eligible", result["reason"])
 
-    def test_BLOCKED_RUNTIME_REJECTED(self) -> None:
+    def test_legacy_blocked_payload_cannot_be_promoted(self) -> None:
         payload = self._valid_payload()
         payload["runtime_dependencies"] = [
             {
@@ -114,20 +115,18 @@ class ReleaseIntegrityTests(unittest.TestCase):
             path = self._write_evidence(directory, payload)
             result = release_integrity.evaluate_evidence(path, self._checkout(), root=Path(directory))
 
-        self.assertEqual(result["classification"], release_integrity.FAIL)
-        self.assertIn("BLOCKED", result["reason"])
-        self.assertIn("failing or stale result", result["reason"])
-        self.assertIn("BLOCKED_RUNTIME_REJECTED", result["rejection_codes"])
+        self.assertEqual(result["classification"], release_integrity.NOT_RUN)
+        self.assertIn("legacy release evidence schema is not promotion eligible", result["reason"])
 
-    def test_fingerprint_mismatch_rejects_evidence_as_fail(self) -> None:
+    def test_legacy_fingerprint_mismatch_cannot_be_promoted(self) -> None:
         payload = self._valid_payload()
         payload["fingerprint"] = {"checkout": "sha256:" + "c" * 64}
         with tempfile.TemporaryDirectory(prefix="release-integrity-") as directory:
             path = self._write_evidence(directory, payload)
             result = release_integrity.evaluate_evidence(path, self._checkout(), root=Path(directory))
 
-        self.assertEqual(result["classification"], release_integrity.FAIL)
-        self.assertIn("fingerprint does not match", result["reason"])
+        self.assertEqual(result["classification"], release_integrity.NOT_RUN)
+        self.assertIn("legacy release evidence schema is not promotion eligible", result["reason"])
 
     def test_unavailable_checkout_cannot_pass_legacy_evidence(self) -> None:
         payload = self._valid_payload()
@@ -139,9 +138,9 @@ class ReleaseIntegrityTests(unittest.TestCase):
             result = release_integrity.evaluate_evidence(path, checkout, root=Path(directory))
 
         self.assertEqual(result["classification"], release_integrity.NOT_RUN)
-        self.assertIn("current checkout identity is unavailable", result["reason"])
+        self.assertIn("legacy release evidence schema is not promotion eligible", result["reason"])
 
-    def test_stale_classification_rejects_evidence_as_fail(self) -> None:
+    def test_legacy_stale_classification_cannot_be_promoted(self) -> None:
         payload = self._valid_payload()
         payload["checks"] = [
             {
@@ -154,8 +153,8 @@ class ReleaseIntegrityTests(unittest.TestCase):
             path = self._write_evidence(directory, payload)
             result = release_integrity.evaluate_evidence(path, self._checkout(), root=Path(directory))
 
-        self.assertEqual(result["classification"], release_integrity.FAIL)
-        self.assertIn("stale", result["reason"])
+        self.assertEqual(result["classification"], release_integrity.NOT_RUN)
+        self.assertIn("legacy release evidence schema is not promotion eligible", result["reason"])
 
     def test_dirty_sentinel_exposes_stable_rejection_code(self) -> None:
         before = {"available": True, "fingerprint": "1" * 64, "status": "DIRTY"}

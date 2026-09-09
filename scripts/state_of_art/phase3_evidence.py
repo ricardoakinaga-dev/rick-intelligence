@@ -610,6 +610,19 @@ def evaluate_matrix(
                             if actual_raw_hash != normalized_raw_hash:
                                 envelope_errors.append(f"raw_artifacts[{raw_index}].sha256")
                                 rejection_codes.add("WRONG_HASH_REJECTED")
+                            try:
+                                raw_payload = json.loads(raw_target.read_text(encoding="utf-8"))
+                            except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+                                envelope_errors.append(f"raw_artifacts[{raw_index}].json")
+                                rejection_codes.add("MISSING_EVIDENCE_REJECTED")
+                            else:
+                                if (
+                                    not isinstance(raw_payload, Mapping)
+                                    or not isinstance(raw_payload.get("status"), str)
+                                    or not raw_payload["status"].strip()
+                                ):
+                                    envelope_errors.append(f"raw_artifacts[{raw_index}].gate_status")
+                                    rejection_codes.add("MISSING_EVIDENCE_REJECTED")
                         if (
                             isinstance(artifact_digest, str)
                             and raw_digests

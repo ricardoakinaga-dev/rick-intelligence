@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from hashlib import sha256
 import json
 import tempfile
@@ -27,6 +28,7 @@ class ReleaseManifestTests(unittest.TestCase):
 
     def _fixture(self, directory: str, *, gate_result: str = "PASS", status: str = "PASS") -> tuple[Path, dict[str, object]]:
         root = Path(directory)
+        observed_at = datetime.now(timezone.utc).isoformat()
         artifact_path = root / "artifact.txt"
         evidence_path = root / "evidence.md"
         artifact_path.write_text("artifact-v1\n", encoding="utf-8")
@@ -53,7 +55,7 @@ class ReleaseManifestTests(unittest.TestCase):
             artifact_hash=artifact_set_digest((artifact,)),
             command=("fixture", "gate"),
             environment="test",
-            timestamp="2026-09-09T12:00:00+00:00",
+            timestamp=observed_at,
             result=gate_result,  # type: ignore[arg-type]
             limitations=("fixture is not a production run",) if gate_result != "PASS" else (),
             reviewer=reviewer,
@@ -62,7 +64,7 @@ class ReleaseManifestTests(unittest.TestCase):
         manifest = ReleaseEvidenceManifest(
             schema_version="state-of-art-release-evidence.v2",
             manifest_id="fixture-manifest",
-            generated_at="2026-09-09T12:00:00+00:00",
+            generated_at=observed_at,
             status=status,  # type: ignore[arg-type]
             commit_binding=CommitBinding(
                 commit_sha=self.HEAD,
@@ -112,6 +114,28 @@ class ReleaseManifestTests(unittest.TestCase):
 
         self.assertEqual(result["classification"], release_integrity.FAIL)
         self.assertIn("checkout tree", result["reason"])
+
+    def test_unavailable_checkout_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="release-manifest-") as directory:
+            path, checkout = self._fixture(directory)
+            checkout["available"] = False
+            checkout["errors"] = ["git status unavailable"]
+            result = release_integrity.evaluate_evidence(path, checkout, root=Path(directory))
+
+        self.assertEqual(result["classification"], release_integrity.FAIL)
+        self.assertIn("checkout identity is unavailable", result["reason"])
+
+    def test_stale_manifest_timestamps_fail_closed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="release-manifest-") as directory:
+            path, checkout = self._fixture(directory)
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            payload["generated_at"] = "2000-01-01T00:00:00+00:00"
+            payload["gates"][0]["timestamp"] = "2000-01-01T00:00:00+00:00"
+            path.write_text(json.dumps(payload), encoding="utf-8")
+            result = release_integrity.evaluate_evidence(path, checkout, root=Path(directory))
+
+        self.assertEqual(result["classification"], release_integrity.FAIL)
+        self.assertIn("current evidence window", result["reason"])
 
     def test_WRONG_HASH_REJECTED(self) -> None:
         with tempfile.TemporaryDirectory(prefix="release-manifest-") as directory:
