@@ -84,6 +84,7 @@ class ReleaseManifestTests(unittest.TestCase):
             "tree": self.TREE,
             "fingerprint": self.CHECKOUT,
             "status": "CLEAN",
+            "errors": [],
         }
         return path, checkout
 
@@ -102,6 +103,15 @@ class ReleaseManifestTests(unittest.TestCase):
 
         self.assertEqual(result["classification"], release_integrity.FAIL)
         self.assertIn("artifact hash does not match", result["reason"])
+
+    def test_missing_checkout_tree_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="release-manifest-") as directory:
+            path, checkout = self._fixture(directory)
+            checkout.pop("tree")
+            result = release_integrity.evaluate_evidence(path, checkout, root=Path(directory))
+
+        self.assertEqual(result["classification"], release_integrity.FAIL)
+        self.assertIn("checkout tree", result["reason"])
 
     def test_WRONG_HASH_REJECTED(self) -> None:
         with tempfile.TemporaryDirectory(prefix="release-manifest-") as directory:

@@ -539,9 +539,17 @@ def _evaluate_typed_manifest(
     expected_head = str(checkout.get("head") or "").lower()
     expected_tree = str(checkout.get("tree") or "").lower()
     expected_fingerprint = str(checkout.get("fingerprint") or "").lower()
+    checkout_errors = checkout.get("errors")
+    if (
+        checkout.get("available") is not True
+        or not isinstance(checkout_errors, Sequence)
+        or isinstance(checkout_errors, (str, bytes, bytearray))
+        or bool(checkout_errors)
+    ):
+        failures.append("current checkout identity is unavailable or has capture errors")
     if not expected_head or binding.commit_sha != expected_head:
         failures.append("manifest commit binding does not match this checkout HEAD")
-    if expected_tree and binding.tree_sha != expected_tree:
+    if not expected_tree or binding.tree_sha != expected_tree:
         failures.append("manifest commit binding does not match this checkout tree")
     if not expected_fingerprint or binding.checkout_fingerprint != expected_fingerprint:
         failures.append("manifest commit binding does not match this checkout fingerprint")
@@ -662,10 +670,18 @@ def evaluate_evidence(
     observed_head, observed_fingerprint = _extract_identity(payload)
     expected_head = checkout.get("head")
     expected_fingerprint = checkout.get("fingerprint")
+    checkout_errors = checkout.get("errors")
     failures: list[str] = []
     not_run: list[str] = []
     warnings: list[str] = []
-    if not expected_head or not expected_fingerprint:
+    if (
+        checkout.get("available") is not True
+        or not isinstance(checkout_errors, Sequence)
+        or isinstance(checkout_errors, (str, bytes, bytearray))
+        or bool(checkout_errors)
+        or not expected_head
+        or not expected_fingerprint
+    ):
         not_run.append("current checkout identity is unavailable")
     else:
         if observed_head is None:

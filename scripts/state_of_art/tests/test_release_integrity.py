@@ -18,8 +18,10 @@ class ReleaseIntegrityTests(unittest.TestCase):
         return {
             "available": True,
             "head": self.HEAD,
+            "tree": "c" * 40,
             "fingerprint": self.FINGERPRINT,
             "status": "CLEAN",
+            "errors": [],
         }
 
     def _write_evidence(self, directory: str, payload: dict[str, object]) -> Path:
@@ -126,6 +128,18 @@ class ReleaseIntegrityTests(unittest.TestCase):
 
         self.assertEqual(result["classification"], release_integrity.FAIL)
         self.assertIn("fingerprint does not match", result["reason"])
+
+    def test_unavailable_checkout_cannot_pass_legacy_evidence(self) -> None:
+        payload = self._valid_payload()
+        checkout = self._checkout()
+        checkout["available"] = False
+        checkout["errors"] = ["git status unavailable"]
+        with tempfile.TemporaryDirectory(prefix="release-integrity-") as directory:
+            path = self._write_evidence(directory, payload)
+            result = release_integrity.evaluate_evidence(path, checkout, root=Path(directory))
+
+        self.assertEqual(result["classification"], release_integrity.NOT_RUN)
+        self.assertIn("current checkout identity is unavailable", result["reason"])
 
     def test_stale_classification_rejects_evidence_as_fail(self) -> None:
         payload = self._valid_payload()
