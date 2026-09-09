@@ -55,7 +55,7 @@ _SENSITIVE_VALUE = re.compile(
     re.IGNORECASE,
 )
 _SENSITIVE_ASSIGNMENT = re.compile(
-    r"\b((?:password|passphrase|secret|token|api[_-]?key|access[_-]?key|private[_-]?key|authorization|cookie|credential|dsn))"
+    r"\b([A-Za-z0-9_-]*(?:password|passphrase|secret|token|api[_-]?key|access[_-]?key|private[_-]?key|authorization|cookie|credential|dsn|url|bearer)[A-Za-z0-9_-]*)"
     r"(\s*[:=]\s*)(?:\"[^\"]*\"|'[^']*'|[^\s,;}\]]+)",
     re.IGNORECASE,
 )
@@ -87,6 +87,68 @@ def _redact(value: Any, *, key: str = "") -> Any:
 
 def _write_json(path: Path, value: Mapping[str, Any]) -> None:
     path.write_text(json.dumps(value, ensure_ascii=False, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+
+
+_CHECKOUT_SHA1 = re.compile(r"^[0-9a-f]{40}$", re.IGNORECASE)
+_CHECKOUT_SHA256 = re.compile(r"^[0-9a-f]{64}$", re.IGNORECASE)
+_CHECKOUT_IDENTITY_FIELDS = ("head", "tree", "fingerprint", "status")
+
+
+def _capture_checkout(root: Path, capture: Callable[[Path], dict[str, Any]]) -> dict[str, Any]:
+    try:
+        captured = capture(root)
+    except Exception:
+        return {
+            "available": False,
+            "head": None,
+            "tree": None,
+            "fingerprint": None,
+            "status": "UNKNOWN",
+            "errors": ["checkout capture failed"],
+        }
+    if not isinstance(captured, Mapping):
+        return {
+            "available": False,
+            "head": None,
+            "tree": None,
+            "fingerprint": None,
+            "status": "UNKNOWN",
+            "errors": ["checkout capture returned a non-object"],
+        }
+    return dict(captured)
+
+
+def _valid_checkout(checkout: Mapping[str, Any]) -> bool:
+    errors = checkout.get("errors")
+    return (
+        checkout.get("available") is True
+        and checkout.get("status") == "CLEAN"
+        and isinstance(checkout.get("head"), str)
+        and bool(_CHECKOUT_SHA1.fullmatch(checkout["head"]))
+        and isinstance(checkout.get("tree"), str)
+        and bool(_CHECKOUT_SHA1.fullmatch(checkout["tree"]))
+        and isinstance(checkout.get("fingerprint"), str)
+        and bool(_CHECKOUT_SHA256.fullmatch(checkout["fingerprint"]))
+        and isinstance(errors, Sequence)
+        and not isinstance(errors, (str, bytes, bytearray))
+        and not errors
+    )
+
+
+def _same_checkout(before: Mapping[str, Any], after: Mapping[str, Any]) -> bool:
+    return _valid_checkout(before) and _valid_checkout(after) and all(
+        before.get(field) == after.get(field) for field in _CHECKOUT_IDENTITY_FIELDS
+    )
+
+
+def _checkout_snapshot(checkout: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        "available": checkout.get("available") is True,
+        "head": checkout.get("head"),
+        "tree": checkout.get("tree"),
+        "fingerprint": checkout.get("fingerprint"),
+        "status": checkout.get("status"),
+    }
 
 
 def _normalize_status(raw: Mapping[str, Any], exit_status: int) -> str:
@@ -133,6 +195,7 @@ def run_gate_adapter(
     raw_base_path = _safe_path(root, raw_output)
     if output_path == raw_base_path:
         raise ValueError("envelope and raw gate output must be different files")
+    checkout_before = _capture_checkout(root, checkout_capture)
     raw_path = raw_base_path.with_name(
         f"{raw_base_path.stem}-{uuid.uuid4().hex[:12]}{raw_base_path.suffix or '.json'}"
     )
@@ -160,10 +223,16 @@ def run_gate_adapter(
                 exit_status = 1
             _write_json(raw_path, raw_payload)
 
-    checkout = checkout_capture(root)
+    checkout_after = _capture_checkout(root, checkout_capture)
+    checkout_unchanged = _same_checkout(checkout_before, checkout_after)
+    checkout_clean = checkout_after.get("available") is True and checkout_after.get("status") == "CLEAN"
     observed_at = datetime.now(timezone.utc).isoformat()
     status = _normalize_status(raw_payload, exit_status)
-    if checkout.get("status") != "CLEAN" and status in {"PASS", "VERIFIED_RUNTIME", "PROMOTABLE"}:
+    if not checkout_unchanged:
+        status = "FAILED"
+        exit_status = 1
+    raw_digest_value = _sha256(raw_path)
+    if raw_digest_value is None:
         status = "FAILED"
         exit_status = 1
     if status == "BLOCKED_EXTERNAL":
@@ -171,10 +240,11 @@ def run_gate_adapter(
     elif status == "FAILED" and exit_status == 0:
         exit_status = 1
     production_safe = (
-        status in {"PASS", "VERIFIED_RUNTIME", "PROMOTABLE"}
+        checkout_unchanged
+        and raw_digest_value is not None
+        and status in {"PASS", "VERIFIED_RUNTIME", "PROMOTABLE"}
         and raw_payload.get("production_safe") is True
     )
-    raw_digest = _sha256(raw_path)
 
     if status == "PASS":
         limitations = [
@@ -200,16 +270,19 @@ def run_gate_adapter(
         "record_id": f"PH3-{capability_id}-{observed_at.replace('-', '').replace(':', '').replace('.', '')}",
         "capability_id": capability_id,
         "status": status,
-        "commit_sha": checkout.get("head"),
-        "tree_sha": checkout.get("tree"),
-        "checkout_fingerprint": checkout.get("fingerprint"),
-        "clean_worktree": checkout.get("status") == "CLEAN",
-        "artifact_sha256": raw_digest,
+        "commit_sha": checkout_after.get("head"),
+        "tree_sha": checkout_after.get("tree"),
+        "checkout_fingerprint": checkout_after.get("fingerprint"),
+        "checkout_available": checkout_after.get("available") is True,
+        "clean_worktree": checkout_clean,
+        "artifact_sha256": raw_digest_value,
         "environment": environment,
         "procedure": procedure,
         "exit_status": exit_status,
         "observed_at": observed_at,
-        "freshness": "CURRENT" if checkout.get("status") == "CLEAN" else "DIRTY_CHECKOUT",
+        "freshness": "CURRENT" if checkout_unchanged else (
+            "DIRTY_CHECKOUT" if checkout_after.get("status") != "CLEAN" else "INVALID_CHECKOUT"
+        ),
         "production_safe": production_safe,
         "reviewer": {
             "id": f"automated-phase3-{capability_id.lower()}",
@@ -219,10 +292,15 @@ def run_gate_adapter(
         },
         "limitations": limitations,
         "next_action": next_action,
+        "checkout_sentinel": {
+            "before": _checkout_snapshot(checkout_before),
+            "after": _checkout_snapshot(checkout_after),
+            "unchanged": checkout_unchanged,
+        },
         "raw_artifacts": [
             {
                 "path": str(raw_path.relative_to(root)),
-                "sha256": raw_digest,
+                "sha256": raw_digest_value,
                 "description": "underlying Phase 11 runtime gate result",
             }
         ],

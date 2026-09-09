@@ -25,10 +25,12 @@ def test_missing_database_is_wrapped_as_blocked_without_runtime_claim(monkeypatc
         adapter,
         "capture_checkout",
         lambda _root: {
+            "available": True,
             "head": "a" * 40,
             "tree": "b" * 40,
             "fingerprint": "c" * 64,
             "status": "CLEAN",
+            "errors": [],
         },
     )
     monkeypatch.setattr(adapter, "RAW_OUTPUT", "raw.json")

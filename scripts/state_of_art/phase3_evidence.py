@@ -392,6 +392,15 @@ def evaluate_matrix(
     expected_head = str(checkout.get("head") or "").lower()
     expected_tree = str(checkout.get("tree") or "").lower()
     expected_fingerprint = str(checkout.get("fingerprint") or "").lower()
+    checkout_errors = checkout.get("errors")
+    if (
+        checkout.get("available") is not True
+        or not isinstance(checkout_errors, Sequence)
+        or isinstance(checkout_errors, (str, bytes, bytearray))
+        or bool(checkout_errors)
+    ):
+        failures.append("checkout identity is unavailable or has capture errors")
+        rejection_codes.add("MISSING_EVIDENCE_REJECTED")
     if candidate["commit_sha"] != expected_head:
         failures.append("candidate commit does not match this checkout HEAD")
         rejection_codes.add("WRONG_COMMIT_EVIDENCE_REJECTED")
@@ -499,6 +508,36 @@ def evaluate_matrix(
                     ):
                         envelope_errors.append("checkout_fingerprint")
                         rejection_codes.add("WRONG_COMMIT_EVIDENCE_REJECTED")
+                    if runtime_record.get("checkout_available") is not True:
+                        envelope_errors.append("checkout_available")
+                        rejection_codes.add("MISSING_EVIDENCE_REJECTED")
+                    checkout_sentinel = runtime_record.get("checkout_sentinel")
+                    if not isinstance(checkout_sentinel, Mapping):
+                        envelope_errors.append("checkout_sentinel")
+                    else:
+                        sentinel_before = checkout_sentinel.get("before")
+                        sentinel_after = checkout_sentinel.get("after")
+                        if not isinstance(sentinel_before, Mapping) or not isinstance(sentinel_after, Mapping):
+                            envelope_errors.append("checkout_sentinel.identity")
+                        else:
+                            for sentinel_name, sentinel in (
+                                ("before", sentinel_before),
+                                ("after", sentinel_after),
+                            ):
+                                if sentinel.get("available") is not True:
+                                    envelope_errors.append(f"checkout_sentinel.{sentinel_name}.available")
+                                if sentinel.get("head") != runtime_commit:
+                                    envelope_errors.append(f"checkout_sentinel.{sentinel_name}.head")
+                                if sentinel.get("tree") != runtime_tree:
+                                    envelope_errors.append(f"checkout_sentinel.{sentinel_name}.tree")
+                                if sentinel.get("fingerprint") != runtime_fingerprint:
+                                    envelope_errors.append(f"checkout_sentinel.{sentinel_name}.fingerprint")
+                                if sentinel.get("status") != "CLEAN":
+                                    envelope_errors.append(f"checkout_sentinel.{sentinel_name}.status")
+                            if sentinel_before != sentinel_after:
+                                envelope_errors.append("checkout_sentinel.changed")
+                        if checkout_sentinel.get("unchanged") is not True:
+                            envelope_errors.append("checkout_sentinel.unchanged")
                     runtime_exit_status = runtime_record.get("exit_status")
                     if type(runtime_exit_status) is not int or runtime_exit_status < 0:
                         envelope_errors.append("exit_status")

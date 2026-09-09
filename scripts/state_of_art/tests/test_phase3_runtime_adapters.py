@@ -28,12 +28,14 @@ def adapter(request: pytest.FixtureRequest) -> ModuleType:
     return _load(f"phase3_adapter_{request.param_index}", f"scripts/state_of_art/{filename}")
 
 
-def _checkout(_root: Path) -> dict[str, str]:
+def _checkout(_root: Path) -> dict[str, object]:
     return {
+        "available": True,
         "head": "a" * 40,
         "tree": "b" * 40,
         "fingerprint": "c" * 64,
         "status": "CLEAN",
+        "errors": [],
     }
 
 
@@ -118,6 +120,90 @@ def test_missing_raw_output_cannot_reuse_a_stale_pass(
     assert envelope["production_safe"] is False
 
 
+def test_missing_checkout_identity_cannot_emit_a_successful_runtime_envelope(
+    adapter: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    def fake_gate(argv: list[str]) -> int:
+        output = tmp_path / Path(argv[argv.index("--output") + 1])
+        output.write_text(json.dumps({"status": "PASS", "production_safe": True}), encoding="utf-8")
+        return 0
+
+    def unavailable_checkout(_root: Path) -> dict[str, object]:
+        return {
+            "available": False,
+            "head": None,
+            "tree": None,
+            "fingerprint": None,
+            "status": "UNKNOWN",
+            "errors": ["git unavailable"],
+        }
+
+    monkeypatch.setattr(adapter, "RAW_OUTPUT", "raw.json")
+    monkeypatch.setattr(adapter, "capture_checkout", unavailable_checkout)
+    monkeypatch.setattr(_gate_module(adapter), "main", fake_gate)
+
+    envelope = adapter.run(tmp_path, output="evidence.json")
+
+    assert envelope["status"] == "FAILED"
+    assert envelope["exit_status"] == 1
+    assert envelope["checkout_available"] is False
+    assert envelope["production_safe"] is False
+
+
+def test_checkout_mutation_during_gate_is_rejected(
+    adapter: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    capture_count = 0
+
+    def capture(_root: Path) -> dict[str, object]:
+        nonlocal capture_count
+        capture_count += 1
+        checkout = _checkout(_root)
+        if capture_count == 2:
+            checkout["head"] = "d" * 40
+        return checkout
+
+    def fake_gate(argv: list[str]) -> int:
+        output = tmp_path / Path(argv[argv.index("--output") + 1])
+        output.write_text(json.dumps({"status": "PASS", "production_safe": True}), encoding="utf-8")
+        return 0
+
+    monkeypatch.setattr(adapter, "RAW_OUTPUT", "raw.json")
+    monkeypatch.setattr(adapter, "capture_checkout", capture)
+    monkeypatch.setattr(_gate_module(adapter), "main", fake_gate)
+
+    envelope = adapter.run(tmp_path, output="evidence.json")
+
+    assert envelope["status"] == "FAILED"
+    assert envelope["exit_status"] == 1
+    assert envelope["checkout_sentinel"]["unchanged"] is False
+
+
+def test_malformed_raw_gate_output_cannot_emit_a_successful_runtime_envelope(
+    adapter: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    def fake_gate(argv: list[str]) -> int:
+        output = tmp_path / Path(argv[argv.index("--output") + 1])
+        output.write_text("not-json", encoding="utf-8")
+        return 0
+
+    monkeypatch.setattr(adapter, "RAW_OUTPUT", "raw.json")
+    monkeypatch.setattr(adapter, "capture_checkout", _checkout)
+    monkeypatch.setattr(_gate_module(adapter), "main", fake_gate)
+
+    envelope = adapter.run(tmp_path, output="evidence.json")
+
+    assert envelope["status"] == "FAILED"
+    assert envelope["exit_status"] == 1
+    assert envelope["production_safe"] is False
+
+
 def test_dirty_checkout_cannot_emit_a_successful_runtime_envelope(
     adapter: ModuleType,
     monkeypatch: pytest.MonkeyPatch,
@@ -160,7 +246,7 @@ def test_raw_gate_payload_is_redacted_before_persistence(
                 "production_safe": True,
                 "password": secret,
                 "endpoint": secret_uri,
-                "detail": f"token={secret}",
+                "detail": f"token={secret} DATABASE_URL={secret_uri} DB_PASSWORD={secret} client_secret={secret}",
                 "nested": {"api_key": secret},
             }),
             encoding="utf-8",

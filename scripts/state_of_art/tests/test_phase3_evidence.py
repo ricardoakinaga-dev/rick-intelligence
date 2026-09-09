@@ -36,6 +36,17 @@ def _raw_ref(root: Path, filename: str) -> dict[str, str]:
     return _ref(root, filename, "raw runtime gate fixture")
 
 
+def _runtime_sentinel() -> dict[str, object]:
+    snapshot = {
+        "available": True,
+        "head": HEAD,
+        "tree": TREE,
+        "fingerprint": CHECKOUT,
+        "status": "CLEAN",
+    }
+    return {"before": snapshot, "after": dict(snapshot), "unchanged": True}
+
+
 def _runtime_record(
     raw_ref: dict[str, str],
     *,
@@ -53,7 +64,9 @@ def _runtime_record(
         "commit_sha": HEAD,
         "tree_sha": TREE,
         "checkout_fingerprint": CHECKOUT,
+        "checkout_available": True,
         "clean_worktree": True,
+        "checkout_sentinel": _runtime_sentinel(),
         "environment": "fixture-runtime",
         "procedure": "fixture runtime procedure",
         "exit_status": 0 if status in {"PASS", "VERIFIED_RUNTIME", "PROMOTABLE"} else 2,
@@ -106,7 +119,14 @@ def _fixture(tmp_path: Path) -> tuple[Path, dict[str, object], dict[str, object]
     }
     path = tmp_path / "matrix.json"
     path.write_text(json.dumps(payload), encoding="utf-8")
-    checkout = {"head": HEAD, "tree": TREE, "fingerprint": CHECKOUT, "status": "CLEAN"}
+    checkout = {
+        "available": True,
+        "head": HEAD,
+        "tree": TREE,
+        "fingerprint": CHECKOUT,
+        "status": "CLEAN",
+        "errors": [],
+    }
     return path, payload, checkout
 
 
@@ -128,6 +148,17 @@ def test_wrong_commit_matrix_is_rejected(tmp_path: Path) -> None:
 
     assert result["classification"] == "FAILED"
     assert "WRONG_COMMIT_EVIDENCE_REJECTED" in result["rejection_codes"]
+
+
+def test_unavailable_checkout_is_rejected_even_when_identity_fields_match(tmp_path: Path) -> None:
+    path, _, checkout = _fixture(tmp_path)
+    checkout["available"] = False
+    checkout["errors"] = ["git status unavailable"]
+
+    result = evaluate_matrix(path, checkout, root=tmp_path, require_complete=False)
+
+    assert result["classification"] == "FAILED"
+    assert "MISSING_EVIDENCE_REJECTED" in result["rejection_codes"]
 
 
 def test_wrong_artifact_hash_matrix_is_rejected(tmp_path: Path) -> None:
@@ -217,7 +248,9 @@ def test_verified_runtime_is_not_promotable_without_explicit_production_promotio
         "commit_sha": HEAD,
         "tree_sha": TREE,
         "checkout_fingerprint": CHECKOUT,
+        "checkout_available": True,
         "clean_worktree": True,
+        "checkout_sentinel": _runtime_sentinel(),
         "environment": "fixture-runtime",
         "procedure": "fixture runtime procedure",
         "exit_status": 0,
@@ -260,6 +293,27 @@ def test_promotable_capability_requires_runtime_production_safety(tmp_path: Path
     assert result["classification"] == "FAILED"
     assert "MISSING_EVIDENCE_REJECTED" in result["rejection_codes"]
     assert "production_safe" in result["reason"]
+
+
+def test_runtime_envelope_requires_checkout_sentinel(tmp_path: Path) -> None:
+    path, payload, checkout = _fixture(tmp_path)
+    raw_ref = _raw_ref(tmp_path, "raw-no-sentinel.json")
+    runtime = tmp_path / "runtime-no-sentinel.json"
+    runtime_record = _runtime_record(raw_ref, status="BLOCKED_EXTERNAL")
+    del runtime_record["checkout_sentinel"]
+    runtime.write_text(json.dumps(runtime_record), encoding="utf-8")
+    payload["capabilities"][0]["status"] = "BLOCKED_EXTERNAL"  # type: ignore[index]
+    payload["capabilities"][0]["runtime_evidence"] = [_ref(  # type: ignore[index]
+        tmp_path,
+        "runtime-no-sentinel.json",
+        "runtime envelope without checkout sentinel",
+    )]
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = evaluate_matrix(path, checkout, root=tmp_path, require_complete=False)
+
+    assert result["classification"] == "FAILED"
+    assert "checkout_sentinel" in result["reason"]
 
 
 def test_current_label_with_old_runtime_observed_at_is_rejected(tmp_path: Path) -> None:
@@ -337,7 +391,9 @@ def test_blocked_runtime_envelope_is_bound_without_becoming_a_pass(tmp_path: Pat
         "commit_sha": HEAD,
         "tree_sha": TREE,
         "checkout_fingerprint": CHECKOUT,
+        "checkout_available": True,
         "clean_worktree": True,
+        "checkout_sentinel": _runtime_sentinel(),
         "environment": "fixture-runtime",
         "procedure": "fixture runtime procedure was not executable",
         "exit_status": 2,
@@ -373,7 +429,13 @@ def test_runtime_envelope_wrong_tree_is_rejected(tmp_path: Path) -> None:
         "commit_sha": HEAD,
         "tree_sha": "d" * 40,
         "checkout_fingerprint": CHECKOUT,
+        "checkout_available": True,
         "clean_worktree": True,
+        "checkout_sentinel": {
+            "before": {"available": True, "head": HEAD, "tree": "d" * 40, "fingerprint": CHECKOUT, "status": "CLEAN"},
+            "after": {"available": True, "head": HEAD, "tree": "d" * 40, "fingerprint": CHECKOUT, "status": "CLEAN"},
+            "unchanged": True,
+        },
         "environment": "fixture-runtime",
         "procedure": "fixture runtime procedure",
         "exit_status": 0,
@@ -408,7 +470,9 @@ def test_stale_runtime_envelope_is_rejected(tmp_path: Path) -> None:
         "commit_sha": HEAD,
         "tree_sha": TREE,
         "checkout_fingerprint": CHECKOUT,
+        "checkout_available": True,
         "clean_worktree": True,
+        "checkout_sentinel": _runtime_sentinel(),
         "environment": "fixture-runtime",
         "procedure": "fixture runtime procedure",
         "exit_status": 2,
