@@ -205,7 +205,7 @@ def test_verified_runtime_cannot_reuse_static_artifact_as_runtime_evidence(tmp_p
         parse_matrix(payload)
 
 
-def test_verified_runtime_accepts_distinct_bound_envelope_with_independent_review(tmp_path: Path) -> None:
+def test_verified_runtime_is_not_promotable_without_explicit_production_promotion(tmp_path: Path) -> None:
     path, payload, checkout = _fixture(tmp_path)
     raw_ref = _raw_ref(tmp_path, "raw-success.json")
     runtime = tmp_path / "runtime.json"
@@ -237,7 +237,7 @@ def test_verified_runtime_accepts_distinct_bound_envelope_with_independent_revie
 
     result = evaluate_matrix(path, checkout, root=tmp_path, require_complete=False)
 
-    assert result["classification"] == "PROMOTABLE"
+    assert result["classification"] == "PARTIAL"
     assert result["rejection_codes"] == []
 
 
@@ -280,6 +280,17 @@ def test_current_label_with_old_runtime_observed_at_is_rejected(tmp_path: Path) 
         "runtime-old-observed-at.json",
         "old runtime envelope",
     )]
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = evaluate_matrix(path, checkout, root=tmp_path, require_complete=False)
+
+    assert result["classification"] == "FAILED"
+    assert "STALE_RUNTIME_EVIDENCE_REJECTED" in result["rejection_codes"]
+
+
+def test_old_capability_observed_at_is_rejected_even_with_current_runtime_envelope(tmp_path: Path) -> None:
+    path, payload, checkout = _fixture(tmp_path)
+    payload["capabilities"][0]["observed_at"] = "2000-01-01T00:00:00+00:00"  # type: ignore[index]
     path.write_text(json.dumps(payload), encoding="utf-8")
 
     result = evaluate_matrix(path, checkout, root=tmp_path, require_complete=False)
@@ -428,3 +439,13 @@ def test_verify_missing_matrix_returns_nonzero(tmp_path: Path) -> None:
         "missing.json",
         "--verify",
     ]) == 1
+
+
+def test_missing_observed_tree_is_rejected(tmp_path: Path) -> None:
+    path, _, checkout = _fixture(tmp_path)
+    checkout["tree"] = None
+
+    result = evaluate_matrix(path, checkout, root=tmp_path, require_complete=False)
+
+    assert result["classification"] == "FAILED"
+    assert "WRONG_COMMIT_EVIDENCE_REJECTED" in result["rejection_codes"]

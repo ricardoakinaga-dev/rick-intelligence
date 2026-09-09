@@ -47,13 +47,26 @@ def _sha256(path: Path) -> str | None:
 
 
 _SENSITIVE_KEY = re.compile(
-    r"(?:password|secret|token|api[_-]?key|access[_-]?key|authorization|cookie|credential|dsn|url)",
+    r"(?:password|passphrase|secret|token|api[_-]?key|access[_-]?key|private[_-]?key|authorization|cookie|credential|dsn|url)",
     re.IGNORECASE,
 )
 _SENSITIVE_VALUE = re.compile(
     r"(?:redis|rediss|postgres(?:ql)?|mysql|amqp|https?)://[^\s\"']+|bearer\s+[^\s\"']+",
     re.IGNORECASE,
 )
+_SENSITIVE_ASSIGNMENT = re.compile(
+    r"\b((?:password|passphrase|secret|token|api[_-]?key|access[_-]?key|private[_-]?key|authorization|cookie|credential|dsn))"
+    r"(\s*[:=]\s*)(?:\"[^\"]*\"|'[^']*'|[^\s,;}\]]+)",
+    re.IGNORECASE,
+)
+
+
+def _redact_text(value: str) -> str:
+    value = _SENSITIVE_VALUE.sub("[REDACTED]", value)
+    return _SENSITIVE_ASSIGNMENT.sub(
+        lambda match: f"{match.group(1)}{match.group(2)}[REDACTED]",
+        value,
+    )
 
 
 def _redact(value: Any, *, key: str = "") -> Any:
@@ -66,7 +79,7 @@ def _redact(value: Any, *, key: str = "") -> Any:
     if isinstance(value, list):
         return [_redact(item) for item in value]
     if isinstance(value, str):
-        return _SENSITIVE_VALUE.sub("[REDACTED]", value)
+        return _redact_text(value)
     if value is None or isinstance(value, (bool, int, float)):
         return value
     return str(value)

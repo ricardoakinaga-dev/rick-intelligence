@@ -331,8 +331,10 @@ def _classify_capabilities(capabilities: Sequence[Mapping[str, Any]]) -> tuple[s
         return "NOT_RUN", "one or more capabilities were not run"
     if any(status in {"PARTIAL", "DONE_LOCAL_SCOPE", "LOCAL_VERIFIED"} for status in statuses):
         return "PARTIAL", "capability evidence is local or partial and is not runtime-promotable"
+    if all(status == "PROMOTABLE" for status in statuses):
+        return "PROMOTABLE", "all capability rows have current production-safe runtime evidence"
     if all(status in {"VERIFIED_RUNTIME", "PROMOTABLE"} for status in statuses):
-        return "PROMOTABLE", "all capability rows have current runtime evidence"
+        return "PARTIAL", "runtime evidence exists but production promotion is not established for every capability"
     return "FAILED", "matrix contains an unsupported promotion state"
 
 
@@ -385,6 +387,7 @@ def evaluate_matrix(
 
     failures: list[str] = []
     rejection_codes: set[str] = set()
+    evaluation_time = datetime.now(timezone.utc)
     candidate = matrix["candidate"]
     expected_head = str(checkout.get("head") or "").lower()
     expected_tree = str(checkout.get("tree") or "").lower()
@@ -392,7 +395,7 @@ def evaluate_matrix(
     if candidate["commit_sha"] != expected_head:
         failures.append("candidate commit does not match this checkout HEAD")
         rejection_codes.add("WRONG_COMMIT_EVIDENCE_REJECTED")
-    if expected_tree and candidate["tree_sha"] != expected_tree:
+    if not expected_tree or candidate["tree_sha"] != expected_tree:
         failures.append("candidate tree does not match this checkout tree")
         rejection_codes.add("WRONG_COMMIT_EVIDENCE_REJECTED")
     if candidate["checkout_fingerprint"] != expected_fingerprint:
@@ -413,6 +416,16 @@ def evaluate_matrix(
 
     for item in matrix["capabilities"]:
         capability_id = item["capability_id"]
+        capability_observed_at = datetime.fromisoformat(item["observed_at"].replace("Z", "+00:00"))
+        capability_age_seconds = (
+            evaluation_time - capability_observed_at.astimezone(timezone.utc)
+        ).total_seconds()
+        if (
+            capability_age_seconds > MAX_RUNTIME_EVIDENCE_AGE_SECONDS
+            or capability_age_seconds < -MAX_RUNTIME_EVIDENCE_FUTURE_SKEW_SECONDS
+        ):
+            failures.append(f"{capability_id}: capability observed_at is outside current evidence window")
+            rejection_codes.add("STALE_RUNTIME_EVIDENCE_REJECTED")
         if item["commit_sha"] != candidate["commit_sha"]:
             failures.append(f"{capability_id}: capability commit does not match candidate")
             rejection_codes.add("WRONG_COMMIT_EVIDENCE_REJECTED")

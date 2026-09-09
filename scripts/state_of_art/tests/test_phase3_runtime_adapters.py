@@ -160,6 +160,7 @@ def test_raw_gate_payload_is_redacted_before_persistence(
                 "production_safe": True,
                 "password": secret,
                 "endpoint": secret_uri,
+                "detail": f"token={secret}",
                 "nested": {"api_key": secret},
             }),
             encoding="utf-8",
@@ -177,6 +178,7 @@ def test_raw_gate_payload_is_redacted_before_persistence(
     assert envelope["status"] == "PASS"
     assert envelope["production_safe"] is True
     assert envelope["gate"]["password"] == "[REDACTED]"
+    assert "token=[REDACTED]" in raw
     assert secret not in raw
     assert secret_uri not in raw
 
