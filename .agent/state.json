@@ -14,20 +14,20 @@
   "active_execplan": ".agent/plans/rec-implementation.md",
   "active_task": "REC-05",
   "verification_state": "PARTIAL",
-  "repository_state": "HEAD66781cb dirty; local candidate v15 binds 546 source files; API418/domain107/worker45/storage24; OpenAPI49; V6 observability, V8 ingestion-lifecycle and REC34 global V15 local integration are independently approved with no Critical/High/Medium findings; REC-05 Compose static config passes with ephemeral values but daemon preflight remains blocked; prepared release checker guards every external status; external runtime/provider/corpus/restore/load/collector/rollout NOT_RUN; REC35 NO-GO/open; no production approval.",
+  "repository_state": "HEAD841a3dd dirty before commit; Phase 2.1 canonical jobs contract is locally approved by fresh I1; external runtime/provider/corpus/restore/load/collector/rollout and REC35 remain NOT_RUN or NO-GO",
   "instruction_scope_refs": [
     ".agent/PLANS.md",
     "cvg-master-rag-v2/AGENTS.md",
     ".agent/RECOVERY-CURRENT.md"
   ],
   "last_gate_record": ".agent/gates/rec-05-ready.json",
-  "last_event_id": "EVT-REC-05-V15-FINAL-CRITIC-20260908",
-  "state_revision": 223,
+  "last_event_id": "EVT-REC-05-PH2-P0-01-CHECKPOINT-20260908",
+  "state_revision": 224,
   "next_gate": "VERIFIED",
   "active_action_id": "REC-05:WAIT_RUNTIME",
   "blocked_by": [
     "Docker/Compose installed, but local daemon access denied inside and outside sandbox; sudo still requires user-local authentication"
   ],
   "human_approval_required": [],
-  "updated_at": "2026-09-08T22:11:56Z"
+  "updated_at": "2026-09-09T00:05:58Z"
 }
