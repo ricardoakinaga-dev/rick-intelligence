@@ -510,6 +510,31 @@ def test_raw_gate_status_must_match_runtime_envelope(tmp_path: Path) -> None:
     assert "MISSING_EVIDENCE_REJECTED" in result["rejection_codes"]
 
 
+@pytest.mark.parametrize("raw_status", ["PROMOTABLE", "VERIFIED_RUNTIME"])
+def test_raw_gate_cannot_self_promote(raw_status: str, tmp_path: Path) -> None:
+    path, payload, checkout = _fixture(tmp_path)
+    raw_ref = _raw_ref(tmp_path, f"raw-{raw_status.lower()}.json", status=raw_status)
+    runtime = tmp_path / f"runtime-{raw_status.lower()}.json"
+    runtime.write_text(
+        json.dumps(_runtime_record(raw_ref, production_safe=True)),
+        encoding="utf-8",
+    )
+    payload["capabilities"][0]["status"] = "PROMOTABLE"  # type: ignore[index]
+    payload["capabilities"][0]["reviewer"]["independent"] = True  # type: ignore[index]
+    payload["capabilities"][0]["runtime_evidence"] = [_ref(  # type: ignore[index]
+        tmp_path,
+        runtime.name,
+        "runtime envelope with promotion-level raw status",
+    )]
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = evaluate_matrix(path, checkout, root=tmp_path, require_complete=False)
+
+    assert result["classification"] == "FAILED"
+    assert "unsupported_gate_status" in result["reason"]
+    assert "MISSING_EVIDENCE_REJECTED" in result["rejection_codes"]
+
+
 def test_missing_raw_artifact_is_rejected(tmp_path: Path) -> None:
     path, payload, checkout = _fixture(tmp_path)
     raw_ref = _raw_ref(tmp_path, "raw-missing.json")

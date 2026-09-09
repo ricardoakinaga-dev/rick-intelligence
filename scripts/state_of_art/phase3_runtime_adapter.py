@@ -59,11 +59,22 @@ _SENSITIVE_ASSIGNMENT = re.compile(
     r"(\s*[:=]\s*)(?:\"[^\"]*\"|'[^']*'|[^\s,;}\]]+)",
     re.IGNORECASE,
 )
+_SENSITIVE_ARGUMENT = re.compile(
+    r"(?<![A-Za-z0-9_-])"
+    r"([/-]{0,2}[A-Za-z0-9_-]*(?:password|passphrase|secret|token|api[_-]?key|access[_-]?key|private[_-]?key|authorization|cookie|credential|dsn|url|bearer)[A-Za-z0-9_-]*)"
+    r"(\s+)"
+    r"(?:\"[^\"]*\"|'[^']*'|[^\s,;}\]]+)",
+    re.IGNORECASE,
+)
 
 
 def _redact_text(value: str) -> str:
     value = _SENSITIVE_VALUE.sub("[REDACTED]", value)
-    return _SENSITIVE_ASSIGNMENT.sub(
+    value = _SENSITIVE_ASSIGNMENT.sub(
+        lambda match: f"{match.group(1)}{match.group(2)}[REDACTED]",
+        value,
+    )
+    return _SENSITIVE_ARGUMENT.sub(
         lambda match: f"{match.group(1)}{match.group(2)}[REDACTED]",
         value,
     )

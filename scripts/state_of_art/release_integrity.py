@@ -598,18 +598,30 @@ def run_gate(
     )
 
     evidence_results: list[dict[str, Any]] = []
-    for raw_path in evidence_paths:
-        safe_path, path_error = _safe_evidence_path(root, raw_path)
-        if path_error:
-            evidence_result = {
-                "path": raw_path,
+    if not evidence_paths:
+        evidence_results.append(
+            {
+                "path": "<none>",
                 "required": True,
-                "classification": FAIL,
-                "reason": path_error,
+                "classification": NOT_RUN,
+                "reason": "required release evidence paths are not configured",
+                "rejection_codes": ["MISSING_EVIDENCE_REJECTED"],
             }
-        else:
-            evidence_result = evaluate_evidence(safe_path, after, root=root)  # type: ignore[arg-type]
-        evidence_results.append(evidence_result)
+        )
+    else:
+        for raw_path in evidence_paths:
+            safe_path, path_error = _safe_evidence_path(root, raw_path)
+            if path_error:
+                evidence_result = {
+                    "path": raw_path,
+                    "required": True,
+                    "classification": FAIL,
+                    "reason": path_error,
+                }
+            else:
+                evidence_result = evaluate_evidence(safe_path, after, root=root)  # type: ignore[arg-type]
+            evidence_results.append(evidence_result)
+    for evidence_result in evidence_results:
         criteria.append(
             {
                 "id": f"evidence:{evidence_result['path']}",

@@ -292,6 +292,15 @@ def test_raw_gate_payload_is_redacted_before_persistence(
     assert secret_uri not in raw
 
 
+def test_free_form_secret_arguments_are_redacted() -> None:
+    adapter_module = _load("phase3_redaction", "scripts/state_of_art/phase3_runtime_adapter.py")
+    output = adapter_module.redact_runtime_value("--password super-secret password another-secret")
+
+    assert "super-secret" not in output
+    assert "another-secret" not in output
+    assert output.count("[REDACTED]") == 2
+
+
 def test_blocked_payload_gets_blocking_exit_even_if_gate_returns_zero(
     adapter: ModuleType,
     monkeypatch: pytest.MonkeyPatch,

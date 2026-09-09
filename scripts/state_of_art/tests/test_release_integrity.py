@@ -6,6 +6,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from scripts.state_of_art import release_integrity
 
@@ -200,6 +201,19 @@ class ReleaseIntegrityTests(unittest.TestCase):
             ),
             release_integrity.NOT_RUN,
         )
+
+    def test_empty_evidence_paths_are_not_promotion_eligible(self) -> None:
+        def fake_command(name: str, *_args: object, **_kwargs: object) -> dict[str, object]:
+            return {"name": name, "classification": release_integrity.PASS, "required": True}
+
+        with patch.object(release_integrity, "capture_checkout", return_value=self._checkout()), patch.object(
+            release_integrity, "_command_result", side_effect=fake_command
+        ):
+            result = release_integrity.run_gate(Path(tempfile.gettempdir()), evidence_paths=())
+
+        self.assertEqual(result["classification"], release_integrity.NOT_RUN)
+        self.assertEqual(result["evidence"][0]["path"], "<none>")
+        self.assertIn("MISSING_EVIDENCE_REJECTED", result["rejection_codes"])
 
 
 if __name__ == "__main__":

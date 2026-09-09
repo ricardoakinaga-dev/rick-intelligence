@@ -56,13 +56,7 @@ RAW_GATE_STATUSES = frozenset(
     {
         "PASS",
         "FAIL",
-        "FAILED",
         "BLOCKED_EXTERNAL",
-        "PARTIAL",
-        "MISSING",
-        "NOT_RUN",
-        "VERIFIED_RUNTIME",
-        "PROMOTABLE",
     }
 )
 MAX_RUNTIME_EVIDENCE_AGE_SECONDS = 24 * 60 * 60
@@ -654,13 +648,10 @@ def evaluate_matrix(
                                     raw_status = raw_payload["status"]
                                     expected_raw_statuses = {
                                         "PASS": {"PASS"},
-                                        "VERIFIED_RUNTIME": {"PASS", "VERIFIED_RUNTIME"},
-                                        "PROMOTABLE": {"PASS", "PROMOTABLE"},
-                                        "FAILED": {"FAIL", "FAILED"},
+                                        "VERIFIED_RUNTIME": {"PASS"},
+                                        "PROMOTABLE": {"PASS"},
+                                        "FAILED": {"FAIL"},
                                         "BLOCKED_EXTERNAL": {"BLOCKED_EXTERNAL"},
-                                        "PARTIAL": {"PARTIAL"},
-                                        "MISSING": {"MISSING"},
-                                        "NOT_RUN": {"NOT_RUN"},
                                     }.get(str(runtime_status), set())
                                     if raw_status not in RAW_GATE_STATUSES:
                                         envelope_errors.append(f"raw_artifacts[{raw_index}].unsupported_gate_status")
