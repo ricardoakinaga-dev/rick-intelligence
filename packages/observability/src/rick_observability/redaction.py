@@ -24,6 +24,28 @@ _EVENT_NAME = re.compile(r"^[A-Za-z][A-Za-z0-9_.:-]{0,95}$")
 _EMBEDDED_URL = re.compile(
     r"(?<![A-Za-z0-9+.-])(?:[A-Za-z][A-Za-z0-9+.-]*://|//)[^\s<>{}\"']+"
 )
+_SENSITIVE_VALUE = re.compile(
+    r"\bbearer\s+[^\s\"']+",
+    re.IGNORECASE,
+)
+_SENSITIVE_ASSIGNMENT = re.compile(
+    r"(?<![A-Za-z0-9_-])([\"']?[A-Za-z0-9_-]*"
+    r"(?:password|passphrase|secret|token|api[_-]?key|access[_-]?key|"
+    r"private[_-]?key|authorization|cookie|credential|dsn|url|bearer)"
+    r"[A-Za-z0-9_-]*[\"']?)(\s*[:=]\s*)"
+    r"(?:\"(?:\\.|[^\"\\])*\"|'(?:\\.|[^'\\])*'|\[redacted\]|"
+    r"[^\s,;}\]]+)",
+    re.IGNORECASE,
+)
+_SENSITIVE_ARGUMENT = re.compile(
+    r"(?<![A-Za-z0-9_-])([/-]{0,2}[A-Za-z0-9_-]*"
+    r"(?:password|passphrase|secret|token|api[_-]?key|access[_-]?key|"
+    r"private[_-]?key|authorization|cookie|credential|dsn|url|bearer)"
+    r"[A-Za-z0-9_-]*)(\s+)"
+    r"(?:\"(?:\\.|[^\"\\])*\"|'(?:\\.|[^'\\])*'|\[redacted\]|"
+    r"[^\s,;}\]]+)",
+    re.IGNORECASE,
+)
 _URL_TRAILING = frozenset(",.;:!?)]}")
 
 
@@ -77,6 +99,22 @@ def _redact_embedded_urls(value: str) -> str:
         return _safe_url(candidate) + trailing
 
     return _EMBEDDED_URL.sub(replace, value)
+
+
+def _redact_inline_secrets(value: str) -> str:
+    """Remove credentials embedded in otherwise non-sensitive text fields."""
+
+    value = value.replace(r"\/", "/")
+    value = _redact_embedded_urls(value)
+    value = _SENSITIVE_VALUE.sub("[redacted]", value)
+    value = _SENSITIVE_ASSIGNMENT.sub(
+        lambda match: f"{match.group(1)}{match.group(2)}[redacted]",
+        value,
+    )
+    return _SENSITIVE_ARGUMENT.sub(
+        lambda match: f"{match.group(1)}{match.group(2)}[redacted]",
+        value,
+    )
 
 
 class _RedactionBudget:
@@ -193,13 +231,7 @@ def redact(
         cleaned = safe_text(value)
         if cleaned is None:
             return None
-        if (
-            "://" in cleaned
-            or cleaned.startswith("//")
-            or r":\/" in cleaned
-            or cleaned.startswith(r"\/\/")
-        ):
-            cleaned = _redact_embedded_urls(cleaned)
+        cleaned = _redact_inline_secrets(cleaned)
         return budget.text(cleaned)
     return budget.marker()
 

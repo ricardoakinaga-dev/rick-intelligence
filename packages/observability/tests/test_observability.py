@@ -158,6 +158,19 @@ def test_redaction_removes_credentials_and_queries_from_non_http_urls() -> None:
     assert "password" not in repr(escaped)
     assert "secret" not in repr(escaped)
 
+    inline = safe_event({
+        "message": "password=super-secret token=abc123 Authorization: Bearer bearer-secret",
+    })
+    assert "super-secret" not in repr(inline)
+    assert "abc123" not in repr(inline)
+    assert "bearer-secret" not in repr(inline)
+
+    nested_text = safe_event({
+        "message": r'nested {"api_key":"json-secret", "password":"json-password"}',
+    })
+    assert "json-secret" not in repr(nested_text)
+    assert "json-password" not in repr(nested_text)
+
 
 def test_metrics_are_bounded_and_deterministic() -> None:
     histogram = Histogram("api.latency", max_samples=2)
