@@ -245,9 +245,17 @@ CI_GATE_ARTIFACTS = {
     # LOCAL_CI_ONLY promotion scope.
     "architecture": ".runtime/ci/architecture.json",
     "contracts": ".runtime/ci/contracts.json",
+    "integration": ".runtime/ci/rag-eval.json",
     "security": ".runtime/ci/security.json",
     "unit": ".runtime/ci/unit.json",
     "supply-chain": ".runtime/ci/supply-chain.json",
+}
+CI_SUPPLEMENTAL_ARTIFACTS = {
+    # These local build envelopes supplement the mandatory live browser lanes;
+    # they never replace frontend runtime evidence or accessibility review.
+    "frontend-e2e": ".runtime/ci/frontend.json",
+    "accessibility": ".runtime/ci/frontend.json",
+    "visual": ".runtime/ci/frontend.json",
 }
 
 
@@ -558,7 +566,10 @@ def generate_manifest(
                     tree_sha=checkout["tree"],
                     artifact_hash=artifact_hash,
                     timestamp=timestamp,
-                    supplemental_ci_relative=CI_GATE_ARTIFACTS.get(gate_id),
+                    supplemental_ci_relative=CI_SUPPLEMENTAL_ARTIFACTS.get(
+                        gate_id,
+                        CI_GATE_ARTIFACTS.get(gate_id),
+                    ),
                 )
             )
     status = "PASS"

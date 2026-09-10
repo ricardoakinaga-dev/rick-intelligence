@@ -92,9 +92,15 @@ def test_local_ci_gate_artifact_registry_is_explicit_and_disjoint() -> None:
     assert generate_release_evidence.CI_GATE_ARTIFACTS == {
         "architecture": ".runtime/ci/architecture.json",
         "contracts": ".runtime/ci/contracts.json",
+        "integration": ".runtime/ci/rag-eval.json",
         "security": ".runtime/ci/security.json",
         "unit": ".runtime/ci/unit.json",
         "supply-chain": ".runtime/ci/supply-chain.json",
+    }
+    assert generate_release_evidence.CI_SUPPLEMENTAL_ARTIFACTS == {
+        "frontend-e2e": ".runtime/ci/frontend.json",
+        "accessibility": ".runtime/ci/frontend.json",
+        "visual": ".runtime/ci/frontend.json",
     }
     assert not (set(generate_release_evidence.CI_GATE_ARTIFACTS) - {"supply-chain"}) & {
         "multi-worker",
@@ -274,6 +280,8 @@ def test_canonical_workflow_binds_ci_artifacts_to_the_same_run() -> None:
         ("unit", "unit"),
         ("contract", "contracts"),
         ("security", "security"),
+        ("rag-eval", "integration"),
+        ("frontend", "frontend"),
         ("supply-chain", "supply-chain"),
     ):
         assert "ci_lane_evidence.py" in text
@@ -282,6 +290,8 @@ def test_canonical_workflow_binds_ci_artifacts_to_the_same_run() -> None:
         assert f"ci-{gate}-${{{{ github.run_id }}}}" in text
 
     assert "Download architecture CI envelope from this workflow run" in text
+    assert "Download RAG evaluation CI envelope from this workflow run" in text
+    assert "Download frontend CI envelope from this workflow run" in text
     assert "Download supply-chain CI envelope from this workflow run" in text
     assert "cvg-master-rag-v2','rick-professor','modulo-redis-locker" in text
     assert "run: make phase3-frontend-supply-runtime" in text
