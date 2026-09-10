@@ -119,6 +119,26 @@ the remaining release/runtime/provider/corpus/review/sealing/Go-No-Go lanes
 are explicitly `BLOCKED_EXTERNAL`. This correction improves truthfulness but
 does not satisfy the definition of done or authorize promotion.
 
+## 19. Promotion return-code contract correction — 2026-09-10
+
+Candidate `3343c02bfbddb960e8642f4ef16db2566e4c5b38` (tree
+`4d06a929ed7893dff4cad59ad885a039f70ee9e3`, checkout fingerprint
+`3ede4e0941bdee4553a694566af0bc987a971cd2c0dbeb628da7d896e4924c99`) passed
+the affected **174-test** release/Phase 3/frontend/promotion suite. Its
+integrated packet (`.runtime/phase-3/triple-aaa-verify.json`, SHA-256
+`94ac8941c705104100c493f299fbaf544caee2883bf0568754fd93b2ced99c60`) binds
+artifact set `ead4ef718b88258a69da69b92a7a6594610e0b741a30db441af556d08c084709`
+and quality-bar hash
+`46e51c3c15dbfa494e0fc1e3b2ecc3360b482a55a30153f5ec5f3a857cf3cd3f`.
+
+The promotion engine now honors the frozen contract: all mandatory PASS is
+exit `0`, local failure is exit `1`, and external-only blocking is exit `2`.
+This run is `STATE_OF_ART_CANDIDATE` with 15 foundation lanes passed and JSON
+plus GNU Make exit `2`; every non-pass mandatory lane is
+`BLOCKED_EXTERNAL`. A malformed supplied packet still remains a local exit
+`1`. The correction is diagnostic and fail-closed; it does not authorize
+State of Art, AAA or Triple AAA promotion.
+
 ## 6. Current risks and authority boundaries
 
 | Risk | Treatment | Evidence needed | Authority |

@@ -19,7 +19,7 @@ artifact-set digest, packet hash and quality-bar hash must be read from that
 packet together. This report never substitutes a manually typed SHA and is
 invalid if the packet is absent, stale, dirty or inconsistent with the exact
 candidate. The latest source-closure packet and its hashes are recorded in
-section 20 of the current gap audit.
+section 21 of the current gap audit.
 
 ## 3. Prompt provenance
 
@@ -255,4 +255,6 @@ runtime configuration, rerun the current adapters and real service lanes,
 rebind every artifact to the resulting SHA/tree, obtain fresh independent
 review and an authorized sealed Go/No-Go decision. The current packet's
 PostgreSQL, Redis, provider, frontend, supply-chain and release envelopes are
-fresh `BLOCKED_EXTERNAL` observations; none is a promotion signal.
+fresh `BLOCKED_EXTERNAL` observations; none is a promotion signal. The
+promotion engine correctly returns `2` for this external-only block; local
+failures and malformed supplied packets remain `1`.

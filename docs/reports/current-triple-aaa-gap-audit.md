@@ -147,6 +147,29 @@ service configuration, approved corpus/provider, image provenance, fresh
 independent review, sealed packet and authorized human Go/No-Go remain
 unavailable. No State of Art, AAA or Triple AAA claim is made.
 
+## 21. Promotion return-code contract correction — 2026-09-10
+
+The exact clean implementation candidate `3343c02bfbddb960e8642f4ef16db2566e4c5b38`
+(tree `4d06a929ed7893dff4cad59ad885a039f70ee9e3`, checkout fingerprint
+`3ede4e0941bdee4553a694566af0bc987a971cd2c0dbeb628da7d896e4924c99`) was
+verified with the affected 174-test contract suite and the integrated
+`make triple-aaa-verify` run. The packet
+(`.runtime/phase-3/triple-aaa-verify.json`, SHA-256
+`94ac8941c705104100c493f299fbaf544caee2883bf0568754fd93b2ced99c60`)
+binds artifact set
+`ead4ef718b88258a69da69b92a7a6594610e0b741a30db441af556d08c084709` and
+quality-bar hash
+`46e51c3c15dbfa494e0fc1e3b2ecc3360b482a55a30153f5ec5f3a857cf3cd3f`.
+
+The promotion engine now maps a genuine external-only block, including the
+absence of an externally authorized packet/seal/final decision, to JSON and
+Make exit `2` (`BLOCKED_EXTERNAL`). A supplied malformed or untrusted packet,
+or any local hard failure, remains exit `1`; no rejection is softened. The
+packet is `STATE_OF_ART_CANDIDATE`, has 15 foundation lanes passed, and has
+no invalid/failing gate result. All non-pass mandatory lanes remain
+`BLOCKED_EXTERNAL`, so promotion remains disallowed and no State of Art, AAA
+or Triple AAA claim is made.
+
 ## 5. Priority and dependency order
 
 ### P0 — release truth and runtime foundation

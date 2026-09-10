@@ -14,7 +14,7 @@
   "active_execplan": ".agent/plans/phase-3-runtime-evidence-production-promotion.md",
   "active_task": "PH3-2-LAB-READINESS",
   "verification_state": "PARTIAL",
-  "repository_state": "Current Phase 3 source implementation candidate is 4019f54af3c5882fb5c3b2d08f333a12b13ed1f2 (tree 71f8fac6feaa6bc54cf7e462bfcb7da8ad396091). It binds shared disposable-runtime preflight, canonical Compose targeting, explicit promotion exits, current-checkout/artifact-set/gate/capability/path/raw-artifact binding, hashed candidate-bound independent-review ledger records for promoted capabilities, fail-closed CI promotion, accessible canonical web targets, finite Compose resource/capability hardening, deterministic real frontend browser evidence, preserved-CVG corpus preflight, runtime-before-release ordering, commit-bound adapters for manifest-consuming lanes and typed raw status/exit-status synchronization. The closure contract suite passed 181 tests; the clean integrated packet at b258098062ad6b52b9114652d8f144c636744f84 (tree 1e30f81a5b2daf18d173184dd2357d7459c91612, checkout fingerprint 2e488a81d5af57bf4e89047d84764ac79af1cc972ca488d55fa3f36a9e111e26, artifact set 4f6891ab27bc70dbc723d4a43b2fa892d2e7f181b5e5e5873632c20e917eaefa, packet SHA-256 4e69ddfb2732f4ac7e81fc5b0767ff08f72606d2f8365dba5aebb7e9ac1c5593) classified STATE_OF_ART_CANDIDATE with verifier JSON exit 1 and GNU Make exit 2; 15 foundation lanes passed while release evidence, release-integrity, Phase 3 evidence verification, immutable image proof, live runtime lanes, independent review, sealing and human promotion remain blocked or non-promotable, so no State of Art, AAA or Triple AAA claim is made.",
+  "repository_state": "Current Phase 3 source implementation candidate is 3343c02bfbddb960e8642f4ef16db2566e4c5b38 (tree 4d06a929ed7893dff4cad59ad885a039f70ee9e3). It binds shared disposable-runtime preflight, canonical Compose targeting, explicit promotion exits, current-checkout/artifact-set/gate/capability/path/raw-artifact binding, hashed candidate-bound independent-review ledger records for promoted capabilities, fail-closed CI promotion, accessible canonical web targets, finite Compose resource/capability hardening, deterministic real frontend browser evidence, preserved-CVG corpus preflight, runtime-before-release ordering, commit-bound adapters for manifest-consuming lanes, typed raw status/exit-status synchronization and the exact external-block return-code contract. The affected closure suite passed 174 tests; the clean integrated packet at 3343c02bfbddb960e8642f4ef16db2566e4c5b38 (tree 4d06a929ed7893dff4cad59ad885a039f70ee9e3, checkout fingerprint 3ede4e0941bdee4553a694566af0bc987a971cd2c0dbeb628da7d896e4924c99, artifact set ead4ef718b88258a69da69b92a7a6594610e0b741a30db441af556d08c084709, packet SHA-256 94ac8941c705104100c493f299fbaf544caee2883bf0568754fd93b2ced99c60) classified STATE_OF_ART_CANDIDATE with verifier JSON and GNU Make exit 2; 15 foundation lanes passed, every non-pass mandatory lane is BLOCKED_EXTERNAL, and no invalid/failing gate remains. The external runtime, provider/corpus, image proof, independent review, sealing and human promotion boundaries remain unavailable, so no State of Art, AAA or Triple AAA claim is made.",
   "instruction_scope_refs": [
     ".agent/PLANS.md",
     "cvg-master-rag-v2/AGENTS.md",
@@ -23,8 +23,8 @@
     "docs/plans/phase-3-runtime-evidence-production-promotion.md"
   ],
   "last_gate_record": ".agent/gates/phase-3-2-lab-readiness-implementation-ready.json",
-  "last_event_id": "EVT-PH3-2-RUNTIME-ENVELOPE-FRESHNESS-20260910",
-  "state_revision": 255,
+  "last_event_id": "EVT-PH3-2-PROMOTION-EXIT-CONTRACT-20260910",
+  "state_revision": 256,
   "next_gate": "VERIFIED",
   "active_action_id": "PH3-2-LAB-READINESS:WAIT_RUNTIME",
   "blocked_by": [
@@ -32,5 +32,5 @@
     "Disposable runtime secrets and endpoint authority are unavailable"
   ],
   "human_approval_required": [],
-  "updated_at": "2026-09-10T09:37:05Z"
+  "updated_at": "2026-09-10T09:45:53Z"
 }
