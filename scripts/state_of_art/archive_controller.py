@@ -8,6 +8,11 @@ import json
 from pathlib import Path
 import shutil
 
+try:  # Package import for tests; script-directory fallback for direct execution.
+    from scripts.state_of_art.json_boundary import load_json
+except ImportError:  # pragma: no cover - exercised by direct script execution.
+    from json_boundary import load_json
+
 
 def digest(path: Path) -> str:
     if path.is_symlink() or not path.is_file():
@@ -49,7 +54,7 @@ def archive(root: Path) -> dict:
                         "archived": str(target.relative_to(root)), "sha256": checksum})
     manifest = {"schema_version": 1, "purpose": "immutable pre-v2 controller history", "files": entries}
     manifest_path = destination / "manifest.json"
-    if manifest_path.exists() and json.loads(manifest_path.read_text()) != manifest:
+    if manifest_path.exists() and load_json(manifest_path) != manifest:
         raise ValueError("archive manifest already exists with different sources")
     for entry in entries:
         target = root / entry["archived"]
@@ -64,7 +69,7 @@ def archive(root: Path) -> dict:
 
 
 def verify(root: Path) -> int:
-    manifest = json.loads(scoped_path(root, ".agent/legacy-v1/manifest.json").read_text())
+    manifest = load_json(scoped_path(root, ".agent/legacy-v1/manifest.json"))
     entries = manifest.get("files")
     if manifest.get("schema_version") != 1 or not isinstance(entries, list) or not entries:
         raise ValueError("invalid archive manifest")

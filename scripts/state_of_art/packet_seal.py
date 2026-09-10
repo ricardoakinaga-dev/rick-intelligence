@@ -31,6 +31,11 @@ except ImportError:  # pragma: no cover - exercised only in dependency-free envi
     Ed25519PrivateKey = None  # type: ignore[assignment,misc]
     Ed25519PublicKey = None  # type: ignore[assignment,misc]
 
+try:  # Package import for tests; script-directory fallback for direct execution.
+    from scripts.state_of_art.json_boundary import load_json
+except ImportError:  # pragma: no cover - exercised by direct script execution.
+    from json_boundary import load_json
+
 
 SEAL_SCHEMA = "state-of-art-packet-seal.v2"
 SEAL_ALGORITHM = "ed25519-sha256-canonical-json"
@@ -126,7 +131,7 @@ def load_trust_store(path: str | Path) -> dict[str, bytes]:
     """Load ``{key_id: base64_raw_ed25519_public_key}`` from a JSON file."""
 
     try:
-        payload = json.loads(Path(path).read_text(encoding="utf-8"))
+        payload = load_json(Path(path))
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise ValueError("promotion trust store is unreadable JSON") from exc
     if isinstance(payload, Mapping) and isinstance(payload.get("keys"), Mapping):

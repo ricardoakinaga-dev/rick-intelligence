@@ -7,6 +7,11 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
+try:  # Package import for tests; script-directory fallback for direct execution.
+    from scripts.state_of_art.json_boundary import load_json
+except ImportError:  # pragma: no cover - exercised by direct script execution.
+    from json_boundary import load_json
+
 
 EXPECTED_ROUTES = ("login", "app", "app-search", "app-chat", "app-documents", "admin")
 EXPECTED_PROJECTS = ("mobile", "tablet", "desktop")
@@ -26,7 +31,7 @@ def main() -> int:
 
     cases = []
     for path in files:
-        data = json.loads(path.read_text())
+        data = load_json(path)
         measured = data["measured"]
         case = {
             "file": path.name,

@@ -87,6 +87,19 @@ class ArchiveTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 archive_module.verify(root)
 
+    def test_manifest_duplicate_keys_are_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.fixture(root)
+            archive_module.archive(root)
+            manifest_path = root / ".agent/legacy-v1/manifest.json"
+            manifest = manifest_path.read_text()
+            manifest_path.write_text(
+                manifest.replace('"schema_version": 1', '"schema_version": 1, "schema_version": 1')
+            )
+            with self.assertRaises(ValueError):
+                archive_module.verify(root)
+
     def test_symlink_archive_parent_is_rejected(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

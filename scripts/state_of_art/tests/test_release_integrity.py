@@ -229,6 +229,18 @@ class ReleaseIntegrityTests(unittest.TestCase):
         self.assertIsNone(path)
         self.assertEqual(error, "evidence path must not traverse a symlink")
 
+    def test_duplicate_evidence_keys_are_rejected(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="release-integrity-") as directory:
+            path = Path(directory) / "release-evidence.json"
+            path.write_text(
+                '{"schema_version":"release-evidence.v1","schema_version":"forged"}',
+                encoding="utf-8",
+            )
+            result = release_integrity.evaluate_evidence(path, self._checkout(), root=Path(directory))
+
+        self.assertEqual(result["classification"], release_integrity.FAIL)
+        self.assertIn("not readable JSON", result["reason"])
+
 
 if __name__ == "__main__":
     unittest.main()

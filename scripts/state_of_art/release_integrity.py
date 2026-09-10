@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import Any
 
 try:  # Package import for tests; script-directory fallback for direct execution.
+    from scripts.state_of_art.json_boundary import load_json
     from scripts.state_of_art.release_manifest import (
         MANIFEST_SCHEMA,
         ManifestValidationError,
@@ -31,6 +32,7 @@ try:  # Package import for tests; script-directory fallback for direct execution
     )
     from scripts.state_of_art.runtime_preflight import load_preflight
 except ImportError:  # pragma: no cover - exercised by the workflow's direct script call.
+    from json_boundary import load_json
     from release_manifest import MANIFEST_SCHEMA, ManifestValidationError, REQUIRED_GATES, ReleaseEvidenceManifest
     from runtime_preflight import load_preflight
 
@@ -643,7 +645,7 @@ def _evaluate_typed_manifest(
         if path_error or safe_path is None or not safe_path.is_file():
             return  # check_file already emits the authoritative path error.
         try:
-            envelope = json.loads(safe_path.read_text(encoding="utf-8"))
+            envelope = load_json(safe_path)
         except (OSError, UnicodeDecodeError, json.JSONDecodeError):
             failures.append(f"gate {gate.gate_id} runtime envelope is not readable JSON")
             return
@@ -801,7 +803,7 @@ def _evaluate_typed_manifest(
             if raw_path_error or raw_safe is None or not raw_safe.is_file():
                 continue
             try:
-                raw_payload = json.loads(raw_safe.read_text(encoding="utf-8"))
+                raw_payload = load_json(raw_safe)
             except (OSError, UnicodeDecodeError, json.JSONDecodeError):
                 failures.append(f"gate {gate.gate_id} runtime raw artifact is not readable JSON")
                 continue
@@ -836,7 +838,7 @@ def _evaluate_typed_manifest(
         if path_error or safe_path is None or not safe_path.is_file():
             return  # check_file already emits the authoritative path error.
         try:
-            envelope = json.loads(safe_path.read_text(encoding="utf-8"))
+            envelope = load_json(safe_path)
         except (OSError, UnicodeDecodeError, json.JSONDecodeError):
             failures.append(f"gate {gate.gate_id} CI envelope is not readable JSON")
             return
@@ -1074,7 +1076,7 @@ def evaluate_evidence(
         return result
 
     try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
+        payload = load_json(path)
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         result.update(
             {

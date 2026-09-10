@@ -104,6 +104,22 @@ def test_json_trust_store_round_trip(tmp_path) -> None:
     assert verify_seal(_seal({"classification": "TRIPLE_AAA"}), trusted_public_keys=loaded) == (True, ())
 
 
+def test_json_trust_store_rejects_duplicate_key_ids(tmp_path) -> None:
+    encoded_key = encode_public_key(PRIVATE_KEY.public_key())
+    path = tmp_path / "trust-store.json"
+    path.write_text(
+        '{"keys":{"release-key-2026":"%s","release-key-2026":"%s"}}' % (encoded_key, encoded_key),
+        encoding="utf-8",
+    )
+
+    try:
+        load_trust_store(path)
+    except ValueError as error:
+        assert "unreadable JSON" in str(error)
+    else:  # pragma: no cover - assertion makes the expected failure explicit.
+        raise AssertionError("duplicate trust-store key was accepted")
+
+
 def test_seal_does_not_accept_unbounded_reference() -> None:
     try:
         seal_payload(
