@@ -50,6 +50,22 @@ def test_persisted_point_decoder_rejects_unbounded_payload_and_nonfinite_vector(
         _decode_point(_stored_point(vector_json="[NaN]", payload=_point()["payload"]))
 
 
+def test_persisted_point_decoder_rejects_duplicate_payload_keys() -> None:
+    payload = _point()["payload"]
+    canonical_payload = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    duplicate_payload = canonical_payload.replace(
+        '"tenant_id":"tenant-1"',
+        '"tenant_id":"tenant-1","tenant_id":"tenant-1"',
+        1,
+    )
+    row = _stored_point(vector_json="[0.1]", payload=payload)
+    row["payload_json"] = duplicate_payload
+    row["payload_checksum"] = hashlib.sha256(canonical_payload.encode("utf-8")).hexdigest()
+
+    with pytest.raises(SQLiteVectorStoreError):
+        _decode_point(row)
+
+
 def test_sqlite_vector_points_survive_reopen_and_converge(tmp_path):
     path = tmp_path / "vectors.sqlite3"
     first = SQLiteVectorStore(path, mode="test")

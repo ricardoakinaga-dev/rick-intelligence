@@ -265,13 +265,26 @@ def _reject_json_constant(_value: str) -> object:
     raise ValueError("non-finite JSON constants are not allowed")
 
 
+def _reject_duplicate_json_keys(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    decoded: dict[str, object] = {}
+    for key, value in pairs:
+        if key in decoded:
+            raise ValueError("duplicate JSON object key")
+        decoded[key] = value
+    return decoded
+
+
 def _decode_stored_json(value: object, *, maximum_bytes: int) -> object:
     if not isinstance(value, str):
         raise SQLiteVectorStoreError("persisted point is corrupt")
     try:
         if len(value.encode("utf-8")) > maximum_bytes:
             raise SQLiteVectorStoreError("persisted point is corrupt")
-        return json.loads(value, parse_constant=_reject_json_constant)
+        return json.loads(
+            value,
+            object_pairs_hook=_reject_duplicate_json_keys,
+            parse_constant=_reject_json_constant,
+        )
     except SQLiteVectorStoreError:
         raise
     except (TypeError, UnicodeError, ValueError, RecursionError):
