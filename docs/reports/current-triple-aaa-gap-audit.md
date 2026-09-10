@@ -196,12 +196,11 @@ human Go/No-Go is recorded for that SHA. Until then the honest state remains
 
 ## 9. Immediate next action
 
-The entry audit is complete. The next safe implementation slice is **P0
-control/release closure**: store the exact prompt, align README with Phase 3,
-make the CI/release lanes and automatic promotion return codes explicit, and
-extend the capability/rejection tests without weakening runtime gates. Only
-after that slice passes its critic and regression checks may the lab/runtime
-slice be attempted.
+The entry audit and local control/release hardening are complete for the
+current candidate, including authenticated promotion packets. The next safe
+action is **P0 runtime execution**: obtain approved disposable Docker,
+secrets and endpoints, then run the lab/readiness and service gates without
+weakening their external evidence requirements.
 
 ## 10. Authenticated promotion packet correction — 2026-09-10
 

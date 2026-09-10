@@ -748,7 +748,7 @@
         "PH3-1-CI-RELEASE-CLOSURE"
       ],
       "owner": "Codex lead",
-      "acceptance_summary": "Canonical dev/staging Compose renders the required 11-service topology, make up validates inventory and waits for health/readiness, failure diagnostics are bounded/redacted, make down is project-scoped and volume-preserving, the local P0 worker implementation includes a real two-process PostgreSQL fencing/crash-reclaim/stale-ACK gate, and the canonical API boundary includes a real two-process Redis rate-limit gate with replay, tenant and bounded-TTL assertions. Citation-support metrics are strict Decision inputs, release generation is artifact-status fail-closed, named runtime envelopes are bound to mandatory runtime gates, runtime diagnostics are transported by the same CI run, and release manifests reject conflicting evidence aliases, inconsistent gate aggregates and reviewer identity spoofing; live startup and runtime execution remain external evidence",
+      "acceptance_summary": "Canonical dev/staging Compose renders the required 11-service topology, make up validates inventory and waits for health/readiness, failure diagnostics are bounded/redacted, make down is project-scoped and volume-preserving, the local P0 worker implementation includes a real two-process PostgreSQL fencing/crash-reclaim/stale-ACK gate, and the canonical API boundary includes a real two-process Redis rate-limit gate with replay, tenant and bounded-TTL assertions. Citation-support metrics are strict Decision inputs, release generation is artifact-status fail-closed, named runtime envelopes are bound to mandatory runtime gates, runtime diagnostics are transported by the same CI run, release manifests reject conflicting evidence aliases, inconsistent gate aggregates and reviewer identity spoofing, and promotion packets require an Ed25519 signature from an explicit trust store with current checkout/freshness binding; live startup and runtime execution remain external evidence",
       "evidence_refs": [
         "docs/prompts/phase-3-runtime-evidence-production-promotion-2026-09-09.txt",
         "docs/reports/phase-3-runtime-evidence-current-audit.md",
@@ -785,7 +785,12 @@
         ".agent/verification.jsonl#VER-PH3-2-RELEASE-MANIFEST-CONSISTENCY-20260910",
         "scripts/state_of_art/ci_lane_evidence.py",
         "scripts/state_of_art/tests/test_ci_lane_evidence.py",
-        ".agent/verification.jsonl#VER-PH3-2-CI-SAME-RUN-EVIDENCE-20260910"
+        ".agent/verification.jsonl#VER-PH3-2-CI-SAME-RUN-EVIDENCE-20260910",
+        "scripts/state_of_art/packet_seal.py",
+        "scripts/state_of_art/requirements.txt",
+        "scripts/state_of_art/tests/test_packet_seal.py",
+        "scripts/state_of_art/tests/test_promotion_engine.py",
+        ".agent/verification.jsonl#VER-PH3-2-AUTHENTICATED-PACKET-SEAL-20260910"
       ],
       "next_action": {
         "id": "PH3-2-LAB-READINESS:WAIT_RUNTIME",
@@ -798,7 +803,7 @@
         "Docker daemon access to /var/run/docker.sock is denied in the current session",
         "Disposable runtime secrets and endpoint authority are unavailable"
       ],
-      "reason": "The current local implementation and fail-closed API/Redis, worker, citation-support, release and same-run CI evidence gates are covered by 256 State-of-Art tests, make validate, make test-fast, make ops-static, make compose-static, make api-contract, make api16-root, make api-security, make security-adversarial and workflow YAML parsing. The exact pushed source candidate is 957b534d7b33a025525cb1dd667872791239ed43 with tree 65dcad96347adbd34e267537c424bef444ec48d7; a fresh read-only post-fix review found zero concrete findings. The prior integrated verifier artifact is stale after this source change. The full make test remains externally incomplete because the preserved CVG dataset and local Playwright browser are unavailable; real Redis/API, Docker startup, readiness, PostgreSQL execution, distributed service checks, frontend runtime and teardown cannot be executed without approved external runtime access"
+      "reason": "The current local implementation and fail-closed API/Redis, worker, citation-support, release, same-run CI evidence and authenticated promotion-seal gates are covered by 264 State-of-Art tests, make validate, focused packet/promotion tests, workflow YAML parsing and git diff --check. The exact pushed source candidate is ca54b4ab9db1f39f94a14ad600f690d438cd144b with tree 354485c5e88aacf9b9217cc92b6d87c68e60bfbc; fresh read-only crypto review found no bypass, while current checkout binding and freshness negatives pass. The prior integrated verifier artifact is stale after this source change. The full make test remains externally incomplete because the preserved CVG dataset and local Playwright browser are unavailable; real Redis/API, Docker startup, readiness, PostgreSQL execution, distributed service checks, frontend runtime and teardown cannot be executed without approved external runtime access"
     }
   ]
 }

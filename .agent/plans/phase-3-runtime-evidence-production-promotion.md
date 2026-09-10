@@ -24,6 +24,7 @@ preserving the frozen Gauntlet bar, Phase 2 history and legacy repositories.
 - [x] (2026-09-10) Harden the release packet at source candidate 7f8fcdfec613085af0384fc76a5bcdb9184ef994: command exit zero cannot override blocked/invalid phase3 or release artifacts, mandatory runtime gates consume named envelopes (including multi-replica Redis and DR/citation/decision), and runtime/frontend/operational diagnostics are transported by the same CI run; `297` combined tests, `make validate`, YAML parsing and independent patch review pass, while promotion remains blocked.
 - [x] (2026-09-10) Harden release-manifest consistency at source candidate b4c8ac0c8fee311ede12c417d0be1cbfd5aada38 (tree b8e92492f2216c0c5c0ecdc90ccdfd5807c77d15): conflicting evidence aliases, status aggregates and gate/declaration reviewer identity mismatches now fail closed; `300` combined tests and `make validate` pass, while runtime promotion remains blocked.
 - [x] (2026-09-10) Bind the canonical local CI lanes at source candidate 957b534d7b33a025525cb1dd667872791239ed43 (tree 65dcad96347adbd34e267537c424bef444ec48d7): bounded redacted raw artifacts carry same-run GitHub provider/workflow/run/attempt/ref/SHA provenance, release validation rejects replay/mismatch/path/hash errors, `supply-chain` keeps runtime primary, and the frontend runtime job emits the Phase 3 envelope; `256` State-of-Art tests and static/API checks pass, while live runtime promotion remains blocked.
+- [x] (2026-09-10) Harden the promotion packet at source candidate ca54b4ab9db1f39f94a14ad600f690d438cd144b (tree 354485c5e88aacf9b9217cc92b6d87c68e60bfbc): Ed25519 signatures require an explicit trust store, bind all seal metadata and the current clean checkout, and reject stale/future packets; `264` State-of-Art tests, `make validate`, workflow parsing and a fresh independent crypto review pass, while live runtime and human promotion remain blocked.
 - [ ] (2026-09-09) Execute the disposable runtime; currently blocked by Docker daemon access and unresolved external authority.
 - [ ] (2026-09-09) Complete independent runtime/design/security reviews and the human Go/No-Go.
 
@@ -55,6 +56,7 @@ access, so no live claim can be made.
 - 2026-09-10: Bind the current Redis/API HTTP correction to source implementation candidate 8f2741d39d83622dc966b859fac06630848d916b with tree 2bf66ea20c2d7c2d0f92d3c343c6f4a2e2907d72; retain the fresh independent read-only findings as non-approval and keep the real Redis/runtime decision BLOCKED_EXTERNAL.
 - 2026-09-10: Require artifact postconditions in the integrated verifier so a successful generator process cannot hide a blocked, invalid or missing matrix/manifest; preserve the mandatory Redis multi-replica binding and same-run CI artifact provenance, with local patch review separate from runtime promotion.
 - 2026-09-10: Bind FAST/UNIT/CONTRACT/SECURITY/SUPPLY_CHAIN CI observations to the current GitHub Actions run and exact checkout; keep `supply-chain` runtime evidence primary, use CI only as a supplemental observation, and keep the frontend adapter envelope separate from local CI. A fresh post-fix read-only review found zero concrete findings; no runtime or Triple AAA claim is made.
+- 2026-09-10: Reject self-declared promotion authority: require Ed25519 verification against an explicit trust store, require current clean checkout binding and reject seals outside the bounded freshness window. Preserve external runtime and human authority as separate blockers.
 
 ## Outcomes & Retrospective
 
@@ -167,13 +169,13 @@ made.
 ## Current candidate closure
 
 The current source implementation candidate is
-957b534d7b33a025525cb1dd667872791239ed43 with tree
-65dcad96347adbd34e267537c424bef444ec48d7. It contains the corrected
+ca54b4ab9db1f39f94a14ad600f690d438cd144b with tree
+354485c5e88aacf9b9217cc92b6d87c68e60bfbc. It contains the corrected
 PostgreSQL worker gate, canonical two-process Redis/API HTTP gate, strict
 release artifact postconditions and manifest consistency checks, plus bounded
 same-run CI envelopes with redacted raw artifacts, exact workflow/run/ref/SHA
 provenance, runtime-primary supply-chain binding and frontend Phase 3
-transport. The State-of-Art suite has 256 passing tests and the relevant
+transport and authenticated promotion packet sealing. The State-of-Art suite has 264 passing tests and the relevant
 static/API checks pass; the full preserved `make test` remains incomplete
 because the CVG dataset and local Playwright browser are unavailable. The
 prior integrated verifier artifact is stale after this source change and is

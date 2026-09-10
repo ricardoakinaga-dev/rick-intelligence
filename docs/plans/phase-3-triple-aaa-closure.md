@@ -1,10 +1,10 @@
 # Phase 3 Triple AAA Closure Plan
 
-**Status:** `ACTIVE — entry audit complete; P0 control/release closure next`  
+**Status:** `ACTIVE — local release hardening complete; live runtime evidence blocked`
 **Prompt:** [`phase-3-triple-aaa-closure-2026-09-09.txt`](../prompts/phase-3-triple-aaa-closure-2026-09-09.txt)  
 **Source attachment SHA-256:** `0d431cf3ec75e4d6455735d32f135b3270b59996866a28fd7296d73a18cabf3d`  
 **Stored copy SHA-256:** `0d431cf3ec75e4d6455735d32f135b3270b59996866a28fd7296d73a18cabf3d`
-**Candidate:** `2d0b177f7745463c9457dc4da6f9dfc769b6c78d` / tree `6fc8b92c5a4c14147915aae787f8143fd81ec8ee`  
+**Candidate:** `ca54b4ab9db1f39f94a14ad600f690d438cd144b` / tree `354485c5e88aacf9b9217cc92b6d87c68e60bfbc`
 **Entry audit:** [`current-triple-aaa-gap-audit.md`](../reports/current-triple-aaa-gap-audit.md)
 
 ## 1. Outcome and constraints
@@ -119,11 +119,12 @@ not erase an unexplained failure; it creates a new exact run. The final report
 must contain the prompt's 28 sections, 25-dimension scorecard, all mandatory
 gate results, remaining risks and a single executable next action.
 
-The current next action is to execute the newly added two-process canonical
-`apps/api` HTTP Redis multi-replica gate from a clean candidate with an
-approved disposable Redis URL, then bind its result to the release matrix and
-a fresh Redis/security critic. The gate is locally tested and remains
-fail-closed when the runtime or driver is unavailable.
+The current next action is to execute the disposable Compose/runtime gates from
+this clean candidate when an approved Docker daemon, disposable secrets and
+endpoints are available. The authenticated packet correction is locally tested
+and remains fail-closed; it does not substitute for live Redis/API,
+PostgreSQL, storage, provider, observability, frontend, operations or human
+promotion evidence.
 
 ## 8. Current local correction — authenticated promotion packet
 
