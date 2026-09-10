@@ -159,7 +159,8 @@ when `OTEL_TRACES_EXPORTER=otlp` is configured. API stage spans cover identity,
 authorization, retrieval, evidence validation, decision policy, provider,
 object storage and queue boundaries; the worker configures its own exporter,
 attaches only flat W3C `traceparent`/`tracestate` fields and emits an ingestion
-stage span. Provider, Qdrant and S3 HTTP boundaries project only bounded W3C
+stage span. Redis rate-limit operations emit a bounded coordination stage span.
+Provider, Qdrant and S3 HTTP boundaries project only bounded W3C
 trace identity after their request/authentication setup; `baggage` and arbitrary
 context are excluded, and the dependency-light helper degrades safely when the
 SDK is absent. Automatic exception payloads are disabled and error spans retain

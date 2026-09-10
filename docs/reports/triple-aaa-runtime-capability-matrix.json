@@ -168,6 +168,7 @@
         "apps/api/src/core/otel.py",
         "packages/observability/src/rick_observability/tracing.py",
         "packages/observability/src/rick_observability/__init__.py",
+        "apps/api/src/core/rate_limit.py",
         "apps/api/src/services/postgres_ingestion.py",
         "apps/api/src/services/professor_backend.py",
         "packages/providers/src/rick_providers/client.py",
@@ -184,6 +185,7 @@
       "TEST_EVIDENCE": [
         "apps/api/tests/test_otel.py",
         "packages/observability/tests/test_observability.py",
+        "apps/api/tests/test_rate_limit.py",
         "apps/api/tests/test_postgres_ingestion.py",
         "packages/providers/tests/test_provider.py",
         "packages/retrieval/tests/test_qdrant.py",

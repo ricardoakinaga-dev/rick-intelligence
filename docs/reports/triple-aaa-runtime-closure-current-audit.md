@@ -201,3 +201,14 @@ This closes the source and hermetic-test portion of downstream HTTP trace
 projection. It does not prove collector delivery, live trace continuity,
 runtime service readiness, independent review, or promotion; Docker remains
 unavailable to this user and the candidate remains **BLOCKED_EXTERNAL / NO-GO**.
+
+## 68. Redis coordination span closure — 2026-09-10
+
+The API rate-limit adapter now wraps the injected Redis/distributed backend in
+the bounded `redis.rate_limit` stage span and records only safe error identity
+when the backend fails. The hermetic rate-limit suite remains green (**10**
+tests), while the live Redis/multi-replica trace remains an external gate.
+
+This completes the source-level trace stage list for the Redis boundary without
+claiming a live collector chain, latency metrics, failover behavior or
+promotion. The candidate remains **BLOCKED_EXTERNAL / NO-GO**.

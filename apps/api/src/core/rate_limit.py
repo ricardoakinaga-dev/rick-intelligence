@@ -9,6 +9,8 @@ import threading
 import time
 from typing import Any, Protocol
 
+from core.otel import record_safe_exception, stage_span
+
 
 class RateLimiter(Protocol):
     """Synchronous limiter contract used by the API routes."""
@@ -156,7 +158,7 @@ def check_rate_limit(limiter: Any, key: str, *, limit_per_min: int) -> bool:
     raise TypeError("configured rate limiter must expose check() or allow()")
 
 
-async def check_rate_limit_async(
+async def _check_rate_limit_async(
     limiter: Any,
     key: str,
     *,
@@ -199,6 +201,31 @@ async def check_rate_limit_async(
             result = await result
         return bool(result)
     raise TypeError("configured rate limiter must expose check() or allow()")
+
+
+async def check_rate_limit_async(
+    limiter: Any,
+    key: str,
+    *,
+    limit_per_min: int,
+    request_id: str | None = None,
+) -> bool:
+    """Evaluate the rate-limit backend inside a bounded Redis stage span."""
+
+    with stage_span(
+        "redis.rate_limit",
+        attributes={"redis.operation": "rate_limit"},
+    ) as span:
+        try:
+            return await _check_rate_limit_async(
+                limiter,
+                key,
+                limit_per_min=limit_per_min,
+                request_id=request_id,
+            )
+        except Exception as exc:
+            record_safe_exception(span, exc)
+            raise
 
 
 def is_production_rate_limiter(limiter: object) -> bool:
