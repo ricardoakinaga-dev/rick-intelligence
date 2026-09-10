@@ -204,8 +204,10 @@ unavailable to this user and the candidate remains **BLOCKED_EXTERNAL / NO-GO**.
 
 ## 68. Redis coordination span closure — 2026-09-10
 
-The API rate-limit adapter now wraps the injected Redis/distributed backend in
-the bounded `redis.rate_limit` stage span and records only safe error identity
+Source candidate `10b25c445505ed522cd57d873635319a5c174c08` (tree
+`6a5c406ca895e7d6e15e3258942864e51b172182`) wraps the injected Redis/
+distributed backend in the API rate-limit adapter's
+bounded `redis.rate_limit` stage span and records only safe error identity
 when the backend fails. The hermetic rate-limit suite remains green (**10**
 tests), while the live Redis/multi-replica trace remains an external gate.
 
