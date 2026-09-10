@@ -22,3 +22,8 @@ An authenticated modern session snapshot is AUTHORITATIVE:
   recomputes permissions, so removals cannot be restored (tested).
 - Invalidation (logout/expiry/disabled/password_version/role_version/revoke)
   returns an anonymous snapshot before any authorization decision.
+
+The canonical PostgreSQL identity adapter also rejects oversized, non-finite,
+or structurally invalid persisted snapshots before they reach this authority
+path. A corrupt snapshot is absent to the provider and therefore cannot be
+silently treated as an authoritative grant or a legacy record.

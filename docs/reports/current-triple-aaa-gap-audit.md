@@ -56,8 +56,8 @@ converted to PASS by the presence of host processes.
 ### Current clean revalidation — 2026-09-10
 
 The latest source implementation candidate is
-`49784e50c16baa92eac41280a7d14d84ae1a8515` with tree
-`e20480c92212957423a55ff938be896ae56fcad5`. The ignored integrated packet
+`b075d446b41a259b08a4106294c57fe99a586a8e` with tree
+`a919928f99aaf093a0f399d8a229a58b95d50bcc`. The ignored integrated packet
 `.runtime/phase-3/triple-aaa-verify.json` is the authority for the exact clean
 checkout, tree, artifact set, packet hash and current classification; the
 latest clean run reports `17` foundation PASS results and `24` mandatory
@@ -844,3 +844,20 @@ State-of-Art suite **295**; compilation and `git diff --check` pass. This is
 local case read-model evidence only. Approved durable case storage, tenant and
 recovery drills, provider/corpus, independent review, sealed packet and human
 Go/No-Go remain unavailable; promotion remains disallowed.
+
+## 42. Persisted PostgreSQL identity JSON closure — 2026-09-10
+
+Source implementation candidate `b075d446b41a259b08a4106294c57fe99a586a8e`
+(tree `a919928f99aaf093a0f399d8a229a58b95d50bcc`) closes a concrete
+authorization persistence gap. The adapter caps ACL and session-snapshot JSON
+at 64 KiB before parsing, rejects non-finite/recursive/malformed values and
+invalid snapshot list/version/state types, bounds writes before `jsonb` casts,
+and omits corrupt user/session rows so invalid data cannot widen scope or
+trigger legacy migration. The adversarial regression covers padded JSON,
+`NaN`, malformed snapshot structure and invalid write values.
+
+The identity/authorization suite passes **31**, the API matrix **440**, and
+the State-of-Art suite **295**; compilation and `git diff --check` pass. This
+is local identity/security evidence only. Approved PostgreSQL runtime,
+tenant/recovery drills, provider/corpus, independent review, sealed packet and
+human Go/No-Go remain unavailable; promotion remains disallowed.

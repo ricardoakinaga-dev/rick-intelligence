@@ -29,3 +29,12 @@ opaque ids only; `get_user` redacts credential material; API responses carry
 `session_token: null`.
 
 Contracts: `identity-contract-v1`, `session-contract-v1` (`packages/contracts`).
+
+The PostgreSQL adapter treats persisted ACL and session-snapshot JSON as an
+untrusted boundary: reads are finite and byte-bounded at 64 KiB, authorization
+lists and snapshot fields are structurally validated, and corrupt rows fail
+closed instead of being interpreted as legacy or wildcard authorization. User
+and session JSON writes are canonicalized with non-finite values rejected and
+the same byte cap enforced before the database `jsonb` cast. This is adapter
+boundary protection; live PostgreSQL execution and recovery remain separate
+runtime evidence.

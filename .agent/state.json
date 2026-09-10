@@ -14,7 +14,7 @@
   "active_execplan": ".agent/plans/phase-3-runtime-evidence-production-promotion.md",
   "active_task": "PH3-2-LAB-READINESS",
   "verification_state": "PARTIAL",
-  "repository_state": "Current source candidate is 49784e50c16baa92eac41280a7d14d84ae1a8515 (tree e20480c92212957423a55ff938be896ae56fcad5); it includes a JSON-only versioned parser result envelope that never unpickles child-controlled bytes, fail-closed invalid UTF-8 rejection, bounded durable-job JSON decoding before contract parsing, bounded legacy SQLite/PostgreSQL queue payload decoding, bounded persisted SQLite vector decoding with finite-vector and canonical checksum checks, bounded persisted SQLite/PostgreSQL chat-history decoding, a shared finite/byte-bounded JSON decoder, fail-closed persisted SQLite case-row decoding, and the prior provider, Professor, observability, API and release-boundary hardening. Clean local evidence currently passes queue-focused 14, worker 52, retrieval 37, domain 158, history 13, case 12, ingestion 103, focused file-security/runtime 79, provider 64, Professor 36, API 440 and State-of-Art 295 tests; the next integrated packet must bind this candidate and remains expected to classify STATE_OF_ART_CANDIDATE with external blockers. No State of Art, AAA or Triple AAA promotion claim is made.",
+  "repository_state": "Current source candidate is b075d446b41a259b08a4106294c57fe99a586a8e (tree a919928f99aaf093a0f399d8a229a58b95d50bcc); it includes a JSON-only versioned parser result envelope that never unpickles child-controlled bytes, fail-closed invalid UTF-8 rejection, bounded durable-job JSON decoding before contract parsing, bounded legacy SQLite/PostgreSQL queue payload decoding, bounded persisted SQLite vector decoding with finite-vector and canonical checksum checks, bounded persisted SQLite/PostgreSQL chat-history decoding, a shared finite/byte-bounded JSON decoder, fail-closed persisted SQLite case-row decoding, bounded and structurally validated PostgreSQL identity ACL/session JSON with fail-closed corrupt authorization rows, and the prior provider, Professor, observability, API and release-boundary hardening. Clean local evidence currently passes queue-focused 14, worker 52, retrieval 37, domain 158, history 13, case 12, identity/authorization 31, ingestion 103, focused file-security/runtime 79, provider 64, Professor 36, API 440 and State-of-Art 295 tests; the next integrated packet must bind this candidate and remains expected to classify STATE_OF_ART_CANDIDATE with external blockers. No State of Art, AAA or Triple AAA promotion claim is made.",
   "instruction_scope_refs": [
     ".agent/PLANS.md",
     "cvg-master-rag-v2/AGENTS.md",
@@ -23,8 +23,8 @@
     "docs/plans/phase-3-runtime-evidence-production-promotion.md"
   ],
   "last_gate_record": ".agent/gates/phase-3-2-lab-readiness-implementation-ready.json",
-  "last_event_id": "EVT-PH3-2-CASE-JSON-BOUNDARY-20260910",
-  "state_revision": 279,
+  "last_event_id": "EVT-PH3-2-IDENTITY-JSON-BOUNDARY-20260910",
+  "state_revision": 280,
   "next_gate": "VERIFIED",
   "active_action_id": "PH3-2-LAB-READINESS:WAIT_RUNTIME",
   "blocked_by": [
@@ -32,5 +32,5 @@
     "Disposable runtime secrets and endpoint authority are unavailable"
   ],
   "human_approval_required": [],
-  "updated_at": "2026-09-10T14:29:00Z"
+  "updated_at": "2026-09-10T14:41:13Z"
 }

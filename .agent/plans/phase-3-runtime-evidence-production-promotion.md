@@ -47,6 +47,7 @@ preserving the frozen Gauntlet bar, Phase 2 history and legacy repositories.
 - [x] (2026-09-10) Bound persisted SQLite vector decoding at source candidate 8035d9995d6715afa5f4571de9bf26c9ce456b4e (tree 0f7010ceaa716670340f3445c9fe41c852c3c445): read-side JSON is capped before parsing, non-finite/invalid vectors and oversized payloads fail closed, and checksum validation remains canonical; retrieval tests pass 37, the combined knowledge/ingestion/retrieval domain suite 158 and API/State-of-Art suites 437/295, while live Qdrant evidence remains blocked.
 - [x] (2026-09-10) Bound persisted chat-history JSON at source candidate 3ce7bc177046d4d4675278ab4bbfc44cdff85874 (tree b2d2661e0ae385e08e00329fd9a6f2633dacf260): SQLite and PostgreSQL history reads cap JSON before parsing, reject non-finite/recursive data and skip corrupt response rows; history tests pass 13, the API matrix 439 and State-of-Art 295, while live PostgreSQL/runtime evidence remains blocked.
 - [x] (2026-09-10) Bound persisted SQLite case JSON at source candidate 49784e50c16baa92eac41280a7d14d84ae1a8515 (tree e20480c92212957423a55ff938be896ae56fcad5): a shared finite/byte-bounded decoder rejects oversized, non-finite, malformed and recursive case fields, and corrupt case rows fail closed; case tests pass 12, the API matrix 440 and State-of-Art 295, while live runtime evidence remains blocked.
+- [x] (2026-09-10) Hardened persisted PostgreSQL identity JSON at source candidate b075d446b41a259b08a4106294c57fe99a586a8e (tree a919928f99aaf093a0f399d8a229a58b95d50bcc): user ACLs and authoritative session snapshots now reject oversized, non-finite and structurally invalid values, writes are bounded before `jsonb` casts, and corrupt rows fail closed; identity/authorization tests pass 31 and the API matrix 440, while live PostgreSQL/runtime evidence remains blocked.
 - [ ] (2026-09-09) Execute the disposable runtime; currently blocked by Docker daemon access and unresolved external authority.
 - [ ] (2026-09-09) Complete independent runtime/design/security reviews and the human Go/No-Go.
 
@@ -198,8 +199,8 @@ made.
 ## Current candidate closure
 
 The current source implementation candidate is
-49784e50c16baa92eac41280a7d14d84ae1a8515 with tree
-e20480c92212957423a55ff938be896ae56fcad5. It contains the corrected
+b075d446b41a259b08a4106294c57fe99a586a8e with tree
+a919928f99aaf093a0f399d8a229a58b95d50bcc. It contains the corrected
 PostgreSQL worker gate, canonical two-process Redis/API HTTP gate, strict
 release artifact postconditions and manifest consistency checks, plus bounded
 same-run CI envelopes with redacted raw artifacts, exact workflow/run/ref/SHA
@@ -224,7 +225,9 @@ contract, plus bounded legacy SQLite/PostgreSQL queue payload decoding at
 the adapter read boundary, bounded persisted SQLite vector decoding with
 finite vector/canonical checksum checks, bounded persisted chat-history
 decoding across SQLite/PostgreSQL, plus a shared finite/byte-bounded decoder
-and fail-closed persisted SQLite case-row decoding. The final
+and fail-closed persisted SQLite case-row decoding, plus bounded and
+structurally validated PostgreSQL identity ACL/session JSON with fail-closed
+corrupt authorization rows. The final
 documentation/control-plane follow-up is bound to the resulting clean
 checkout, while live provider/runtime evidence remains external.
 The provider, Professor, API and State-of-Art suites have 64, 36, 440 and 295

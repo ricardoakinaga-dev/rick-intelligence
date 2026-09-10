@@ -632,3 +632,19 @@ compilation and `git diff --check` pass. This is local clinical-case
 read-model evidence only. Live durable case storage, tenant/recovery drills,
 provider/corpus, independent review and promotion authority remain
 unavailable; promotion remains disallowed.
+
+## 41. Persisted PostgreSQL identity JSON closure — 2026-09-10
+
+Source candidate `b075d446b41a259b08a4106294c57fe99a586a8e` (tree
+`a919928f99aaf093a0f399d8a229a58b95d50bcc`) closes an authorization read/write
+boundary. User ACL JSON and authoritative session snapshots are capped at
+64 KiB, reject non-finite values before and after DB-driver decoding, validate
+list/version/state structure, and omit corrupt rows rather than widening scope
+or migrating an invalid modern snapshot. Writes are canonicalized with
+`allow_nan=False` before PostgreSQL `jsonb` casts.
+
+The identity/authorization suite passes **31** and the API matrix **440**;
+compilation and `git diff --check` pass. This is local adapter/security
+evidence only. Live PostgreSQL, multi-tenant and recovery drills, independent
+review and promotion authority remain unavailable; promotion remains
+disallowed.
