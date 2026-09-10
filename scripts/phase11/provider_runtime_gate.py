@@ -199,6 +199,7 @@ async def _run_checks(
     json_ok = False
     tools_ok = False
     streaming_tools_ok = False
+    streaming_json_ok = False
     context_ok = False
     try:
         try:
@@ -371,6 +372,42 @@ async def _run_checks(
             assertions.append(_Assertion("streaming-contract", FAIL, "live streaming assertion failed"))
 
         try:
+            json_deltas: list[str] = []
+            json_finish_reason: str | None = None
+            stream = client.chat_completion_stream(
+                messages=[
+                    ProviderMessage(
+                        role="user",
+                        content="Return a JSON object with status=ok.",
+                    )
+                ],
+                temperature=0,
+                response_format={"type": "json_object"},
+                correlation_id=f"phase11-provider-stream-json-{uuid.uuid4().hex[:12]}",
+            )
+            async for chunk in stream:
+                json_deltas.append(chunk.delta)
+                if chunk.finish_reason:
+                    json_finish_reason = chunk.finish_reason
+            decoded = json.loads("".join(json_deltas), parse_constant=_reject_json_constant)
+            streaming_json_ok = bool(
+                isinstance(decoded, dict)
+                and decoded.get("status") == "ok"
+                and json_finish_reason in {"stop", "length", "content_filter", "unknown"}
+            )
+            assertions.append(
+                _Assertion(
+                    "streaming-json-contract",
+                    PASS if streaming_json_ok else FAIL,
+                    "streamed content reassembled into a strict JSON object"
+                    if streaming_json_ok
+                    else "streamed content did not satisfy the JSON object contract",
+                )
+            )
+        except Exception:
+            assertions.append(_Assertion("streaming-json-contract", FAIL, "live streaming JSON assertion failed"))
+
+        try:
             streamed_tool_calls: dict[int, dict[str, str]] = {}
             stream_finish_reason: str | None = None
             stream_tool_conflict = False
@@ -478,6 +515,7 @@ async def _run_checks(
             and json_ok
             and tools_ok
             and streaming_ok
+            and streaming_json_ok
             and streaming_tools_ok
             and context_ok
             and embedding_ok

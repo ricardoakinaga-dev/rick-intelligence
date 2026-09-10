@@ -214,6 +214,40 @@ async def test_streaming_contract_emits_typed_deltas_and_terminal_finish_reason(
 
 
 @pytest.mark.asyncio
+async def test_streaming_json_content_can_be_reassembled_as_an_object() -> None:
+    body = (
+        b'data: {"model":"chat-test-model","choices":[{"delta":{"content":"{\\"status\\":"},"finish_reason":null}]}\n\n'
+        b'data: {"model":"chat-test-model","choices":[{"delta":{"content":"\\"ok\\"}"},"finish_reason":"stop"}]}\n\n'
+        b"data: [DONE]\n\n"
+    )
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        payload = json.loads(request.content)
+        assert payload["response_format"] == {"type": "json_object"}
+        return httpx.Response(
+            200,
+            content=body,
+            headers={"content-type": "text/event-stream"},
+            request=request,
+        )
+
+    provider = OpenAICompatibleClient(_config(), transport=httpx.MockTransport(handler))
+    try:
+        chunks = [
+            chunk
+            async for chunk in provider.chat_completion_stream(
+                messages=[{"role": "user", "content": "return JSON"}],
+                response_format={"type": "json_object"},
+            )
+        ]
+    finally:
+        await _close(provider)
+
+    assert json.loads("".join(chunk.delta for chunk in chunks)) == {"status": "ok"}
+    assert chunks[-1].finish_reason == "stop"
+
+
+@pytest.mark.asyncio
 async def test_function_tools_are_serialized_and_typed_calls_are_returned() -> None:
     requests: list[httpx.Request] = []
     tool = {

@@ -81,6 +81,11 @@ class _ProviderHandler(BaseHTTPRequestHandler):
                         ],
                     },
                 )
+            elif body.get("response_format") == {"type": "json_object"}:
+                events = (
+                    {"model": body["model"], "choices": [{"delta": {"content": '{"status":'}, "finish_reason": None}]},
+                    {"model": body["model"], "choices": [{"delta": {"content": '"ok"}'}, "finish_reason": "stop"}]},
+                )
             else:
                 events = (
                     {"model": body["model"], "choices": [{"delta": {"content": "stream "}, "finish_reason": None}]},
@@ -211,6 +216,7 @@ def test_real_openai_compatible_endpoint_passes_semantic_checks(provider_url: st
         "json-response-contract",
         "tool-call-contract",
         "streaming-contract",
+        "streaming-json-contract",
         "streaming-tool-call-contract",
         "embedding-contract",
     }
