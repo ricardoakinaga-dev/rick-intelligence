@@ -206,6 +206,7 @@ def test_real_openai_compatible_endpoint_passes_semantic_checks(provider_url: st
     assert status == "PASS"
     assert {item.name for item in assertions} >= {
         "provider-health-probe",
+        "context-budget-contract",
         "chat-completion-contract",
         "json-response-contract",
         "tool-call-contract",

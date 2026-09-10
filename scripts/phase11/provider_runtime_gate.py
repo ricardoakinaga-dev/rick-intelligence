@@ -166,6 +166,7 @@ async def _run_checks(
     try:
         from rick_providers.client import OpenAICompatibleClient
         from rick_providers.config import ProviderConfig
+        from rick_providers.resilience import ProviderBudgetError, ResilientProvider
         from rick_contracts.providers import ProviderMessage
     except ImportError:
         raise _BlockedExternal() from None
@@ -198,7 +199,45 @@ async def _run_checks(
     json_ok = False
     tools_ok = False
     streaming_tools_ok = False
+    context_ok = False
     try:
+        try:
+            bounded = ResilientProvider(
+                client,
+                max_messages=2,
+                max_prompt_chars=256,
+                max_embedding_chars=256,
+            )
+            try:
+                await bounded.chat_completion(
+                    messages=[
+                        ProviderMessage(
+                            role="user",
+                            content="x" * 257,
+                        )
+                    ],
+                    correlation_id=f"phase11-provider-context-{uuid.uuid4().hex[:12]}",
+                )
+            except ProviderBudgetError:
+                context_ok = True
+            assertions.append(
+                _Assertion(
+                    "context-budget-contract",
+                    PASS if context_ok else FAIL,
+                    "resilient provider rejected an over-budget prompt before I/O"
+                    if context_ok
+                    else "resilient provider did not enforce the prompt budget",
+                )
+            )
+        except Exception:
+            assertions.append(
+                _Assertion(
+                    "context-budget-contract",
+                    FAIL,
+                    "provider context-budget assertion failed",
+                )
+            )
+
         try:
             provider_health_ok = await client.health_check()
             assertions.append(
@@ -440,6 +479,7 @@ async def _run_checks(
             and tools_ok
             and streaming_ok
             and streaming_tools_ok
+            and context_ok
             and embedding_ok
             else FAIL
         )
