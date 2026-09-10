@@ -93,6 +93,12 @@ plans, transactions, concurrency, idempotency, DLQ/replay, retention, leases
 and fencing against a real disposable database. Static SQL and unit tests do
 not close this section.
 
+The local canonical PostgreSQL adapter now rejects database JSON larger than
+256 KiB, non-finite constants and recursive decoder failures before applying
+the bounded job contract at source candidate
+`b3229685b432be6c4313609d95f56b316ecc0885`. This is a corruption/DoS
+containment improvement, not evidence of a live database or fencing run.
+
 ## 10. Worker A/B behavior
 
 Two real worker processes must prove ownership, heartbeat fencing, stale ACK

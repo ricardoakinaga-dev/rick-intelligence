@@ -761,3 +761,19 @@ the State-of-Art suite **295**; compilation and `git diff --check` pass. This
 is local process-isolation evidence only. The approved disposable runtime,
 malicious corpus, distributed file-security drill, independent review, sealed
 packet and human Go/No-Go remain unavailable; promotion remains disallowed.
+
+## 37. Durable job JSON decoding closure — 2026-09-10
+
+Source implementation candidate `b3229685b432be6c4313609d95f56b316ecc0885`
+(tree `43cf3eff8bfbcca3500887c729d5ddd6d99364d5`) closes a concrete durable
+queue input-boundary gap. Database-provided JSON is capped at 256 KiB before
+decoding, non-finite JSON constants are rejected, and recursive/malformed
+decoder failures become bounded corruption errors rather than escaping into
+the adapter. The adversarial test covers both oversized and non-finite rows.
+
+The worker suite passes **50**, the PostgreSQL adapter slice **15**, the API
+matrix **437**, and the State-of-Art suite **295**; compilation and
+`git diff --check` pass. This is local durable-adapter evidence only. The
+approved disposable PostgreSQL runtime, crash/fencing drill, independent
+review, sealed packet and human Go-No-Go remain unavailable; promotion
+remains disallowed.
