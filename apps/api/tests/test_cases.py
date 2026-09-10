@@ -290,6 +290,28 @@ def test_sqlite_store_round_trip_and_legacy_compatible_record(tmp_path: Path):
         reopened.close()
 
 
+def test_sqlite_store_rejects_oversized_persisted_case_json(tmp_path: Path):
+    store = SQLiteClinicalCaseStore(tmp_path / "corrupt-case.sqlite3")
+    owner = _session()
+    try:
+        item = store.create_case(session=owner, title="SQLite", summary="Resumo")
+        oversized = '["tag"]' + (" " * (256 * 1024))
+        with store._transaction():
+            store._connection.execute(
+                "UPDATE clinical_cases SET tags_json=? WHERE case_id=?",
+                (oversized, item["case_id"]),
+            )
+        assert store.get_case(session=owner, case_id=item["case_id"]) is None
+        with store._transaction():
+            store._connection.execute(
+                "UPDATE clinical_cases SET tags_json=? WHERE case_id=?",
+                ('["tag",NaN]', item["case_id"]),
+            )
+        assert store.get_case(session=owner, case_id=item["case_id"]) is None
+    finally:
+        store.close()
+
+
 def test_sqlite_store_replays_stable_mutation_keys_without_duplicates(tmp_path: Path):
     store = SQLiteClinicalCaseStore(tmp_path / "idempotent.sqlite3")
     owner = _session()

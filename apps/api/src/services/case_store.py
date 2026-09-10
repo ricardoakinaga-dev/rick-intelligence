@@ -29,10 +29,13 @@ from rick_contracts.cases import (
     CaseRecord,
     CaseReview,
 )
+from services.json_boundary import decode_bounded_json
 
 
 MAX_PAGE_SIZE = 100
 MAX_OFFSET = 100_000
+MAX_CASE_JSON_BYTES = 256 * 1024
+_INVALID_CASE_JSON = object()
 
 
 def _value(item: object, name: str, default: Any = None) -> Any:
@@ -171,6 +174,13 @@ def _request_id(value: object) -> str | None:
 
 def _new_id(prefix: str) -> str:
     return f"{prefix}-{uuid.uuid4().hex[:20]}"
+
+
+def _decode_case_list(value: object) -> list[Any] | None:
+    decoded = decode_bounded_json(value, _INVALID_CASE_JSON, max_bytes=MAX_CASE_JSON_BYTES)
+    if not isinstance(decoded, list):
+        return None
+    return decoded
 
 
 def _case_payload(
@@ -668,14 +678,19 @@ class SQLiteClinicalCaseStore:
 
     @staticmethod
     def _case_row_payload(row: sqlite3.Row, *, review_count: int, feedback_count: int,
-                          last_review_at: float | None, last_feedback_at: float | None) -> dict[str, Any]:
+                          last_review_at: float | None, last_feedback_at: float | None) -> dict[str, Any] | None:
+        hypotheses = _decode_case_list(row["hypotheses_json"] or "[]")
+        evidence = _decode_case_list(row["evidence_json"] or "[]")
+        tags = _decode_case_list(row["tags_json"] or "[]")
+        if hypotheses is None or evidence is None or tags is None:
+            return None
         return _case_payload(
             case_id=row["case_id"], tenant_id=row["tenant_id"], workspace_id=row["workspace_id"],
             owner_user_id=row["owner_user_id"], title=row["title"], summary=row["summary_text"] or row["record_text"],
             record=row["record_text"],
-            hypotheses=json.loads(row["hypotheses_json"] or "[]"),
-            evidence=json.loads(row["evidence_json"] or "[]"),
-            tags=json.loads(row["tags_json"] or "[]"), status=row["status"],
+            hypotheses=hypotheses,
+            evidence=evidence,
+            tags=tags, status=row["status"],
             created_by_user_id=row["created_by_user_id"], created_at=float(row["created_at"]),
             updated_by_user_id=row["updated_by_user_id"], updated_at=float(row["updated_at"]),
             last_request_id=row["last_request_id"], review_count=review_count,

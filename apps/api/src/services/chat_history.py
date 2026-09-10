@@ -20,6 +20,8 @@ import time
 from typing import Any
 import uuid
 
+from services.json_boundary import decode_bounded_json
+
 
 def _value(item: object, name: str, default: Any = None) -> Any:
     if isinstance(item, Mapping):
@@ -41,36 +43,9 @@ STREAM_CONTEXT_EXCLUDED_STATUSES = frozenset({"partial", "error", "cancelled"})
 MAX_HISTORY_JSON_BYTES = 256 * 1024
 
 
-def _reject_json_constant(_value: str) -> object:
-    raise ValueError("non-finite JSON constants are not allowed")
-
-
 def _decode_json(value: object, default: object) -> object:
     """Decode persisted history JSON only after applying a finite byte bound."""
-
-    parsed = value
-    if isinstance(value, str):
-        try:
-            if len(value.encode("utf-8")) > MAX_HISTORY_JSON_BYTES:
-                return default
-            parsed = json.loads(value, parse_constant=_reject_json_constant)
-        except (TypeError, UnicodeError, ValueError, RecursionError):
-            return default
-    if not isinstance(parsed, (dict, list)):
-        return default
-    try:
-        encoded = json.dumps(
-            parsed,
-            ensure_ascii=False,
-            sort_keys=True,
-            separators=(",", ":"),
-            allow_nan=False,
-        )
-        if len(encoded.encode("utf-8")) > MAX_HISTORY_JSON_BYTES:
-            return default
-    except (TypeError, UnicodeError, ValueError, OverflowError, RecursionError):
-        return default
-    return parsed
+    return decode_bounded_json(value, default, max_bytes=MAX_HISTORY_JSON_BYTES)
 
 
 def _bounded_page(limit: object, offset: object = 0) -> tuple[int, int]:
