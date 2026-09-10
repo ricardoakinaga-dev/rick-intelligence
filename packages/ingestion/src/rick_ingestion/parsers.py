@@ -15,6 +15,7 @@ filenames never become storage paths.
 from __future__ import annotations
 
 import codecs
+from collections.abc import Mapping
 import hashlib
 import io
 import math
@@ -55,8 +56,11 @@ DEFAULT_PARSER_TIMEOUT_SECONDS = 30.0
 MAX_PARSER_TIMEOUT_SECONDS = 300.0
 DEFAULT_PARSER_MEMORY_BYTES = 512 * 1024 * 1024
 MAX_PARSER_MEMORY_BYTES = 2 * 1024 * 1024 * 1024
+MAX_PARSER_RESULT_BYTES = 32 * 1024 * 1024
 MAX_FILENAME_CHARS = 256
 MAX_RAW_FILENAME_CHARS = 4_096
+MAX_PARSER_AUX_CHARS = MAX_PARSED_TEXT_CHARS
+MAX_PARSER_AUX_NODES = 4 * (MAX_PARSED_SECTIONS + MAX_PARSED_PAGES) + 1_024
 
 _MIME_BY_EXTENSION = {
     ".pdf": frozenset({"application/pdf"}),
@@ -281,6 +285,85 @@ class ParsedDocument:
     metadata: dict = field(default_factory=dict)
 
 
+def _validate_parser_auxiliary(
+    value: object,
+    *,
+    depth: int,
+    budget: list[int],
+) -> None:
+    """Validate bounded parser metadata before it crosses a process boundary."""
+
+    if depth > 4:
+        raise ParseError("validation_error", "Parser metadata is too deeply nested.")
+    budget[1] -= 1
+    if budget[1] < 0:
+        raise ParseError("request_too_large", "Parser metadata exceeds the result limit.")
+    if isinstance(value, str):
+        budget[0] -= len(value)
+        if budget[0] < 0:
+            raise ParseError("request_too_large", "Parser metadata exceeds the result limit.")
+        return
+    if value is None or isinstance(value, (bool, int)):
+        return
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            raise ParseError("validation_error", "Parser metadata contains a non-finite number.")
+        return
+    if isinstance(value, Mapping):
+        if len(value) > 64:
+            raise ParseError("request_too_large", "Parser metadata contains too many fields.")
+        for key, item in value.items():
+            if not isinstance(key, str) or not key or len(key) > 128:
+                raise ParseError("validation_error", "Parser metadata contains an invalid field.")
+            _validate_parser_auxiliary(key, depth=depth + 1, budget=budget)
+            _validate_parser_auxiliary(item, depth=depth + 1, budget=budget)
+        return
+    if isinstance(value, (list, tuple)):
+        if len(value) > 64:
+            raise ParseError("request_too_large", "Parser metadata contains too many values.")
+        for item in value:
+            _validate_parser_auxiliary(item, depth=depth + 1, budget=budget)
+        return
+    raise ParseError("validation_error", "Parser metadata contains an unsupported value.")
+
+
+def _validate_parsed_document(value: object) -> ParsedDocument:
+    """Reject malformed or oversized parser output before downstream use."""
+
+    if not isinstance(value, ParsedDocument):
+        raise ParseError()
+    if not isinstance(value.text, str):
+        raise ParseError("validation_error", "Parser returned invalid text.")
+    if len(value.text) > MAX_PARSED_TEXT_CHARS:
+        raise ParseError("request_too_large", "Parsed document exceeds the text limit.")
+    if not isinstance(value.pages, (list, tuple)) or len(value.pages) > MAX_PARSED_PAGES:
+        raise ParseError("request_too_large", "Parsed document contains too many pages.")
+    page_chars = 0
+    for page in value.pages:
+        if not isinstance(page, ParsedPage):
+            raise ParseError("validation_error", "Parser returned an invalid page.")
+        if (
+            isinstance(page.page_number, bool)
+            or not isinstance(page.page_number, int)
+            or not 1 <= page.page_number <= MAX_PARSED_PAGES
+        ):
+            raise ParseError("validation_error", "Parser returned an invalid page number.")
+        if not isinstance(page.text, str):
+            raise ParseError("validation_error", "Parser returned invalid page text.")
+        page_chars += len(page.text)
+        if page_chars > MAX_PARSED_TEXT_CHARS:
+            raise ParseError("request_too_large", "Parsed pages exceed the text limit.")
+    if not isinstance(value.sections, (list, tuple)) or len(value.sections) > MAX_PARSED_SECTIONS:
+        raise ParseError("request_too_large", "Parser returned too many sections.")
+    auxiliary_budget = [MAX_PARSER_AUX_CHARS, MAX_PARSER_AUX_NODES]
+    for section in value.sections:
+        _validate_parser_auxiliary(section, depth=0, budget=auxiliary_budget)
+    if not isinstance(value.metadata, Mapping):
+        raise ParseError("validation_error", "Parser returned invalid metadata.")
+    _validate_parser_auxiliary(value.metadata, depth=0, budget=auxiliary_budget)
+    return value
+
+
 class DocumentParser(Protocol):
     def parse(self, path: Path, *, workspace_id: str) -> ParsedDocument: ...
 
@@ -365,9 +448,7 @@ class InProcessParserRunner:
             raise ParseError() from exc
         if time.monotonic() >= deadline:
             raise ParserTimeoutError()
-        if not isinstance(result, ParsedDocument):
-            raise ParseError()
-        return result
+        return _validate_parsed_document(result)
 
 
 def _apply_parser_resource_limits(*, timeout_seconds: float, memory_bytes: int) -> None:
@@ -417,6 +498,26 @@ def _isolated_parser_copy(parser: DocumentParser) -> DocumentParser:
     return parser
 
 
+def _encode_parser_envelope(envelope: tuple[str, object]) -> bytes | None:
+    """Serialize a parser result only when its wire representation is bounded."""
+
+    try:
+        payload = pickle.dumps(envelope, protocol=pickle.HIGHEST_PROTOCOL)
+    except (MemoryError, OSError, OverflowError, pickle.PickleError):
+        return None
+    if len(payload) > MAX_PARSER_RESULT_BYTES:
+        return None
+    return payload
+
+
+def _decode_parser_envelope(payload: bytes) -> object:
+    """Decode the child response after the connection applied its byte cap."""
+
+    if len(payload) > MAX_PARSER_RESULT_BYTES:
+        raise ValueError("parser result exceeds the wire limit")
+    return pickle.loads(payload)
+
+
 def _parser_process_entry(
     connection,
     parser: DocumentParser,
@@ -440,18 +541,24 @@ def _parser_process_entry(
         setter = getattr(parser, "_set_parser_deadline", None)
         if callable(setter):
             setter(time.monotonic() + timeout_seconds)
-        result = parser.parse(path, workspace_id=workspace_id)
-        if not isinstance(result, ParsedDocument):
-            raise ParseError()
-        connection.send(("ok", result))
+        result = _validate_parsed_document(parser.parse(path, workspace_id=workspace_id))
+        payload = _encode_parser_envelope(("ok", result))
+        if payload is None:
+            payload = _encode_parser_envelope(("error", "request_too_large"))
+        if payload is not None:
+            connection.send_bytes(payload)
     except ParseError as exc:
         try:
-            connection.send(("error", exc.code))
+            payload = _encode_parser_envelope(("error", exc.code))
+            if payload is not None:
+                connection.send_bytes(payload)
         except (BrokenPipeError, EOFError, OSError):
             pass
     except TimeoutError:
         try:
-            connection.send(("error", "parser_timeout"))
+            payload = _encode_parser_envelope(("error", "parser_timeout"))
+            if payload is not None:
+                connection.send_bytes(payload)
         except (BrokenPipeError, EOFError, OSError):
             pass
     except BaseException:
@@ -558,8 +665,10 @@ class ProcessParserRunner:
                     raise ParserTimeoutError()
                 if parent.poll(min(remaining, 0.05)):
                     try:
-                        envelope = parent.recv()
-                    except (EOFError, OSError, ValueError) as exc:
+                        envelope = _decode_parser_envelope(
+                            parent.recv_bytes(MAX_PARSER_RESULT_BYTES)
+                        )
+                    except (EOFError, OSError, ValueError, TypeError, pickle.UnpicklingError) as exc:
                         raise ParseError() from exc
                     break
                 if not process.is_alive():
@@ -567,8 +676,10 @@ class ProcessParserRunner:
                     # close without an envelope; that is a safe parse error.
                     if parent.poll(0):
                         try:
-                            envelope = parent.recv()
-                        except (EOFError, OSError, ValueError) as exc:
+                            envelope = _decode_parser_envelope(
+                                parent.recv_bytes(MAX_PARSER_RESULT_BYTES)
+                            )
+                        except (EOFError, OSError, ValueError, TypeError, pickle.UnpicklingError) as exc:
                             raise ParseError() from exc
                     else:
                         raise ParseError()
@@ -587,10 +698,7 @@ class ProcessParserRunner:
                 if code == "validation_error":
                     raise ParseError("validation_error", "Document could not be parsed safely.")
                 raise ParseError()
-            result = envelope[1]
-            if not isinstance(result, ParsedDocument):
-                raise ParseError()
-            return result
+            return _validate_parsed_document(envelope[1])
         finally:
             if process.is_alive():
                 self._terminate(process)
@@ -634,9 +742,12 @@ def execute_parser(
         # A custom runner is an untrusted boundary. Never leak its exception
         # text or turn an adapter failure into a successful parse.
         raise ParseError() from exc
-    if not isinstance(result, ParsedDocument):
-        raise ParseError()
-    return result
+    try:
+        return _validate_parsed_document(result)
+    except ParseError:
+        raise
+    except Exception as exc:
+        raise ParseError() from exc
 
 
 def _read_probe(path: Path) -> bytes:

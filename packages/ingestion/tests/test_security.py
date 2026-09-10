@@ -20,6 +20,7 @@ from rick_ingestion import (  # noqa: E402
     ControlledPdfParser,
     FilenameValidationError,
     MimeMismatchError,
+    MAX_PARSED_TEXT_CHARS,
     ParseError,
     ParsedDocument,
     ParserLimits,
@@ -54,6 +55,11 @@ class _BlockingParser:
     def parse(self, path: Path, *, workspace_id: str) -> ParsedDocument:
         time.sleep(2.0)
         return ParsedDocument(text="late")
+
+
+class _OversizedParser:
+    def parse(self, path: Path, *, workspace_id: str) -> ParsedDocument:
+        return ParsedDocument(text="x" * (MAX_PARSED_TEXT_CHARS + 1))
 
 
 @pytest.mark.parametrize(
@@ -301,6 +307,21 @@ def test_process_runner_parses_in_a_fresh_child(tmp_path: Path) -> None:
     assert result.text == "isolated text\n"
 
 
+def test_process_runner_rejects_an_oversized_result_before_transport(tmp_path: Path) -> None:
+    path = _write(tmp_path / "payload.txt", b"payload\n")
+
+    with pytest.raises(ParseError) as error:
+        execute_parser(
+            _OversizedParser(),
+            path,
+            workspace_id="workspace",
+            runner=ProcessParserRunner(),
+            timeout_seconds=5,
+        )
+
+    assert error.value.code == "request_too_large"
+
+
 def test_process_runner_hard_stops_a_blocking_parser(tmp_path: Path) -> None:
     path = _write(tmp_path / "payload.txt", b"payload\n")
 
@@ -349,3 +370,11 @@ def test_custom_runner_failure_and_invalid_result_fail_closed() -> None:
 
     with pytest.raises(ParseError):
         execute_parser(object(), Path("payload.txt"), workspace_id="workspace", runner=InvalidRunner())
+
+    class OversizedRunner:
+        def run(self, *args, **kwargs):
+            return ParsedDocument(text="x" * (MAX_PARSED_TEXT_CHARS + 1))
+
+    with pytest.raises(ParseError) as error:
+        execute_parser(object(), Path("payload.txt"), workspace_id="workspace", runner=OversizedRunner())
+    assert error.value.code == "request_too_large"
