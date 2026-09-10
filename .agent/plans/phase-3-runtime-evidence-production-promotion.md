@@ -43,6 +43,7 @@ preserving the frozen Gauntlet bar, Phase 2 history and legacy repositories.
 - [x] (2026-09-10) Reject invalid UTF-8 at source candidate bacfc9ee569e07357d3412f3588f4a7bda554c73 (tree 4c05c1348224f1cefe845d891d62634d9981cc9b): remove the permissive TXT Latin-1 fallback and convert decoder failures into a bounded `validation_error` for both TXT and Markdown; ingestion security/admission/full tests pass 102, focused file-security/runtime adapter tests 79, and API/State-of-Art suites remain green at 437/295 while external runtime evidence remains blocked.
 - [x] (2026-09-10) Remove Pickle from the parser result wire at source candidate 714355e346adf900960725bb863b99cbfda52900 (tree b3456248f0774ed7a4bb99b1d81753bb03457673): return values now cross the child pipe as a bounded versioned JSON envelope, and the parent rejects legacy or malicious Pickle payloads; ingestion security/admission/full tests pass 103, focused file-security/runtime adapter tests 79, and API/State-of-Art suites remain green at 437/295 while external runtime evidence remains blocked.
 - [x] (2026-09-10) Bound durable-job JSON decoding at source candidate b3229685b432be6c4313609d95f56b316ecc0885 (tree 43cf3eff8bfbcca3500887c729d5ddd6d99364d5): reject database JSON above 256 KiB, non-finite constants and recursive decoder failures as corruption before job-contract parsing; worker tests pass 50, while API/State-of-Art suites remain green at 437/295 and external runtime evidence remains blocked.
+- [x] (2026-09-10) Bound legacy durable-queue payload decoding at source candidate 594a8474a600f78fe09aa5d3ff52db5ae8c5e02e (tree d4de0a8d3ef4487b4377bcdc143c0719bd9575a7): SQLite and PostgreSQL queue reads now cap persisted JSON at 32 KiB, reject non-finite constants and malformed/recursive or non-string payload values through the write contract; focused queue tests pass 14, the full worker suite 52 and API/State-of-Art suites 437/295, while live runtime evidence remains blocked.
 - [ ] (2026-09-09) Execute the disposable runtime; currently blocked by Docker daemon access and unresolved external authority.
 - [ ] (2026-09-09) Complete independent runtime/design/security reviews and the human Go/No-Go.
 
@@ -194,8 +195,8 @@ made.
 ## Current candidate closure
 
 The current source implementation candidate is
-b3229685b432be6c4313609d95f56b316ecc0885 with tree
-43cf3eff8bfbcca3500887c729d5ddd6d99364d5. It contains the corrected
+594a8474a600f78fe09aa5d3ff52db5ae8c5e02e with tree
+d4de0a8d3ef4487b4377bcdc143c0719bd9575a7. It contains the corrected
 PostgreSQL worker gate, canonical two-process Redis/API HTTP gate, strict
 release artifact postconditions and manifest consistency checks, plus bounded
 same-run CI envelopes with redacted raw artifacts, exact workflow/run/ref/SHA
@@ -216,7 +217,8 @@ before child transport through a versioned JSON-only envelope, never
 unpickles child-controlled bytes, and rejects invalid UTF-8 with a bounded
 parser error instead of silently decoding text with a permissive fallback,
 and bounds durable-job JSON decoding before applying the canonical job
-contract. The final
+contract, plus bounded legacy SQLite/PostgreSQL queue payload decoding at
+the adapter read boundary. The final
 documentation/control-plane follow-up is bound to the resulting clean
 checkout, while live provider/runtime evidence remains external.
 The provider, Professor, API and State-of-Art suites have 64, 36, 437 and 295

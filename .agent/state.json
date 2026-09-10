@@ -14,7 +14,7 @@
   "active_execplan": ".agent/plans/phase-3-runtime-evidence-production-promotion.md",
   "active_task": "PH3-2-LAB-READINESS",
   "verification_state": "PARTIAL",
-  "repository_state": "Current source candidate is b3229685b432be6c4313609d95f56b316ecc0885 (tree 43cf3eff8bfbcca3500887c729d5ddd6d99364d5); it includes a JSON-only versioned parser result envelope that never unpickles child-controlled bytes, fail-closed invalid UTF-8 rejection, bounded durable-job JSON decoding before contract parsing, and the prior provider, Professor, observability, API and release-boundary hardening. Clean local evidence currently passes worker 50, PostgreSQL adapter 15, ingestion 103, focused file-security/runtime 79, provider 64, Professor 36, API 437 and State-of-Art 295 tests; the next integrated packet must bind this candidate and remains expected to classify STATE_OF_ART_CANDIDATE with external blockers. No State of Art, AAA or Triple AAA promotion claim is made.",
+  "repository_state": "Current source candidate is 594a8474a600f78fe09aa5d3ff52db5ae8c5e02e (tree d4de0a8d3ef4487b4377bcdc143c0719bd9575a7); it includes a JSON-only versioned parser result envelope that never unpickles child-controlled bytes, fail-closed invalid UTF-8 rejection, bounded durable-job JSON decoding before contract parsing, bounded legacy SQLite/PostgreSQL queue payload decoding, and the prior provider, Professor, observability, API and release-boundary hardening. Clean local evidence currently passes queue-focused 14, worker 52, ingestion 103, focused file-security/runtime 79, provider 64, Professor 36, API 437 and State-of-Art 295 tests; the next integrated packet must bind this candidate and remains expected to classify STATE_OF_ART_CANDIDATE with external blockers. No State of Art, AAA or Triple AAA promotion claim is made.",
   "instruction_scope_refs": [
     ".agent/PLANS.md",
     "cvg-master-rag-v2/AGENTS.md",
@@ -23,8 +23,8 @@
     "docs/plans/phase-3-runtime-evidence-production-promotion.md"
   ],
   "last_gate_record": ".agent/gates/phase-3-2-lab-readiness-implementation-ready.json",
-  "last_event_id": "EVT-PH3-2-JOBS-JSON-BOUNDARY-20260910",
-  "state_revision": 275,
+  "last_event_id": "EVT-PH3-2-QUEUE-JSON-BOUNDARY-20260910",
+  "state_revision": 276,
   "next_gate": "VERIFIED",
   "active_action_id": "PH3-2-LAB-READINESS:WAIT_RUNTIME",
   "blocked_by": [
@@ -32,5 +32,5 @@
     "Disposable runtime secrets and endpoint authority are unavailable"
   ],
   "human_approval_required": [],
-  "updated_at": "2026-09-10T13:53:49Z"
+  "updated_at": "2026-09-10T14:03:49Z"
 }

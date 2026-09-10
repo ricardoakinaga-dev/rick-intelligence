@@ -569,3 +569,20 @@ API matrix **437**, and the State-of-Art suite **295**; compilation and
 approved disposable PostgreSQL runtime, crash/fencing drill, independent
 review and promotion authority remain unavailable; promotion remains
 disallowed.
+
+## 37. Legacy queue payload JSON decoding closure — 2026-09-10
+
+Source candidate `594a8474a600f78fe09aa5d3ff52db5ae8c5e02e` (tree
+`d4de0a8d3ef4487b4377bcdc143c0719bd9575a7`) closes the matching boundedness
+gap in the legacy SQLite and PostgreSQL queue adapters. Persisted payload JSON
+is capped at 32 KiB before parsing, `NaN`/`Infinity` constants are rejected,
+recursive or malformed values fail closed, and decoded mappings must pass the
+existing whitelist and bounded-string write contract before reaching a
+`QueueRecord`.
+
+The focused queue slice passes **14**, the full worker suite **52**, the API
+matrix **437**, and the State-of-Art suite **295**; compilation and
+`git diff --check` pass. This is local queue-boundary evidence only. The
+approved disposable PostgreSQL runtime, distributed crash/fencing drill,
+independent review and promotion authority remain unavailable; promotion
+remains disallowed.

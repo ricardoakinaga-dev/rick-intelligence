@@ -19,6 +19,14 @@ transactions, and every mutation requires that exact token. Expired leases are r
 bounded exponential backoff or moved to the dead-letter state. Payloads reject
 arbitrary fields and raw content.
 
+Reads apply the same payload contract as writes: persisted JSON is capped at
+32 KiB before parsing, non-finite constants and malformed/recursive values are
+rejected, and only bounded string fields from the whitelist are returned. The
+legacy SQLite and PostgreSQL queue adapters therefore do not turn corrupted
+rows into arbitrary mappings; invalid stored payloads become an empty bounded
+payload at the adapter boundary and remain subject to downstream required-field
+validation.
+
 The local file is WAL-backed and private (`0700` parent, `0600` database). A
 reopened queue can recover a leased job after its lease expires. This proves a
 restartable local primitive only. It is not a distributed queue, does not

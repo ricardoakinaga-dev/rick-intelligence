@@ -777,3 +777,21 @@ matrix **437**, and the State-of-Art suite **295**; compilation and
 approved disposable PostgreSQL runtime, crash/fencing drill, independent
 review, sealed packet and human Go-No-Go remain unavailable; promotion
 remains disallowed.
+
+## 38. Legacy queue payload JSON decoding closure — 2026-09-10
+
+Source implementation candidate `594a8474a600f78fe09aa5d3ff52db5ae8c5e02e`
+(tree `d4de0a8d3ef4487b4377bcdc143c0719bd9575a7`) closes a concrete queue
+read-boundary gap. The SQLite and PostgreSQL legacy queue decoders now cap
+persisted payload JSON at 32 KiB before decoding, reject non-finite constants,
+recursive/malformed JSON and non-string values through the existing whitelist
+and bounded-string contract, and never expose arbitrary decoded mappings to a
+`QueueRecord`. The adversarial regression covers oversized and non-finite
+rows in both adapters.
+
+The focused queue slice passes **14**, the full worker suite **52**, the API
+matrix **437**, and the State-of-Art suite **295**; compilation and
+`git diff --check` pass. This is local queue-boundary evidence only. The
+approved disposable PostgreSQL/runtime, distributed crash/fencing drill,
+provider/corpus, independent review, sealed packet and human Go/No-Go remain
+unavailable; promotion remains disallowed.

@@ -99,6 +99,13 @@ the bounded job contract at source candidate
 `b3229685b432be6c4313609d95f56b316ecc0885`. This is a corruption/DoS
 containment improvement, not evidence of a live database or fencing run.
 
+The legacy SQLite/PostgreSQL queue readers at source candidate
+`594a8474a600f78fe09aa5d3ff52db5ae8c5e02e` apply the same bounded payload
+contract on reads: persisted JSON is capped at 32 KiB, non-finite and malformed
+values are rejected, and arbitrary/non-string mappings are not returned as job
+payloads. This is local corruption/DoS containment only; it does not replace
+the required live PostgreSQL, multi-worker or crash-recovery evidence.
+
 ## 10. Worker A/B behavior
 
 Two real worker processes must prove ownership, heartbeat fencing, stale ACK
