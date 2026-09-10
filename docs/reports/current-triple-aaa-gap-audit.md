@@ -612,14 +612,16 @@ the next documentation/control-plane commit requires another integrated run.
 
 ## 28. Streaming tool-call gate closure — 2026-09-10
 
-Source implementation candidate `e6aba35afcb2fb0fe277494b63742decb6b4390d`
-(tree `779bce9e5774cd0a705012bafac83b2e0e47e963`) closes a remaining local
-Phase 3.8 evidence gap. The provider runtime gate now performs a separate
+Source implementation candidate `547518d26e6527ccb1803fe7eb0da37cccab3bc3`
+(tree `82a0d1ab60ad978c0ffa20e91377580691a151b7`) closes remaining local
+Phase 3.8 evidence gaps. The provider runtime gate now performs a separate
 streaming function-tool probe, reassembles typed deltas by index, rejects
 unexpected extra calls and conflicting id/type/name fragments, requires a
 terminal finish reason and validates the assembled arguments as a strict JSON
-object with the expected semantic value. The hermetic endpoint fixture emits
-split tool arguments so the same path is exercised locally.
+object with the expected semantic value. It also verifies that the resilient
+provider rejects an over-budget prompt before any network I/O. The hermetic
+endpoint fixture emits split tool arguments so the same path is exercised
+locally.
 
 The focused provider runtime fixture passes **3 tests**; the provider suite
 passes **59** and the provider contract suite passes **6**. This is local

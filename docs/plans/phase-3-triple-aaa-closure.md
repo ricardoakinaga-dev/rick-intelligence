@@ -428,13 +428,14 @@ subsequent documentation/control-plane commit requires a fresh packet.
 
 ## 27. Streaming tool-call gate closure — 2026-09-10
 
-Source candidate `e6aba35afcb2fb0fe277494b63742decb6b4390d` (tree
-`779bce9e5774cd0a705012bafac83b2e0e47e963`) extends the provider runtime gate
+Source candidate `547518d26e6527ccb1803fe7eb0da37cccab3bc3` (tree
+`82a0d1ab60ad978c0ffa20e91377580691a151b7`) extends the provider runtime gate
 with an explicit streaming function-tool assertion. It consumes split typed
 deltas, rejects conflicting fragments and unexpected indexes, and validates a
-strict assembled JSON object and terminal finish reason. The hermetic fixture
-and focused gate tests pass **3**, while the provider and contract suites pass
-**59** and **6**. This improves local Phase 3.8 evidence coverage but does not
-replace approved provider, corpus, runtime, independent-review or promotion
-evidence; the integrated packet must be regenerated after the subsequent
-documentation/control-plane commit.
+strict assembled JSON object and terminal finish reason. The same gate also
+asserts that the resilient provider rejects a prompt over its context budget
+before I/O. The hermetic fixture and focused gate tests pass **3**, while the
+provider and contract suites pass **59** and **6**. This improves local Phase
+3.8 evidence coverage but does not replace approved provider, corpus, runtime,
+independent-review or promotion evidence; the integrated packet must be
+regenerated after the subsequent documentation/control-plane commit.
