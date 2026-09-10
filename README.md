@@ -27,9 +27,11 @@ externally blocked. No production,
 that is `NOT_RUN`, `BLOCKED_EXTERNAL` or failed keeps the candidate below
 promotion.
 
-The current audit is
-[`current-triple-aaa-gap-audit.md`](docs/reports/current-triple-aaa-gap-audit.md)
-and the execution plan is
+The active runtime-closure audit is
+[`triple-aaa-runtime-closure-current-audit.md`](docs/reports/triple-aaa-runtime-closure-current-audit.md);
+the predecessor audit remains
+[`current-triple-aaa-gap-audit.md`](docs/reports/current-triple-aaa-gap-audit.md).
+The execution plan is
 [`phase-3-triple-aaa-closure.md`](docs/plans/phase-3-triple-aaa-closure.md).
 The runtime-evidence execution plan remains
 [`phase-3-runtime-evidence-production-promotion.md`](docs/plans/phase-3-runtime-evidence-production-promotion.md).
