@@ -19,7 +19,7 @@ artifact-set digest, packet hash and quality-bar hash must be read from that
 packet together. This report never substitutes a manually typed SHA and is
 invalid if the packet is absent, stale, dirty or inconsistent with the exact
 candidate. The latest source-closure packet and its hashes are recorded in
-section 21 of the current gap audit.
+section 22 of the current gap audit.
 
 ## 3. Prompt provenance
 
@@ -166,18 +166,22 @@ SLO claim.
 
 ## 22. Frontend and accessibility
 
-The real API/browser matrix must cover login, chat, upload, documents,
-sources, jobs, offline, interruption, permission and degraded provider states
-at 375/768/1440. Keyboard/focus, axe, screen-reader, zoom, contrast,
-reduced-motion, touch, console/network and native screenshot evidence require
-a fresh independent design review.
+The current managed API/browser packet passes login, authenticated workbench
+and chat at 375/768/1440, with keyboard/focus, axe, contrast, reduced-motion,
+touch and console/request checks passing. It is real non-intercepted local
+evidence; it does not prove production runtime or independent visual approval.
+Upload, documents, sources, jobs, offline, interruption, permission and
+degraded provider states plus a fresh independent design review remain
+required for promotion.
 
 ## 23. Supply chain and containers
 
-The exact image digests, dependency/license/secret scans, SBOM, provenance,
-signatures, non-root/read-only/capability/resource/health hardening and
-rollback digest must be current. The prepared packet is not a built-image
-PASS.
+Source lockfiles, source SBOM, secret and license checks pass in the current
+packet. The exact image digests, image SBOM, provenance, signatures,
+non-root/read-only/capability/resource/health hardening and rollback digest
+must still be current. `container-digests` and `container-sbom` are
+`NOT_RUN`, so the scoped supply lane remains `BLOCKED_EXTERNAL`; the packet
+is not a built-image PASS.
 
 ## 24. Independent reviews
 
@@ -254,7 +258,10 @@ runtime and promotion gates passing.
 runtime configuration, rerun the current adapters and real service lanes,
 rebind every artifact to the resulting SHA/tree, obtain fresh independent
 review and an authorized sealed Go/No-Go decision. The current packet's
-PostgreSQL, Redis, provider, frontend, supply-chain and release envelopes are
-fresh `BLOCKED_EXTERNAL` observations; none is a promotion signal. The
-promotion engine correctly returns `2` for this external-only block; local
-failures and malformed supplied packets remain `1`.
+PostgreSQL, Redis, provider and release envelopes are fresh
+`BLOCKED_EXTERNAL` observations. Its scoped frontend-e2e and accessibility
+lanes are PASS, while the combined frontend/supply envelope and supply-chain
+lane remain `BLOCKED_EXTERNAL` because image evidence is absent; none is a
+promotion signal. The promotion engine correctly returns `2` for this
+external-only block; local failures and malformed supplied packets remain
+`1`.

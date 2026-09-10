@@ -315,3 +315,23 @@ Phase 3 evidence verifier reject non-promotable current evidence. Runtime,
 provider/corpus, image, recovery, independent-review, sealing and human
 promotion lanes remain required. The packet is current diagnostic evidence
 only and cannot authorize promotion.
+
+## 20. Scoped frontend evidence and single-adapter projection — 2026-09-10
+
+Candidate `fe0f06ccc4deed9a56e1a806842b71d3da8ace66` (tree
+`0080bb23a61486e538fbf5876c5bd38e81a23ab1`) now runs the shared frontend,
+accessibility and supply adapter once and derives three independent lane
+observations from the same current envelope. The fresh clean integrated
+packet (`.runtime/phase-3/triple-aaa-verify.json`, SHA-256
+`ca75447123b1d006159a549b26eed86737d7d9861fe076052cd08000febf627a`)
+classified the candidate as `STATE_OF_ART_CANDIDATE` / JSON exit `2` with
+17 PASS and 24 `BLOCKED_EXTERNAL` results.
+
+The real managed API/browser run passed login, authenticated workbench and
+chat at 375/768/1440 plus keyboard/focus, axe, contrast, reduced-motion,
+touch and console/request checks. The integrated lanes now truthfully report
+`frontend-e2e=PASS`, `frontend-accessibility=PASS`, and
+`supply-chain=BLOCKED_EXTERNAL` because immutable container digest and image
+SBOM evidence was not run. This does not supply production runtime,
+independent visual review, image provenance/signing, external service
+authority, sealed promotion evidence or human Go/No-Go.

@@ -109,9 +109,9 @@ strongest current state supported by evidence, not an aspiration.
 | Chaos and distributed failure | `NOT_RUN` | resilience seams/runbooks | bounded local failure tests | No fault-injection run | No chaos reviewer | Lab/authority unavailable | P1 | Worker/Redis/Qdrant/Postgres/S3/provider/network faults show no corruption/duplicates and bounded recovery |
 | Soak | `NOT_RUN` | worker/resource instrumentation | no sustained run | No short/extended soak | No operations reviewer | Lab/observation window unavailable | P1 | Memory/threads/processes/connections/queue/retry/latency/starvation remain within declared budgets |
 | Performance | `NOT_RUN` | benchmark harness and SLO budgets | local benchmark preparation | No 1/10/50/100 concurrency runtime | No performance reviewer | Lab/data/observation window unavailable | P1 | API/retrieval/chat/ingestion/worker p50/p95/p99, throughput, errors, CPU and RAM pass environment-specific thresholds |
-| Frontend runtime | `PARTIAL` | `apps/web` and API integration | lint/type/build and prior smoke evidence | No fresh real API matrix | No current visual reviewer | Browser/runtime/API unavailable for current packet | P1 | login/chat/upload/documents/sources/jobs/offline/interruption/permission/worker/provider states pass |
-| Accessibility and visual QA | `PARTIAL` | web components/styles and visual docs | static frontend checks | No current 375/768/1440 keyboard/axe/screen-reader render packet | No fresh independent visual review | Browser evidence unavailable | P1 | native viewport/state matrix, keyboard/focus/axe/zoom/contrast/reduced-motion/touch and independent review pass |
-| Supply chain and container hardening | `PARTIAL` | workflows, lockfiles, Dockerfiles | existing partial static checks | No current SBOM/image/provenance scan | No independent supply-chain review | Tooling/signing/runtime unavailable | P1 | dependency/secret/container/license/SBOM/image digest/signature and non-root/read-only/capability checks pass |
+| Frontend runtime | `PARTIAL` | `apps/web` and API integration | lint/type/build and current managed API/browser packet | Real API-backed 375/768/1440 login/workbench/chat states pass; production runtime is not claimed | No current independent visual reviewer | Production authority and fresh reviewer unavailable | P1 | login/chat/upload/documents/sources/jobs/offline/interruption/permission/worker/provider states pass |
+| Accessibility and visual QA | `PARTIAL` | web components/styles and visual docs | current browser keyboard/focus/axe/contrast/reduced-motion/touch packet | Real local browser checks pass at 375/768/1440; independent visual approval is absent | No fresh independent visual review | Reviewer and production authority unavailable | P1 | native viewport/state matrix, keyboard/focus/axe/zoom/contrast/reduced-motion/touch and independent review pass |
+| Supply chain and container hardening | `PARTIAL` | workflows, lockfiles, Dockerfiles | source SBOM, lockfile, secret and license checks pass | Image digest and image SBOM are `NOT_RUN`; scoped supply lane is `BLOCKED_EXTERNAL` | No independent supply-chain review | Candidate image/tool/signing authority unavailable | P1 | dependency/secret/container/license/SBOM/image digest/signature and non-root/read-only/capability checks pass |
 | Independent reviews and human decision | `NOT_RUN` | review packet/report contracts | historical scoped reviews | No current full packet | No final Go/No-Go | Required exact packet and authority absent | P1 | Architecture, security, runtime, DB, observability, recovery, RAG, frontend and operations reviewers attempt rejection and authority signs exact SHA |
 | Promotion engine | `PARTIAL` | `scripts/state_of_art/triple_aaa_verify.py` and release verifier | fail-closed negative paths | Current result cannot promote | Local review only | Full mandatory evidence absent | P0 | Classification is derived automatically; return `0` only all mandatory PASS, `2` external block, `1` failure |
 | Advanced retrieval/calibration | `NOT_RUN` | retrieval/evaluation foundations | no post-baseline runtime gate | Intentionally deferred | None | P0/P1 critical gates open | P2 | Enable only after baseline runtime, citation and promotion gates are current |
@@ -169,6 +169,40 @@ packet is `STATE_OF_ART_CANDIDATE`, has 15 foundation lanes passed, and has
 no invalid/failing gate result. All non-pass mandatory lanes remain
 `BLOCKED_EXTERNAL`, so promotion remains disallowed and no State of Art, AAA
 or Triple AAA claim is made.
+
+## 22. Scoped frontend evidence and single-adapter projection — 2026-09-10
+
+The clean source candidate `fe0f06ccc4deed9a56e1a806842b71d3da8ace66`
+(tree `0080bb23a61486e538fbf5876c5bd38e81a23ab1`, checkout fingerprint
+`8f48d520b23fbfdf4a79c33aa94040951e36adf2cbbde6dd44720910898acfc2`) fixes a
+diagnostic contract defect in the integrated verifier. The combined frontend,
+accessibility and supply adapter now executes once per packet and projects
+independent scoped observations from its current envelope. A blocked image
+evidence check therefore cannot relabel a real browser/API PASS as a browser
+failure; the supply lane remains separately `BLOCKED_EXTERNAL`.
+
+The fresh clean packet at
+`.runtime/phase-3/triple-aaa-verify.json` (SHA-256
+`ca75447123b1d006159a549b26eed86737d7d9861fe076052cd08000febf627a`) bound
+artifact set
+`4e5ec313ea19b00f9e417a1e74a152ddf00614982437193717f5c0be02cc1329` and
+classified the candidate as `STATE_OF_ART_CANDIDATE` with JSON and Make exit
+`2`. It contains **17 PASS** and **24 BLOCKED_EXTERNAL** results. The current
+scoped observations are:
+
+- `frontend-e2e`: `PASS`, with source adapter exit `2` preserved as diagnostic metadata;
+- `frontend-accessibility`: `PASS`, with the same scoped projection;
+- `supply-chain`: `BLOCKED_EXTERNAL`, because `container-digests` and `container-sbom` are `NOT_RUN`.
+
+The managed local browser/API evidence is real and non-intercepted at
+375/768/1440: login, authenticated workbench and chat states passed, as did
+keyboard/focus, axe, contrast, reduced-motion, touch and console/request
+checks. Source lockfiles, source SBOM, secret scan and license checks passed.
+This is local/API-backed evidence, not production runtime evidence or fresh
+independent visual approval. Docker daemon access, immutable image references,
+image SBOM/provenance/signing, full service runtime, corpus/provider
+authority, independent reviewers, sealed packet and human Go/No-Go remain
+external blockers. No State of Art, AAA or Triple AAA claim is made.
 
 ## 5. Priority and dependency order
 
