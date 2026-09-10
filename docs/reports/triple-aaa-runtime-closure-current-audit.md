@@ -235,3 +235,18 @@ configuration was absent; the independent Docker probe still returns
 permission denied for `/run/docker.sock`. No host services were adopted and no
 runtime, distributed failure, recovery, independent-review or sealed-promotion
 claim is made. Promotion remains **NO-GO**.
+
+## 70. Complete local CI envelope coverage — 2026-09-10
+
+Source candidate `736180e71e00023404520f1ef0814352aa87a770` (tree
+`04a3d242b848a349c4b83079edbadf42fb5aac8a`) binds the RAG-EVAL and FRONTEND
+workflow jobs to the bounded `ci_lane_evidence.py` envelope. The release job
+downloads those same-run artifacts; the manifest treats RAG-EVAL as the local
+`integration` gate and uses the frontend envelope only as a supplement to the
+separate live browser/accessibility lanes. This prevents a direct command's
+exit code from being mistaken for a typed promotion artifact.
+
+Focused release-manifest and CI-envelope tests pass (**40** tests combined).
+This closes the local CI evidence-shape gap without changing runtime status;
+Docker, live services, remote provenance, independent review and promotion
+sealing remain unavailable.

@@ -55,8 +55,10 @@ validation, contract/security regression, Professor, Locker, lint, typecheck,
 Python compilation and the frontend production build. Focused current suites
 also pass for observability, rate limiting, provider, Qdrant, S3 transport and
 storage. The canonical FAST, UNIT, CONTRACT, SECURITY, RAG_EVAL, FRONTEND,
-SUPPLY_CHAIN and release envelope has no current same-SHA remote result in this
-environment; skipped or unavailable lanes remain non-promotable.
+SUPPLY_CHAIN and PHASE3_EVIDENCE workflow now records RAG-EVAL and FRONTEND
+through the same bounded CI-envelope helper as the other local lanes. There is
+no current same-SHA remote result in this environment; skipped or unavailable
+lanes remain non-promotable.
 
 ## 6. PostgreSQL
 
