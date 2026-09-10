@@ -81,7 +81,7 @@ Run `make help` for the complete list.
 | `make bootstrap` | Installs from the preserved lockfiles and prepares the existing CVG local runtime through its current bootstrap script. |
 | `make validate` | Checks current root package boundaries, protected legacy paths, and repository layout. |
 | `make test-fast` | Runs the root validator and focused CVG, Professor, and Locker regression suites. |
-| `make test` | Runs the available full component suites, including the existing frontend smoke command; known Phase 0.6 corpus failures remain visible. |
+| `make test` | Runs the available full component suites, including the existing frontend smoke command; when the approved CVG dataset is unavailable, that lane is explicitly `BLOCKED_EXTERNAL` and the independent component lanes still run. The command returns `2` for that external block and never fabricates or silently skips the corpus. |
 | `make test-integration` | Uses only disposable loopback Qdrant/Redis state and the existing Phase 0.5 integration probes. |
 | `make lint` | Runs the root static checks, Python compilation, JavaScript syntax check, and existing frontend lint. |
 | `make typecheck` | Runs the existing TypeScript checks/build compiler and Python syntax/import compilation; no new Python type checker is introduced yet. |
