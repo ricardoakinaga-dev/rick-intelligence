@@ -235,6 +235,28 @@
         }
       }
     },
+    "/metrics": {
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "Metrics",
+        "description": "Expose only bounded process metrics for an internal Prometheus scrape.\n\nThe exposition contains counters, readiness state and bounded latency\nsummaries; it never includes request payloads, identities or credentials.\nAuthentication remains on the administrative JSON and Prometheus routes,\nwhile the private Compose network restricts this scrape target.",
+        "operationId": "metrics_metrics_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/auth/login": {
       "post": {
         "tags": [
