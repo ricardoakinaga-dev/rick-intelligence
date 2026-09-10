@@ -41,12 +41,53 @@ class _ProviderHandler(BaseHTTPRequestHandler):
         length = int(self.headers.get("Content-Length", "0"))
         body = json.loads(self.rfile.read(length))
         if self.path.endswith("/chat/completions") and body.get("stream") is True:
-            encoded = (
-                f'data: {json.dumps({"model": body["model"], "choices": [{"delta": {"content": "stream "}, "finish_reason": None}]})}\n\n'
-                f'data: {json.dumps({"model": body["model"], "choices": [{"delta": {"content": "acknowledged"}, "finish_reason": None}]})}\n\n'
-                f'data: {json.dumps({"model": body["model"], "choices": [{"delta": {}, "finish_reason": "stop"}]})}\n\n'
-                "data: [DONE]\n\n"
-            ).encode("utf-8")
+            if body.get("tools"):
+                events = (
+                    {
+                        "model": body["model"],
+                        "choices": [
+                            {
+                                "delta": {
+                                    "tool_calls": [
+                                        {
+                                            "index": 0,
+                                            "id": "call-phase11-stream",
+                                            "type": "function",
+                                            "function": {
+                                                "name": "report_status",
+                                                "arguments": '{"sta',
+                                            },
+                                        }
+                                    ]
+                                },
+                                "finish_reason": None,
+                            }
+                        ],
+                    },
+                    {
+                        "model": body["model"],
+                        "choices": [
+                            {
+                                "delta": {
+                                    "tool_calls": [
+                                        {
+                                            "index": 0,
+                                            "function": {"arguments": 'tus":"ok"}'},
+                                        }
+                                    ]
+                                },
+                                "finish_reason": "stop",
+                            }
+                        ],
+                    },
+                )
+            else:
+                events = (
+                    {"model": body["model"], "choices": [{"delta": {"content": "stream "}, "finish_reason": None}]},
+                    {"model": body["model"], "choices": [{"delta": {"content": "acknowledged"}, "finish_reason": None}]},
+                    {"model": body["model"], "choices": [{"delta": {}, "finish_reason": "stop"}]},
+                )
+            encoded = "".join(f"data: {json.dumps(event)}\n\n" for event in events).encode("utf-8") + b"data: [DONE]\n\n"
             self.send_response(200)
             self.send_header("Content-Type", "text/event-stream")
             self.send_header("Content-Length", str(len(encoded)))
@@ -169,6 +210,7 @@ def test_real_openai_compatible_endpoint_passes_semantic_checks(provider_url: st
         "json-response-contract",
         "tool-call-contract",
         "streaming-contract",
+        "streaming-tool-call-contract",
         "embedding-contract",
     }
     assert production_safe is False

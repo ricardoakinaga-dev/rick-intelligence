@@ -41,6 +41,28 @@ class _InvalidConfiguration(Exception):
     """The supplied provider configuration violates the gate contract."""
 
 
+def _report_status_tool() -> dict[str, object]:
+    """Return the bounded function tool used by the provider contract probe."""
+
+    return {
+        "type": "function",
+        "function": {
+            "name": "report_status",
+            "description": "Report the provider health status.",
+            "parameters": {
+                "type": "object",
+                "properties": {"status": {"type": "string"}},
+                "required": ["status"],
+                "additionalProperties": False,
+            },
+        },
+    }
+
+
+def _reject_json_constant(value: str) -> None:
+    raise ValueError(f"non-finite JSON constant: {value}")
+
+
 @dataclass(frozen=True)
 class _Endpoint:
     parsed: SplitResult
@@ -175,6 +197,7 @@ async def _run_checks(
     streaming_ok = False
     json_ok = False
     tools_ok = False
+    streaming_tools_ok = False
     try:
         try:
             provider_health_ok = await client.health_check()
@@ -226,7 +249,7 @@ async def _run_checks(
                 response_format={"type": "json_object"},
                 correlation_id=f"phase11-provider-json-{uuid.uuid4().hex[:12]}",
             )
-            decoded = json.loads(structured.content)
+            decoded = json.loads(structured.content, parse_constant=_reject_json_constant)
             json_ok = bool(structured.model == config.chat_model and isinstance(decoded, dict))
             assertions.append(
                 _Assertion(
@@ -249,30 +272,21 @@ async def _run_checks(
                     )
                 ],
                 temperature=0,
-                tools=[
-                    {
-                        "type": "function",
-                        "function": {
-                            "name": "report_status",
-                            "description": "Report the provider health status.",
-                            "parameters": {
-                                "type": "object",
-                                "properties": {"status": {"type": "string"}},
-                                "required": ["status"],
-                                "additionalProperties": False,
-                            },
-                        },
-                    }
-                ],
+                tools=[_report_status_tool()],
                 correlation_id=f"phase11-provider-tool-{uuid.uuid4().hex[:12]}",
             )
             tool_call = (tool_result.tool_calls or [None])[0]
-            decoded_arguments = json.loads(tool_call.function.arguments) if tool_call is not None else None
+            decoded_arguments = (
+                json.loads(tool_call.function.arguments, parse_constant=_reject_json_constant)
+                if tool_call is not None
+                else None
+            )
             tools_ok = bool(
                 tool_result.model == config.chat_model
                 and tool_call is not None
                 and tool_call.function.name == "report_status"
                 and isinstance(decoded_arguments, dict)
+                and decoded_arguments.get("status") == "ok"
             )
             assertions.append(
                 _Assertion(
@@ -318,6 +332,78 @@ async def _run_checks(
             assertions.append(_Assertion("streaming-contract", FAIL, "live streaming assertion failed"))
 
         try:
+            streamed_tool_calls: dict[int, dict[str, str]] = {}
+            stream_finish_reason: str | None = None
+            stream_tool_conflict = False
+            stream_tool_extra = False
+            stream = client.chat_completion_stream(
+                messages=[
+                    ProviderMessage(
+                        role="user",
+                        content="Use the report_status function with status=ok.",
+                    )
+                ],
+                temperature=0,
+                tools=[_report_status_tool()],
+                correlation_id=f"phase11-provider-stream-tool-{uuid.uuid4().hex[:12]}",
+            )
+            async for chunk in stream:
+                if chunk.finish_reason:
+                    stream_finish_reason = chunk.finish_reason
+                for delta in chunk.tool_calls or []:
+                    if delta.index != 0:
+                        stream_tool_extra = True
+                        continue
+                    current = streamed_tool_calls.setdefault(
+                        delta.index,
+                        {"id": "", "type": "", "name": "", "arguments": ""},
+                    )
+                    if delta.id:
+                        stream_tool_conflict |= bool(current["id"] and current["id"] != delta.id)
+                        current["id"] = delta.id
+                    if delta.type:
+                        stream_tool_conflict |= bool(current["type"] and current["type"] != delta.type)
+                        current["type"] = delta.type
+                    if delta.function.name:
+                        stream_tool_conflict |= bool(current["name"] and current["name"] != delta.function.name)
+                        current["name"] = delta.function.name
+                    current["arguments"] += delta.function.arguments
+            assembled = streamed_tool_calls.get(0)
+            decoded_arguments = (
+                json.loads(assembled["arguments"], parse_constant=_reject_json_constant)
+                if assembled
+                else None
+            )
+            streaming_tools_ok = bool(
+                assembled
+                and assembled["id"]
+                and assembled["type"] == "function"
+                and assembled["name"] == "report_status"
+                and isinstance(decoded_arguments, dict)
+                and decoded_arguments.get("status") == "ok"
+                and not stream_tool_conflict
+                and not stream_tool_extra
+                and stream_finish_reason in {"stop", "length", "content_filter", "unknown"}
+            )
+            assertions.append(
+                _Assertion(
+                    "streaming-tool-call-contract",
+                    PASS if streaming_tools_ok else FAIL,
+                    "streamed tool-call deltas reassembled into a JSON object"
+                    if streaming_tools_ok
+                    else "streamed tool-call deltas did not satisfy the contract",
+                )
+            )
+        except Exception:
+            assertions.append(
+                _Assertion(
+                    "streaming-tool-call-contract",
+                    FAIL,
+                    "live streaming tool assertion failed",
+                )
+            )
+
+        try:
             embedding = await client.get_embedding(
                 "provider runtime health probe",
                 correlation_id=f"phase11-provider-embedding-{uuid.uuid4().hex[:12]}",
@@ -346,7 +432,17 @@ async def _run_checks(
                 "canonical OpenAI-compatible client is configured",
             )
         )
-        status = PASS if provider_health_ok and chat_ok and json_ok and tools_ok and streaming_ok and embedding_ok else FAIL
+        status = (
+            PASS
+            if provider_health_ok
+            and chat_ok
+            and json_ok
+            and tools_ok
+            and streaming_ok
+            and streaming_tools_ok
+            and embedding_ok
+            else FAIL
+        )
         production_safe = bool(
             status == PASS
             and config.is_production
