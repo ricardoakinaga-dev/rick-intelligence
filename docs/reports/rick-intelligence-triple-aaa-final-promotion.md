@@ -13,16 +13,13 @@ independent reviews and human authority keep the candidate below `TRIPLE_AAA`.
 
 ## 2. Candidate identity
 
-The current diagnostic packet binds commit
-`4019f54af3c5882fb5c3b2d08f333a12b13ed1f2`, tree
-`71f8fac6feaa6bc54cf7e462bfcb7da8ad396091`, checkout fingerprint
-`d5a68677e02581b3439f0b0bd3a3d55ddf37fa7e996e01f236037fc185506eae` and
-artifact-set digest
-`5aa145de1039a75dac1fae9e4d3c5f266e04103f149493226261f1969eaebbe0`. The
-packet is `.runtime/phase-3/triple-aaa-verify.json` with SHA-256
-`91c7839cc1f30621c28ab539393ef10626502778a8b67bbff18ecbf66d6de2af`.
-This report remains invalid if that packet is absent, stale, dirty or
-inconsistent with the exact candidate.
+The authoritative identity is always the same-run packet at
+`.runtime/phase-3/triple-aaa-verify.json`: commit, tree, checkout fingerprint,
+artifact-set digest, packet hash and quality-bar hash must be read from that
+packet together. This report never substitutes a manually typed SHA and is
+invalid if the packet is absent, stale, dirty or inconsistent with the exact
+candidate. The latest source-closure packet and its hashes are recorded in
+section 20 of the current gap audit.
 
 ## 3. Prompt provenance
 
