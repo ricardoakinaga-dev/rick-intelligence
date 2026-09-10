@@ -14,7 +14,7 @@
   "active_execplan": ".agent/plans/phase-3-runtime-evidence-production-promotion.md",
   "active_task": "PH3-2-LAB-READINESS",
   "verification_state": "PARTIAL",
-  "repository_state": "Current source candidate is a480e6cc67ada68fc91e0c7034a37f53f23051b3 (tree 3e470607d31cc0ff45d2d2648f35ae9eaa647c14); the prior clean integrated packet for 28a3dae3308849da4494219811c7c7e832496dd0 is stale after this source change. It includes the corrected PostgreSQL worker gate, canonical two-process Redis/API HTTP gate, strict release artifact postconditions and manifest consistency checks, bounded same-run CI envelopes with redacted raw artifacts, exact workflow/run/ref/SHA provenance, runtime-primary supply-chain binding, frontend Phase 3 transport, authenticated promotion packet sealing, scoped frontend-lane projection, checkout-bound frontend evidence, reproducible release-test dependencies, a bounded cancellation-aware synchronous provider-embedding bridge, a bounded authenticated live provider-health probe, bounded function-tool/JSON/streaming tool-call contracts, streaming tool-call and streaming JSON reassembly, context-budget rejection before I/O, normal JSON-object response validation without retry and Professor max_tool_calls enforcement across normal/fallback/streaming paths, including immediate rejection before a streamed content delta is published. Clean provider/Professor/API/State-of-Art regressions pass 64, 29, 437 and 295 tests respectively; the next integrated packet must bind this candidate and remains expected to classify STATE_OF_ART_CANDIDATE with external blockers. No State of Art, AAA or Triple AAA promotion claim is made.",
+  "repository_state": "Current source candidate is eced09b7431de92fa064d9910d9ff7d489bb5dc1 (tree 6f2f162009e7bcda9327922b20e49796a79fc5d5); the prior clean integrated packet for 28a3dae3308849da4494219811c7c7e832496dd0 is stale after this source change. It includes the corrected PostgreSQL worker gate, canonical two-process Redis/API HTTP gate, strict release artifact postconditions and manifest consistency checks, bounded same-run CI envelopes with redacted raw artifacts, exact workflow/run/ref/SHA provenance, runtime-primary supply-chain binding, frontend Phase 3 transport, authenticated promotion packet sealing, scoped frontend-lane projection, checkout-bound frontend evidence, reproducible release-test dependencies, a bounded cancellation-aware synchronous provider-embedding bridge, a bounded authenticated live provider-health probe, bounded function-tool/JSON/streaming tool-call contracts, streaming tool-call and streaming JSON reassembly, context-budget rejection before I/O, normal JSON-object response validation without retry and Professor max_tool_calls enforcement across normal/fallback/streaming paths, including immediate rejection before a streamed content delta is published, plus strict runtime types for integer budgets and timeout booleans. Clean provider/Professor/API/State-of-Art regressions pass 64, 36, 437 and 295 tests respectively; the next integrated packet must bind this candidate and remains expected to classify STATE_OF_ART_CANDIDATE with external blockers. No State of Art, AAA or Triple AAA promotion claim is made.",
   "instruction_scope_refs": [
     ".agent/PLANS.md",
     "cvg-master-rag-v2/AGENTS.md",
@@ -23,8 +23,8 @@
     "docs/plans/phase-3-runtime-evidence-production-promotion.md"
   ],
   "last_gate_record": ".agent/gates/phase-3-2-lab-readiness-implementation-ready.json",
-  "last_event_id": "EVT-PH3-2-PROFESSOR-STREAM-BUDGET-20260910",
-  "state_revision": 268,
+  "last_event_id": "EVT-PH3-2-PROFESSOR-BUDGET-TYPES-20260910",
+  "state_revision": 269,
   "next_gate": "VERIFIED",
   "active_action_id": "PH3-2-LAB-READINESS:WAIT_RUNTIME",
   "blocked_by": [
@@ -32,5 +32,5 @@
     "Disposable runtime secrets and endpoint authority are unavailable"
   ],
   "human_approval_required": [],
-  "updated_at": "2026-09-10T12:47:52Z"
+  "updated_at": "2026-09-10T12:54:48Z"
 }

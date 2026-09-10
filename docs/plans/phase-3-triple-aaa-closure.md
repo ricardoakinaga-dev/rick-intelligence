@@ -464,3 +464,13 @@ partial response and proves that no delta event escapes the fail-closed path.
 The Professor, API and State-of-Art suites pass **29**, **437** and **295**;
 this remains local orchestration evidence and does not replace external
 runtime, provider, corpus or promotion evidence.
+
+## 30. Professor budget type closure — 2026-09-10
+
+Source candidate `eced09b7431de92fa064d9910d9ff7d489bb5dc1` (tree
+`6f2f162009e7bcda9327922b20e49796a79fc5d5`) makes Professor budget
+configuration strict: integer limits reject `bool` and `float` values, while
+reasoning/request timeout limits reject booleans. The focused validation matrix
+passes **36** Professor tests; API and State-of-Art suites pass **437** and
+**295**. This closes ambiguous local configuration only and does not replace
+external runtime, provider, corpus or promotion evidence.

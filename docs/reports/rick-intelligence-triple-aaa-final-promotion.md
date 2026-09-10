@@ -148,19 +148,21 @@ conservative answer/retry/clarify/abstain/escalate decisions.
 
 The local source corrections at `2238b99ec797b0b2416208dd0e0b02c74897f7d9`,
 `09a467652c3c9ba85770937e3cdce8c39f545e44`,
-`6095bafcc368a4b7ee7d468bd4bac98e7b153faf` and
-`a480e6cc67ada68fc91e0c7034a37f53f23051b3` add a bounded authenticated
+`6095bafcc368a4b7ee7d468bd4bac98e7b153faf`,
+`a480e6cc67ada68fc91e0c7034a37f53f23051b3` and
+`eced09b7431de92fa064d9910d9ff7d489bb5dc1` add a bounded authenticated
 `GET /models` provider-health probe, strict model-list validation, resilient
 delegation, bounded function tools, typed complete/streaming tool calls, JSON
 argument validation, streaming tool-call reassembly and explicit live-health,
 JSON, streaming and normal/streaming tool-call prerequisites in the provider
 runtime gate, including a fail-closed context-budget assertion that rejects an
 over-budget prompt before I/O. The current source candidate has 64 provider
-tests, 6 provider-contract tests, 29 Professor tests, 437 API tests, 295
+tests, 6 provider-contract tests, 36 Professor tests, 437 API tests, 295
 State-of-Art tests and 3 provider-runtime tests passing. The Professor
 orchestration seam enforces `max_tool_calls` over complete and distinct
 streaming tool calls without executing over-budget tools and rejects a newly
-over-budget streaming index before publishing its content delta. The normal
+over-budget streaming index before publishing its content delta. Integer
+budget fields and timeout booleans are also type-strict. The normal
 JSON-object response mode is also
 validated at the client boundary and rejects invalid semantic content without
 retry, and the streaming JSON contract reassembles split deltas as an object.

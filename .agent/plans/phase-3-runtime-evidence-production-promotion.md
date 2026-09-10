@@ -36,6 +36,7 @@ preserving the frozen Gauntlet bar, Phase 2 history and legacy repositories.
 - [x] (2026-09-10) Extend the provider boundary at source candidate 6095bafcc368a4b7ee7d468bd4bac98e7b153faf (tree 10f363d35567e1c5763652161004a399f02cc51e): streaming function-tool and JSON deltas are reassembled and checked for strict JSON, terminal completion, fragment conflicts and extra indexes; the resilient wrapper rejects an over-budget prompt before I/O; normal `json_object` responses reject invalid semantic content without retry; the hermetic gate, provider and contract suites pass 3/64/6, while approved live provider evidence remains external.
 - [x] (2026-09-10) Enforce the Professor `max_tool_calls` budget at source candidate 63a195a96a588231acf5a885d11916385b438a18 (tree 1ee17a5c2b9cc1dbe26222a0498150ee4a35da1d): normal, provider-fallback and streaming paths count complete/distinct tool calls and fail with `tool_calls_budget_exceeded` before execution or result acceptance; Professor/API/State-of-Art suites pass 29/437/295, while external runtime and promotion evidence remain blocked.
 - [x] (2026-09-10) Tighten streaming Professor tool-budget enforcement at source candidate a480e6cc67ada68fc91e0c7034a37f53f23051b3 (tree 3e470607d31cc0ff45d2d2648f35ae9eaa647c14): reject a newly observed over-budget tool-call index immediately, before publishing a content delta; the focused Professor, API and State-of-Art suites pass 29/437/295, while external runtime and promotion evidence remain blocked.
+- [x] (2026-09-10) Make Professor budget configuration type-strict at source candidate eced09b7431de92fa064d9910d9ff7d489bb5dc1 (tree 6f2f162009e7bcda9327922b20e49796a79fc5d5): reject boolean/float values in integer limits and boolean timeout values; Professor/API/State-of-Art suites pass 36/437/295, while external runtime and promotion evidence remain blocked.
 - [ ] (2026-09-09) Execute the disposable runtime; currently blocked by Docker daemon access and unresolved external authority.
 - [ ] (2026-09-09) Complete independent runtime/design/security reviews and the human Go/No-Go.
 
@@ -187,8 +188,8 @@ made.
 ## Current candidate closure
 
 The current source implementation candidate is
-a480e6cc67ada68fc91e0c7034a37f53f23051b3 with tree
-3e470607d31cc0ff45d2d2648f35ae9eaa647c14. It contains the corrected
+eced09b7431de92fa064d9910d9ff7d489bb5dc1 with tree
+6f2f162009e7bcda9327922b20e49796a79fc5d5. It contains the corrected
 PostgreSQL worker gate, canonical two-process Redis/API HTTP gate, strict
 release artifact postconditions and manifest consistency checks, plus bounded
 same-run CI envelopes with redacted raw artifacts, exact workflow/run/ref/SHA
@@ -200,10 +201,11 @@ bounded provider function-tool, JSON and streaming-call contracts and a
 streaming function-tool/JSON reassembly assertions, context-budget assertion
 in the live gate, normal JSON-object response validation and Professor
 `max_tool_calls` enforcement across normal/fallback/streaming paths, including
-immediate rejection before a streamed content delta is published. The final
+immediate rejection before a streamed content delta is published, and strict
+runtime types for every integer budget plus timeout booleans. The final
 documentation/control-plane follow-up is bound to the resulting clean
 checkout, while live provider/runtime evidence remains external.
-The provider, Professor, API and State-of-Art suites have 64, 29, 437 and 295
+The provider, Professor, API and State-of-Art suites have 64, 36, 437 and 295
 passing tests respectively and the relevant static checks pass; the full preserved `make test` remains incomplete
 because the CVG dataset and local Playwright browser are unavailable. The
 prior integrated verifier artifact is stale after this source change and is
