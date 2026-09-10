@@ -167,6 +167,10 @@ runtime evidence columns remain blocked and promotion remains **NO-GO**.
 
 ## 66. RealWorkerRuntime multi-process gate closure — 2026-09-10
 
+Source candidate `9ea14048a7431e9f7f8e65c1c749a8dc57b84b9e` (tree
+`3b2e314986dffdefc2023baab39aead62c5334e4`) changes the gate's concurrent
+worker path to execute the canonical runtime.
+
 The multi-worker gate now executes the canonical `RealWorkerRuntime` in each
 isolated worker process for its concurrent claim path. The handler waits for a
 heartbeat emitted by the runtime before returning a bounded `JobResult`, and
