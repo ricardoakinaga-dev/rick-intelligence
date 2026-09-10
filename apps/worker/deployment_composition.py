@@ -23,6 +23,7 @@ from services.external_composition import (
     build_external_providers,
 )
 from services.object_store_transport import StdlibS3HttpTransport
+from core.otel import OpenTelemetryRuntime, configure_process_otel
 
 
 def _required(name: str) -> str:
@@ -130,11 +131,12 @@ async def _await(value: object) -> object:
 class DeploymentRuntime:
     """Lifecycle owner returned by the worker composition factory."""
 
-    def __init__(self, providers: object) -> None:
+    def __init__(self, providers: object, *, otel_runtime: OpenTelemetryRuntime | None = None) -> None:
         self.providers = providers
         self.worker = getattr(providers, "worker", None)
         if self.worker is None:
             raise ExternalCompositionError("worker runtime")
+        self.otel_runtime = otel_runtime
         self._closed = False
 
     def start(self) -> object:
@@ -199,6 +201,8 @@ class DeploymentRuntime:
             close = getattr(redis_client, "aclose", None) or getattr(redis_client, "close", None)
             if callable(close):
                 asyncio.run(_await(close()))
+        if self.otel_runtime is not None:
+            self.otel_runtime.close()
         return True
 
 
@@ -217,7 +221,8 @@ def build_worker() -> DeploymentRuntime:
 
     settings = _settings()
     providers = build_external_providers(settings, _build_inputs(settings))
-    return DeploymentRuntime(providers)
+    otel_runtime = configure_process_otel(service_name="rick-worker")
+    return DeploymentRuntime(providers, otel_runtime=otel_runtime)
 
 
 __all__ = ["DeploymentRuntime", "build_api_inputs", "build_worker"]

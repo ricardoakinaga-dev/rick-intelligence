@@ -18,6 +18,7 @@ from runtime import (
     StartupValidationError,
     WorkerCancelled,
 )
+import runtime as runtime_module
 
 
 SCOPE = JobScope("tenant-a", "workspace-a", "collection-a")
@@ -240,6 +241,43 @@ def success(_job: Job, _lease: JobLease, *, cancelled) -> JobResult:
         document_id="doc-1",
         completed_at=_job.updated_at,
     )
+
+
+def test_worker_execution_uses_flat_w3c_trace_context_without_persisting_baggage(monkeypatch):
+    from contextlib import contextmanager
+
+    observed: dict[str, object] = {}
+
+    @contextmanager
+    def fake_attach(carrier):
+        observed["carrier"] = carrier
+        yield
+
+    @contextmanager
+    def fake_span(name, **kwargs):
+        observed["span"] = (name, kwargs)
+        yield None
+
+    monkeypatch.setattr(runtime_module, "attach_trace_context", fake_attach)
+    monkeypatch.setattr(runtime_module, "stage_span", fake_span)
+    worker_job = job(
+        payload={
+            "source_key": "objects/input.txt",
+            "traceparent": "00-" + "a" * 32 + "-" + "b" * 16 + "-01",
+            "tracestate": "vendor=value",
+        }
+    )
+    queue = FakeQueue([worker_job])
+    runtime = make_runtime(queue, ManualClock(), success)
+
+    result = runtime.run_once()
+
+    assert result.succeeded == 1
+    assert observed["carrier"] == {
+        "traceparent": "00-" + "a" * 32 + "-" + "b" * 16 + "-01",
+        "tracestate": "vendor=value",
+    }
+    assert observed["span"][0] == "worker.ingestion"
 
 
 def test_registry_and_startup_reject_invalid_composition() -> None:

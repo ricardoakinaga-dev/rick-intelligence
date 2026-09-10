@@ -20,6 +20,20 @@ from core.telemetry import emit_safely, opaque_ref
 from rick_ingestion.parsers import SUPPORTED_EXTENSIONS, sanitize_display_filename
 from rick_storage import ObjectScope
 
+try:
+    from core.otel import current_trace_context, record_safe_exception, stage_span
+except ImportError:  # pragma: no cover - standalone package import
+    def current_trace_context() -> dict[str, str]:
+        return {}
+
+    def record_safe_exception(_span, _error) -> None:
+        return None
+
+    from contextlib import nullcontext
+
+    def stage_span(_name, **_kwargs):
+        return nullcontext(None)
+
 from services.ingestion_service import IngestionApplicationError
 
 
@@ -252,6 +266,7 @@ class PostgresIngestionApplicationService:
         request_id: str | None = None,
         correlation_id: str | None = None,
         idempotency_key: str | None = None,
+        trace_context: Mapping[str, object] | None = None,
         operation: str = "ingest",
         document_id: str | None = None,
     ) -> dict[str, object]:
@@ -285,6 +300,21 @@ class PostgresIngestionApplicationService:
         }
         if document_id:
             payload["document_id"] = document_id
+        # Persist only the bounded W3C identity carrier. It is intentionally
+        # added after idempotency/source construction and never includes
+        # baggage, tenant metadata, prompts or document content.
+        trace_carrier = dict(trace_context or current_trace_context())
+        if trace_carrier:
+            for key, value in trace_carrier.items():
+                if (
+                    key in {"traceparent", "tracestate"}
+                    and isinstance(value, str)
+                    and value
+                    and len(value) <= 512
+                ):
+                    # Flat string fields preserve the canonical JobPayload
+                    # contract; nested arbitrary metadata is rejected.
+                    payload[key] = value
         try:
             lookup = getattr(self.queue, "get_by_idempotency", None)
             existing = None
@@ -297,11 +327,30 @@ class PostgresIngestionApplicationService:
                 )
             if existing is not None:
                 existing_payload = _field(existing, "payload", {})
-                if not isinstance(existing_payload, Mapping) or dict(existing_payload) != payload:
+                comparable_existing = (
+                    {
+                        key: value
+                        for key, value in existing_payload.items()
+                        if key not in {"traceparent", "tracestate"}
+                    }
+                    if isinstance(existing_payload, Mapping)
+                    else None
+                )
+                comparable_payload = {
+                    key: value
+                    for key, value in payload.items()
+                    if key not in {"traceparent", "tracestate"}
+                }
+                if comparable_existing is None or comparable_existing != comparable_payload:
                     raise IngestionApplicationError("conflict")
                 record = existing
             else:
-                metadata = self.object_store.put(scope, source_key, data)
+                with stage_span("stores.object_store.put", attributes={"storage.operation": "put"}) as span:
+                    try:
+                        metadata = self.object_store.put(scope, source_key, data)
+                    except Exception as exc:
+                        record_safe_exception(span, exc)
+                        raise
                 observed_checksum = str(getattr(metadata, "checksum", "") or checksum_ref)
                 try:
                     observed_size = int(getattr(metadata, "size", len(data)))
@@ -310,14 +359,19 @@ class PostgresIngestionApplicationService:
                 if observed_checksum != checksum_ref or observed_size != len(data):
                     raise IngestionApplicationError("storage_unavailable")
             if existing is None:
-                record = self.queue.enqueue(
-                    job_id=job_id,
-                    idempotency_key=key,
-                    payload=payload,
-                    tenant_id=tenant,
-                    workspace_id=workspace,
-                    collection_id=collection,
-                )
+                with stage_span("queue.enqueue", attributes={"queue.operation": "enqueue"}) as span:
+                    try:
+                        record = self.queue.enqueue(
+                            job_id=job_id,
+                            idempotency_key=key,
+                            payload=payload,
+                            tenant_id=tenant,
+                            workspace_id=workspace,
+                            collection_id=collection,
+                        )
+                    except Exception as exc:
+                        record_safe_exception(span, exc)
+                        raise
         except IngestionApplicationError:
             # The object key is content addressed and the idempotency lookup
             # plus enqueue are separate durable operations.  A concurrent

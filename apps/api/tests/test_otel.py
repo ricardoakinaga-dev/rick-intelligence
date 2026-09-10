@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from contextlib import contextmanager
 
-from core.otel import _HTTPSpanMiddleware, install_otel
+from core.otel import _HTTPSpanMiddleware, install_otel, record_safe_exception, stage_span
 
 
 class _Telemetry:
@@ -53,10 +53,12 @@ class _Tracer:
     def __init__(self) -> None:
         self.context = None
         self.span = _Span()
+        self.kwargs = {}
 
     @contextmanager
     def start_as_current_span(self, _name, **kwargs):
         self.context = kwargs.get("context")
+        self.kwargs = kwargs
         yield self.span
 
 
@@ -81,6 +83,7 @@ def test_http_middleware_extracts_bounded_w3c_context_and_ignores_other_headers(
                     (b"traceparent", b"00-" + b"a" * 32 + b"-" + b"b" * 16 + b"-01"),
                     (b"authorization", b"secret-must-not-enter-carrier"),
                     (b"tracestate", b"vendor=value"),
+                    (b"baggage", b"password=secret"),
                 ],
             },
             None,
@@ -92,3 +95,21 @@ def test_http_middleware_extracts_bounded_w3c_context_and_ignores_other_headers(
         "tracestate": "vendor=value",
     }
     assert tracer.context == "parent-context"
+
+
+def test_stage_span_disables_automatic_exception_payloads_and_keeps_only_safe_identity(monkeypatch):
+    import core.otel as otel
+
+    tracer = _Tracer()
+    monkeypatch.setattr(otel, "_PROCESS_TRACER", tracer)
+    error = RuntimeError("password=super-secret")
+    with stage_span("provider.request", attributes={"provider.operation": "chat"}) as span:
+        record_safe_exception(span, error)
+
+    assert tracer.kwargs["record_exception"] is False
+    assert tracer.kwargs["set_status_on_exception"] is False
+    assert tracer.span.attributes == {
+        "provider.operation": "chat",
+        "error.type": "RuntimeError",
+    }
+    assert "super-secret" not in str(tracer.span.attributes)

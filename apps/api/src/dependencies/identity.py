@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi import Cookie, Depends, Header, Request
 
 from core.errors import ApiError
+from core.otel import record_safe_exception, stage_span
 from core.security import resolve_auth_precedence, resolve_session_cookie
 from dependencies.services import get_providers
 from models import SessionSnapshot
@@ -47,7 +48,12 @@ async def get_current_session(
     bearer_token = _extract_bearer(authorization)
     token, _source = resolve_auth_precedence(cookie_token, bearer_token)
     identity = providers.identity
-    snapshot = identity.validate_token(token)  # type: ignore[union-attr]
+    with stage_span("auth.identity", attributes={"auth.operation": "validate_token"}) as span:
+        try:
+            snapshot = identity.validate_token(token)  # type: ignore[union-attr]
+        except Exception as exc:
+            record_safe_exception(span, exc)
+            raise
     if snapshot.authenticated and not _has_explicit_tenant(snapshot):
         # An authenticated identity without an explicit tenant is malformed;
         # never reinterpret it as the default tenant.

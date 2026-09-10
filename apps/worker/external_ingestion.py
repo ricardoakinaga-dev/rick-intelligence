@@ -12,6 +12,17 @@ import tempfile
 from rick_ingestion.parsers import SUPPORTED_EXTENSIONS, sanitize_display_filename
 from rick_storage import ObjectScope
 
+try:
+    from core.otel import record_safe_exception, stage_span
+except ImportError:  # pragma: no cover - standalone worker package import
+    from contextlib import nullcontext
+
+    def stage_span(_name, **_kwargs):
+        return nullcontext(None)
+
+    def record_safe_exception(_span, _error) -> None:
+        return None
+
 
 class ExternalIngestionError(RuntimeError):
     def __init__(self, code: str = "ingestion_failed") -> None:
@@ -107,14 +118,16 @@ class ExternalIngestionHandler:
             filename = payload.get("display_filename")
         if not all(isinstance(value, str) and value.strip() for value in (job_id, tenant_id, workspace_id, collection_id, source_id, object_key, filename)):
             raise ExternalIngestionError("validation_error")
-        try:
-            source = self.object_store.get(
-                ObjectScope(tenant_id=tenant_id, workspace_id=workspace_id, source_id=source_id),
-                object_key,
-                max_bytes=self.max_bytes,
-            )
-        except Exception:
-            raise ExternalIngestionError("storage_unavailable") from None
+        with stage_span("stores.object_store.get", attributes={"storage.operation": "get"}) as span:
+            try:
+                source = self.object_store.get(
+                    ObjectScope(tenant_id=tenant_id, workspace_id=workspace_id, source_id=source_id),
+                    object_key,
+                    max_bytes=self.max_bytes,
+                )
+            except Exception as exc:
+                record_safe_exception(span, exc)
+                raise ExternalIngestionError("storage_unavailable") from None
         if not isinstance(source, bytes) or not source:
             raise ExternalIngestionError("storage_unavailable")
         if len(source) > self.max_bytes:

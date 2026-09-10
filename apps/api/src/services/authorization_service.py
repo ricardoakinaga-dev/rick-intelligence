@@ -15,18 +15,24 @@ from rick_authorization import (
     filter_collection_items as _filter_items,
     permission_granted,
 )
+from core.otel import record_safe_exception, stage_span
 
 
 def has_permission(session, permission: str) -> bool:
     """Authoritative check against the session snapshot. No role fallback."""
-    if not getattr(session, "authenticated", False):
-        return False
-    return permission_granted(
-        role=None,
-        permissions=list(getattr(session, "permissions", None) or []),
-        required=permission,
-        authoritative=True,
-    )
+    with stage_span("auth.authorization", attributes={"auth.operation": "permission_check"}) as span:
+        try:
+            if not getattr(session, "authenticated", False):
+                return False
+            return permission_granted(
+                role=None,
+                permissions=list(getattr(session, "permissions", None) or []),
+                required=permission,
+                authoritative=True,
+            )
+        except Exception as exc:
+            record_safe_exception(span, exc)
+            raise
 
 
 def build_retrieval_context(session, *, workspace_id: str, collection_id: str | None = None) -> dict:

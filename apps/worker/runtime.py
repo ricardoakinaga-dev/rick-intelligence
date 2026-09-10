@@ -73,6 +73,22 @@ except ImportError:  # pragma: no cover - exercised only in a minimal install
             return False
         return True
 
+try:  # Optional API-image tracing helpers are dependency-light and bounded.
+    from core.otel import attach_trace_context, record_safe_exception, stage_span
+except ImportError:  # pragma: no cover - standalone worker package tests
+    from contextlib import contextmanager
+
+    @contextmanager
+    def attach_trace_context(_value):
+        yield
+
+    @contextmanager
+    def stage_span(_name, **_kwargs):
+        yield None
+
+    def record_safe_exception(_span, _error):
+        return None
+
 
 RUNTIME_CONTRACT_VERSION = "real-worker-runtime-v1"
 
@@ -1127,17 +1143,29 @@ class RealWorkerRuntime:
         )
 
         def invoke() -> None:
-            try:
-                execution.result = callable_handler(
-                    job,
-                    lease,
-                    cancelled=execution.token,
-                )
-            except BaseException as error:  # worker isolation boundary
-                execution.error = error
-            finally:
-                execution.handler_done.set()
-                self._reap()
+            payload = job.payload if isinstance(job.payload, Mapping) else {}
+            trace_context = {
+                key: payload[key]
+                for key in ("traceparent", "tracestate")
+                if isinstance(payload.get(key), str)
+            }
+            with attach_trace_context(trace_context or None):
+                with stage_span(
+                    "worker.ingestion",
+                    attributes={"worker.operation": str(job.operation)},
+                ) as span:
+                    try:
+                        execution.result = callable_handler(
+                            job,
+                            lease,
+                            cancelled=execution.token,
+                        )
+                    except BaseException as error:  # worker isolation boundary
+                        record_safe_exception(span, error)
+                        execution.error = error
+                    finally:
+                        execution.handler_done.set()
+                        self._reap()
 
         thread = Thread(
             target=invoke,

@@ -74,6 +74,15 @@ def test_operation_uses_the_runtime_identifier_grammar(operation: str) -> None:
         make_job(operation=operation)
 
 
+def test_payload_allows_only_bounded_w3c_trace_identity_fields() -> None:
+    traceparent = "00-" + "a" * 32 + "-" + "b" * 16 + "-01"
+    job = make_job(payload={"source_key": "objects/one.txt", "traceparent": traceparent, "tracestate": "vendor=value"})
+    assert job.payload["traceparent"] == traceparent
+    assert job.payload["tracestate"] == "vendor=value"
+    with pytest.raises(JobValidationError):
+        make_job(payload={"source_key": "objects/one.txt", "baggage": "password=secret"})
+
+
 def test_attempt_lifecycle_is_explicit_and_serialized() -> None:
     job = queued_job()
     running = job.start_attempt(worker_id="worker-a", now=102.0)
@@ -307,6 +316,15 @@ def test_idempotency_is_scoped_and_replay_or_conflict_is_deterministic() -> None
         "tenant-a", "workspace-a", "collection-a", "idem-1"
     )
     assert ensure_idempotent(existing, replay) is existing
+    trace_replay = make_job(
+        job_id="job-trace-replay",
+        payload={
+            "source_key": "objects/one.txt",
+            "filename": "one.txt",
+            "traceparent": "00-" + "a" * 32 + "-" + "b" * 16 + "-01",
+        },
+    )
+    assert ensure_idempotent(existing, trace_replay) is existing
     with pytest.raises(JobIdempotencyConflictError):
         ensure_idempotent(existing, make_job(job_id="job-other", payload={"source_key": "objects/two.txt"}))
     with pytest.raises(JobIdempotencyConflictError):

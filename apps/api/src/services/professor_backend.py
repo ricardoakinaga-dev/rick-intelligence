@@ -10,6 +10,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator, Mapping, Sequence
 import inspect
 
+from core.otel import record_safe_exception, stage_span
 from rick_contracts.chat import Citation
 from rick_contracts.professor import ProfessorRequest
 from rick_contracts.providers import ChatCompletionChunk, ChatCompletionResult, ProviderMessage
@@ -37,26 +38,36 @@ class ProviderChatAdapter:
         self, *, messages: Sequence[ProviderMessage], conversation_id: str
     ) -> ChatCompletionResult:
         correlation_id = f"chat-{conversation_id}"[:128]
-        return await self.provider.chat_completion(
-            messages=messages,
-            correlation_id=correlation_id,
-        )
+        with stage_span("provider.chat_completion", attributes={"provider.operation": "chat_completion"}) as span:
+            try:
+                return await self.provider.chat_completion(
+                    messages=messages,
+                    correlation_id=correlation_id,
+                )
+            except Exception as exc:
+                record_safe_exception(span, exc)
+                raise
 
     def stream(self, *, messages: Sequence[ProviderMessage], conversation_id: str) -> AsyncIterator[ChatCompletionChunk]:
         async def iterate() -> AsyncIterator[ChatCompletionChunk]:
-            target = getattr(self.provider, "chat_completion_stream", None)
-            if callable(target):
-                stream = target(messages=messages, correlation_id=f"chat-{conversation_id}"[:128])
-                if hasattr(stream, "__await__"):
-                    stream = await stream
-                async for chunk in stream:
-                    yield chunk if isinstance(chunk, ChatCompletionChunk) else ChatCompletionChunk.model_validate(chunk)
-                return
-            result = await self.complete(messages=messages, conversation_id=conversation_id)
-            yield ChatCompletionChunk(
-                model=result.model, delta=result.content, finish_reason=result.finish_reason,
-                correlation_id=result.correlation_id, usage=result.usage,
-            )
+            with stage_span("provider.chat_completion.stream", attributes={"provider.operation": "chat_completion_stream"}) as span:
+                try:
+                    target = getattr(self.provider, "chat_completion_stream", None)
+                    if callable(target):
+                        stream = target(messages=messages, correlation_id=f"chat-{conversation_id}"[:128])
+                        if hasattr(stream, "__await__"):
+                            stream = await stream
+                        async for chunk in stream:
+                            yield chunk if isinstance(chunk, ChatCompletionChunk) else ChatCompletionChunk.model_validate(chunk)
+                        return
+                    result = await self.complete(messages=messages, conversation_id=conversation_id)
+                    yield ChatCompletionChunk(
+                        model=result.model, delta=result.content, finish_reason=result.finish_reason,
+                        correlation_id=result.correlation_id, usage=result.usage,
+                    )
+                except Exception as exc:
+                    record_safe_exception(span, exc)
+                    raise
         return iterate()
 
 
@@ -460,31 +471,51 @@ class EvidenceDecisionGate:
         last_payload: dict[str, object] = {"evidence": []}
         last_decision = None
         for attempt in range(2):
-            raw_result = await self._call(target, query=query, context=context)
-            payload = dict(self._mapping(raw_result))
-            raw_evidence = payload.get("evidence", [])
-            candidates = (
-                list(raw_evidence)
-                if isinstance(raw_evidence, Sequence)
-                and not isinstance(raw_evidence, (str, bytes, bytearray))
-                else []
-            )
-            normalized, bundle, quality = self._issue_candidates(
-                query=query,
-                context=context,
-                candidates=candidates,
-            )
-            citation_support_metrics, citation_metrics_present = self._citation_support_metrics(payload)
-            decision_input = self._decision_input(
-                context=context,
-                bundle=bundle,
-                evidence_count=len(normalized),
-                retrieval_quality=quality,
-                attempt=attempt,
-                citation_support_metrics=citation_support_metrics,
-                citation_metrics_present=citation_metrics_present,
-            )
-            decision = self.decision_layer.decide(decision_input)
+            with stage_span("retrieval", attributes={"retrieval.attempt": attempt}) as retrieval_span:
+                try:
+                    with stage_span("stores.retrieval", attributes={"store.operation": "retrieve"}) as stores_span:
+                        try:
+                            raw_result = await self._call(target, query=query, context=context)
+                        except Exception as exc:
+                            record_safe_exception(stores_span, exc)
+                            raise
+                    payload = dict(self._mapping(raw_result))
+                    raw_evidence = payload.get("evidence", [])
+                    candidates = (
+                        list(raw_evidence)
+                        if isinstance(raw_evidence, Sequence)
+                        and not isinstance(raw_evidence, (str, bytes, bytearray))
+                        else []
+                    )
+                    with stage_span("evidence.validation", attributes={"evidence.candidates": len(candidates)}) as evidence_span:
+                        try:
+                            normalized, bundle, quality = self._issue_candidates(
+                                query=query,
+                                context=context,
+                                candidates=candidates,
+                            )
+                        except Exception as exc:
+                            record_safe_exception(evidence_span, exc)
+                            raise
+                    citation_support_metrics, citation_metrics_present = self._citation_support_metrics(payload)
+                    decision_input = self._decision_input(
+                        context=context,
+                        bundle=bundle,
+                        evidence_count=len(normalized),
+                        retrieval_quality=quality,
+                        attempt=attempt,
+                        citation_support_metrics=citation_support_metrics,
+                        citation_metrics_present=citation_metrics_present,
+                    )
+                    with stage_span("decision.policy", attributes={"decision.attempt": attempt}) as decision_span:
+                        try:
+                            decision = self.decision_layer.decide(decision_input)
+                        except Exception as exc:
+                            record_safe_exception(decision_span, exc)
+                            raise
+                except Exception as exc:
+                    record_safe_exception(retrieval_span, exc)
+                    raise
             last_payload = payload
             last_decision = decision
             if decision.action is not self._DecisionAction.RETRIEVE_AGAIN:

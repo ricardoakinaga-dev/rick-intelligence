@@ -28,6 +28,7 @@ MAX_PAYLOAD_KEY_LENGTH = 64
 MAX_PAYLOAD_VALUE_LENGTH = 512
 MAX_METADATA_FIELDS = 32
 MAX_ATTEMPTS = 64
+_TRACE_PAYLOAD_FIELDS = frozenset({"traceparent", "tracestate"})
 
 _IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$")
 _OPERATION = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$")
@@ -74,6 +75,8 @@ _SAFE_METADATA_KEYS = frozenset(
         "status",
         "tenant_id",
         "trace_id",
+        "traceparent",
+        "tracestate",
         "uri",
         "url",
         "version",
@@ -256,6 +259,16 @@ def _bounded_map(
             raise JobValidationError(f"{field_name}.{key} looks like secret or raw content")
         clean[key] = clean_value
     return MappingProxyType(dict(sorted(clean.items())))
+
+
+def _idempotency_payload(payload: Mapping[str, str]) -> tuple[tuple[str, str], ...]:
+    """Compare request identity without treating trace lineage as input data."""
+
+    return tuple(
+        (key, value)
+        for key, value in payload.items()
+        if key not in _TRACE_PAYLOAD_FIELDS
+    )
 
 
 def _timestamp(value: object, *, field_name: str) -> float:
@@ -871,8 +884,8 @@ def ensure_idempotent(existing: Job | None, candidate: Job) -> Job:
         raise JobValidationError("idempotency values must be jobs")
     if idempotency_identity(existing) != idempotency_identity(candidate):
         raise JobIdempotencyConflictError("idempotency key is outside the existing job scope")
-    existing_envelope = (existing.operation, tuple(existing.payload.items()), existing.max_attempts)
-    candidate_envelope = (candidate.operation, tuple(candidate.payload.items()), candidate.max_attempts)
+    existing_envelope = (existing.operation, _idempotency_payload(existing.payload), existing.max_attempts)
+    candidate_envelope = (candidate.operation, _idempotency_payload(candidate.payload), candidate.max_attempts)
     if existing_envelope != candidate_envelope:
         raise JobIdempotencyConflictError("idempotency key was reused for a different request")
     return existing

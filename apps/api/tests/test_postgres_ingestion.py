@@ -104,6 +104,27 @@ def test_upload_is_scoped_and_idempotent_at_the_durable_boundary():
     assert "display_filename" not in queue.enqueues[0]["payload"]
 
 
+def test_upload_persists_only_bounded_w3c_trace_identity():
+    queue = Queue()
+    objects = Objects()
+    service = PostgresIngestionApplicationService(queue=queue, object_store=objects, max_bytes=1024)
+
+    service.submit_upload(
+        b"# Guide", filename="Guide.md", collection_id="guides",
+        workspace_id="workspace-a", tenant_id="tenant-a", idempotency_key="trace-1",
+        trace_context={
+            "traceparent": "00-" + "a" * 32 + "-" + "b" * 16 + "-01",
+            "tracestate": "vendor=value",
+            "baggage": "password=secret",
+        },
+    )
+
+    payload = queue.enqueues[0]["payload"]
+    assert payload["traceparent"].startswith("00-")
+    assert payload["tracestate"] == "vendor=value"
+    assert "baggage" not in payload
+
+
 def test_idempotent_replay_does_not_rewrite_content_addressed_object():
     queue = Queue()
     objects = Objects()
@@ -121,6 +142,26 @@ def test_idempotent_replay_does_not_rewrite_content_addressed_object():
     assert second["job_id"] == first["job_id"]
     assert len(objects.puts) == 1
     assert len(queue.enqueues) == 1
+
+
+def test_trace_context_does_not_turn_an_idempotent_replay_into_a_conflict():
+    queue = Queue()
+    objects = Objects()
+    service = PostgresIngestionApplicationService(queue=queue, object_store=objects, max_bytes=1024)
+
+    first = service.submit_upload(
+        b"# Guide", filename="Guide.md", collection_id="guides",
+        workspace_id="workspace-a", tenant_id="tenant-a", idempotency_key="request-trace",
+        trace_context={"traceparent": "00-" + "a" * 32 + "-" + "b" * 16 + "-01"},
+    )
+    second = service.submit_upload(
+        b"# Guide", filename="Guide.md", collection_id="guides",
+        workspace_id="workspace-a", tenant_id="tenant-a", idempotency_key="request-trace",
+        trace_context={"traceparent": "00-" + "c" * 32 + "-" + "d" * 16 + "-01"},
+    )
+
+    assert second["job_id"] == first["job_id"]
+    assert len(objects.puts) == 1
 
 
 def test_idempotency_conflict_is_rejected_before_object_write():

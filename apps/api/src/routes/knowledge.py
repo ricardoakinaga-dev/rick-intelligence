@@ -15,6 +15,7 @@ from starlette.concurrency import run_in_threadpool
 
 from core.errors import ApiError
 from core.middleware import RequestTooLarge, is_request_too_large
+from core.otel import current_trace_context
 from dependencies.identity import require_authenticated
 from dependencies.services import get_providers
 from services.audit import emit_required
@@ -804,15 +805,27 @@ async def upload_document(request: Request, session=Depends(require_authenticate
         raise ApiError("storage_unavailable")
     request_id, correlation_id = _request_context_values(request)
     try:
+        upload_method = getattr(service, "submit_upload", service.upload)
+        upload_kwargs = {
+            "filename": filename or "",
+            "collection_id": collection_id or "",
+            "tenant_id": ctx["tenant_id"],
+            "workspace_id": ctx["workspace_id"],
+            "request_id": request_id,
+            "correlation_id": correlation_id,
+        }
+        try:
+            upload_parameters = tuple(inspect.signature(upload_method).parameters.values())
+        except (TypeError, ValueError):
+            upload_parameters = ()
+        if "trace_context" in {parameter.name for parameter in upload_parameters} or any(
+            parameter.kind is inspect.Parameter.VAR_KEYWORD for parameter in upload_parameters
+        ):
+            upload_kwargs["trace_context"] = current_trace_context()
         result = await run_in_threadpool(
-            getattr(service, "submit_upload", service.upload),
+            upload_method,
             source,
-            filename=filename or "",
-            collection_id=collection_id or "",
-            tenant_id=ctx["tenant_id"],
-            workspace_id=ctx["workspace_id"],
-            request_id=request_id,
-            correlation_id=correlation_id,
+            **upload_kwargs,
         )
     except Exception as exc:
         _api_ingestion_error(exc)

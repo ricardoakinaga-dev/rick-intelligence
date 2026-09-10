@@ -22,6 +22,7 @@ import time
 from typing import Callable
 
 from core.config import ApiSettings
+from core.otel import record_safe_exception, stage_span
 from dependencies.services import Providers
 
 
@@ -169,7 +170,12 @@ class SyncEmbeddingAdapter:
         for text in texts:
             if not isinstance(text, str) or not text.strip():
                 raise ValueError("embedding text is invalid")
-            result = self._run(self.provider.get_embedding(text, model=self.model))
+            with stage_span("provider.embedding", attributes={"provider.operation": "embedding"}) as span:
+                try:
+                    result = self._run(self.provider.get_embedding(text, model=self.model))
+                except Exception as exc:
+                    record_safe_exception(span, exc)
+                    raise
             vector = getattr(result, "vector", None)
             if not isinstance(vector, list) or len(vector) != self.dimensions:
                 raise ValueError("embedding dimension mismatch")
