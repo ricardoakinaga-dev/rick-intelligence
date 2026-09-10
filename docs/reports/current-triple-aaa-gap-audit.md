@@ -265,3 +265,21 @@ working tree was intentionally dirty, so its honest result was
 Docker daemon access, disposable credentials, live service probes,
 provider/corpus authority, independent production reviews and human Go/No-Go
 remain unavailable. No Triple AAA claim is made.
+
+## 13. Promoted-capability review binding — 2026-09-10
+
+The current implementation candidate `7f11eab54bc588d263e0d77ec56e567ce85d5cad`
+(tree `b7cb338f33c53869424c5336edba18a0754d6032`) closes a local evidence
+boundary: a Phase 3 capability cannot become `VERIFIED_RUNTIME` or
+`PROMOTABLE` by changing only the reviewer boolean. Such rows now require a
+current, candidate-bound canonical verification-ledger record, its exact hash,
+matching reviewer identity, executed PASS/exit `0`, and an explicit independent
+review class. A missing or altered binding is rejected with
+`SELF_PROMOTED_GATE_REJECTED`.
+
+The focused matrix suite passed 31 tests and the combined State-of-Art/Phase 11
+regression passed 300 tests. `make validate`, web lint and web typecheck pass;
+the clean integrated verifier remains `STATE_OF_ART_CANDIDATE` with exit `1`
+because release evidence, sealed packet and all live runtime lanes are absent,
+blocked or non-promotable. No independent approval, runtime authority or
+Triple AAA claim is inferred from this correction.

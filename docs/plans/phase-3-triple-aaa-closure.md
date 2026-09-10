@@ -134,7 +134,7 @@ versioned Ed25519 seal, an explicit public-key trust store, full seal-metadata
 coverage, current-checkout binding and a 24-hour freshness window. Unknown
 keys, missing trust, stale/future timestamps, mutated metadata and absent
 checkout binding remain non-promotable. The current combined State-of-Art/
-Phase 11 suite now has 299 passing tests; this does not close live runtime or
+Phase 11 suite now has 300 passing tests; this does not close live runtime or
 human promotion gates.
 
 ## 9. Shared runtime attestation correction — 2026-09-10
@@ -180,6 +180,17 @@ projects.
 The web boundary also gained a focusable skip-link destination, deterministic
 composer readiness assertions across mobile/tablet/desktop, and narrower
 live-region semantics for completed and streaming chat content. The combined
-State-of-Art/Phase 11 suite is 299 passing tests; the exact live runtime,
+State-of-Art/Phase 11 suite is 300 passing tests; the exact live runtime,
 browser authority, supply-chain evidence, independent reviews and final human
 Go/No-Go remain external blockers.
+
+## 11. Promoted-capability review binding — 2026-09-10
+
+The Phase 3 matrix no longer treats `reviewer.independent=true` as sufficient
+promotion evidence. `VERIFIED_RUNTIME` and `PROMOTABLE` rows must reference a
+current `I1`/`I2`/`I3`/`INDEPENDENT` record in the canonical append-only
+`.agent/verification.jsonl`, bind its SHA-256 and reviewer identity, require an
+executed PASS with exit `0`, and bind the record to the candidate commit.
+Missing or forged review references produce `SELF_PROMOTED_GATE_REJECTED` and
+`MISSING_EVIDENCE_REJECTED`. This is a local anti-gaming control; it does not
+create independent review, live runtime evidence or human promotion authority.

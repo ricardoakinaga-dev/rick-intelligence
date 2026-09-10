@@ -183,6 +183,12 @@ runtime, database, observability, recovery, RAG, frontend and operations.
 Builder review is not independent approval, and a self-promoted PASS is
 rejected by the evidence contract.
 
+The current Phase 3 matrix additionally requires each promoted capability to
+bind a hashed, candidate-scoped independent record in the canonical
+verification ledger. The current candidate has no such complete promotion
+packet or fresh full-product reviewer; this local binding is a rejection guard,
+not approval evidence.
+
 ## 25. Risks and residuals
 
 Open residuals are runtime authority, provider/corpus approval, live tenant

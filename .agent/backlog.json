@@ -807,7 +807,10 @@
         "apps/web/components/chat/chat-workspace.tsx",
         "apps/web/tests/canonical-shell.spec.ts",
         ".github/workflows/quality.yml",
-        ".agent/verification.jsonl#VER-PH3-2-FAIL-CLOSED-PROMOTION-A11Y-20260910"
+        ".agent/verification.jsonl#VER-PH3-2-FAIL-CLOSED-PROMOTION-A11Y-20260910",
+        "scripts/state_of_art/phase3_evidence.py",
+        "scripts/state_of_art/tests/test_phase3_evidence.py",
+        ".agent/verification.jsonl#VER-PH3-2-INDEPENDENT-REVIEW-BINDING-20260910"
       ],
       "next_action": {
         "id": "PH3-2-LAB-READINESS:WAIT_RUNTIME",
@@ -820,7 +823,7 @@
         "Docker daemon access to /var/run/docker.sock is denied in the current session",
         "Disposable runtime secrets and endpoint authority are unavailable"
       ],
-      "reason": "The current local implementation and fail-closed API/Redis, worker, citation-support, release, same-run CI evidence, authenticated promotion-seal, shared-runtime-preflight, current-artifact promotion binding and canonical accessibility gates are covered by 299 State-of-Art/Phase 11 tests, web lint/typecheck, 15 canonical browser checks, make validate and git diff --check. The exact implementation candidate is ceb3f1ec44d52a7b889ca9a308707bd1c91c907c with tree f120a8c8397c92d6fffa66a5a31fe9b7942a6165; the integrated verifier classifies it as STATE_OF_ART_CANDIDATE with exit 1 because stale local runtime/release artifacts are rejected fail-closed. The preserved full make test, real Docker/Compose startup, readiness, PostgreSQL/Redis/object/vector execution, distributed service checks, frontend runtime authority, teardown, production authority and human Go/No-Go remain unavailable without approved external runtime access"
+      "reason": "The current local implementation and fail-closed API/Redis, worker, citation-support, release, same-run CI evidence, authenticated promotion-seal, shared-runtime-preflight, current-artifact promotion binding, promoted-capability independent-review binding and canonical accessibility gates are covered by 300 State-of-Art/Phase 11 tests, web lint/typecheck, 15 canonical browser checks, make validate and git diff --check. The exact implementation candidate is 7f11eab54bc588d263e0d77ec56e567ce85d5cad with tree b7cb338f33c53869424c5336edba18a0754d6032; the clean integrated verifier classifies it as STATE_OF_ART_CANDIDATE with exit 1 because release evidence and the sealed packet are not promotable while live runtime lanes remain blocked. The preserved full make test, real Docker/Compose startup, readiness, PostgreSQL/Redis/object/vector execution, distributed service checks, frontend runtime authority, teardown, production authority and human Go/No-Go remain unavailable without approved external runtime access"
     }
   ]
 }
