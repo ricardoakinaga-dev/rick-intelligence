@@ -56,9 +56,12 @@ Python compilation and the frontend production build. Focused current suites
 also pass for observability, rate limiting, provider, Qdrant, S3 transport and
 storage. The canonical FAST, UNIT, CONTRACT, SECURITY, RAG_EVAL, FRONTEND,
 SUPPLY_CHAIN and PHASE3_EVIDENCE workflow now records RAG-EVAL and FRONTEND
-through the same bounded CI-envelope helper as the other local lanes. There is
-no current same-SHA remote result in this environment; skipped or unavailable
-lanes remain non-promotable.
+through the same bounded CI-envelope helper as the other local lanes. The
+envelope records start/finish timestamps and exit code, and release validation
+checks lifecycle order, status/exit consistency, candidate commit/tree/
+fingerprint, clean sentinel, lane scope, command status and raw-artifact hash.
+There is no current same-SHA remote result in this environment; skipped or
+unavailable lanes remain non-promotable.
 
 ## 6. PostgreSQL
 
@@ -74,9 +77,12 @@ cancellation and stale acknowledgement boundaries. Two worker services are
 declared and share the durable queue. The multi-worker gate's happy path now
 executes `RealWorkerRuntime.start()`, `run_once()` and `shutdown()` in each
 isolated process and requires a runtime-owned heartbeat before the result is
-acknowledged. The gate still does not prove every requested crash point in a
-live Worker A/B run, and no external PostgreSQL result is present. That
-runtime evidence is therefore blocked.
+acknowledged. Its crash matrix explicitly lists all eight requested points;
+only `after_claim` and `after_heartbeat` have hermetic runtime injection.
+`during_handler`, `before_result`, `in_transaction`, `after_commit`,
+`before_publish` and `after_publish` remain `NOT_IMPLEMENTED`, so the gate
+reports `production_safe=false`. No external PostgreSQL Worker A/B result is
+present and the runtime evidence is therefore blocked.
 
 ## 8. Redis
 
@@ -129,9 +135,11 @@ cannot be sealed while runtime and authority prerequisites are unavailable.
 ## 14. Decision
 
 Local decision and Professor boundaries enforce citation/evidence contracts,
-bounded tool budgets and conservative failure modes. No production decision is
-authorized without approved provider/corpus metrics, citation support evidence,
-fresh negative cases and the sealed release packet.
+bounded tool budgets and conservative failure modes. Citation support now has
+five explicit metrics, including reviewed faithfulness; the canonical golden
+policy requires all five. No production decision is authorized without
+approved provider/corpus metrics, citation support evidence, fresh negative
+cases and the sealed release packet.
 
 ## 15. Provider
 
@@ -144,8 +152,10 @@ rotation evidence is not available.
 ## 16. Retrieval
 
 Retrieval uses the explicit Qdrant adapter and embedding port with bounded
-queries and scope filters. Local fixtures do not establish approved-corpus
-quality, citation precision/recall, unsupported-claim rate or live latency.
+queries and scope filters. The local fixture and Rec22 pack exercise the five
+metric shape with explicit reviewed faithfulness, but do not establish
+approved-corpus quality, citation precision/recall, unsupported-claim rate or
+live latency.
 
 ## 17. Security
 
@@ -202,8 +212,10 @@ current production-shaped performance packet exists.
 ## 23. Frontend
 
 The managed browser surface has local build and visual-matrix coverage at
-375/768/1440. API-backed authenticated, upload, degraded-provider and
-interruption states require a live stack and current same-SHA evidence.
+375/768/1440. Each managed run uses an ephemeral `NEXT_DIST_DIR` and restores
+generated Next metadata during teardown so local browser attempts preserve the
+clean checkout sentinel. API-backed authenticated, upload, degraded-provider
+and interruption states require a live stack and current same-SHA evidence.
 
 ## 24. Accessibility
 

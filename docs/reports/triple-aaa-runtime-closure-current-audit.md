@@ -250,3 +250,53 @@ Focused release-manifest and CI-envelope tests pass (**40** tests combined).
 This closes the local CI evidence-shape gap without changing runtime status;
 Docker, live services, remote provenance, independent review and promotion
 sealing remain unavailable.
+
+## 71. Reviewed faithfulness contract — 2026-09-10
+
+Source candidate `038faa5` (tree `fd0570621837116309fd02ad95ed211a261b984f`)
+closes the retrieval-evaluation faithfulness contract. The evaluator now
+accepts only an explicit reviewed boolean or bounded numeric annotation; it
+does not infer faithfulness from lexical overlap or citation identifiers.
+Citation support therefore reports five fields — citation correctness,
+completeness, entailment, citation validity and reviewed faithfulness — with
+missing faithfulness remaining `INCONCLUSIVE`. The local fixture and Rec22
+pack carry the explicit annotation, and the decision contract can require the
+metric; the canonical golden runtime policy requires all five fields.
+
+Focused evaluator, decision, API and golden-runtime checks pass, and the full
+State-of-Art suite passes **330** tests. This closes the local contract and
+fixture gap only. Approved provider/corpus evidence, live retrieval quality,
+independent review and runtime promotion remain unavailable.
+
+## 72. CI envelope provenance hardening — 2026-09-10
+
+The bounded CI envelope now records `started_at`, `finished_at` and
+`exit_code` in addition to its observation timestamp. Release evidence
+validation checks schema, lifecycle ordering, status/exit consistency,
+candidate commit/tree/fingerprint, current-clean sentinel, lane/gate
+identity, promotion scope, command statuses and raw-artifact hash before an
+envelope can support promotion. The corresponding release-integrity checks
+apply the same lifecycle and exit-status rules. This is local provenance
+hardening; it does not create remote same-SHA, runtime or authority evidence.
+
+## 73. Worker crash-point coverage boundary — 2026-09-10
+
+The multi-worker gate now enumerates all eight requested crash points:
+`after_claim`, `after_heartbeat`, `during_handler`, `before_result`,
+`in_transaction`, `after_commit`, `before_publish` and `after_publish`.
+The canonical `RealWorkerRuntime` path has hermetic injection and assertions
+for the first two points, including heartbeat renewal and stale/lease
+recovery. The remaining six points are explicitly `NOT_IMPLEMENTED`; the
+gate emits `crash_matrix_complete=false` and `production_safe=false` until
+all eight pass. No live PostgreSQL Worker A/B evidence is claimed.
+
+## 74. Browser-run isolation hygiene — 2026-09-10
+
+The managed frontend gate assigns each run an ephemeral
+`apps/web/.next-phase3-<port>` build directory through `NEXT_DIST_DIR` and
+restores generated `next-env.d.ts` and `tsconfig.json` snapshots during
+teardown. The repository ignores those per-run directories, so a browser
+attempt cannot leave tracked Next metadata dirty. This improves local
+repeatability and clean-sentinel integrity; it does not prove live
+API-backed browser states, accessibility approval, image provenance or
+promotion.
