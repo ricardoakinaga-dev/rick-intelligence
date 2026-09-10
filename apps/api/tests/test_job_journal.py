@@ -486,6 +486,38 @@ def test_cleanup_lease_survives_both_journal_and_unlink_failure(tmp_path: Path, 
     reopened.close()
 
 
+def test_cleanup_lease_json_fails_closed_for_oversized_or_nonfinite_markers(tmp_path: Path) -> None:
+    for suffix, raw_payload in (
+        (
+            "oversized",
+            '{"version":1,"job_id":"lease-oversized","source_path":"SOURCE",'
+            '"tenant_id":"tenant-a","workspace_id":"workspace-a",'
+            '"collection_id":"collection-a","padding":"' + ("x" * (8 * 1024)) + '"}',
+        ),
+        (
+            "nonfinite",
+            '{"version":1,"job_id":"lease-nonfinite","source_path":"SOURCE",'
+            '"tenant_id":"tenant-a","workspace_id":"workspace-a",'
+            '"collection_id":"collection-a","padding":NaN}',
+        ),
+    ):
+        staging = tmp_path / suffix
+        source = staging / "source.txt"
+        source.parent.mkdir(parents=True)
+        source.write_text("private source", encoding="utf-8")
+        job_id = f"lease-{suffix}"
+        lease_root = staging / ".cleanup-leases"
+        lease_root.mkdir(mode=0o700)
+        marker = lease_root / IngestionApplicationService._cleanup_lease_filename(job_id)
+        marker.write_text(raw_payload.replace("SOURCE", str(source)), encoding="utf-8")
+
+        service = IngestionApplicationService(_FakeIngestion(), staging_root=staging)
+
+        assert source.exists()
+        assert marker.exists()
+        service.shutdown(wait=True)
+
+
 def test_staging_failure_quarantines_unowned_source_until_restart_cleanup(
     tmp_path: Path, monkeypatch
 ) -> None:

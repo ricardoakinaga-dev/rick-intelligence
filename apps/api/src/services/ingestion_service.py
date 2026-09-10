@@ -36,6 +36,7 @@ from threading import Condition, Event, RLock, Thread, current_thread, get_ident
 from typing import Any, Callable
 
 from core.telemetry import emit_safely, opaque_ref
+from services.json_boundary import decode_bounded_json
 
 
 SUPPORTED_EXTENSIONS = frozenset({".pdf", ".docx", ".md", ".txt"})
@@ -45,6 +46,7 @@ DEFAULT_MAX_JOBS = 256
 DEFAULT_MAX_RETRIES = 3
 DEFAULT_MAX_STAGED_BYTES = DEFAULT_MAX_BYTES * 2
 MAX_POINT_SNAPSHOT = 100_000
+MAX_CLEANUP_LEASE_JSON_BYTES = 8 * 1024
 
 _WORKSPACE_ID = re.compile(r"^[^\x00/\\]{1,128}$")
 _JOB_STATES = frozenset(
@@ -530,8 +532,17 @@ class IngestionApplicationService:
             descriptor, temporary = tempfile.mkstemp(
                 prefix=".lease-", suffix=".tmp", dir=str(lease_root)
             )
+            encoded = json.dumps(
+                payload,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+                allow_nan=False,
+            )
+            if len(encoded.encode("utf-8")) > MAX_CLEANUP_LEASE_JSON_BYTES:
+                raise ValueError("cleanup lease marker is too large")
             with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
-                json.dump(payload, stream, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+                stream.write(encoded)
                 stream.flush()
                 os.fsync(stream.fileno())
             os.chmod(temporary, 0o600)
@@ -570,10 +581,19 @@ class IngestionApplicationService:
             if marker.is_symlink() or not marker.is_file() or marker.suffix != ".json":
                 continue
             try:
-                payload = json.loads(marker.read_text(encoding="utf-8"))
-            except (OSError, TypeError, ValueError, json.JSONDecodeError):
+                with marker.open("r", encoding="utf-8") as stream:
+                    raw = stream.read(MAX_CLEANUP_LEASE_JSON_BYTES + 1)
+                payload = decode_bounded_json(
+                    raw, None, max_bytes=MAX_CLEANUP_LEASE_JSON_BYTES
+                )
+            except (OSError, TypeError, UnicodeError, ValueError, json.JSONDecodeError):
                 continue
-            if not isinstance(payload, Mapping) or payload.get("version") != 1:
+            if (
+                not isinstance(payload, Mapping)
+                or payload.get("version") != 1
+                or isinstance(payload.get("version"), bool)
+                or not _safe_identifier(payload.get("job_id"), max_length=128)
+            ):
                 continue
             if not all(
                 _safe_identifier(payload.get(name), max_length=128)
