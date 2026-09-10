@@ -4,10 +4,17 @@ from types import SimpleNamespace
 
 import pytest
 
-from services.postgres_chat_history import PostgresChatHistoryError, PostgresChatHistoryStore
+from services.postgres_chat_history import PostgresChatHistoryError, PostgresChatHistoryStore, _json
 
 
 SESSION = SimpleNamespace(tenant_id="tenant-a", workspace_id="workspace-a", user_id="user-a")
+
+
+def test_database_json_decoder_rejects_oversized_and_nonfinite_history_values() -> None:
+    oversized = '{"answer":"' + ("a" * (256 * 1024)) + '"}'
+
+    assert _json(oversized, {}) == {}
+    assert _json('{"metadata":{"stream_ttft_ms":NaN}}', {}) == {}
 
 
 class Cursor:

@@ -21,6 +21,7 @@ from services.chat_history import (
     InMemoryChatHistoryStore,
     STREAM_CONTEXT_EXCLUDED_STATUSES,
     STREAM_TERMINAL_STATUSES,
+    _decode_json,
     _bounded_page,
     _filter_citations,
     _turn_allowed,
@@ -50,14 +51,7 @@ def _row_dict(cursor: object, row: object) -> dict[str, object]:
 
 
 def _json(value: object, default: object) -> object:
-    if isinstance(value, (dict, list)):
-        return value
-    if isinstance(value, str):
-        try:
-            return json.loads(value)
-        except (TypeError, ValueError, json.JSONDecodeError):
-            return default
-    return default
+    return _decode_json(value, default)
 
 
 def _timestamp(value: object) -> float | object:

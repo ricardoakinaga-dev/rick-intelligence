@@ -38,6 +38,39 @@ def _scope(session: object) -> tuple[str, str, str]:
 
 STREAM_TERMINAL_STATUSES = frozenset({"partial", "error", "cancelled", "complete"})
 STREAM_CONTEXT_EXCLUDED_STATUSES = frozenset({"partial", "error", "cancelled"})
+MAX_HISTORY_JSON_BYTES = 256 * 1024
+
+
+def _reject_json_constant(_value: str) -> object:
+    raise ValueError("non-finite JSON constants are not allowed")
+
+
+def _decode_json(value: object, default: object) -> object:
+    """Decode persisted history JSON only after applying a finite byte bound."""
+
+    parsed = value
+    if isinstance(value, str):
+        try:
+            if len(value.encode("utf-8")) > MAX_HISTORY_JSON_BYTES:
+                return default
+            parsed = json.loads(value, parse_constant=_reject_json_constant)
+        except (TypeError, UnicodeError, ValueError, RecursionError):
+            return default
+    if not isinstance(parsed, (dict, list)):
+        return default
+    try:
+        encoded = json.dumps(
+            parsed,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        )
+        if len(encoded.encode("utf-8")) > MAX_HISTORY_JSON_BYTES:
+            return default
+    except (TypeError, UnicodeError, ValueError, OverflowError, RecursionError):
+        return default
+    return parsed
 
 
 def _bounded_page(limit: object, offset: object = 0) -> tuple[int, int]:
@@ -608,8 +641,8 @@ class SQLiteChatHistoryStore:
             ).fetchall()
         messages: list[dict[str, str]] = []
         for row in reversed(rows):
-            metadata = json.loads(row["metadata_json"] or "{}")
-            citations = json.loads(row["citations_json"] or "[]")
+            metadata = _decode_json(row["metadata_json"] or "{}", {})
+            citations = _decode_json(row["citations_json"] or "[]", [])
             if not _turn_allowed(citations, allowed_collection_ids):
                 continue
             if isinstance(metadata, Mapping) and metadata.get("stream_status") in STREAM_CONTEXT_EXCLUDED_STATUSES:
@@ -627,7 +660,7 @@ class SQLiteChatHistoryStore:
             ).fetchone()
         if row is None:
             return None
-        value = json.loads(row["response_json"])
+        value = _decode_json(row["response_json"], None)
         if not isinstance(value, dict):
             return None
         metadata = value.get("metadata")
@@ -654,7 +687,7 @@ class SQLiteChatHistoryStore:
                     (*scope, key),
                 ).fetchone()
                 if existing is not None:
-                    value = json.loads(existing["response_json"])
+                    value = _decode_json(existing["response_json"], {})
                     metadata = value.get("metadata") if isinstance(value, dict) else None
                     if not (isinstance(metadata, Mapping) and metadata.get("stream_status") in STREAM_CONTEXT_EXCLUDED_STATUSES):
                         return value if isinstance(value, dict) else dict(response)
@@ -738,14 +771,15 @@ class SQLiteChatHistoryStore:
             ).fetchall()
         result: list[dict[str, Any]] = []
         for row in rows:
-            value = json.loads(row["response_json"])
-            if isinstance(value, dict):
-                if not _turn_allowed(value.get("citations"), allowed_collection_ids):
-                    continue
-                value["citations"] = _filter_citations(value.get("citations"), allowed_collection_ids)
-                value["question"] = row["question"]
-                value["created_at"] = row["created_at"]
-                result.append(value)
+            value = _decode_json(row["response_json"], None)
+            if not isinstance(value, dict):
+                continue
+            if not _turn_allowed(value.get("citations"), allowed_collection_ids):
+                continue
+            value["citations"] = _filter_citations(value.get("citations"), allowed_collection_ids)
+            value["question"] = row["question"]
+            value["created_at"] = row["created_at"]
+            result.append(value)
         return result
 
     def list_history_page(

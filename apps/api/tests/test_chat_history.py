@@ -5,6 +5,14 @@ import pytest
 from conftest import login_as
 
 
+def test_persisted_history_json_decoder_rejects_oversized_and_nonfinite_values():
+    from services.chat_history import _decode_json
+
+    oversized = '{"answer":"' + ("a" * (256 * 1024)) + '"}'
+    assert _decode_json(oversized, {}) == {}
+    assert _decode_json('{"metadata":{"stream_ttft_ms":NaN}}', {}) == {}
+
+
 def test_chat_history_and_sources_are_scoped_and_bounded(client):
     from services.chat_history import InMemoryChatHistoryStore
 
