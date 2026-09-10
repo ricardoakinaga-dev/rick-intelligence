@@ -215,7 +215,7 @@ This completes the source-level trace stage list for the Redis boundary without
 claiming a live collector chain, latency metrics, failover behavior or
 promotion. The candidate remains **BLOCKED_EXTERNAL / NO-GO**.
 
-## 69. Current exact-candidate revalidation — 2026-09-10
+## 69. Prior exact-candidate revalidation — 2026-09-10
 
 The current clean candidate is `5723884a9de9b0a7ac1aa55f077ef798a2e2ab7e`
 with tree `d6e5af4a73c2d2b559ad45bc58d842f3cc4bd16e`. The archived prompt
@@ -333,3 +333,24 @@ against an approved PostgreSQL Worker A/B deployment.
 The focused crash/worker tests pass **14** cases and the full State-of-Art
 suite passes **336** tests. No external database or distributed runtime claim
 is made.
+
+## 77. Final exact-candidate revalidation — 2026-09-10
+
+The current clean candidate is `6d2f7998527805c17e3c30eb67937704a4dc2606`
+with tree `4259796dd45a567c31be5a7e927a0e3c222e01e5`. The archived prompt
+still matches the supplied attachment byte-for-byte (27,366 bytes; SHA-256
+`064be5e04ed483d5d95ef803a66faf6675f7c1f00633cdea83d5abfdd5370d5f`).
+
+Fresh local validation passes: `make validate`,
+`make triple-aaa-capability-matrix` and `make eval-retrieval-pack`. The
+release manifest and integrated verifier are bound to this clean candidate;
+the artifact-set digest is
+`0caba7cb80ce3b81e3fb9e9b1546ef82bcd588fcfa57dc36af1f8dffa8bd26e0` and the
+checkout fingerprint is
+`c5200b2a32f5393bed0602d27c86b64d4cac46dde8aca2bdbc4ab06d145e518f`.
+
+The verifier remains `STATE_OF_ART_CANDIDATE`, exit **2**, with **17** local
+PASS lanes and **24** `BLOCKED_EXTERNAL` mandatory lanes; promotion is
+`false`. Docker still cannot be accessed from this environment, so no live
+service, distributed failure/recovery, independent-review or sealed-promotion
+claim is made. The candidate remains **NO-GO**.
