@@ -36,6 +36,13 @@ local bounded; uma fonte ausente vira falha explícita `recovery_required`. As
 respostas marcam esse caminho como `durability=local-sqlite` e
 `restart_recovery=true`.
 
+ACL, metadata e snapshots persistidos são tratados como JSON não confiável:
+o limite de 32 KiB, números finitos, estrutura allowlisted e chaves de objeto
+únicas são exigidos antes de uma linha virar estado de recuperação. Uma linha
+ambígua ou corrompida é omitida; o journal nunca escolhe silenciosamente o
+último valor de uma chave duplicada. Essa é contenção local e bounded, não
+prova de fila distribuída ou durabilidade PostgreSQL.
+
 ## Rework após revisão I1
 
 O slice local foi reaberto depois de uma revisão independente encontrar quatro

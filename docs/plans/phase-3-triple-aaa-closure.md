@@ -822,3 +822,21 @@ knowledge/ingestion/retrieval domain suite passes **165**; compilation and
 schema/filter/alias/rebuild/restore, approved object storage, distributed
 runtime, independent review, sealed packet and human Go/No-Go remain
 unavailable; promotion remains disallowed.
+
+## 54. Persisted journal, knowledge and identity duplicate-key closure — 2026-09-10
+
+Source candidate `688d97311eb5569451e312e9ff5c172902abcdc4` (tree
+`83172ae5a4392c36f609a1d0dc0271d1241d22c7`) closes three remaining local
+persisted-JSON ambiguity paths. The process-local job journal, SQLite/PostgreSQL
+knowledge metadata decoder and PostgreSQL identity ACL/session decoder now
+reject duplicate object keys before allowlist, authorization or recovery-row
+projection; corrupt or ambiguous rows fail closed instead of selecting the last
+value.
+
+The focused job-journal suite passes **16**, the knowledge suite **23**, the
+identity suite **21**, the complete API matrix **446**, and the combined
+knowledge/ingestion/retrieval domain suite **166**; compilation and
+`git diff --check` pass. This is local adapter/read-model evidence only.
+Approved PostgreSQL durability, distributed recovery, tenant runtime,
+independent review, sealed packet and human Go/No-Go remain unavailable;
+promotion remains disallowed.

@@ -73,6 +73,12 @@ prove live history, case/identity/job/audit/knowledge/object durability,
 Redis fencing or multi-replica behavior, tenant isolation or distributed
 Qdrant recovery or distributed recovery.
 
+At source candidate `688d97311eb5569451e312e9ff5c172902abcdc4`, the journal,
+knowledge metadata and PostgreSQL identity decoders also reject duplicate JSON
+object keys before recovery, metadata or authorization projection. This
+strengthens local ambiguity/corruption containment only; it does not prove
+PostgreSQL durability, distributed recovery or live tenant isolation.
+
 The API upload, reindex and retry routes at source candidate
 `1ddd3c5b1c9af913bc3da427c284a91f8f454f99` also apply the configured request
 byte budget and a finite, duplicate-free UTF-8 decoder before model validation.
