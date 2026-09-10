@@ -23,6 +23,12 @@ import tempfile
 from typing import Any
 import uuid
 
+try:  # Package import for repository execution; root-relative fallback for direct execution.
+    from scripts.state_of_art.json_boundary import load_json
+except ImportError:  # pragma: no cover - exercised by direct script execution.
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts" / "state_of_art"))
+    from json_boundary import load_json
+
 
 SCHEMA_VERSION = "rick-backup.v1"
 MANIFEST_NAME = "manifest.json"
@@ -212,7 +218,7 @@ def _read_manifest(backup_dir: Path, *, match_directory_name: bool = True) -> di
             raise BackupError("backup manifest is invalid")
         if path.stat().st_size > _MAX_MANIFEST_BYTES:
             raise BackupError("backup manifest is too large")
-        payload = json.loads(path.read_text(encoding="utf-8"))
+        payload = load_json(path, maximum_bytes=_MAX_MANIFEST_BYTES)
     except BackupError:
         raise
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
@@ -641,10 +647,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         elif args.operation == "purge":
             result = purge_backups(args.output_root, retention_days=args.retention_days, keep_latest=args.keep_latest, dry_run=not args.apply)
         else:
-            observed = json.loads(args.observed.read_text(encoding="utf-8"))
+            observed = load_json(args.observed)
             expected_scope = None
             if args.expected_scope is not None:
-                expected_scope = json.loads(args.expected_scope.read_text(encoding="utf-8"))
+                expected_scope = load_json(args.expected_scope)
             result = reconcile_backup(
                 args.backup,
                 observed,

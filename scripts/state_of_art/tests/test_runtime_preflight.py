@@ -144,3 +144,19 @@ def test_preflight_rejects_dirty_non_disposable_missing_endpoint_and_symlink(tmp
     assert any("web-readiness" in error for error in errors)
     assert any("symlinked" in error for error in errors)
     outside.unlink()
+
+
+def test_preflight_loader_rejects_duplicate_json_keys(tmp_path: Path) -> None:
+    target = tmp_path / DEFAULT_PATH
+    target.parent.mkdir(parents=True)
+    target.write_text(
+        '{"schema_version":"state-of-art-runtime-preflight.v1",'
+        '"schema_version":"forged"}',
+        encoding="utf-8",
+    )
+
+    loaded, errors, digest = load_preflight(tmp_path)
+
+    assert loaded is None
+    assert digest is None
+    assert errors == ["preflight artifact is unreadable: JSONDecodeError"]

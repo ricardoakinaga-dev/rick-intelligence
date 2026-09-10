@@ -18,6 +18,11 @@ import re
 import tempfile
 from collections.abc import Mapping, Sequence
 from typing import Any
+
+try:  # Package import for tests; script-directory fallback for direct execution.
+    from scripts.state_of_art.json_boundary import load_json
+except ImportError:  # pragma: no cover - exercised by direct script execution.
+    from json_boundary import load_json
 from urllib.parse import urlsplit
 
 
@@ -364,8 +369,7 @@ def load_preflight(
     if not target.is_file() or target.is_symlink():
         return None, ["preflight artifact is missing or symlinked"], None
     try:
-        raw = target.read_text(encoding="utf-8")
-        payload = json.loads(raw)
+        payload = load_json(target)
     except (OSError, UnicodeDecodeError, json.JSONDecodeError, TypeError) as exc:
         return None, [f"preflight artifact is unreadable: {type(exc).__name__}"], None
     digest = _sha256_file(target)

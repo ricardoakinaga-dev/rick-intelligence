@@ -10,6 +10,12 @@ import re
 import sys
 from typing import Any
 
+try:  # Package import for repository execution; root-relative fallback for direct execution.
+    from scripts.state_of_art.json_boundary import load_json
+except ImportError:  # pragma: no cover - exercised by direct script execution.
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts" / "state_of_art"))
+    from json_boundary import load_json
+
 
 DOCKER_ROOT = Path(__file__).resolve().parent
 DEFAULT_MANIFEST = DOCKER_ROOT / "release-manifest.json"
@@ -29,7 +35,7 @@ ALLOWED_SOURCE_NOT_CAPTURED = {"NOT_CAPTURED", *ALLOWED_NOT_RUN}
 
 
 def _load_json(path: Path) -> dict[str, Any]:
-    value = json.loads(path.read_text(encoding="utf-8"))
+    value = load_json(path)
     if not isinstance(value, dict):
         raise ValueError(f"{path} must contain a JSON object")
     return value

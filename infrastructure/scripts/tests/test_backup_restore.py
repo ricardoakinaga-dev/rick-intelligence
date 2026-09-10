@@ -161,3 +161,24 @@ def test_semantic_metadata_is_bounded_and_validated(tmp_path: Path) -> None:
             restore_target="target",
             component_metadata={"audit": {"acl_sha256": "not-a-checksum"}},
         )
+
+
+def test_backup_manifest_rejects_duplicate_fields(tmp_path: Path) -> None:
+    source = tmp_path / "source.txt"
+    source.write_text("x", encoding="utf-8")
+    root = tmp_path / "backups"
+    backup_restore.create_backup(
+        {"audit": source}, root, backup_id="duplicate-manifest", operator="ops", restore_target="target"
+    )
+    path = root / "duplicate-manifest" / "manifest.json"
+    manifest = path.read_text(encoding="utf-8")
+    path.write_text(
+        manifest.replace(
+            '"schema_version":"rick-backup.v1"',
+            '"schema_version":"rick-backup.v1","schema_version":"forged"',
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(backup_restore.BackupError, match="manifest is invalid"):
+        backup_restore.verify_backup(root / "duplicate-manifest")

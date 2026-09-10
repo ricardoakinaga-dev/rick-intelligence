@@ -11,6 +11,11 @@ import re
 import sys
 from typing import Any
 
+try:  # Package import for tests; script-directory fallback for direct execution.
+    from scripts.state_of_art.json_boundary import load_json
+except ImportError:  # pragma: no cover - exercised by direct script execution.
+    from json_boundary import load_json
+
 
 ROOT = Path(__file__).resolve().parents[2]
 QUALITY_BAR = ROOT / "docs/reports/current-triple-aaa-quality-bar-v1.json"
@@ -49,7 +54,7 @@ def _digest(path: Path) -> str:
 def validate(path: Path = QUALITY_BAR) -> list[str]:
     errors: list[str] = []
     try:
-        payload: Any = json.loads(path.read_text(encoding="utf-8"))
+        payload: Any = load_json(path)
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         return [f"quality bar is not readable JSON: {exc}"]
     if not isinstance(payload, dict):

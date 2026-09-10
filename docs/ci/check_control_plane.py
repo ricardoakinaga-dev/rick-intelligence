@@ -21,6 +21,12 @@ from typing import Any
 
 
 ROOT = Path(__file__).resolve().parents[2]
+try:  # Package import for repository execution; root-relative fallback for copied fixtures.
+    from scripts.state_of_art.json_boundary import load_json, loads_json
+except ImportError:  # pragma: no cover - exercised by isolated copied fixtures.
+    sys.path.insert(0, str(ROOT / "scripts" / "state_of_art"))
+    from json_boundary import load_json, loads_json
+
 PHASE06_ACTIVE_PLAN = ".agent/plans/phase-0.6-promotion-closure.md"
 PHASE11_ACTIVE_PLAN = ".agent/plans/phase-1.1-monorepo-skeleton.md"
 PUBLISHED_SHA_RE = re.compile(r"Published root commit:\s*`?([0-9a-f]{40})", re.IGNORECASE)
@@ -90,8 +96,8 @@ def _git(*args: str) -> tuple[int, str, str]:
 
 def _load_json(relative: str, errors: list[str]) -> Any | None:
     try:
-        return json.loads(_read(relative))
-    except (OSError, json.JSONDecodeError) as exc:
+        return load_json(ROOT / relative)
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         errors.append(f"{relative}: invalid JSON ({exc})")
         return None
 
@@ -108,8 +114,8 @@ def _check_jsonl(relative: str, errors: list[str]) -> int:
         if not line.strip():
             continue
         try:
-            json.loads(line)
-        except json.JSONDecodeError as exc:
+            loads_json(line)
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
             errors.append(f"{relative}:{line_number}: invalid JSONL ({exc})")
         else:
             records += 1

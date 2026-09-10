@@ -121,7 +121,7 @@ class CanonicalControllerTests(unittest.TestCase):
                 shutil.copytree(ROOT / relative, root / relative)
             for relative in ("cvg-master-rag-v2/AGENTS.md", "docs/architecture/controller-recovery.md",
                              "docs/ci/check_control_plane.py", "scripts/state_of_art/archive_controller.py",
-                             "scripts/state_of_art/review_control_views.py"):
+                             "scripts/state_of_art/review_control_views.py", "scripts/state_of_art/json_boundary.py"):
                 target = root / relative
                 target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(ROOT / relative, target)

@@ -9,12 +9,20 @@ from pathlib import Path
 import tempfile
 import os
 
-from archive_controller import digest, scoped_path
+try:  # Package import for module execution; script-directory fallback for direct execution.
+    from scripts.state_of_art.archive_controller import digest, scoped_path
+    from scripts.state_of_art.json_boundary import load_json
+except ImportError:  # pragma: no cover - exercised by direct script execution.
+    from archive_controller import digest, scoped_path
+    from json_boundary import load_json
+
+
+MAX_CONTROL_STATE_BYTES = 32 * 1024 * 1024
 
 
 def expected_views(root: Path) -> dict[str, str]:
-    state = json.loads((root / ".agent/state.json").read_text())
-    backlog = json.loads((root / ".agent/backlog.json").read_text())
+    state = load_json(root / ".agent/state.json")
+    backlog = load_json(root / ".agent/backlog.json")
     view = {
         "schema_version": "derived-task-view.v1",
         "authoritative": False,
@@ -52,7 +60,7 @@ def expected_views(root: Path) -> dict[str, str]:
 
 
 def verify_history(root: Path) -> int:
-    manifest = json.loads(scoped_path(root, ".review-control-history/manifest.json").read_text())
+    manifest = load_json(scoped_path(root, ".review-control-history/manifest.json"))
     entries = manifest["files"]
     if manifest.get("schema_version") != 1 or not isinstance(entries, list) or not entries:
         raise ValueError("invalid review history manifest")
@@ -73,13 +81,13 @@ def verify_history(root: Path) -> int:
 
 def verify_bar(root: Path) -> None:
     original_path = root / ".gauntlet-state-of-art/bar.json"
-    original = json.loads(original_path.read_text())
-    canonical = json.loads((root / ".gauntlet-state-of-art/bar.canonical.json").read_text())
-    actual = json.loads((root / ".gauntlet/bar.json").read_text())
+    original = load_json(original_path)
+    canonical = load_json(root / ".gauntlet-state-of-art/bar.canonical.json")
+    actual = load_json(root / ".gauntlet/bar.json")
     if actual != canonical or canonical["goal"] != original["goal"] or len(canonical["criteria"]) != len(original["criteria"]):
         raise ValueError("frozen bar differs from canonical recovery")
     goal = (root / ".gauntlet-state-of-art/goal.txt").read_text().strip()
-    state = json.loads((root / ".gauntlet/state.json").read_text())
+    state = load_json(root / ".gauntlet/state.json", maximum_bytes=MAX_CONTROL_STATE_BYTES)
     if state["goal"] != {"text": goal, "sha256": hashlib.sha256(goal.encode()).hexdigest()}:
         raise ValueError("active run goal differs from the original request")
     for old, new in zip(original["criteria"], canonical["criteria"]):

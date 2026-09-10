@@ -55,6 +55,8 @@ EVIDENCE_STATUSES = {"PASS", "FAIL", "NOT_RUN", "BLOCKED", "INVALID", "STALE"}
 DECISIONS = {"APPROVE", "REJECT", "BLOCKED", "INVALID"}
 INDEPENDENCE = {"I0", "I1", "I2", "I3"}
 VERDICTS = {"PASS", "CONDITIONAL_PASS", "FAIL"}
+MAX_STATE_JSON_BYTES = 32 * 1024 * 1024
+MAX_JSONL_RECORD_BYTES = 1 * 1024 * 1024
 
 
 class StateError(RuntimeError):
@@ -81,14 +83,51 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _json_error(message: str) -> json.JSONDecodeError:
+    return json.JSONDecodeError(message, "", 0)
+
+
+def _reject_json_constant(_value: str) -> object:
+    raise _json_error("non-finite JSON constants are not allowed")
+
+
+def _unique_json_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    value: dict[str, Any] = {}
+    for key, item in pairs:
+        if key in value:
+            raise _json_error("duplicate JSON object key")
+        value[key] = item
+    return value
+
+
+def _loads_json(value: str | bytes, *, maximum_bytes: int) -> Any:
+    if isinstance(value, bytes):
+        if len(value) > maximum_bytes:
+            raise _json_error("JSON exceeds the bounded byte limit")
+        text = value.decode("utf-8")
+    elif isinstance(value, str):
+        if len(value.encode("utf-8")) > maximum_bytes:
+            raise _json_error("JSON exceeds the bounded byte limit")
+        text = value
+    else:
+        raise TypeError("JSON input must be text or bytes")
+    return json.loads(
+        text,
+        object_pairs_hook=_unique_json_object,
+        parse_constant=_reject_json_constant,
+    )
+
+
 def read_json(path: Path) -> dict[str, Any]:
     if path.is_symlink():
         raise StateError(f"refusing symlink JSON file: {path}")
     try:
-        value = json.loads(path.read_text(encoding="utf-8"))
+        with path.open("rb") as stream:
+            raw = stream.read(MAX_STATE_JSON_BYTES + 1)
+        value = _loads_json(raw, maximum_bytes=MAX_STATE_JSON_BYTES)
     except FileNotFoundError as error:
         raise StateError(f"missing JSON file: {path}") from error
-    except (OSError, json.JSONDecodeError) as error:
+    except (OSError, UnicodeDecodeError, TypeError, json.JSONDecodeError) as error:
         raise StateError(f"invalid JSON file {path}: {error}") from error
     if not isinstance(value, dict):
         raise StateError(f"JSON root must be an object: {path}")
@@ -530,16 +569,23 @@ def load_jsonl(path: Path) -> list[dict[str, Any]]:
     if not path.exists():
         raise StateError(f"missing JSONL file: {path}")
     values: list[dict[str, Any]] = []
-    for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
-        if not line.strip():
-            continue
-        try:
-            value = json.loads(line)
-        except json.JSONDecodeError as error:
-            raise StateError(f"invalid JSONL at {path}:{number}: {error}") from error
-        if not isinstance(value, dict):
-            raise StateError(f"JSONL item must be an object at {path}:{number}")
-        values.append(value)
+    try:
+        with path.open("rb") as stream:
+            for number, raw_line in enumerate(stream, 1):
+                line = raw_line.rstrip(b"\r\n")
+                if not line.strip():
+                    continue
+                try:
+                    value = _loads_json(line, maximum_bytes=MAX_JSONL_RECORD_BYTES)
+                except (UnicodeDecodeError, TypeError, json.JSONDecodeError) as error:
+                    raise StateError(f"invalid JSONL at {path}:{number}: {error}") from error
+                if not isinstance(value, dict):
+                    raise StateError(f"JSONL item must be an object at {path}:{number}")
+                values.append(value)
+    except FileNotFoundError as error:
+        raise StateError(f"missing JSONL file: {path}") from error
+    except OSError as error:
+        raise StateError(f"invalid JSONL file {path}: {error}") from error
     return values
 
 
@@ -834,7 +880,7 @@ def cmd_init(args: argparse.Namespace) -> int:
     envelope_errors = validate_capabilities(capabilities) + validate_budget(budget)
     if envelope_errors:
         raise StateError("invalid resource envelope: " + "; ".join(envelope_errors))
-    frozen_bar = json.loads(canonical_json(bar))
+    frozen_bar = _loads_json(canonical_json(bar), maximum_bytes=MAX_STATE_JSON_BYTES)
     artifact = fingerprint(repo)
     state = {
         "schema_version": STATE_SCHEMA_VERSION,

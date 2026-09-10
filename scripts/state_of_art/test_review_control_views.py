@@ -17,6 +17,17 @@ spec.loader.exec_module(views)
 
 
 class ReviewControlTests(unittest.TestCase):
+    def test_derived_view_reader_rejects_duplicate_state_keys(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / ".agent").mkdir()
+            (root / ".agent/state.json").write_text(
+                '{"state_revision":1,"state_revision":2}', encoding="utf-8"
+            )
+            (root / ".agent/backlog.json").write_text('{"items":[]}', encoding="utf-8")
+            with self.assertRaises(ValueError):
+                views.expected_views(root)
+
     def test_current_views_are_derived_and_history_preserved(self):
         self.assertEqual(views.verify_history(ROOT), 11)
         views.verify_bar(ROOT)

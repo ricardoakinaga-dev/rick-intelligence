@@ -85,6 +85,14 @@ class ReleaseStaticTests(unittest.TestCase):
             errors = CHECK.validate_release(Path(handle.name), mode="prepared")
         self.assertTrue(any("scan.status is invalid" in error for error in errors))
 
+    def test_manifest_reader_rejects_duplicate_fields(self) -> None:
+        with tempfile.NamedTemporaryFile("w", suffix=".json", encoding="utf-8") as handle:
+            handle.write('{"schema":"rick.release.manifest/v1","schema":"forged"}')
+            handle.flush()
+            errors = CHECK.validate_release(Path(handle.name), mode="prepared")
+
+        self.assertTrue(any("manifest:" in error for error in errors))
+
     def test_prepared_packet_rejects_pass_claims_in_every_external_status(self) -> None:
         mutations = {
             "build.status": lambda manifest: manifest["build"].__setitem__("status", "PASS"),
