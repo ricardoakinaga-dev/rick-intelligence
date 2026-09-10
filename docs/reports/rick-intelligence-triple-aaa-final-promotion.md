@@ -148,6 +148,12 @@ SBOM and release/container artifacts before source, license, digest or runtime
 projection. This prevents ambiguous local artifacts from becoming supply-chain
 claims; browser, image and external authority remain required.
 
+At source candidate `e60ceaccf3fca6e54ee969554cc450ab41223582`, the Phase 11
+corpus, Compose static and skeleton validators apply the strict boundary before
+security categories, service readiness or preservation claims are projected.
+This closes local validator ambiguity only; Docker, approved corpus and final
+promotion authority remain required.
+
 ## 7. CI and release lanes
 
 The canonical workflow names FAST, UNIT, CONTRACT, SECURITY, RAG_EVAL,

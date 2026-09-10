@@ -948,3 +948,18 @@ This is local frontend/supply-gate integrity evidence only. It does not supply
 approved browser/image/SBOM runtime, external supply authority, independent
 review, sealed packet or human Go/No-Go authority; promotion remains
 disallowed.
+
+## 62. Phase 11 validator JSON boundary closure — 2026-09-10
+
+Source implementation candidate `e60ceaccf3fca6e54ee969554cc450ab41223582`
+(tree `56c5e5c048b5d3a9002b3f79ffc80184fff97d74`) closes permissive JSON paths
+in the Phase 11 adversarial-corpus, rendered-Compose and skeleton validators.
+Corpus records, rendered service configuration and preservation manifests now
+share the strict UTF-8, finite-value and duplicate-key decoder before category,
+service, health or structural claims are projected.
+
+The Phase 11 validator suite passes **27** tests and the complete State-of-Art
+suite passes **305**; compilation and `git diff --check` pass. This is local
+validator-integrity evidence only. It does not supply Docker/services,
+approved corpus authority, independent review, sealed packet or human Go/No-Go
+authority; promotion remains disallowed.

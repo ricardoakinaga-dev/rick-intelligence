@@ -239,3 +239,10 @@ job-level `contents: read` only for checkout, a ten-minute timeout, and no
 external dependency installation. Generation is not itself a pass condition;
 it records `BLOCKED_EXTERNAL`/`NOT_RUN` honestly, and the verifier rejects any
 mandatory non-`PASS` gate.
+
+The Phase 11 adversarial-corpus, rendered-Compose and skeleton validators also
+use the shared bounded strict JSON decoder. Duplicate keys, non-finite values,
+invalid UTF-8 and oversized records fail before security categories, service
+readiness, preservation policy or dependency-boundary claims are projected.
+This closes local validator ambiguity without creating Docker, corpus or
+promotion authority.
