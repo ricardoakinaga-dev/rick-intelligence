@@ -101,6 +101,142 @@ def test_gate_cycle_uses_real_runtime_heartbeat_and_result(local_runtime_contrac
     assert queue.acknowledged[0][1].output_refs == {"publication_ref": "runtime-publication:runtime-contract"}
 
 
+def test_runtime_fault_seam_exposes_distinct_handler_and_result_boundaries(local_runtime_contract) -> None:
+    contract = local_runtime_contract
+    job = contract.job(operation="runtime_multi_worker", now=time.time())
+    queue = contract.FakeQueue([job])
+    observed: list[tuple[str, str]] = []
+
+    def inject(point, observed_job, lease):
+        observed.append((point, str(observed_job.job_id)))
+        assert lease.job_id == observed_job.job_id
+
+    runtime = contract.RealWorkerRuntime(
+        queue,
+        worker_id="worker-fault-contract",
+        scope=contract.SCOPE,
+        handlers={"runtime_multi_worker": lambda _job, _lease, *, cancelled: contract.JobResult(
+            output_refs={"publication_ref": "runtime-publication:fault-contract"},
+            completed_at=time.time(),
+        )},
+        poll_interval_seconds=0.001,
+        heartbeat_interval_seconds=10.0,
+        handler_timeout_seconds=1.0,
+        shutdown_timeout_seconds=1.0,
+        fault_injector=inject,
+    )
+    try:
+        runtime.start()
+        result = runtime.run_once(wait=True)
+    finally:
+        runtime.shutdown(timeout=1.0)
+
+    assert result.succeeded == 1
+    assert [point for point, _job_id in observed] == ["during_handler", "before_result"]
+    assert queue.acknowledged
+
+
+def test_postgres_fault_seam_marks_transaction_after_lock_and_commit(local_runtime_contract) -> None:
+    from postgres_jobs import PostgresJobError, PostgresJobQueue
+
+    contract = local_runtime_contract
+
+    class Cursor:
+        def close(self):
+            pass
+
+    class Connection:
+        commits = 0
+        rollbacks = 0
+
+        def cursor(self):
+            return Cursor()
+
+        def commit(self):
+            self.commits += 1
+
+        def rollback(self):
+            self.rollbacks += 1
+
+        def close(self):
+            pass
+
+    connection = Connection()
+    observed: list[str] = []
+
+    def injector(point):
+        observed.append(point)
+        if point == "in_transaction":
+            raise RuntimeError("injected transaction crash")
+
+    queue = PostgresJobQueue(lambda: connection, fault_injector=injector)
+    queued = contract.job(operation="runtime_multi_worker", now=time.time())
+    running = queued.start_attempt(worker_id="worker-fault-contract", now=time.time())
+    lease = contract.JobLease(
+        job_id=running.job_id,
+        scope=running.scope,
+        worker_id="worker-fault-contract",
+        token="fault-token",
+        acquired_at=time.time(),
+        expires_at=time.time() + 30,
+        heartbeat_at=time.time(),
+    )
+    queue._lock_lease = lambda *_args, **_kwargs: (None, running)
+
+    with pytest.raises(PostgresJobError):
+        queue.acknowledge(
+            lease,
+            contract.JobResult(output_refs={"publication_ref": "fault"}, completed_at=time.time()),
+            now=time.time(),
+            expected_version=running.version,
+        )
+
+    assert observed == ["in_transaction"]
+    assert connection.commits == 0
+    assert connection.rollbacks == 1
+
+
+def test_postgres_fault_seam_wraps_result_event_publication(local_runtime_contract, monkeypatch) -> None:
+    from postgres_jobs import PostgresJobQueue
+
+    contract = local_runtime_contract
+    observed: list[str] = []
+    queue = PostgresJobQueue(lambda: None, fault_injector=observed.append)
+    queued = contract.job(operation="runtime_multi_worker", now=time.time())
+    running = queued.start_attempt(worker_id="worker-fault-contract", now=time.time())
+    completed_at = time.time()
+    succeeded = running.finish_attempt(
+        contract.JobState.SUCCEEDED,
+        now=completed_at,
+        result=contract.JobResult(output_refs={"publication_ref": "fault"}, completed_at=completed_at),
+    )
+    event_order: list[str] = []
+    monkeypatch.setattr(PostgresJobQueue, "_execute", staticmethod(lambda *_args, **_kwargs: None))
+    monkeypatch.setattr(PostgresJobQueue, "_one", staticmethod(lambda *_args, **_kwargs: {}))
+    monkeypatch.setattr(PostgresJobQueue, "_write_attempts", classmethod(lambda *_args, **_kwargs: None))
+    monkeypatch.setattr(
+        PostgresJobQueue,
+        "_write_event",
+        classmethod(lambda *_args, **_kwargs: event_order.append("event")),
+    )
+    monkeypatch.setattr(
+        PostgresJobQueue,
+        "_decode",
+        classmethod(lambda _cls, _cursor, _row: succeeded),
+    )
+
+    queue._persist(
+        object(),
+        succeeded,
+        expected_version=running.version,
+        from_state=running.state,
+        event_type="acknowledged",
+    )
+
+    assert observed == ["before_publish", "after_publish"]
+    assert event_order == ["event"]
+
+
 def test_idle_real_runtime_does_not_claim_heartbeat_or_ack(local_runtime_contract) -> None:
     contract = local_runtime_contract
     queue = contract.FakeQueue([])
@@ -179,6 +315,7 @@ def test_crash_injection_runs_inside_real_handler(local_runtime_contract, monkey
 
 def test_partial_crash_coverage_does_not_claim_complete_production_safety(tmp_path, monkeypatch):
     monkeypatch.setattr(gate, "ROOT", tmp_path)
+    monkeypatch.setattr(gate, "SUPPORTED_CRASH_POINTS", ("after_claim", "after_heartbeat"))
     monkeypatch.setattr(gate, "run_gate", lambda *_args, **_kwargs: (
         "PASS", [gate.GateResult(f"CRASH_{point.upper()}", "PASS") for point in gate.SUPPORTED_CRASH_POINTS]
     ))

@@ -171,6 +171,7 @@ class OperationHandler(Protocol):
 
 
 Handler: TypeAlias = OperationHandler | Callable[..., JobResult]
+FaultInjector: TypeAlias = Callable[[str, Job, JobLease], object]
 Clock: TypeAlias = Callable[[], float]
 Sleeper: TypeAlias = Callable[[float], object]
 VersionResolver: TypeAlias = Callable[[JobId], int]
@@ -524,6 +525,7 @@ class RealWorkerRuntime:
         sleep_fn: Sleeper = time.sleep,
         event_sink: object | None = None,
         expected_version_resolver: VersionResolver | None = None,
+        fault_injector: FaultInjector | None = None,
     ) -> None:
         self.queue = queue
         self.worker_id = WorkerId(_identifier(worker_id, name="worker_id"))
@@ -578,10 +580,15 @@ class RealWorkerRuntime:
             raise RuntimeConfigurationError("sleep_fn is not callable")
         if expected_version_resolver is not None and not callable(expected_version_resolver):
             raise RuntimeConfigurationError("expected_version_resolver is not callable")
+        if fault_injector is not None and not callable(fault_injector):
+            raise RuntimeConfigurationError("fault_injector is not callable")
         self.clock = clock
         self.sleep_fn = sleep_fn
         self.event_sink = event_sink
         self.expected_version_resolver = expected_version_resolver
+        # This seam is inert unless an explicit composition root supplies it;
+        # production workers never read or enable it implicitly.
+        self.fault_injector = fault_injector
 
         self._lock = RLock()
         self._active: dict[str, _Execution] = {}
@@ -884,6 +891,11 @@ class RealWorkerRuntime:
             return handler
         raise RuntimeConfigurationError("handler is not callable")
 
+    def _inject_fault(self, point: str, execution: _Execution) -> None:
+        injector = self.fault_injector
+        if injector is not None:
+            injector(point, execution.job, execution.lease)
+
     def _failure(
         self,
         job: Job,
@@ -1024,6 +1036,7 @@ class RealWorkerRuntime:
         if not self._begin_finalization(execution):
             return
         try:
+            self._inject_fault("before_result", execution)
             self.queue.acknowledge(
                 execution.lease,
                 result,
@@ -1155,6 +1168,7 @@ class RealWorkerRuntime:
                     attributes={"worker.operation": str(job.operation)},
                 ) as span:
                     try:
+                        self._inject_fault("during_handler", execution)
                         execution.result = callable_handler(
                             job,
                             lease,

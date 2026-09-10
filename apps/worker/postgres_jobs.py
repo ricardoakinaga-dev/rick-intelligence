@@ -48,6 +48,11 @@ class DbConnection(Protocol):
     def close(self) -> object: ...
 
 
+# Deliberately opt-in test seam. The canonical queue has no fault injection
+# when this callback is omitted, and callers must choose the named boundary.
+FaultInjector = Callable[[str], object]
+
+
 class PostgresJobError(RuntimeError):
     """Base error for adapter failures."""
 
@@ -303,6 +308,7 @@ class PostgresJobQueue(JobRepository, JobQueue, JobScheduler):
         lease_seconds: float = 30.0,
         backoff_seconds: float = 1.0,
         close_connections: bool = True,
+        fault_injector: FaultInjector | None = None,
     ) -> None:
         if not callable(connection_factory):
             raise PostgresJobError("invalid_input", "connection_factory must be callable")
@@ -314,20 +320,34 @@ class PostgresJobQueue(JobRepository, JobQueue, JobScheduler):
             raise PostgresJobError("invalid_input", "lease_seconds is out of range")
         if isinstance(backoff_seconds, bool) or not 0 <= float(backoff_seconds) <= 86_400:
             raise PostgresJobError("invalid_input", "backoff_seconds is out of range")
+        if fault_injector is not None and not callable(fault_injector):
+            raise PostgresJobError("invalid_input", "fault_injector must be callable")
         self._factory = connection_factory
         self.max_pending = max_pending
         self.max_attempts = max_attempts
         self.lease_seconds = float(lease_seconds)
         self.backoff_seconds = float(backoff_seconds)
         self._close_connections = close_connections
+        self._fault_injector = fault_injector
         self._closed = False
 
+    def _inject_fault(self, point: str) -> None:
+        injector = self._fault_injector
+        if injector is not None:
+            injector(point)
+
     @contextmanager
-    def _session(self, *, write: bool = False) -> Iterator[tuple[DbConnection, object]]:
+    def _session(
+        self,
+        *,
+        write: bool = False,
+        operation: str | None = None,
+    ) -> Iterator[tuple[DbConnection, object]]:
         if self._closed:
             raise PostgresJobError("closed")
         connection: DbConnection | None = None
         cursor: object | None = None
+        committed = False
         try:
             connection = self._factory()
             if connection is None:
@@ -336,15 +356,18 @@ class PostgresJobQueue(JobRepository, JobQueue, JobScheduler):
             yield connection, cursor
             if write:
                 connection.commit()
+                committed = True
+                if operation == "acknowledge":
+                    self._inject_fault("after_commit")
         except (PostgresJobError, JobContractError):
-            if write and connection is not None:
+            if write and connection is not None and not committed:
                 try:
                     connection.rollback()
                 except Exception:
                     pass
             raise
         except Exception as exc:
-            if write and connection is not None:
+            if write and connection is not None and not committed:
                 try:
                     connection.rollback()
                 except Exception:
@@ -745,9 +768,8 @@ class PostgresJobQueue(JobRepository, JobQueue, JobScheduler):
             metadata=metadata,
         )
 
-    @classmethod
     def _persist(
-        cls,
+        self,
         cursor: object,
         job: Job,
         *,
@@ -760,6 +782,7 @@ class PostgresJobQueue(JobRepository, JobQueue, JobScheduler):
         event_type: str = "transition",
         deadline: float | None = None,
     ) -> Job:
+        cls = type(self)
         if isinstance(expected_version, bool) or not isinstance(expected_version, int) or expected_version < 0:
             raise PostgresJobError("invalid_input", "expected_version is invalid")
         if job.version != expected_version + 1:
@@ -859,7 +882,11 @@ class PostgresJobQueue(JobRepository, JobQueue, JobScheduler):
                 raise PostgresJobLeaseError("lease expired or was replaced before persistence")
             raise PostgresJobConcurrencyError()
         cls._write_attempts(cursor, job)
+        if event_type == "acknowledged":
+            self._inject_fault("before_publish")
         cls._write_event(cursor, job, from_state=from_state, event_type=event_type)
+        if event_type == "acknowledged":
+            self._inject_fault("after_publish")
         return cls._decode(cursor, row)
 
     @classmethod
@@ -1429,8 +1456,11 @@ class PostgresJobQueue(JobRepository, JobQueue, JobScheduler):
             deadline = _time(deadline, field="deadline")
             if now >= deadline:
                 raise PostgresJobLeaseError("handler deadline expired")
-        with self._session(write=True) as (_connection, cursor):
+        with self._session(write=True, operation="acknowledge") as (_connection, cursor):
             _row, job = self._lock_lease(cursor, lease, expected_version=expected_version, now=now)
+            # The transaction has acquired the live lease row lock, but the
+            # result mutation and its projections have not started yet.
+            self._inject_fault("in_transaction")
             try:
                 succeeded = job.finish_attempt(JobState.SUCCEEDED, now=now, result=result)
             except JobContractError as exc:

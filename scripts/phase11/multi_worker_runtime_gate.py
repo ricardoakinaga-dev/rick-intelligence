@@ -34,7 +34,10 @@ CRASH_POINTS = (
     "after_claim", "after_heartbeat", "during_handler", "before_result",
     "in_transaction", "after_commit", "before_publish", "after_publish",
 )
-SUPPORTED_CRASH_POINTS = ("after_claim", "after_heartbeat")
+# The full matrix is executable through explicit runtime and canonical queue
+# fault seams. ``production_safe`` still requires every point to finish with a
+# real external database run; local tests never promote that claim.
+SUPPORTED_CRASH_POINTS = CRASH_POINTS
 
 
 @dataclass(frozen=True)
@@ -80,12 +83,18 @@ def _runtime_dependencies() -> tuple[Any, ...] | None:
     )
 
 
-def _queue_for(dsn: str, dependencies: tuple[Any, ...]) -> Any:
+def _queue_for(
+    dsn: str,
+    dependencies: tuple[Any, ...],
+    *,
+    fault_injector: Any | None = None,
+) -> Any:
     psycopg, _lease_error, queue_type = dependencies[:3]
     return queue_type(
         lambda: psycopg.connect(dsn),
         lease_seconds=LEASE_SECONDS,
         backoff_seconds=0.0,
+        fault_injector=fault_injector,
     )
 
 
@@ -198,16 +207,65 @@ class _ObservedHeartbeatQueue:
         return renewed
 
 
-def _run_crash_cycle(queue: Any, scope: Any, worker_id: str, channel: Any, crash_point: str) -> None:
-    """Terminate inside a real worker handler at one explicitly supported point."""
+def _run_crash_cycle(
+    queue: Any,
+    scope: Any,
+    worker_id: str,
+    channel: Any,
+    crash_point: str,
+    result_type: Any | None = None,
+) -> None:
+    """Terminate a real runtime at one explicit matrix boundary.
+
+    Handler boundaries are injected by ``RealWorkerRuntime`` and transaction
+    boundaries by ``PostgresJobQueue``. The callback is only supplied by this
+    gate process; normal workers have no enabled crash injector.
+    """
 
     from runtime import RealWorkerRuntime
+    if result_type is None:
+        from rick_jobs import JobResult as result_type
 
     if crash_point not in SUPPORTED_CRASH_POINTS:
         raise ValueError("unsupported crash point")
     observed = _ObservedHeartbeatQueue(queue)
+    claim: dict[str, Any] = {"job": None, "lease": None}
+    sent = False
+
+    def send_claim(job: Any, lease: Any) -> None:
+        nonlocal sent
+        if sent:
+            return
+        sent = True
+        claim["job"] = job
+        claim["lease"] = lease
+        # Lease credentials cross only the private parent pipe for the stale
+        # mutation negative. They are never included in the evidence artifact.
+        _send(channel, {
+            "kind": "claimed", "pid": os.getpid(), "worker_id": worker_id,
+            "job_id": str(job.job_id), "version": job.version,
+            "token": str(lease.token), "acquired_at": lease.acquired_at,
+            "expires_at": lease.expires_at, "heartbeat_at": lease.heartbeat_at,
+            "runtime": "RealWorkerRuntime", "crash_point": crash_point,
+        })
+
+    def terminate() -> None:
+        if claim["job"] is not None and claim["lease"] is not None:
+            send_claim(claim["job"], claim["lease"])
+        try:
+            channel.close()
+        except (AttributeError, OSError):
+            pass
+        os._exit(0)
+
+    def runtime_fault(point: str, job: Any, lease: Any) -> None:
+        if point == crash_point:
+            send_claim(job, lease)
+            terminate()
 
     def handler(job: Any, lease: Any, *, cancelled: Any) -> Any:
+        claim["job"] = job
+        claim["lease"] = lease
         if crash_point == "after_heartbeat":
             deadline = time.monotonic() + WORKER_WAIT_SECONDS / 2
             while runtime.metrics().heartbeats < 1:
@@ -216,24 +274,25 @@ def _run_crash_cycle(queue: Any, scope: Any, worker_id: str, channel: Any, crash
                     raise RuntimeError("runtime heartbeat was not observed")
                 time.sleep(0.01)
             lease = observed.renewed_lease
-        # Lease credentials cross only the private parent pipe for the stale
-        # mutation negative. They are never included in the evidence artifact.
-        channel.send({
-            "kind": "claimed", "pid": os.getpid(), "worker_id": worker_id,
-            "job_id": str(job.job_id), "version": job.version,
-            "token": str(lease.token), "acquired_at": lease.acquired_at,
-            "expires_at": lease.expires_at, "heartbeat_at": lease.heartbeat_at,
-            "runtime": "RealWorkerRuntime", "crash_point": crash_point,
-        })
-        channel.close()
-        os._exit(0)
+            claim["lease"] = lease
+        if crash_point in {"after_claim", "after_heartbeat"}:
+            send_claim(job, lease)
+            terminate()
+        # Publish the private observation before result finalization. For
+        # transaction points the queue callback terminates after this handler
+        # returns, while ``before_result`` terminates in the runtime itself.
+        send_claim(job, lease)
+        return result_type(
+            output_refs={"publication_ref": f"runtime-publication:{job.job_id}"},
+            completed_at=time.time(),
+        )
 
     runtime = RealWorkerRuntime(
         observed, worker_id=worker_id, scope=scope,
         handlers={"runtime_multi_worker": handler}, max_concurrency=1,
         heartbeat_interval_seconds=LEASE_SECONDS / 3,
         poll_interval_seconds=0.01, handler_timeout_seconds=WORKER_WAIT_SECONDS / 2,
-        shutdown_timeout_seconds=2.0,
+        shutdown_timeout_seconds=2.0, fault_injector=runtime_fault,
     )
     try:
         runtime.start()
@@ -263,9 +322,21 @@ def _crash_after_claim_worker(
         if not ready.wait(WORKER_WAIT_SECONDS):
             _send(channel, {"kind": "error", "error": "worker_start_barrier_timeout"})
             os._exit(1)
-        queue = _queue_for(dsn, dependencies)
+        def queue_fault(point: str) -> None:
+            if point != crash_point:
+                return
+            # The handler has sent the private lease observation before any
+            # result transaction is entered. Abrupt exit forces PostgreSQL to
+            # roll back all uncommitted writes for the three pre-commit points.
+            try:
+                channel.close()
+            except (AttributeError, OSError):
+                pass
+            os._exit(0)
+
+        queue = _queue_for(dsn, dependencies, fault_injector=queue_fault)
         scope = scope_type(*scope_values)
-        _run_crash_cycle(queue, scope, worker_id, channel, crash_point)
+        _run_crash_cycle(queue, scope, worker_id, channel, crash_point, _result_type)
     except Exception as exc:  # pragma: no cover - exercised by a live dependency.
         _send(channel, {"kind": "error", "error": type(exc).__name__})
         os._exit(1)
@@ -400,22 +471,25 @@ def _run_crash_recovery(
         raise RuntimeError("crash worker did not observe a renewed lease")
 
     expires_at = float(claim["expires_at"])
-    time.sleep(max(0.0, expires_at - time.time() + 0.25))
-    reclaim_ready = context.Event()
-    reclaim_parent, reclaim_child = context.Pipe(duplex=False)
-    reclaimer = context.Process(
-        target=_claim_and_ack_worker,
-        args=(dsn, scope, job_id, "worker-reclaimer", reclaim_ready, reclaim_child),
-        name="rick-runtime-worker-reclaimer",
-    )
-    reclaimer.start()
-    reclaim_child.close()
-    reclaim_ready.set()
-    reclaimed = _receive(reclaim_parent, WORKER_WAIT_SECONDS)
-    reclaim_parent.close()
-    _finish_process(reclaimer)
-    if reclaimed.get("kind") == "error" or reclaimed.get("claimed") is not True or reclaimed.get("acked") is not True:
-        raise RuntimeError("a second worker did not reclaim and acknowledge the crashed job")
+    committed_result = crash_point == "after_commit"
+    reclaimed: dict[str, object] | None = None
+    if not committed_result:
+        time.sleep(max(0.0, expires_at - time.time() + 0.25))
+        reclaim_ready = context.Event()
+        reclaim_parent, reclaim_child = context.Pipe(duplex=False)
+        reclaimer = context.Process(
+            target=_claim_and_ack_worker,
+            args=(dsn, scope, job_id, "worker-reclaimer", reclaim_ready, reclaim_child),
+            name="rick-runtime-worker-reclaimer",
+        )
+        reclaimer.start()
+        reclaim_child.close()
+        reclaim_ready.set()
+        reclaimed = _receive(reclaim_parent, WORKER_WAIT_SECONDS)
+        reclaim_parent.close()
+        _finish_process(reclaimer)
+        if reclaimed.get("kind") == "error" or reclaimed.get("claimed") is not True or reclaimed.get("acked") is not True:
+            raise RuntimeError("a second worker did not reclaim and acknowledge the crashed job")
 
     psycopg, lease_error_type, _queue_type, _job_type, job_id_type, lease_type, result_type, scope_type, token_type, worker_type = dependencies
     stale_lease = lease_type(
@@ -448,7 +522,21 @@ def _run_crash_recovery(
         collection_id=scope[2],
     )
     if final_job is None or final_job.state.value != "SUCCEEDED":
-        raise RuntimeError("reclaimed job did not finish successfully")
+        raise RuntimeError("crashed job did not finish successfully")
+    expected_attempts = 1 if committed_result else 2
+    if final_job.attempt_count != expected_attempts:
+        raise RuntimeError("crash recovery produced an unexpected attempt count")
+    if not final_job.attempts or final_job.attempts[-1].state.value != "SUCCEEDED":
+        raise RuntimeError("crash recovery produced no successful final attempt")
+    if committed_result:
+        if final_job.attempts[0].state.value != "SUCCEEDED":
+            raise RuntimeError("after-commit crash did not retain the committed attempt")
+    elif (
+        final_job.attempts[0].state.value != "FAILED"
+        or final_job.attempts[0].failure is None
+        or final_job.attempts[0].failure.code != "lease_expired"
+    ):
+        raise RuntimeError("reclaimed crash did not record the expired first attempt")
     with psycopg.connect(dsn) as connection:
         with connection.cursor() as cursor:
             cursor.execute(
@@ -463,16 +551,42 @@ def _run_crash_recovery(
                 (job_id,),
             )
             outbox_row = cursor.fetchone()
+            cursor.execute(
+                "SELECT COUNT(*) FROM rick_audit_events "
+                "WHERE target_id=%s AND action='jobs.acknowledged'",
+                (job_id,),
+            )
+            audit_row = cursor.fetchone()
+            cursor.execute(
+                "SELECT lease_owner, lease_until FROM rick_ingestion_jobs WHERE job_id=%s",
+                (job_id,),
+            )
+            lease_row = cursor.fetchone()
     if not lifecycle_row or int(lifecycle_row[0]) != 1:
         raise RuntimeError("crash recovery produced an unexpected lifecycle publication count")
     if not outbox_row or int(outbox_row[0]) != 1:
         raise RuntimeError("crash recovery produced an unexpected durable publication count")
+    if not audit_row or int(audit_row[0]) != 1:
+        raise RuntimeError("crash recovery produced an unexpected audit count")
+    if not lease_row or lease_row[0] is not None or lease_row[1] is not None:
+        raise RuntimeError("successful crash recovery retained a durable lease")
+    recovery_detail = (
+        "real worker terminated after the result transaction committed; durable state, attempt, audit and outbox were retained"
+        if committed_result
+        else "real worker terminated before result commit; lease expiry reclaimed the job with one durable publication"
+    )
     return [
-        GateResult(f"CRASH_{crash_point.upper()}", "PASS", "real worker process terminated and its durable job recovered"),
-        GateResult("LEASE_RECLAIM_AFTER_EXPIRY", "PASS", "a second process reclaimed the expired durable lease"),
-        GateResult("STALE_WORKER_ACK_REJECTED", "PASS", "the crashed worker's stale lease could not acknowledge after reclaim"),
+        GateResult(f"CRASH_{crash_point.upper()}", "PASS", recovery_detail),
+        GateResult(
+            "LEASE_RECLAIM_AFTER_EXPIRY",
+            "PASS",
+            "a second process reclaimed the expired durable lease"
+            if not committed_result
+            else "no reclaim was required because the result transaction was already durable",
+        ),
+        GateResult("STALE_WORKER_ACK_REJECTED", "PASS", "the crashed worker's stale lease could not acknowledge after the terminal mutation"),
         GateResult("STALE_WORKER_PUBLISH_REJECTED", "PASS", "the stale worker attempt left the durable outbox publication count unchanged"),
-        GateResult("CRASH_RECOVERY_SUCCEEDS", "PASS", "the reclaimed job completed with one lifecycle and one outbox event"),
+        GateResult("CRASH_RECOVERY_SUCCEEDS", "PASS", "state, lease, attempt, audit and outbox invariants held after recovery"),
         GateResult("DUPLICATE_PUBLICATION_REJECTED", "PASS", "crash recovery retained exactly one durable publication event"),
     ]
 
