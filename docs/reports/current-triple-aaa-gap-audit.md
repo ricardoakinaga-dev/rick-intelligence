@@ -119,6 +119,34 @@ strongest current state supported by evidence, not an aspiration.
 No capability is currently `VERIFIED_RUNTIME` or `PROMOTABLE` for the full
 program. `LOCAL_VERIFIED` means only the declared local boundary passed.
 
+## 20. Runtime-envelope freshness and release-order correction — 2026-09-10
+
+The exact clean implementation candidate `4019f54af3c5882fb5c3b2d08f333a12b13ed1f2`
+(tree `71f8fac6feaa6bc54cf7e462bfcb7da8ad396091`, checkout fingerprint
+`d5a68677e02581b3439f0b0bd3a3d55ddf37fa7e996e01f236037fc185506eae`) was
+verified with the integrated `make triple-aaa-verify` packet
+(`.runtime/phase-3/triple-aaa-verify.json`, SHA-256
+`91c7839cc1f30621c28ab539393ef10626502778a8b67bbff18ecbf66d6de2af`).
+The packet artifact set is
+`5aa145de1039a75dac1fae9e4d3c5f266e04103f149493226261f1969eaebbe0` and the
+quality-bar hash is `711d866b8506a22b8097cb3dd0ca7fdf74b2e2bbf320b1c7880b95bdd0a5f8e6`.
+
+This candidate closes a local evidence-integrity defect: runtime lanes now
+run before Phase 3/release artifact generation; PostgreSQL, Redis and provider
+lanes use commit-bound adapters; frontend/accessibility/supply lanes always
+refresh one current adapter envelope even when the browser or approved
+runtime is unavailable; and every raw runtime artifact records the final
+typed `status` and `exit_status`. Focused contract coverage is **181 passed**
+tests. The integrated verifier reports **15 foundation lanes passed** and
+`STATE_OF_ART_CANDIDATE` with JSON exit `1`; release evidence, release
+integrity and Phase 3 evidence verification are now consistently
+`BLOCKED_EXTERNAL`, rather than stale `FAIL`/`INVALID` records.
+
+This is still diagnostic evidence only. Docker daemon access, disposable
+service configuration, approved corpus/provider, image provenance, fresh
+independent review, sealed packet and authorized human Go/No-Go remain
+unavailable. No State of Art, AAA or Triple AAA claim is made.
+
 ## 5. Priority and dependency order
 
 ### P0 — release truth and runtime foundation

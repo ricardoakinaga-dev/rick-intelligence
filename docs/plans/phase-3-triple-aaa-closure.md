@@ -99,6 +99,26 @@ High, sealed packet and final independent Go/No-Go. Any required non-PASS
 short-circuits to the appropriate lower classification and maps to exit `2`
 when the cause is external blocking, otherwise exit `1`.
 
+## 18. Runtime-envelope freshness closure — 2026-09-10
+
+Candidate `4019f54af3c5882fb5c3b2d08f333a12b13ed1f2` (tree
+`71f8fac6feaa6bc54cf7e462bfcb7da8ad396091`) passed the focused evidence
+contract suite (**181 tests**) and a clean integrated verifier run. The
+verifier bound checkout fingerprint
+`d5a68677e02581b3439f0b0bd3a3d55ddf37fa7e996e01f236037fc185506eae`, artifact
+set `5aa145de1039a75dac1fae9e4d3c5f266e04103f149493226261f1969eaebbe0` and
+packet SHA-256
+`91c7839cc1f30621c28ab539393ef10626502778a8b67bbff18ecbf66d6de2af`.
+
+The implementation now orders runtime observation before matrix/manifest
+generation, refreshes all manifest-consuming envelopes through their
+commit-bound adapters, and makes raw artifacts agree with the envelope's
+final typed status and exit code. The result is
+`STATE_OF_ART_CANDIDATE` / JSON exit `1`, with 15 foundation lanes passing;
+the remaining release/runtime/provider/corpus/review/sealing/Go-No-Go lanes
+are explicitly `BLOCKED_EXTERNAL`. This correction improves truthfulness but
+does not satisfy the definition of done or authorize promotion.
+
 ## 6. Current risks and authority boundaries
 
 | Risk | Treatment | Evidence needed | Authority |

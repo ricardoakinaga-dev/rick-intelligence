@@ -13,10 +13,16 @@ independent reviews and human authority keep the candidate below `TRIPLE_AAA`.
 
 ## 2. Candidate identity
 
-The exact commit, tree, checkout fingerprint and artifact-set digest must be
-read from the same-run packet at
-`.runtime/phase-3/triple-aaa-verify.json`. This report never substitutes a
-manually typed SHA and is invalid if the packet is absent, stale or dirty.
+The current diagnostic packet binds commit
+`4019f54af3c5882fb5c3b2d08f333a12b13ed1f2`, tree
+`71f8fac6feaa6bc54cf7e462bfcb7da8ad396091`, checkout fingerprint
+`d5a68677e02581b3439f0b0bd3a3d55ddf37fa7e996e01f236037fc185506eae` and
+artifact-set digest
+`5aa145de1039a75dac1fae9e4d3c5f266e04103f149493226261f1969eaebbe0`. The
+packet is `.runtime/phase-3/triple-aaa-verify.json` with SHA-256
+`91c7839cc1f30621c28ab539393ef10626502778a8b67bbff18ecbf66d6de2af`.
+This report remains invalid if that packet is absent, stale, dirty or
+inconsistent with the exact candidate.
 
 ## 3. Prompt provenance
 
@@ -234,15 +240,22 @@ immutable digest and migration-compatible boundary.
 | 24 | Frontend/a11y | `PARTIAL` | real browser matrix + critic |
 | 25 | Supply/review/promotion | `NOT_RUN` | scans, independent review, Go/No-Go |
 
-Scores are advisory only. No numeric score is issued while mandatory evidence
-is missing or blocked; no score can override a required rejection.
+**Advisory score: `10/100`.** The score uses equal 25-dimension weighting:
+`LOCAL_VERIFIED = 2`, `PARTIAL = 1`, and `PASS`/`VERIFIED_RUNTIME`/
+`PROMOTABLE = 4`; `BLOCKED_EXTERNAL` and `NOT_RUN` score zero. The current
+matrix has one `LOCAL_VERIFIED` dimension and eight `PARTIAL` dimensions.
+This is a diagnostic measure only; it cannot override a mandatory rejection,
+and the definition-of-done threshold remains `96/100` with all required
+runtime and promotion gates passing.
 
 ## 28. Final Go/No-Go and next action
 
 **Decision:** `NO-GO / NOT PROMOTED`.  
 **Authorized approver:** `NOT_RUN`.  
 **Sealed packet:** `NOT_RUN`.  
-**Executable next action:** run the P0 control packet from a clean candidate,
-then obtain an explicitly owned disposable runtime; re-run all blocked lanes,
-rebind every artifact to the resulting SHA/tree and request fresh independent
-review before any promotion decision.
+**Executable next action:** provide the approved disposable Docker daemon and
+runtime configuration, rerun the current adapters and real service lanes,
+rebind every artifact to the resulting SHA/tree, obtain fresh independent
+review and an authorized sealed Go/No-Go decision. The current packet's
+PostgreSQL, Redis, provider, frontend, supply-chain and release envelopes are
+fresh `BLOCKED_EXTERNAL` observations; none is a promotion signal.
