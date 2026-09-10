@@ -37,6 +37,30 @@
       "value": 1.0
     },
     {
+      "id": "citation-precision",
+      "metric_path": "metrics.citation_support.citation_precision.value",
+      "operator": ">=",
+      "value": 1.0
+    },
+    {
+      "id": "citation-recall",
+      "metric_path": "metrics.citation_support.citation_recall.value",
+      "operator": ">=",
+      "value": 1.0
+    },
+    {
+      "id": "citation-completeness",
+      "metric_path": "metrics.citation_support.citation_completeness.value",
+      "operator": ">=",
+      "value": 1.0
+    },
+    {
+      "id": "unsupported-claim-rate",
+      "metric_path": "metrics.citation_support.unsupported_claim_rate.value",
+      "operator": "<=",
+      "value": 0.0
+    },
+    {
       "id": "fixture-p95-latency",
       "metric_path": "metrics.latency.p95",
       "operator": "<=",

@@ -240,12 +240,14 @@ function toMessages(entries: ChatHistoryEntry[]): WorkspaceMessage[] {
     .filter((message) => message.content || message.role === "assistant");
 }
 
-function CitationList({ citations, messageId }: { citations: ChatCitation[]; messageId: string }) {
+function CitationList({ citations, messageId, responseNumber }: { citations: ChatCitation[]; messageId: string; responseNumber: number }) {
   const headingId = sourceHeadingId(messageId);
+  const landmarkContextId = `${headingId}-context`;
   return (
-    <section className={`${styles.sources} evidence-stack`} aria-labelledby={headingId}>
+    <section className={`${styles.sources} evidence-stack`} aria-labelledby={`${headingId} ${landmarkContextId}`}>
       <div className={`${styles.sourcesHeading} source-heading`}>
         <h3 id={headingId} tabIndex={-1}><FileText size={15} aria-hidden="true" />Fontes associadas</h3>
+        <span id={landmarkContextId} className="sr-only">da resposta {responseNumber}</span>
         <span>{citations.length}</span>
       </div>
       {citations.length ? (
@@ -279,7 +281,7 @@ function CitationList({ citations, messageId }: { citations: ChatCitation[]; mes
   );
 }
 
-function MessageBubble({ message, onCopy }: { message: WorkspaceMessage; onCopy: (content: string) => void }) {
+function MessageBubble({ message, onCopy, responseNumber }: { message: WorkspaceMessage; onCopy: (content: string) => void; responseNumber: number }) {
   const assistant = message.role === "assistant";
   const sourcesId = sourceHeadingId(message.id);
   return (
@@ -307,7 +309,7 @@ function MessageBubble({ message, onCopy }: { message: WorkspaceMessage; onCopy:
               <Copy size={14} />Copiar
             </Button>
           </div>
-          <CitationList citations={message.citations} messageId={message.id} />
+          <CitationList citations={message.citations} messageId={message.id} responseNumber={responseNumber} />
           {(() => {
             const trust = evidenceState(message);
             return (
@@ -833,12 +835,12 @@ export function ChatWorkspace() {
               </div>
             ) : messages.length || pendingAssistant ? (
               <div className={styles.messageStack}>
-                {messages.map((message) => <MessageBubble key={message.id} message={message} onCopy={(content) => void copyAnswer(content)} />)}
+                {messages.map((message, index) => <MessageBubble key={message.id} message={message} responseNumber={index + 1} onCopy={(content) => void copyAnswer(content)} />)}
                 {pendingAssistant ? (
                   <article className={`${styles.message} ${styles.assistantMessage} ${styles.streamingMessage} ${pendingIsInterrupted ? styles.interruptedMessage : ""}`} aria-label={pendingIsInterrupted ? "Resposta interrompida" : "Resposta provisória em andamento"} aria-live={pendingIsInterrupted ? undefined : "polite"}>
                     <div className={styles.messageHeader}><span className={styles.messageAuthor}><span className={`${styles.messageAvatar} ${styles.assistantAvatar}`} aria-hidden="true"><Bot size={15} /></span><strong>RICK</strong></span><span className={pendingIsInterrupted ? styles.interruptedLabel : styles.streamingLabel}>{pendingIsInterrupted ? "Resposta interrompida · não finalizada" : `Resposta provisória · ${pendingAssistant.answer ? "validando fontes…" : "consultando fontes…"}`}</span></div>
                     <div className={styles.messageContent}>{pendingAssistant.answer || <span className={styles.typingDots} aria-label="Gerando resposta"><i /><i /><i /></span>}</div>
-                    {pendingAssistant.citations.length ? <CitationList citations={pendingAssistant.citations} messageId={pendingAssistant.id} /> : null}
+                    {pendingAssistant.citations.length ? <CitationList citations={pendingAssistant.citations} messageId={pendingAssistant.id} responseNumber={messages.length + 1} /> : null}
                     {pendingIsInterrupted ? <p className={styles.interruptedNote} role="status">Este conteúdo parcial não foi marcado como resposta concluída nem deve ser usado sem uma nova consulta.</p> : null}
                   </article>
                 ) : null}

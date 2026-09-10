@@ -122,6 +122,8 @@ DEFAULT_ARTIFACTS = (
     "scripts/phase11/tenant_evidence_runtime_gate.py",
     "scripts/phase11/observability_runtime_gate.py",
     "scripts/phase11/frontend_supply_runtime_gate.py",
+    "scripts/phase11/restore_runtime_gate.py",
+    "scripts/phase11/file_security_runtime_gate.py",
     "scripts/phase11/postgres_runtime_gate.py",
     "scripts/state_of_art/run_phase3_postgres.py",
     "scripts/state_of_art/run_phase3_object_qdrant.py",
@@ -130,6 +132,8 @@ DEFAULT_ARTIFACTS = (
     "scripts/state_of_art/run_phase3_tenant_evidence.py",
     "scripts/state_of_art/run_phase3_observability.py",
     "scripts/state_of_art/run_phase3_frontend_supply.py",
+    "scripts/state_of_art/run_phase3_restore.py",
+    "scripts/state_of_art/run_phase3_file_security.py",
     "scripts/state_of_art/run_phase3_operational.py",
     "scripts/state_of_art/tests/test_phase3_postgres_runtime.py",
     "scripts/phase11/multi_worker_runtime_gate.py",
@@ -162,6 +166,8 @@ DEFAULT_ARTIFACTS = (
     "scripts/state_of_art/tests/test_tenant_evidence_runtime.py",
     "scripts/state_of_art/tests/test_observability_runtime.py",
     "scripts/state_of_art/tests/test_frontend_supply_runtime.py",
+    "scripts/state_of_art/tests/test_restore_runtime.py",
+    "scripts/state_of_art/tests/test_file_security_runtime.py",
 )
 RUNTIME_GATE_ARTIFACTS = {
     "postgresql": ".runtime/phase-3/postgres-runtime-evidence.json",
@@ -169,6 +175,8 @@ RUNTIME_GATE_ARTIFACTS = {
     "redis": ".runtime/phase-3/redis-multi-replica-runtime-evidence.json",
     "qdrant": ".runtime/phase-3/object-qdrant-runtime-evidence.json",
     "object-storage": ".runtime/phase-3/object-qdrant-runtime-evidence.json",
+    "restore": ".runtime/phase-3/restore-runtime-evidence.json",
+    "file-security": ".runtime/phase-3/file-security-runtime-evidence.json",
 }
 def _run(root: Path, command: Sequence[str]) -> tuple[str, int | None, str]:
     try:

@@ -36,7 +36,7 @@ SHA1_RE = re.compile(r"^[0-9a-f]{40}$", re.IGNORECASE)
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$", re.IGNORECASE)
 REQUIRED_CAPABILITY_IDS = frozenset(
     {f"P0-{index:02d}" for index in range(1, 9)}
-    | {f"P1-{index:02d}" for index in range(1, 9)}
+    | {f"P1-{index:02d}" for index in range(1, 10)}
     | {"P2-01"}
 )
 RUNTIME_EVIDENCE_SCHEMA = "state-of-art-runtime-evidence.v1"
@@ -438,9 +438,11 @@ def evaluate_matrix(
         rejection_codes.add("MISSING_EVIDENCE_REJECTED")
     if candidate["commit_sha"] != expected_head:
         failures.append("candidate commit does not match this checkout HEAD")
+        rejection_codes.add("WRONG_COMMIT_REJECTED")
         rejection_codes.add("WRONG_COMMIT_EVIDENCE_REJECTED")
     if not expected_tree or candidate["tree_sha"] != expected_tree:
         failures.append("candidate tree does not match this checkout tree")
+        rejection_codes.add("WRONG_TREE_REJECTED")
         rejection_codes.add("WRONG_COMMIT_EVIDENCE_REJECTED")
     if candidate["checkout_fingerprint"] != expected_fingerprint:
         failures.append("candidate checkout fingerprint does not match this checkout")
@@ -479,6 +481,7 @@ def evaluate_matrix(
             rejection_codes.add("STALE_RUNTIME_EVIDENCE_REJECTED")
         if item["commit_sha"] != candidate["commit_sha"]:
             failures.append(f"{capability_id}: capability commit does not match candidate")
+            rejection_codes.add("WRONG_COMMIT_REJECTED")
             rejection_codes.add("WRONG_COMMIT_EVIDENCE_REJECTED")
         if artifact_set_digest(item["artifact_refs"]) != item["artifact_sha256"]:
             failures.append(f"{capability_id}: artifact set hash does not match declaration")
@@ -538,10 +541,12 @@ def evaluate_matrix(
                     runtime_commit = runtime_record.get("commit_sha")
                     if not isinstance(runtime_commit, str) or runtime_commit.lower() != candidate["commit_sha"]:
                         envelope_errors.append("commit_sha")
+                        rejection_codes.add("WRONG_COMMIT_REJECTED")
                         rejection_codes.add("WRONG_COMMIT_EVIDENCE_REJECTED")
                     runtime_tree = runtime_record.get("tree_sha")
                     if not isinstance(runtime_tree, str) or runtime_tree.lower() != candidate["tree_sha"]:
                         envelope_errors.append("tree_sha")
+                        rejection_codes.add("WRONG_TREE_REJECTED")
                         rejection_codes.add("WRONG_COMMIT_EVIDENCE_REJECTED")
                     runtime_fingerprint = runtime_record.get("checkout_fingerprint")
                     if (

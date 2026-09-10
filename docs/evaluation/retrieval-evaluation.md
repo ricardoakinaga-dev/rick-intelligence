@@ -31,8 +31,10 @@ PYTHONPATH=. python3 scripts/state_of_art/evaluate_retrieval.py \
 The checked-in fixture is intentionally small and synthetic. The current
 observed result is `PASS` for that fixture: hit@1 `1.0`, recall@1 `0.75`,
 hit@3 `1.0`, recall@3 `1.0`, ACL leakage `0`, citation/source coverage `1.0`,
-and fixture-reported latency p50 `9 ms` / p95 `12 ms`. These numbers describe
-only the fixture and are not a production quality, capacity, or SLO claim.
+claim citation precision/recall/completeness `1.0`, unsupported-claim rate
+`0.0`, and fixture-reported latency p50 `9 ms` / p95 `12 ms`. These numbers
+describe only the fixture and are not a production quality, capacity, or SLO
+claim.
 
 ## Metrics and status semantics
 
@@ -41,6 +43,12 @@ only the fixture and are not a production quality, capacity, or SLO claim.
   corpus scope, and report leakage as `FAIL` rather than hiding it;
 - source, checksum, and citation coverage check provenance completeness and
   citation-to-retrieved-source correspondence;
+- `metrics.citation_support` keeps claim support separate from retrieval
+  relevance and citation validity. Each claim in a promoted offline pack must
+  carry approved `reference_citation_ids` (or a reviewed `supported` boolean)
+  plus the emitted `citation_ids`; the four explicit metrics are
+  `citation_precision`, `citation_recall`, `citation_completeness`, and
+  `unsupported_claim_rate`;
 - latency summaries are descriptive fixture observations using nearest-rank
   percentiles, with no implicit target threshold;
 - `PASS` means the supplied observations satisfy the harness checks;
@@ -58,6 +66,29 @@ runtime artifact.
 Live mode is deliberately declaration-only. It returns `NOT_RUN` whether or
 not provider environment markers exist until a separately reviewed live
 adapter, corpus policy, and execution evidence are added.
+
+## Claim-support contract
+
+The optional case field below is the smallest supported shape for the
+identity-level metrics:
+
+```json
+{
+  "claims": [
+    {
+      "claim_id": "claim-1",
+      "text": "A bounded statement from the approved corpus.",
+      "citation_ids": ["chunk-1"],
+      "reference_citation_ids": ["chunk-1"]
+    }
+  ]
+}
+```
+
+`reference_citation_ids` are approved evaluation annotations, not generated
+by the answer. Missing annotations produce `INCONCLUSIVE`; forged emitted
+IDs are a `FAIL`. The evaluator measures citation identity overlap only and
+does not claim entailment, truth, or answer faithfulness.
 
 ## Evidence boundary
 

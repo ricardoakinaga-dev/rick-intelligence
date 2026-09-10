@@ -31,6 +31,20 @@
         {"chunk_id": "alpha-1", "source": "alpha.txt"},
         {"chunk_id": "alpha-2", "source": "alpha.txt"}
       ],
+      "claims": [
+        {
+          "claim_id": "alpha-claim-1",
+          "text": "The alpha record is present in the approved corpus.",
+          "citation_ids": ["alpha-1"],
+          "reference_citation_ids": ["alpha-1"]
+        },
+        {
+          "claim_id": "alpha-claim-2",
+          "text": "The second alpha record is also present.",
+          "citation_ids": ["alpha-2"],
+          "reference_citation_ids": ["alpha-2"]
+        }
+      ],
       "latency_samples_ms": [8, 9, 11]
     },
     {
@@ -57,6 +71,14 @@
       ],
       "citations": [
         {"chunk_id": "beta-1", "source": "beta.txt"}
+      ],
+      "claims": [
+        {
+          "claim_id": "beta-claim-1",
+          "text": "The beta record is present in the approved corpus.",
+          "citation_ids": ["beta-1"],
+          "reference_citation_ids": ["beta-1"]
+        }
       ],
       "latency_samples_ms": [7, 10, 15]
     },

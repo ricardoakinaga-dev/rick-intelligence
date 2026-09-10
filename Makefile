@@ -12,7 +12,7 @@ WEB_CURRENT_EVIDENCE_DIR := $(ROOT)/.gauntlet-state-of-art/evidence/visual-cycle
 
 .DEFAULT_GOAL := help
 
-.PHONY: help bootstrap validate quality-bar-static dev test test-fast test-integration lint typecheck build up down logs ci eval eval-retrieval eval-retrieval-pack security-adversarial storage-test ops-migration-check ops-static compose-static postgres-runtime phase3-postgres-runtime multi-worker-runtime phase3-multi-worker-runtime redis-multi-replica-runtime phase3-redis-multi-replica-runtime phase3-redis-runtime phase3-object-qdrant-runtime redis-runtime object-qdrant-runtime provider-runtime phase3-provider-runtime golden-runtime phase3-golden-runtime provider-rag-runtime tenant-evidence-runtime phase3-tenant-evidence-runtime observability-runtime phase3-observability-runtime frontend-supply-runtime phase3-frontend-supply-runtime triple-aaa-verify ops-backup-test jobs-test release-evidence phase3-evidence phase3-evidence-verify phase3-performance phase3-chaos phase3-soak web-install web-lint web-typecheck web-build web-e2e web-validate api-dev api-test api-contract api-security api-benchmark api131-canonical api131-differential api131-full api131-benchmark api14-units api14-differential api14-acl api14-full api14-benchmark api15-contracts api15-provider api15-lock api15-professor api15-root api15-benchmark api15-verify api15-full api15-boundaries api16-domain api16-worker api16-root api16-benchmark api16-full api16-verify
+.PHONY: help bootstrap validate quality-bar-static dev test test-fast test-integration lint typecheck build up down logs ci eval eval-retrieval eval-retrieval-pack security-adversarial storage-test ops-migration-check ops-static compose-static postgres-runtime phase3-postgres-runtime multi-worker-runtime phase3-multi-worker-runtime redis-multi-replica-runtime phase3-redis-multi-replica-runtime phase3-redis-runtime phase3-object-qdrant-runtime redis-runtime object-qdrant-runtime provider-runtime phase3-provider-runtime golden-runtime phase3-golden-runtime provider-rag-runtime tenant-evidence-runtime phase3-tenant-evidence-runtime observability-runtime phase3-observability-runtime frontend-supply-runtime phase3-frontend-supply-runtime restore-runtime phase3-restore-runtime file-security-runtime phase3-file-security-runtime triple-aaa-verify ops-backup-test jobs-test release-evidence phase3-evidence phase3-evidence-verify phase3-performance phase3-chaos phase3-soak web-install web-lint web-typecheck web-build web-e2e web-validate api-dev api-test api-contract api-security api-benchmark api131-canonical api131-differential api131-full api131-benchmark api14-units api14-differential api14-acl api14-full api14-benchmark api15-contracts api15-provider api15-lock api15-professor api15-root api15-benchmark api15-verify api15-full api15-boundaries api16-domain api16-worker api16-root api16-benchmark api16-full api16-verify
 
 help:
 	@printf '%s\n' 'RICK Intelligence root commands:'
@@ -55,6 +55,10 @@ help:
 	@printf '%s\n' '  make phase3-observability-runtime emit commit-bound observability evidence'
 	@printf '%s\n' '  make frontend-supply-runtime run frontend/accessibility/supply-chain checks'
 	@printf '%s\n' '  make phase3-frontend-supply-runtime emit commit-bound frontend/supply evidence'
+	@printf '%s\n' '  make restore-runtime run the authorized disposable backup/restore sequence'
+	@printf '%s\n' '  make phase3-restore-runtime emit commit-bound restore evidence'
+	@printf '%s\n' '  make file-security-runtime run the hostile file corpus in an isolated worker'
+	@printf '%s\n' '  make phase3-file-security-runtime emit commit-bound file-security evidence'
 	@printf '%s\n' '  make triple-aaa-verify run the fail-closed integrated verification packet'
 	@printf '%s\n' '  make release-evidence generate the ignored commit-bound release manifest'
 	@printf '%s\n' '  make phase3-evidence generate the ignored Phase 3 capability matrix'
@@ -202,6 +206,18 @@ frontend-supply-runtime:
 
 phase3-frontend-supply-runtime:
 	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)" $(PYTHON) "$(ROOT)/scripts/state_of_art/run_phase3_frontend_supply.py"
+
+restore-runtime:
+	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)" $(PYTHON) "$(ROOT)/scripts/phase11/restore_runtime_gate.py"
+
+phase3-restore-runtime:
+	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)" $(PYTHON) "$(ROOT)/scripts/state_of_art/run_phase3_restore.py"
+
+file-security-runtime:
+	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)" $(PYTHON) "$(ROOT)/scripts/phase11/file_security_runtime_gate.py"
+
+phase3-file-security-runtime:
+	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)" $(PYTHON) "$(ROOT)/scripts/state_of_art/run_phase3_file_security.py"
 
 triple-aaa-verify:
 	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) "$(ROOT)/scripts/state_of_art/triple_aaa_verify.py"

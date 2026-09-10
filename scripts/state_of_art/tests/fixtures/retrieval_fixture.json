@@ -65,6 +65,20 @@
         {"chunk_id": "chunk-a-1", "source": "mastite-a.pdf"},
         {"chunk_id": "chunk-a-2", "source": "mastite-a.pdf"}
       ],
+      "claims": [
+        {
+          "claim_id": "claim-a-1",
+          "text": "O protocolo está documentado na fonte autorizada.",
+          "citation_ids": ["chunk-a-1"],
+          "reference_citation_ids": ["chunk-a-1"]
+        },
+        {
+          "claim_id": "claim-a-2",
+          "text": "A segunda evidência pertence ao mesmo escopo.",
+          "citation_ids": ["chunk-a-2"],
+          "reference_citation_ids": ["chunk-a-2"]
+        }
+      ],
       "latency_samples_ms": [8.0, 9.0, 11.0]
     },
     {
@@ -108,6 +122,14 @@
       ],
       "citations": [
         {"chunk_id": "chunk-b-1", "source": "mastite-b.pdf"}
+      ],
+      "claims": [
+        {
+          "claim_id": "claim-b-1",
+          "text": "A fonte autorizada registra o protocolo.",
+          "citation_ids": ["chunk-b-1"],
+          "reference_citation_ids": ["chunk-b-1"]
+        }
       ],
       "latency_samples_ms": [7.0, 10.0, 12.0]
     }

@@ -150,6 +150,7 @@ def test_wrong_commit_matrix_is_rejected(tmp_path: Path) -> None:
     result = evaluate_matrix(path, checkout, root=tmp_path, require_complete=False)
 
     assert result["classification"] == "FAILED"
+    assert "WRONG_COMMIT_REJECTED" in result["rejection_codes"]
     assert "WRONG_COMMIT_EVIDENCE_REJECTED" in result["rejection_codes"]
 
 
@@ -593,6 +594,7 @@ def test_runtime_envelope_wrong_tree_is_rejected(tmp_path: Path) -> None:
     result = evaluate_matrix(path, checkout, root=tmp_path, require_complete=False)
 
     assert result["classification"] == "FAILED"
+    assert "WRONG_TREE_REJECTED" in result["rejection_codes"]
     assert "WRONG_COMMIT_EVIDENCE_REJECTED" in result["rejection_codes"]
 
 
@@ -650,4 +652,5 @@ def test_missing_observed_tree_is_rejected(tmp_path: Path) -> None:
     result = evaluate_matrix(path, checkout, root=tmp_path, require_complete=False)
 
     assert result["classification"] == "FAILED"
+    assert "WRONG_TREE_REJECTED" in result["rejection_codes"]
     assert "WRONG_COMMIT_EVIDENCE_REJECTED" in result["rejection_codes"]

@@ -75,6 +75,7 @@ STATE_OF_ART_LANES = FOUNDATION_LANES + (
     "frontend-e2e",
     "frontend-accessibility",
     "supply-chain",
+    "file-security-runtime",
 )
 
 AAA_LANES = STATE_OF_ART_LANES + (

@@ -54,6 +54,7 @@ class _Case:
     relevant_ids: tuple[str, ...] | None
     denied_ids: tuple[str, ...]
     citations: list[Any] | None
+    claims: list[dict[str, Any]] | None
     latency_values_ms: tuple[float, ...]
     corpus: list[dict[str, Any]]
 
@@ -261,6 +262,67 @@ def _id_list(value: Any, *, path: str, errors: list[str]) -> tuple[str, ...] | N
     return tuple(result)
 
 
+def _claim_list(value: Any, *, path: str, errors: list[str]) -> list[dict[str, Any]] | None:
+    """Validate the versioned claim observation contract.
+
+    Claim support is intentionally annotation-driven.  This evaluator does not
+    infer entailment from a query or silently turn lexical overlap into a
+    faithfulness claim.  A claim may provide output ``citation_ids``, approved
+    ``reference_citation_ids``, and an optional reviewed ``supported`` value.
+    Missing fields remain observable as INCONCLUSIVE in the metric report.
+    """
+
+    if value is None:
+        return None
+    if not isinstance(value, list):
+        errors.append(f"{path} must be an array")
+        return []
+
+    claims: list[dict[str, Any]] = []
+    for index, raw_claim in enumerate(value):
+        claim_path = f"{path}[{index}]"
+        if not isinstance(raw_claim, Mapping):
+            errors.append(f"{claim_path} must be an object")
+            continue
+
+        claim = dict(raw_claim)
+        claim_id = _nonempty_text(claim.get("claim_id", claim.get("id")))
+        if claim_id is None:
+            errors.append(f"{claim_path}.claim_id must be a non-empty string")
+            claim_id = f"claim-{index + 1}"
+        text = _nonempty_text(claim.get("text", claim.get("claim")))
+        if text is None:
+            errors.append(f"{claim_path}.text must be a non-empty string")
+
+        for field_name, aliases in (
+            ("citation_ids", ("citation_ids", "cited_ids", "support_ids")),
+            (
+                "reference_citation_ids",
+                ("reference_citation_ids", "gold_citation_ids", "expected_support_ids"),
+            ),
+        ):
+            present = next((alias for alias in aliases if alias in claim), None)
+            if present is None:
+                claim[field_name] = None
+                continue
+            claim[field_name] = _id_list(
+                claim[present],
+                path=f"{claim_path}.{present}",
+                errors=errors,
+            )
+
+        if "supported" in claim and not isinstance(claim["supported"], bool):
+            errors.append(f"{claim_path}.supported must be a boolean when supplied")
+            claim["supported"] = None
+        elif "supported" not in claim:
+            claim["supported"] = None
+
+        claim["claim_id"] = claim_id
+        claim["text"] = text or ""
+        claims.append(claim)
+    return claims
+
+
 def _number(value: Any, *, path: str, errors: list[str], minimum: float = 0.0) -> float | None:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         errors.append(f"{path} must be a finite number")
@@ -355,6 +417,8 @@ def _normalise_case(raw: Any, index: int, errors: list[str]) -> _Case | None:
             errors.append(f"{path}.{citation_key} must be an array or string")
             citations = []
 
+    claims = _claim_list(raw.get("claims"), path=f"{path}.claims", errors=errors)
+
     raw_latency: Any = None
     if "latency_samples_ms" in raw:
         raw_latency = raw["latency_samples_ms"]
@@ -397,6 +461,7 @@ def _normalise_case(raw: Any, index: int, errors: list[str]) -> _Case | None:
         relevant_ids=relevant_ids,
         denied_ids=denied_ids,
         citations=citations,
+        claims=claims,
         latency_values_ms=tuple(latency_values),
         corpus=corpus,
     )
@@ -850,6 +915,210 @@ def _citation_source_metrics(cases: Sequence[_Case]) -> dict[str, Any]:
     )
 
 
+def _claim_support_metrics(cases: Sequence[_Case]) -> dict[str, Any]:
+    """Evaluate claim-to-citation observations without claiming entailment.
+
+    ``reference_citation_ids`` are reviewed, versioned support annotations from
+    the approved evaluation pack.  ``citation_ids`` are the answer's emitted
+    citations.  The evaluator measures identity-level support and completeness
+    only; domain review or an entailment model remains a separate authority.
+    """
+
+    claims = [
+        (case, claim)
+        for case in cases
+        for claim in (case.claims or [])
+    ]
+    if not claims:
+        not_run = _metric(NOT_RUN, reason="no claims were supplied in the fixture")
+        return _metric(
+            NOT_RUN,
+            reason="no claims were supplied in the fixture",
+            citation_precision=dict(not_run),
+            citation_recall=dict(not_run),
+            citation_completeness=dict(not_run),
+            unsupported_claim_rate=dict(not_run),
+            claim_count=0,
+            per_claim=[],
+        )
+
+    per_claim: list[dict[str, Any]] = []
+    precision_claims: list[dict[str, Any]] = []
+    missing_support_annotations: list[str] = []
+    invalid_citation_count = 0
+    supported_count = 0
+    unsupported_count = 0
+
+    for case, claim in claims:
+        predicted_raw = claim.get("citation_ids")
+        reference_raw = claim.get("reference_citation_ids")
+        predicted = set(predicted_raw or ()) if predicted_raw is not None else set()
+        references = set(reference_raw or ()) if reference_raw is not None else None
+        available_ids = {
+            identifier
+            for citation in (case.citations or [])
+            for identifier in _identifiers(citation)
+        }
+        valid_predicted = predicted.intersection(available_ids)
+        invalid_predicted = predicted.difference(available_ids)
+        invalid_citation_count += len(invalid_predicted)
+
+        true_positive: set[str] = set()
+        if references is not None:
+            true_positive = valid_predicted.intersection(references)
+            if references:
+                precision_claims.append({
+                    "case_id": case.case_id,
+                    "claim_id": claim["claim_id"],
+                    "predicted": valid_predicted,
+                    "predicted_count": len(predicted),
+                    "references": references,
+                    "true_positive": true_positive,
+                })
+
+        explicit_supported = claim.get("supported")
+        if isinstance(explicit_supported, bool):
+            supported = explicit_supported
+            support_source = "reviewed_annotation"
+        elif references is not None:
+            supported = bool(true_positive)
+            support_source = "reference_citation_intersection"
+        else:
+            supported = None
+            support_source = "unobservable"
+            missing_support_annotations.append(f"{case.case_id}:{claim['claim_id']}")
+
+        if supported is True:
+            supported_count += 1
+        elif supported is False:
+            unsupported_count += 1
+
+        per_claim.append({
+            "case_id": case.case_id,
+            "claim_id": claim["claim_id"],
+            "predicted_citation_ids": sorted(predicted),
+            "valid_citation_ids": sorted(valid_predicted),
+            "invalid_citation_ids": sorted(invalid_predicted),
+            "reference_citation_ids": sorted(references) if references is not None else None,
+            "true_positive_citation_ids": sorted(true_positive),
+            "supported": supported,
+            "support_source": support_source,
+        })
+
+    precision_numerator = sum(len(row["true_positive"]) for row in precision_claims)
+    precision_denominator = sum(row["predicted_count"] for row in precision_claims)
+    recall_denominator = sum(len(row["references"]) for row in precision_claims)
+
+    annotation_status = INCONCLUSIVE if missing_support_annotations else PASS
+    precision_status = annotation_status
+    recall_status = annotation_status
+    if invalid_citation_count:
+        precision_status = FAIL
+        recall_status = FAIL
+
+    if not precision_claims:
+        precision_metric = _metric(
+            INCONCLUSIVE,
+            reason="non-empty reference_citation_ids are required for citation precision",
+            value=None,
+            numerator=0,
+            denominator=0,
+            excluded_claims=[row["claim_id"] for row in per_claim],
+        )
+        recall_metric = _metric(
+            INCONCLUSIVE,
+            reason="non-empty reference_citation_ids are required for citation recall",
+            value=None,
+            numerator=0,
+            denominator=0,
+            excluded_claims=[row["claim_id"] for row in per_claim],
+        )
+    else:
+        if precision_denominator:
+            precision_metric = _metric(
+                precision_status,
+                value=_round_ratio(precision_numerator / precision_denominator),
+                numerator=precision_numerator,
+                denominator=precision_denominator,
+                aggregation="micro_over_claim_citations",
+            )
+        else:
+            precision_metric = _metric(
+                INCONCLUSIVE,
+                reason="no emitted citation was available to define citation precision",
+                value=None,
+                numerator=0,
+                denominator=0,
+            )
+        recall_metric = _metric(
+            recall_status,
+            value=_round_ratio(
+                sum(len(row["true_positive"]) for row in precision_claims) / recall_denominator
+            ) if recall_denominator else None,
+            numerator=precision_numerator,
+            denominator=recall_denominator,
+            aggregation="micro_over_reference_citations",
+        )
+
+    if missing_support_annotations:
+        completeness_metric = _metric(
+            INCONCLUSIVE,
+            reason="each claim needs reference_citation_ids or a reviewed supported annotation",
+            value=None,
+            numerator=supported_count,
+            denominator=len(claims),
+            missing_claims=missing_support_annotations,
+        )
+        unsupported_metric = _metric(
+            INCONCLUSIVE,
+            reason="each claim needs reference_citation_ids or a reviewed supported annotation",
+            value=None,
+            numerator=unsupported_count,
+            denominator=len(claims),
+            missing_claims=missing_support_annotations,
+        )
+    else:
+        completeness_status = FAIL if invalid_citation_count else PASS
+        unsupported_status = FAIL if invalid_citation_count else PASS
+        completeness_metric = _metric(
+            completeness_status,
+            value=_round_ratio(supported_count / len(claims)),
+            numerator=supported_count,
+            denominator=len(claims),
+            aggregation="micro_over_claims",
+        )
+        unsupported_metric = _metric(
+            unsupported_status,
+            value=_round_ratio(unsupported_count / len(claims)),
+            numerator=unsupported_count,
+            denominator=len(claims),
+            aggregation="micro_over_claims",
+        )
+
+    status = _status_join([
+        precision_metric["status"],
+        recall_metric["status"],
+        completeness_metric["status"],
+        unsupported_metric["status"],
+    ])
+    return _metric(
+        status,
+        citation_precision=precision_metric,
+        citation_recall=recall_metric,
+        citation_completeness=completeness_metric,
+        unsupported_claim_rate=unsupported_metric,
+        claim_count=len(claims),
+        supported_claims=supported_count,
+        unsupported_claims=unsupported_count,
+        invalid_citation_count=invalid_citation_count,
+        per_claim=per_claim,
+        limitations=[
+            "Citation support is identity-level evaluation against approved reference IDs; it is not entailment or answer faithfulness.",
+            "Low metric values remain observable so pack-owned thresholds, rather than this evaluator, decide quality acceptance.",
+        ],
+    )
+
+
 def _nearest_rank(values: Sequence[float], percentile: float) -> float:
     ordered = sorted(values)
     position = max(1, math.ceil(percentile * len(ordered)))
@@ -914,6 +1183,7 @@ def _evaluate_loaded(
         "ranking": _ranking_metrics(cases, k_values),
         "acl_leakage": _acl_metrics(cases),
         "citation_source_coverage": _citation_source_metrics(cases),
+        "citation_support": _claim_support_metrics(cases),
         "latency": _latency_metrics(cases),
     }
     input_status = FAIL if errors else PASS if cases else INCONCLUSIVE
@@ -925,6 +1195,8 @@ def _evaluate_loaded(
         limitations.append("ACL verification is inconclusive where tenant, workspace, collection, or trusted corpus scope is not observable.")
     if metrics["citation_source_coverage"]["status"] == INCONCLUSIVE:
         limitations.append("Citation coverage is inconclusive when citations or source provenance are absent from the fixture.")
+    if metrics["citation_support"]["status"] == INCONCLUSIVE:
+        limitations.append("Claim support metrics are inconclusive when reviewed support annotations are absent from the fixture.")
     if errors:
         limitations.append("The fixture contains schema or value errors; the overall result is not a valid quality pass.")
 
@@ -980,7 +1252,7 @@ def _live_provider_configured() -> bool:
 def _not_run_result(*, mode: str, reason: str, fixture_path: str | None = None) -> dict[str, Any]:
     metrics = {
         name: _metric(NOT_RUN, reason=reason)
-        for name in ("ranking", "acl_leakage", "citation_source_coverage", "latency")
+        for name in ("ranking", "acl_leakage", "citation_source_coverage", "citation_support", "latency")
     }
     if mode == "live":
         configured = _live_provider_configured()

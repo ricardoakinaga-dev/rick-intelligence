@@ -78,7 +78,11 @@ button { border: 0; }
 .status-dot { display: inline-block; width: 7px; height: 7px; flex: 0 0 7px; border-radius: 999px; background: currentColor; }.status-dot.ok { color: var(--teal-700); }.status-dot.bad { color: var(--red-700); }
 
 .workspace { min-width: 0; width: 100%; max-width: 100%; }
-.topbar { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; justify-content: space-between; min-width: 0; width: 100%; max-width: 100%; min-height: 72px; padding: 0 42px; border-bottom: 1px solid var(--line); background: rgba(238,242,239,.88); backdrop-filter: blur(16px); }
+.topbar { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; justify-content: space-between; min-width: 0; width: 100%; max-width: 100%; min-height: 72px; padding: 0 42px; border-bottom: 1px solid var(--line); background: var(--canvas); }
+
+/* The Next development tools are not product content and must not become a
+   keyboard stop in the real browser gate. Production does not render this host. */
+nextjs-portal { display: none !important; }
 .topbar-leading, .topbar-trailing, .breadcrumb { display: flex; align-items: center; }
 .breadcrumb { gap: 9px; color: var(--ink-500); font-size: 12px; }
 .breadcrumb strong { color: var(--ink-900); font-weight: 700; }

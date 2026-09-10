@@ -21,7 +21,8 @@ contracts, deterministic tests, static checks and frontend build evidence are
 substantial; live PostgreSQL/Redis/Qdrant/object-storage execution,
 multi-worker fencing, distributed observability, restore/chaos/soak,
 production-shaped performance, complete API-backed visual states and release
-promotion evidence remain open or externally blocked. No production,
+promotion evidence, and hostile file-ingestion runtime proof remain open or
+externally blocked. No production,
 `STATE_OF_ART`, `AAA` or `TRIPLE_AAA` claim is made here. A mandatory gate
 that is `NOT_RUN`, `BLOCKED_EXTERNAL` or failed keeps the candidate below
 promotion.
@@ -87,6 +88,7 @@ Run `make help` for the complete list.
 | `make build` | Builds the existing Professor and frontend artifacts and compiles the preserved Python source. |
 | `make ci` | Runs the root foundation validation plus fast tests, lint, typecheck, and build. |
 | `make eval` | Runs the deterministic, explicitly non-live Phase 0.5 RAG plumbing evaluation. |
+| `make eval-retrieval`, `make eval-retrieval-pack` | Evaluate the synthetic retrieval pack for ranking, ACL, provenance, claim citation support (`citation_precision`, `citation_recall`, `citation_completeness`, `unsupported_claim_rate`) and descriptive latency; this is not live-provider or clinical evidence. |
 | `make api-dev` | Runs the canonical `apps/api` kernel (hermetic by default; legacy opt-in). |
 | `make api-test` | Phase 1.3 API matrix (routing/auth/errors/health/compat/streaming/policy). |
 | `make api-contract` | OpenAPI generation + required-path check. |
@@ -109,6 +111,12 @@ Run `make help` for the complete list.
 | `make postgres-runtime` | Runs the real PostgreSQL migration/queue/fencing gate from an explicit `RICK_TEST_DATABASE_DSN`; returns `BLOCKED_EXTERNAL` when unavailable. |
 | `make redis-runtime` | Runs the real Redis namespace/lease/rate-limit gate from an explicit `RICK_TEST_REDIS_URL`; local semantics do not imply production-safe TLS/auth. |
 | `make object-qdrant-runtime` | Runs the real object/vector lifecycle gate from explicit test endpoints; no endpoint discovery or fake transport is used. |
+| `make golden-runtime`, `make tenant-evidence-runtime`, `make observability-runtime` | Run the real ingestion/lineage, multi-tenant/evidence-negative, and distributed telemetry gates when their explicitly approved external authorities are configured; otherwise they remain blocked. |
+| `make restore-runtime` | Runs the authorized disposable `seed → backup → destroy → restore → rebuild → verify` sequence and records RPO/RTO without accepting a local simulation. |
+| `make file-security-runtime` | Runs the ten-case hostile file corpus through an isolated external worker with bounded time, memory, CPU, output and redaction assertions. |
+| `make phase3-evidence`, `make phase3-evidence-verify` | Generate and validate the commit-bound Phase 3 capability matrix; missing, stale, blocked or non-production-safe runtime evidence is not promoted. |
+| `make phase3-restore-runtime`, `make phase3-file-security-runtime` | Bind the restore and file-security runtime observations to the exact clean checkout. |
+| `make phase3-performance`, `make phase3-chaos`, `make phase3-soak` | Run explicitly supplied bounded operational harnesses; no harness is treated as a pass. |
 | `make triple-aaa-verify` | Executes the integrated fail-closed Phase 3 packet and writes a redacted ignored result; `0` is reserved for all mandatory lanes passing, `2` means external blocking, `1` means failure. |
 
 For current component-specific commands and runtime prerequisites, see

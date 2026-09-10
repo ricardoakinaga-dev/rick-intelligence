@@ -38,6 +38,7 @@ REQUIRED_GATES = (
     "observability",
     "dr",
     "restore",
+    "file-security",
     "chaos",
     "soak",
     "performance",
