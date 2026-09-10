@@ -133,8 +133,9 @@ digest and allowed self-declared authority. The correction introduces a
 versioned Ed25519 seal, an explicit public-key trust store, full seal-metadata
 coverage, current-checkout binding and a 24-hour freshness window. Unknown
 keys, missing trust, stale/future timestamps, mutated metadata and absent
-checkout binding remain non-promotable. The local State-of-Art suite now has
-264 passing tests; this does not close live runtime or human promotion gates.
+checkout binding remain non-promotable. The current combined State-of-Art/
+Phase 11 suite now has 299 passing tests; this does not close live runtime or
+human promotion gates.
 
 ## 9. Shared runtime attestation correction — 2026-09-10
 
@@ -163,3 +164,22 @@ This is local release hardening only. Docker daemon access, disposable secrets,
 live endpoint probes, service gates, independent review and human Go/No-Go are
 still unavailable; the honest status remains blocked and no Triple AAA claim
 is made.
+
+## 10. Fail-closed promotion, canonical targets and web boundary — 2026-09-10
+
+Fresh read-only reviews found that typed evidence could still be weakened by
+implicit exit codes, a packet without the release artifact-set binding, a
+cross-gate runtime envelope, or a raw artifact whose status contradicted its
+envelope. The local correction requires explicit zero exit status for PASS,
+binds the sealed packet to `artifact_set_sha256`, restricts external exit `2`
+to purely external blockers, validates the expected Phase 3 capability/path
+and raw status/exit code, and rejects superficial untyped matrix/manifest
+artifacts. Preflight target IDs now bind only canonical Compose files and
+projects.
+
+The web boundary also gained a focusable skip-link destination, deterministic
+composer readiness assertions across mobile/tablet/desktop, and narrower
+live-region semantics for completed and streaming chat content. The combined
+State-of-Art/Phase 11 suite is 299 passing tests; the exact live runtime,
+browser authority, supply-chain evidence, independent reviews and final human
+Go/No-Go remain external blockers.

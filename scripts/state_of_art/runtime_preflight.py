@@ -34,6 +34,7 @@ COMPOSE_PROJECT_BASES = {
     "docker-compose.dev.yml": "rick-intelligence-dev",
     "docker-compose.staging.yml": "rick-intelligence-staging",
 }
+CANONICAL_COMPOSE_FILES = frozenset(COMPOSE_PROJECT_BASES)
 ENDPOINT_CONTRACT = {
     "api-readiness": ("/health/ready", 18000),
     "web-readiness": ("/login", 13000),
@@ -246,6 +247,8 @@ def validate_preflight(
         compose_path = root / compose_file
         if not compose_path.is_file() or compose_path.is_symlink():
             errors.append("preflight compose_file is absent or symlinked")
+        if compose_file.as_posix() not in CANONICAL_COMPOSE_FILES:
+            errors.append("preflight compose_file is not a canonical Phase 3 Compose target")
     if expected_compose_file is not None and payload.get("compose_file") != expected_compose_file:
         errors.append("preflight compose_file does not match the selected target")
     project = payload.get("compose_project")
@@ -256,6 +259,10 @@ def validate_preflight(
         canonical_project = canonical_compose_project(root, compose_file.as_posix())
     if canonical_project is not None and project != canonical_project:
         errors.append("preflight compose_project does not match the selected target")
+    if compose_file is not None and isinstance(project, str):
+        expected_target = f"phase3-compose:{project}:{compose_file.as_posix()}"
+        if target_id != expected_target:
+            errors.append("preflight target_id does not bind the canonical Compose project and file")
     config_hash = payload.get("compose_config_sha256")
     if not isinstance(config_hash, str) or not SHA256_RE.fullmatch(config_hash):
         errors.append("preflight compose_config_sha256 is missing or invalid")

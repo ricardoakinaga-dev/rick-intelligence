@@ -127,9 +127,17 @@ def _read_lane_artifact(lane_id: str) -> tuple[str, str, str] | None:
         return "FAIL", "FAIL", f"{relative_path} does not contain a JSON object"
 
     if lane_id == "phase3-evidence":
+        if payload.get("schema_version") != "state-of-art-phase-3-evidence.v1":
+            return "FAIL", "FAIL", f"{relative_path} has no approved Phase 3 matrix schema"
+        if not isinstance(payload.get("candidate"), dict) or not isinstance(payload.get("capabilities"), list):
+            return "FAIL", "FAIL", f"{relative_path} has no complete candidate/capability binding"
         classification = _phase3_matrix_classification(payload)
         promotable = "PROMOTABLE"
     else:
+        if payload.get("schema_version") != "state-of-art-release-evidence.v2":
+            return "FAIL", "FAIL", f"{relative_path} has no approved release manifest schema"
+        if not isinstance(payload.get("commit_binding"), dict) or not isinstance(payload.get("gates"), list):
+            return "FAIL", "FAIL", f"{relative_path} has no complete release binding"
         raw_status = payload.get("status", payload.get("classification"))
         classification = raw_status.upper() if isinstance(raw_status, str) and raw_status.strip() else None
         promotable = "PASS"
@@ -421,6 +429,7 @@ def _packet_matches_current(
         candidate.get("commit_sha") != checkout.get("head")
         or candidate.get("tree_sha") != checkout.get("tree")
         or candidate.get("checkout_fingerprint") != checkout.get("fingerprint")
+        or candidate.get("artifact_set_sha256") != checkout.get("artifact_set_sha256")
         or candidate.get("clean_worktree") is not True
         or checkout.get("status") != "CLEAN"
     ):
@@ -551,6 +560,10 @@ def main(argv: list[str] | None = None) -> int:
             packet_info["status"] = "INVALID_REFERENCE"
             packet_info["seal_verified"] = False
     checkout = capture_checkout(ROOT)
+    # The release manifest is the authoritative artifact-set binding for the
+    # sealed packet.  Keep it alongside the checkout identity so the
+    # promotion engine can reject a packet from a different manifest.
+    checkout["artifact_set_sha256"] = _manifest_artifact_hash()
     _apply_packet_lanes(
         results,
         packet,

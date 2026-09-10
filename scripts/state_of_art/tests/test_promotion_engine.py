@@ -17,6 +17,7 @@ FIXTURE_CHECKOUT = {
     "head": "a" * 40,
     "tree": "b" * 40,
     "fingerprint": "c" * 64,
+    "artifact_set_sha256": "d" * 64,
     "status": "CLEAN",
 }
 
@@ -28,6 +29,7 @@ def _results(*, status: str = "PASS", external: bool = False) -> list[dict[str, 
             "status": status,
             "required": True,
             "external": external or lane_id in promotion_engine.EXTERNAL_LANES,
+            "return_code": 0,
             "detail": "fixture observation",
             "independent": True,
         }
@@ -43,6 +45,7 @@ def _sealed_packet(results: list[dict[str, object]]) -> dict[str, object]:
                 "commit_sha": "a" * 40,
                 "tree_sha": "b" * 40,
                 "checkout_fingerprint": "c" * 64,
+                "artifact_set_sha256": "d" * 64,
                 "clean_worktree": True,
             },
             "results": results,
@@ -99,7 +102,21 @@ def test_external_block_returns_candidate_and_exit_two() -> None:
 
     assert result["classification"] == "STATE_OF_ART_CANDIDATE"
     assert result["promotion_allowed"] is False
-    assert result["exit_code"] == promotion_engine.EXIT_BLOCKED_EXTERNAL
+    assert result["exit_code"] == promotion_engine.EXIT_FAILED
+    assert "BLOCKED_GATE_REJECTED" in result["rejection_codes"]
+
+
+def test_blocked_foundation_lane_remains_candidate_and_exit_two() -> None:
+    observations = _results()
+    release = next(item for item in observations if item["id"] == "release-evidence-generation")
+    release["status"] = "BLOCKED_EXTERNAL"
+    release["external"] = False
+
+    result = promotion_engine.evaluate(observations)
+
+    assert result["classification"] == "STATE_OF_ART_CANDIDATE"
+    assert result["promotion_allowed"] is False
+    assert result["exit_code"] == promotion_engine.EXIT_FAILED
     assert "BLOCKED_GATE_REJECTED" in result["rejection_codes"]
 
 
@@ -266,12 +283,12 @@ def test_external_block_requires_explicit_exit_two() -> None:
         (
             "phase3-evidence",
             {"capabilities": [{"status": "BLOCKED_EXTERNAL"}]},
-            "BLOCKED_EXTERNAL",
+            "FAIL",
         ),
         (
             "release-evidence-generation",
             {"status": "BLOCKED_EXTERNAL"},
-            "BLOCKED_EXTERNAL",
+            "FAIL",
         ),
     ),
 )
@@ -294,7 +311,7 @@ def test_zero_exit_does_not_hide_blocked_artifact(
     )
 
     assert result["status"] == expected_status
-    assert result["artifact_classification"] == "BLOCKED_EXTERNAL"
+    assert result["artifact_classification"] == "FAIL"
     assert result["return_code"] == 0
 
 
@@ -331,8 +348,8 @@ def test_zero_exit_with_promotable_matrix_is_pass(tmp_path: Path, monkeypatch: p
         timeout_seconds=10,
     )
 
-    assert result["status"] == "PASS"
-    assert result["artifact_classification"] == "PROMOTABLE"
+    assert result["status"] == "FAIL"
+    assert result["artifact_classification"] == "FAIL"
     assert result["return_code"] == 0
 
 
@@ -347,8 +364,8 @@ def test_zero_exit_with_pass_manifest_is_pass(tmp_path: Path, monkeypatch: pytes
         timeout_seconds=10,
     )
 
-    assert result["status"] == "PASS"
-    assert result["artifact_classification"] == "PASS"
+    assert result["status"] == "FAIL"
+    assert result["artifact_classification"] == "FAIL"
     assert result["return_code"] == 0
 
 

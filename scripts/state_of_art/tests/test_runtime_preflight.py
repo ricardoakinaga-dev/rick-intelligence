@@ -104,6 +104,18 @@ def test_preflight_rejects_wrong_identity_target_or_service_readiness(tmp_path: 
     assert any("redis" in error and "healthy" in error for error in errors)
 
 
+def test_preflight_rejects_noncanonical_target_binding(tmp_path: Path) -> None:
+    payload = _payload(tmp_path)
+    payload["target_id"] = "phase3-compose:another-project:compose.yml"
+    payload["compose_file"] = "compose.yml"
+    (tmp_path / "compose.yml").write_text("services:\n", encoding="utf-8")
+
+    errors = validate_preflight(payload, root=tmp_path)
+
+    assert any("canonical Phase 3 Compose" in error for error in errors)
+    assert any("target_id" in error for error in errors)
+
+
 def test_preflight_rejects_stale_and_secret_bearing_endpoint(tmp_path: Path) -> None:
     old = datetime.now(timezone.utc) - timedelta(days=2)
     payload = _payload(tmp_path, generated_at=old)

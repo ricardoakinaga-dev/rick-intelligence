@@ -873,6 +873,12 @@ def mode_validate() -> int:
 
 def mode_compose(action: str) -> int:
     configured_file = os.environ.get("RICK_COMPOSE_FILE", "docker-compose.dev.yml").strip()
+    if configured_file not in COMPOSE_PROJECTS:
+        print(
+            "NOT_READY: RICK_COMPOSE_FILE must select docker-compose.dev.yml or docker-compose.staging.yml.",
+            file=sys.stderr,
+        )
+        return 2
     compose = (ROOT / configured_file).resolve()
     try:
         compose.relative_to(ROOT)

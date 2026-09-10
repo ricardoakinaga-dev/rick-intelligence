@@ -238,3 +238,30 @@ This closes a local evidence-integrity gap only. Docker daemon access,
 disposable secrets, live service probes, full runtime lanes, independent
 reviews and human Go/No-Go remain unavailable, so the candidate remains
 blocked and is not Triple AAA.
+
+## 12. Fail-closed promotion and accessibility correction — 2026-09-10
+
+Fresh read-only reviews found additional promotion-boundary risks. PASS
+observations now require an explicit integer zero exit status; a sealed packet
+must bind the release artifact-set digest to the current checkout; and exit
+`2` is emitted only when all remaining blockers are genuinely external. Runtime
+release envelopes now bind each manifest gate to its expected Phase 3
+capability and canonical artifact path, and their raw gate artifact must be
+readable JSON with matching status and exit code. Untyped zero-exit matrix or
+manifest artifacts are rejected.
+
+The shared preflight also rejects non-canonical Compose targets and target IDs
+that do not bind the project and file. The web shell's skip link now lands on
+a focusable main landmark, the canonical browser test waits for the composer
+to become interactive across 375/768/1440, and completed chat answers are no
+longer announced as an entire live region; only transient response state is
+announced.
+
+The local regression boundary is now **299 passing State-of-Art/Phase 11
+tests**, web lint and typecheck pass, the canonical shell browser matrix is
+15/15, and `make validate` passes. The integrated verifier was rerun while the
+working tree was intentionally dirty, so its honest result was
+`DEVELOPMENT` / exit `1`; it must be rerun after the source commit is clean.
+Docker daemon access, disposable credentials, live service probes,
+provider/corpus authority, independent production reviews and human Go/No-Go
+remain unavailable. No Triple AAA claim is made.

@@ -52,6 +52,7 @@ test("keeps navigation keyboard safe at every viewport", async ({ page }) => {
   await expect(skipLink).toHaveCSS("opacity", "1");
   await page.keyboard.press("Enter");
   await expect(page).toHaveURL(/#main-content$/);
+  await expect(page.locator("#main-content")).toBeFocused();
   const menu = page.getByRole("button", { name: "Abrir navegação" });
 
   if ((await menu.count()) === 0) {
@@ -90,8 +91,13 @@ test("connects the authorized admin and grounded chat surfaces", async ({ page }
   await expect(page.getByText("kernel: Disponível")).toBeVisible();
 
   await page.goto("/app/chat");
-  await page.getByLabel("Pergunta").fill("Quais documentos estão disponíveis?");
-  await page.getByRole("button", { name: "Consultar" }).click();
+  const question = page.getByLabel("Pergunta");
+  const submit = page.getByRole("button", { name: "Consultar" });
+  await expect(question).toBeEnabled();
+  await expect(submit).toBeDisabled();
+  await question.fill("Quais documentos estão disponíveis?");
+  await expect(submit).toBeEnabled();
+  await submit.click();
   await expect(page.getByRole("heading", { name: "Leitura do resultado" })).toBeVisible();
   await expect(page.getByRole("article", { name: "Resposta do corpus" }).last().getByText("Fontes associadas", { exact: true })).toBeVisible();
 });

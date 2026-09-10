@@ -46,6 +46,60 @@ RELEASE_INTEGRITY_COMMAND = ("git", "diff", "--check", "&&", "make", "validate")
 RELEASE_INTEGRITY_PROCEDURE = "run git diff --check and make validate against the exact checkout"
 CI_ENVELOPE_SCHEMA = "state-of-art-ci-evidence.v1"
 
+# Release-manifest gate names intentionally differ from the Phase 3 capability
+# IDs.  Keep this mapping explicit so an envelope for one capability cannot be
+# reused to satisfy a neighboring gate merely because its JSON is well formed.
+RUNTIME_GATE_CAPABILITY_IDS = {
+    "multi-worker": "P0-05",
+    "multi-tenant": "P1-03",
+    "redis": "P0-06",
+    "redis-multi-replica": "P0-06",
+    "postgresql": "P0-04",
+    "qdrant": "P0-07",
+    "object-storage": "P0-07",
+    "ingestion-e2e": "P0-08",
+    "evidence": "P1-03",
+    "citation": "P0-08",
+    "decision": "P0-08",
+    "observability": "P1-04",
+    "restore": "P1-05",
+    "dr": "P1-05",
+    "file-security": "P1-09",
+    "chaos": "P1-05",
+    "soak": "P1-05",
+    "performance": "P1-05",
+    "frontend-e2e": "P1-06",
+    "accessibility": "P1-06",
+    "visual": "P1-06",
+    "supply-chain": "P1-07",
+    "provider": "P1-02",
+}
+RUNTIME_GATE_ARTIFACT_PATHS = {
+    "multi-worker": ".runtime/phase-3/multi-worker-runtime-evidence.json",
+    "multi-tenant": ".runtime/phase-3/tenant-evidence-runtime-evidence.json",
+    "redis": ".runtime/phase-3/redis-multi-replica-runtime-evidence.json",
+    "redis-multi-replica": ".runtime/phase-3/redis-multi-replica-runtime-evidence.json",
+    "postgresql": ".runtime/phase-3/postgres-runtime-evidence.json",
+    "qdrant": ".runtime/phase-3/object-qdrant-runtime-evidence.json",
+    "object-storage": ".runtime/phase-3/object-qdrant-runtime-evidence.json",
+    "ingestion-e2e": ".runtime/phase-3/golden-ingestion-runtime-evidence.json",
+    "evidence": ".runtime/phase-3/tenant-evidence-runtime-evidence.json",
+    "citation": ".runtime/phase-3/golden-ingestion-runtime-evidence.json",
+    "decision": ".runtime/phase-3/golden-ingestion-runtime-evidence.json",
+    "observability": ".runtime/phase-3/observability-runtime-evidence.json",
+    "restore": ".runtime/phase-3/restore-runtime-evidence.json",
+    "dr": ".runtime/phase-3/restore-runtime-evidence.json",
+    "file-security": ".runtime/phase-3/file-security-runtime-evidence.json",
+    "chaos": ".runtime/phase-3/chaos-runtime-evidence.json",
+    "soak": ".runtime/phase-3/soak-runtime-evidence.json",
+    "performance": ".runtime/phase-3/performance-runtime-evidence.json",
+    "frontend-e2e": ".runtime/phase-3/frontend-supply-runtime-evidence.json",
+    "accessibility": ".runtime/phase-3/frontend-supply-runtime-evidence.json",
+    "visual": ".runtime/phase-3/frontend-supply-runtime-evidence.json",
+    "supply-chain": ".runtime/phase-3/supply-chain-runtime-evidence.json",
+    "provider": ".runtime/phase-3/provider-runtime-evidence.json",
+}
+
 PASS = "PASS"
 FAIL = "FAIL"
 BLOCKED_EXTERNAL = "BLOCKED_EXTERNAL"
@@ -596,6 +650,17 @@ def _evaluate_typed_manifest(
         if not isinstance(envelope, Mapping) or envelope.get("schema_version") != "state-of-art-runtime-evidence.v1":
             failures.append(f"gate {gate.gate_id} runtime envelope has an unsupported schema")
             return
+        expected_capability = RUNTIME_GATE_CAPABILITY_IDS.get(gate.gate_id, gate.gate_id)
+        envelope_capability = envelope.get("capability_id")
+        if envelope_capability not in {expected_capability, gate.gate_id}:
+            failures.append(
+                f"gate {gate.gate_id} runtime envelope capability_id does not match the gate"
+            )
+        expected_path = RUNTIME_GATE_ARTIFACT_PATHS.get(gate.gate_id)
+        if expected_path and evidence_path not in {expected_path, f".runtime/{gate.gate_id}.json"}:
+            failures.append(
+                f"gate {gate.gate_id} runtime envelope path is not its canonical artifact"
+            )
         if envelope.get("status") != gate.result:
             failures.append(f"gate {gate.gate_id} runtime envelope status does not match the manifest")
         expected_exit = {
@@ -704,6 +769,21 @@ def _evaluate_typed_manifest(
         if not isinstance(raw_artifacts, Sequence) or isinstance(raw_artifacts, (str, bytes, bytearray)) or not raw_artifacts:
             failures.append(f"gate {gate.gate_id} runtime envelope has no raw artifact")
             return
+        raw_hashes: list[str] = []
+        expected_raw_status = {
+            "PASS": "PASS",
+            "BLOCKED_EXTERNAL": "BLOCKED_EXTERNAL",
+            "FAIL": "FAIL",
+            "STALE": "STALE",
+            "INVALID": "INVALID",
+        }.get(gate.result)
+        expected_raw_exit = {
+            "PASS": 0,
+            "BLOCKED_EXTERNAL": 2,
+            "FAIL": 1,
+            "STALE": 1,
+            "INVALID": 1,
+        }.get(gate.result)
         for index, raw_ref in enumerate(raw_artifacts):
             if not isinstance(raw_ref, Mapping):
                 failures.append(f"gate {gate.gate_id} runtime raw_artifacts[{index}] is invalid")
@@ -714,6 +794,34 @@ def _evaluate_typed_manifest(
                 failures.append(f"gate {gate.gate_id} runtime raw_artifacts[{index}] is incomplete")
                 continue
             check_file(raw_path, raw_hash, f"gate {gate.gate_id}.runtime.raw_artifacts[{index}]")
+            normalized_raw_hash = raw_hash.removeprefix("sha256:").lower()
+            if SHA256_RE.fullmatch(normalized_raw_hash):
+                raw_hashes.append(normalized_raw_hash)
+            raw_safe, raw_path_error = _safe_evidence_path(root, raw_path)
+            if raw_path_error or raw_safe is None or not raw_safe.is_file():
+                continue
+            try:
+                raw_payload = json.loads(raw_safe.read_text(encoding="utf-8"))
+            except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+                failures.append(f"gate {gate.gate_id} runtime raw artifact is not readable JSON")
+                continue
+            if not isinstance(raw_payload, Mapping):
+                failures.append(f"gate {gate.gate_id} runtime raw artifact is not a JSON object")
+                continue
+            raw_status = raw_payload.get("status")
+            if expected_raw_status is not None and raw_status != expected_raw_status:
+                failures.append(f"gate {gate.gate_id} runtime raw artifact status does not match the envelope")
+            raw_exit = raw_payload.get("exit_status")
+            if expected_raw_exit is not None and (type(raw_exit) is not int or raw_exit != expected_raw_exit):
+                failures.append(f"gate {gate.gate_id} runtime raw artifact exit_status does not match the envelope")
+        artifact_sha = envelope.get("artifact_sha256")
+        normalized_artifact_sha = (
+            artifact_sha.removeprefix("sha256:").lower()
+            if isinstance(artifact_sha, str)
+            else ""
+        )
+        if len(raw_hashes) == 1 and normalized_artifact_sha != raw_hashes[0]:
+            failures.append(f"gate {gate.gate_id} runtime envelope artifact_sha256 does not match its raw artifact")
 
     def check_ci_envelope(gate: Any, evidence_path: str) -> None:
         """Validate the same-run local CI observation behind a CI gate."""

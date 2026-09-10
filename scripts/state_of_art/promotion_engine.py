@@ -98,6 +98,8 @@ HARD_FAILURES = frozenset({FAIL, STALE, INVALID})
 NON_PASS = frozenset({FAIL, BLOCKED_EXTERNAL, NOT_RUN, STALE, INVALID})
 _SHA1_RE = re.compile(r"^[0-9a-f]{40}$")
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+_EXTERNAL_ONLY_REJECTIONS = frozenset({"BLOCKED_GATE_REJECTED", "BLOCKED_RUNTIME_REJECTED"})
+_MISSING = object()
 
 
 def _raw_status(item: Mapping[str, Any]) -> str:
@@ -115,8 +117,11 @@ def _status(item: Mapping[str, Any]) -> str:
     if raw == PASS:
         if item.get("promotion_allowed") is False:
             return INVALID
+        explicit_exit = item.get("exit_status", item.get("return_code", _MISSING))
+        if type(explicit_exit) is not int or explicit_exit != 0:
+            return INVALID
         for field in ("return_code", "exit_status"):
-            if field in item and item[field] is not None and item[field] != 0:
+            if field in item and (type(item[field]) is not int or item[field] != 0):
                 return INVALID
         return PASS
     if raw == "PROMOTABLE":
@@ -124,7 +129,7 @@ def _status(item: Mapping[str, Any]) -> str:
         # that can be fed back into the promotion engine as proof.
         return INVALID
     if raw == "VERIFIED_RUNTIME":
-        if item.get("production_safe") is True and item.get("exit_status", 0) == 0:
+        if item.get("production_safe") is True and type(item.get("exit_status")) is int and item.get("exit_status") == 0:
             return PASS
         return INVALID
     if raw in {FAIL, BLOCKED_EXTERNAL, NOT_RUN, STALE, INVALID}:
@@ -170,7 +175,10 @@ def _blocking_observations(
     for lane_id in required_lanes:
         item = by_id.get(lane_id) or _synthetic_missing(lane_id)
         status = _status(item)
-        external = item.get("external") is True or lane_id in EXTERNAL_LANES
+        # A typed BLOCKED_EXTERNAL observation is itself an external blocker,
+        # even when an older producer omitted the advisory ``external`` flag.
+        # The status contract must not be weakened by producer metadata.
+        external = item.get("external") is True or lane_id in EXTERNAL_LANES or status == BLOCKED_EXTERNAL
         if status == PASS:
             if lane_id in INDEPENDENT_LANES and item.get("independent") is not True:
                 blockers.append(
@@ -231,6 +239,15 @@ def _has_hard_foundation_failure(by_id: Mapping[str, Mapping[str, Any]]) -> bool
     return any(_status(by_id.get(lane_id) or _synthetic_missing(lane_id)) in HARD_FAILURES for lane_id in FOUNDATION_LANES)
 
 
+def _has_blocked_foundation_lane(by_id: Mapping[str, Mapping[str, Any]]) -> bool:
+    """Distinguish external incompleteness from a local foundation failure."""
+
+    return any(
+        _status(by_id.get(lane_id) or _synthetic_missing(lane_id)) == BLOCKED_EXTERNAL
+        for lane_id in FOUNDATION_LANES
+    )
+
+
 def _canonical(value: Any) -> bytes:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
 
@@ -285,6 +302,10 @@ def _packet_rejections(
             if not isinstance(value, str) or pattern.fullmatch(value.lower()) is None:
                 codes.add("PACKET_BINDING_REJECTED")
                 errors.append(f"sealed packet candidate.{field} is invalid")
+        artifact_set_sha256 = candidate.get("artifact_set_sha256")
+        if not isinstance(artifact_set_sha256, str) or _SHA256_RE.fullmatch(artifact_set_sha256.lower()) is None:
+            codes.add("PACKET_BINDING_REJECTED")
+            errors.append("sealed packet candidate.artifact_set_sha256 is invalid")
         if candidate.get("clean_worktree") is not True:
             codes.add("PACKET_BINDING_REJECTED")
             errors.append("sealed packet candidate is not clean")
@@ -296,6 +317,7 @@ def _packet_rejections(
                 ("commit_sha", "head"),
                 ("tree_sha", "tree"),
                 ("checkout_fingerprint", "fingerprint"),
+                ("artifact_set_sha256", "artifact_set_sha256"),
             ):
                 if candidate.get(field) != checkout.get(checkout_field):
                     codes.add("PACKET_BINDING_REJECTED")
@@ -345,7 +367,12 @@ def evaluate(
     blockers, rejection_codes = _blocking_observations(required, by_id, duplicate_ids)
 
     if not _all_pass(FOUNDATION_LANES, by_id):
-        classification = "DEVELOPMENT" if _has_hard_foundation_failure(by_id) else "ADVANCED_ENGINEERING"
+        if _has_hard_foundation_failure(by_id):
+            classification = "DEVELOPMENT"
+        elif _has_blocked_foundation_lane(by_id):
+            classification = "STATE_OF_ART_CANDIDATE"
+        else:
+            classification = "ADVANCED_ENGINEERING"
     elif not _all_pass(STATE_OF_ART_LANES, by_id):
         classification = "STATE_OF_ART_CANDIDATE"
     elif not _all_pass(AAA_LANES, by_id):
@@ -374,7 +401,7 @@ def evaluate(
     )
     if hard_failure:
         exit_code = EXIT_FAILED
-    elif external_block:
+    elif external_block and not (set(rejection_codes) - _EXTERNAL_ONLY_REJECTIONS):
         exit_code = EXIT_BLOCKED_EXTERNAL
     elif blockers or rejection_codes:
         exit_code = EXIT_FAILED

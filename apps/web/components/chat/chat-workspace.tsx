@@ -296,7 +296,7 @@ function MessageBubble({ message, onCopy, responseNumber }: { message: Workspace
         <time dateTime={message.createdAt ? new Date(timestamp(message.createdAt)).toISOString() : undefined}>{formatTime(message.createdAt)}</time>
       </div>
       {assistant && message.citations.length ? <a className="source-jump" href={`#${sourcesId}`} onClick={(event) => focusAnchor(event, sourcesId)}>Consultar fontes ({message.citations.length})</a> : null}
-      <div className={`${styles.messageContent}${assistant ? " answer-text" : ""}`} role={assistant ? "status" : undefined} aria-live={assistant ? "polite" : undefined}>{message.content || "A resposta não trouxe texto."}</div>
+      <div className={`${styles.messageContent}${assistant ? " answer-text" : ""}`}>{message.content || "A resposta não trouxe texto."}</div>
       {!assistant && message.status && message.status !== "sent" ? (
         <p className={`${styles.messageStatus} ${message.status === "failed" ? styles.failedStatus : ""}`}>
           {message.status === "sending" ? "Enviando consulta…" : message.status === "cancelled" ? "Consulta cancelada." : "Consulta não concluída."}
@@ -837,8 +837,8 @@ export function ChatWorkspace() {
               <div className={styles.messageStack}>
                 {messages.map((message, index) => <MessageBubble key={message.id} message={message} responseNumber={index + 1} onCopy={(content) => void copyAnswer(content)} />)}
                 {pendingAssistant ? (
-                  <article className={`${styles.message} ${styles.assistantMessage} ${styles.streamingMessage} ${pendingIsInterrupted ? styles.interruptedMessage : ""}`} aria-label={pendingIsInterrupted ? "Resposta interrompida" : "Resposta provisória em andamento"} aria-live={pendingIsInterrupted ? undefined : "polite"}>
-                    <div className={styles.messageHeader}><span className={styles.messageAuthor}><span className={`${styles.messageAvatar} ${styles.assistantAvatar}`} aria-hidden="true"><Bot size={15} /></span><strong>RICK</strong></span><span className={pendingIsInterrupted ? styles.interruptedLabel : styles.streamingLabel}>{pendingIsInterrupted ? "Resposta interrompida · não finalizada" : `Resposta provisória · ${pendingAssistant.answer ? "validando fontes…" : "consultando fontes…"}`}</span></div>
+                  <article className={`${styles.message} ${styles.assistantMessage} ${styles.streamingMessage} ${pendingIsInterrupted ? styles.interruptedMessage : ""}`} aria-label={pendingIsInterrupted ? "Resposta interrompida" : "Resposta provisória em andamento"}>
+                    <div className={styles.messageHeader}><span className={styles.messageAuthor}><span className={`${styles.messageAvatar} ${styles.assistantAvatar}`} aria-hidden="true"><Bot size={15} /></span><strong>RICK</strong></span><span role="status" aria-live="polite" className={pendingIsInterrupted ? styles.interruptedLabel : styles.streamingLabel}>{pendingIsInterrupted ? "Resposta interrompida · não finalizada" : `Resposta provisória · ${pendingAssistant.answer ? "validando fontes…" : "consultando fontes…"}`}</span></div>
                     <div className={styles.messageContent}>{pendingAssistant.answer || <span className={styles.typingDots} aria-label="Gerando resposta"><i /><i /><i /></span>}</div>
                     {pendingAssistant.citations.length ? <CitationList citations={pendingAssistant.citations} messageId={pendingAssistant.id} responseNumber={messages.length + 1} /> : null}
                     {pendingIsInterrupted ? <p className={styles.interruptedNote} role="status">Este conteúdo parcial não foi marcado como resposta concluída nem deve ser usado sem uma nova consulta.</p> : null}

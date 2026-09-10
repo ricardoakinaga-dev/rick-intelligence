@@ -116,6 +116,30 @@ class ReleaseManifestTests(unittest.TestCase):
                 continue
             runtime_relative = f".runtime/{runtime_gate_id}.json"
             runtime_target = root / runtime_relative
+            raw_relative = f".runtime/raw-{runtime_gate_id}.json"
+            raw_target = root / raw_relative
+            raw_exit_status = (
+                0
+                if gate_result == "PASS"
+                else 1
+                if gate_result in {"FAIL", "STALE", "INVALID"}
+                else 2
+                if gate_result == "BLOCKED_EXTERNAL"
+                else None
+            )
+            raw_target.write_text(
+                json.dumps(
+                    {
+                        "schema_version": "fixture-runtime-gate.v1",
+                        "gate_id": runtime_gate_id,
+                        "status": gate_result,
+                        "exit_status": raw_exit_status,
+                    },
+                    sort_keys=True,
+                ),
+                encoding="utf-8",
+            )
+            raw_hash = sha256(raw_target.read_bytes()).hexdigest()
             runtime_target.write_text(
                 json.dumps(
                     {
@@ -163,8 +187,14 @@ class ReleaseManifestTests(unittest.TestCase):
                         "next_action": "replace fixture with an approved runtime observation",
                         "observed_at": observed_at,
                         "freshness": "CURRENT",
-                        "artifact_sha256": evidence.sha256,
-                        "raw_artifacts": [evidence.to_dict()],
+                        "artifact_sha256": raw_hash,
+                        "raw_artifacts": [
+                            {
+                                "description": "fixture raw gate result",
+                                "path": raw_relative,
+                                "sha256": raw_hash,
+                            }
+                        ],
                     },
                     sort_keys=True,
                 ),
