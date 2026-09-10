@@ -91,7 +91,7 @@ Run `make help` for the complete list.
 | `make build` | Builds the existing Professor and frontend artifacts and compiles the preserved Python source. |
 | `make ci` | Runs the root foundation validation plus fast tests, lint, typecheck, and build. |
 | `make eval` | Runs the deterministic, explicitly non-live Phase 0.5 RAG plumbing evaluation. |
-| `make eval-retrieval`, `make eval-retrieval-pack` | Evaluate the synthetic retrieval pack for ranking, ACL, provenance, claim citation support (`citation_precision`, `citation_recall`, `citation_completeness`, `unsupported_claim_rate`) and descriptive latency; this is not live-provider or clinical evidence. |
+| `make eval-retrieval`, `make eval-retrieval-pack` | Evaluate the synthetic retrieval pack for ranking, ACL, provenance, claim citation support (`citation_precision`, `citation_recall`, `citation_completeness`, `unsupported_claim_rate`, reviewed `faithfulness`) and descriptive latency; this is not live-provider or clinical evidence. |
 | `make api-dev` | Runs the canonical `apps/api` kernel (hermetic by default; legacy opt-in). |
 | `make api-test` | Phase 1.3 API matrix (routing/auth/errors/health/compat/streaming/policy). |
 | `make api-contract` | OpenAPI generation + required-path check. |
