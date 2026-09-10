@@ -120,6 +120,11 @@ def test_missing_external_authority_is_blocked_and_runs_no_cases(tmp_path: Path,
     assert report["required_case_count"] == 10
 
 
+def test_worker_json_boundary_rejects_duplicate_fields() -> None:
+    with pytest.raises(json.JSONDecodeError):
+        gate.loads_json(b'{"operation":"case","operation":"preflight"}')
+
+
 def test_unauthorized_composition_cannot_be_promoted(tmp_path: Path) -> None:
     runtime_path = _write_runtime(
         tmp_path,

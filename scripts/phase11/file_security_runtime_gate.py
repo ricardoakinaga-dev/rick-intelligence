@@ -58,6 +58,13 @@ import uuid
 
 
 ROOT = Path(__file__).resolve().parents[2]
+
+try:
+    from scripts.state_of_art.json_boundary import loads_json
+except ModuleNotFoundError:  # Direct execution from the scripts/phase11 directory.
+    sys.path.insert(0, str(ROOT))
+    from scripts.state_of_art.json_boundary import loads_json
+
 DEFAULT_OUTPUT = ".runtime/phase-3/file-security-runtime-gate.json"
 DEFAULT_TIMEOUT_SECONDS = 10.0
 MAX_TIMEOUT_SECONDS = 120.0
@@ -639,7 +646,7 @@ def _worker_main(argv: Sequence[str]) -> int:
         raw_bytes = sys.stdin.buffer.read(MAX_WORKER_INPUT_BYTES + 1)
         if len(raw_bytes) > MAX_WORKER_INPUT_BYTES:
             raise _InvalidConfiguration()
-        value = json.loads(raw_bytes.decode("utf-8"))
+        value = loads_json(raw_bytes)
         if not isinstance(value, dict):
             raise _InvalidConfiguration()
         value["runtime_path"] = args.runtime_path
@@ -918,7 +925,7 @@ def _run_worker(
     if read_status != "ok":
         return FAIL, {}, "isolated worker exited without a valid result"
     try:
-        decoded = json.loads(raw.decode("utf-8"))
+        decoded = loads_json(raw)
     except (UnicodeDecodeError, json.JSONDecodeError, RecursionError):
         return FAIL, {}, "isolated worker returned malformed JSON"
     if not isinstance(decoded, Mapping):
