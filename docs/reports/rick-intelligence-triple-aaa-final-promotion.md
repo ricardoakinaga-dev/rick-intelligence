@@ -2,453 +2,265 @@
 
 **Report state:** `DIAGNOSTIC / NO-GO / NOT SEALED`  
 **Promotion claim:** none  
-**Decision rule:** this report is descriptive until the automatic verifier
-binds a current clean candidate, current evidence and an authorized decision.
+**Decision rule:** this report is descriptive. Promotion requires the same-run
+clean candidate packet, all mandatory runtime gates, qualified independent
+review and an authorized human Go/No-Go decision.
 
-## 1. Executive decision
+## 1. Executive Summary
 
-The current program is not promoted. Local source, control and static checks
-are useful, but unavailable disposable services, runtime evidence, current
-independent reviews and human authority keep the candidate below `TRIPLE_AAA`.
+The implementation now has an explicit external composition root, bounded S3
+transport, migration/Qdrant/object-store bootstrap services, separate API and
+worker ownership, optional OTLP tracing and a current capability matrix. Local
+contracts and focused tests pass. Triple AAA is not claimed: Docker access is
+denied in this environment, so service startup, image builds, provider/corpus,
+multi-worker fencing, distributed telemetry, recovery, chaos, soak, performance
+and sealed promotion evidence remain open.
 
-## 2. Candidate identity
+## 2. Candidate Identity
 
-The authoritative identity is always the same-run packet at
-`.runtime/phase-3/triple-aaa-verify.json`: commit, tree, checkout fingerprint,
-artifact-set digest, packet hash and quality-bar hash must be read from that
-packet together. This report never substitutes a manually typed SHA and is
-invalid if the packet is absent, stale, dirty or inconsistent with the exact
-candidate. The latest source-closure notes are recorded in section 25 of the
-current gap audit; the packet remains authoritative for exact hashes.
+Requirements are bound to
+[`triple-aaa-runtime-closure-2026-09-10.txt`](../prompts/triple-aaa-runtime-closure-2026-09-10.txt),
+SHA-256 `064be5e04ed483d5d95ef803a66faf6675f7c1f00633cdea83d5abfdd5370d5f`.
+The machine-readable capability inventory is
+[`triple-aaa-runtime-capability-matrix.json`](triple-aaa-runtime-capability-matrix.json).
+The same-run verifier packet at `.runtime/phase-3/triple-aaa-verify.json` is
+authoritative for commit, tree, artifact digest and packet hash; a stale,
+dirty or absent packet is invalid evidence.
 
-## 3. Prompt provenance
+## 3. Quality Bar
 
-Requirements are bound to the stored closure prompt and its recorded source
-attachment hash in `docs/reports/current-triple-aaa-gap-audit.md` and
-`docs/reports/current-triple-aaa-quality-bar-v1.json`. The stored copy's
-normalized final newline is explicitly documented; it is not represented as
-byte identity with the attachment.
+The target is at least `96/100`, with zero unresolved Critical/High findings,
+all mandatory gates passing, exact commit/tree/hash binding, fresh independent
+review and an authorized sealed decision. A score never overrides a mandatory
+runtime or authority rejection. Local tests, static Compose rendering and
+source review are evidence classes below a production-shaped runtime.
 
-## 4. Frozen quality bar
+## 4. Architecture
 
-The historical twelve-criterion bar in `current-triple-aaa-quality-bar-v1.json`
-remains a minimum predecessor contract. The current prompt's twenty-five
-dimensions are the explicit scorecard in section 27; neither contract may be
-averaged around a mandatory runtime or authority blocker. Their baseline
-statuses remain `NOT_RUN` or runtime-blocked until current evidence satisfies
-the declared method.
+The API and worker use the explicit `deployment_composition` seam. Postgres,
+Redis, Qdrant, S3-compatible storage, identity, provider, leases and worker
+scope are required inputs; tenant/workspace/collection scope is never inferred.
+The API does not report an unstarted in-process worker as ready; the worker
+container owns startup and readiness. Compose now gates application processes
+on migration, Qdrant collection/index and scoped object-store bootstrap jobs.
 
-## 5. Scope and non-goals
+The composition graph is locally verified without opening sockets. Runtime
+authority, migration execution, credentials, provider approval and distributed
+ownership still require the disposable lab.
 
-The scope is the root RICK platform and its API, web, worker, contracts,
-storage, retrieval, provider, evidence, decision, observability, operations,
-CI and release boundaries. The three preserved child repositories remain
-compatibility surfaces. No production data, host-owned service, paid
-provider, credential, destructive operation or permission change is in scope
-for local verification.
+## 5. CI
 
-## 6. Architecture and authority
+`make validate`, `make test-fast`, the API suite, focused composition/transport
+tests, matrix validation and `make compose-static` are local checks. The
+canonical FAST, UNIT, CONTRACT, SECURITY, RAG_EVAL, FRONTEND, SUPPLY_CHAIN and
+release envelope has no current same-SHA remote result in this environment;
+skipped or unavailable lanes remain non-promotable.
 
-Durable metadata and jobs remain authoritative; Redis coordinates, object
-storage holds immutable bytes, Qdrant is a rebuildable projection, and the
-evidence/decision layer is the authority for supported responses. Every
-protected boundary must carry tenant/workspace scope and server-derived IDs.
+## 6. PostgreSQL
 
-The local and PostgreSQL chat-history read models, local SQLite clinical-case
-read model, PostgreSQL identity adapter, process-local job journal and local
-SQLite/PostgreSQL audit sinks at source candidate
-`1816748cf44dee8e48b16d718142e2ed8550ca51` cap persisted JSON before
-decoding, reject non-finite/malformed/structurally invalid values and omit
-corrupt response, case, user, session, recovery-journal, audit-metadata or
-knowledge rows; private cleanup-lease markers use the same fail-closed
-contract before a source deletion. The local object envelope additionally has
-a fixed 4 KiB header budget and rejects non-finite constants and duplicate
-keys before trusting persisted scope, key, size or checksum metadata. The
-Locker HTTP coordination adapter also keeps its 64 KiB streamed response
-ceiling and rejects non-finite or duplicate-key success JSON before returning
-a lease result. The Qdrant adapter applies the same finite, duplicate-free
-decoder to lifecycle, alias, point, count and search responses before
-projection data is trusted. These are local read-boundary safeguards only; they do not
-prove live history, case/identity/job/audit/knowledge/object durability,
-Redis fencing or multi-replica behavior, tenant isolation or distributed
-Qdrant recovery or distributed recovery.
+The API image carries the ordered migration runner and Compose runs it as a
+one-shot dependency before API/Worker A/B. This closes the prior missing
+migration-runner seam in source configuration. Live migration, transaction,
+constraint, queue, DLQ, replay, backup and fencing evidence was not observed.
 
-At source candidate `688d97311eb5569451e312e9ff5c172902abcdc4`, the journal,
-knowledge metadata and PostgreSQL identity decoders also reject duplicate JSON
-object keys before recovery, metadata or authorization projection. This
-strengthens local ambiguity/corruption containment only; it does not prove
-PostgreSQL durability, distributed recovery or live tenant isolation.
+## 7. Worker Fencing
 
-The API upload, reindex and retry routes at source candidate
-`1ddd3c5b1c9af913bc3da427c284a91f8f454f99` also apply the configured request
-byte budget and a finite, duplicate-free UTF-8 decoder before model validation.
-This closes local `NaN` and duplicate-field ambiguity at the public request
-boundary; it does not replace live tenant, provider, distributed-runtime or
-production evidence.
+The canonical worker validates scope, leases, heartbeats, cooperative
+cancellation and stale acknowledgement boundaries. Two worker services are
+declared and share the durable queue. The existing runtime gate still does not
+prove every requested crash point or an independent durable outbox/publication
+fence; live Worker A/B evidence is therefore blocked.
 
-The SQLite/legacy PostgreSQL queue readers and canonical PostgreSQL job adapter
-at source candidate `e62afddd2124ae71ef9b05f6ff50f6db226aec6b` likewise reject
-duplicate persisted JSON keys before queue payloads or job results are trusted.
-This is local corruption containment only; it does not prove PostgreSQL
-durability, multi-worker fencing, crash recovery or production promotion.
+## 8. Redis
 
-The OpenAI-compatible provider and provider-tool contract at source candidate
-`0708ab378a7a5794aff883962327f19f4c81c70e` also reject duplicate JSON keys in
-normal responses, SSE chunks, health/error payloads, JSON-mode content and
-complete tool arguments before typed projection or tool execution. This is
-local provider evidence only; live endpoint, corpus and budget authority remain
-required.
+The composition binds one shared Redis client to the global rate limiter and
+lease namespace. Production settings retain authenticated TLS validation; the
+development lab uses an explicit disposable configuration. Live auth/TLS,
+reconnect, failover, namespace isolation, two-replica buckets and TTL evidence
+were not run.
 
-At source candidate `99d37eaee6b4e7507bbb49f50c37703c0b245e1b`, the Phase 3
-matrix/release readers, packet verifier, runtime adapter, operational harness
-and offline evaluators share a bounded strict JSON decoder. Duplicate object
-keys, non-finite constants, invalid UTF-8 and inputs above 1 MiB fail closed
-before evidence status or candidate fields are projected. This protects local
-promotion integrity only; it does not turn blocked runtime or review lanes into
-promotion evidence.
+## 9. Object Storage
 
-At source candidate `e84227c9a90ab3d12b78885b7fa7228607efcac7`, the Phase 11
-object/Qdrant runtime gate applies that strict boundary to request-filter
-observations and bounded Qdrant responses. Duplicate fields, non-finite values,
-invalid UTF-8 and oversized bodies cannot alter status, points, counts, aliases
-or recorded scope observations. This closes a local gate-integrity ambiguity;
-it does not provide the authorized live Qdrant/object runtime or promote the
-candidate.
+`StdlibS3HttpTransport` confines endpoint origin/path, disables redirects,
+requires finite timeouts, bounds response reads and sanitizes errors. Compose
+creates the bucket and a bucket-scoped application user before admission. Local
+transport tests pass; live scoped PUT/GET/delete, checksum, retention, restore
+and credential-policy evidence is not run.
 
-At source candidate `4fee8ebe88611c1b7139e37f1130ec18b90bf924`, the Phase 11
-provider runtime gate applies the same strict boundary to JSON-mode content,
-function-tool arguments and both streaming reassembly paths. Ambiguous or
-non-finite provider-controlled JSON cannot become a local contract pass. This
-is local provider-gate hardening only; live endpoint, corpus, budget and
-promotion authority remain required.
+## 10. Qdrant
 
-At source candidate `6d84f3cae289e4294458f312b5bf99a318a1b138`, the Phase 11
-file-security gate applies the strict boundary to both directions of its
-isolated worker protocol. Ambiguous or non-finite worker data cannot alter
-authorization, preflight or safety-case observations. This is local worker
-boundary hardening only; external process-isolation, corpus and promotion
-evidence remain required.
+Compose performs an idempotent collection preflight, creates the named dense
+schema when absent and ensures tenant/workspace/collection keyword indexes.
+The adapter and local tests validate request and response boundaries. Live
+schema, filters, alias swap, reindex, partial failure, deletion, rebuild and
+restore evidence remains external.
 
-At source candidate `c73eefa5e0d4ce0abc03e62c9793c649987ceffc`, the Phase 11
-observability gate applies the strict boundary to backend responses and
-operational-harness artifacts before trace, metrics, alert or SLO projection.
-This prevents ambiguous local observations from becoming gate passes; it does
-not provide distributed observability runtime, live-drill or promotion
-evidence.
+## 11. Golden Runtime Path
 
-At source candidate `9d68b79e27a0e89f3e9772feda0fcfb209bc4b35`, the guarded
-Compose lifecycle parser applies the strict boundary to whole-output and
-JSON-lines service inventories before readiness projection. Ambiguous records
-cannot alter service identity or health status; this does not prove Docker
-startup, service health or production promotion.
+The required journey is upload → object → durable job → worker → parse →
+normalize → chunk → embed → Qdrant → verify → publish → retrieve → evidence →
+Professor → decision → response. The source graph and bootstrap dependencies
+are present, but no approved disposable run has observed every transition,
+lineage record, idempotency result or recovery outcome.
 
-At source candidate `1a901eae0878cbc7ff8a6977b75103f9576f5241`, the
-frontend/supply gate applies the strict boundary to package, lock, browser,
-SBOM and release/container artifacts before source, license, digest or runtime
-projection. This prevents ambiguous local artifacts from becoming supply-chain
-claims; browser, image and external authority remain required.
+## 12. Multi-Tenancy
 
-At source candidate `e60ceaccf3fca6e54ee969554cc450ab41223582`, the Phase 11
-corpus, Compose static and skeleton validators apply the strict boundary before
-security categories, service readiness or preservation claims are projected.
-This closes local validator ambiguity only; Docker, approved corpus and final
-promotion authority remain required.
+The composition requires explicit tenant/workspace/collection scope and the
+storage, queue and retrieval adapters carry scope in their contracts. A live
+Tenant A/B matrix across identity, cache, queue, object, vectors, evidence,
+decision, logs and timing metadata has not been executed.
 
-At source candidate `6840096c43fa4bf45fa4db60861038ef9939c12c`, immutable
-archive manifests, promotion trust stores, release-integrity runtime/CI
-envelopes and evidence, and local web-performance samples also reject
-duplicate keys, non-finite values, invalid UTF-8 and oversized JSON before
-integrity or status projection. This is local release-boundary hardening only;
-Docker/services, provider/corpus authority, independent review, sealed packet
-and human Go/No-Go authority remain required.
+## 13. Evidence
 
-At source candidate `c179acc196ffa19ccdbae6a91ab5c05233af1314`, runtime
-preflight, review-control, quality-bar, backup/restore, release-manifest and
-vendored Gauntlet state/history readers also use bounded strict JSON. Duplicate
-keys, non-finite constants, invalid UTF-8 and oversized inputs fail closed
-before control, recovery or promotion projection. The focused boundary set
-passes 34 tests and the complete State-of-Art suite passes 314; the clean
-source packet remains `STATE_OF_ART_CANDIDATE` with 17 PASS, 24
-`BLOCKED_EXTERNAL`, exit 2 and no promotion claim.
+Evidence readers and the new capability validator fail closed on malformed,
+stale, dirty or incomplete artifacts. `make triple-aaa-capability-matrix`
+passes its bounded schema check. The current verifier packet is diagnostic and
+cannot be sealed while runtime and authority prerequisites are unavailable.
 
-## 7. CI and release lanes
+## 14. Decision
 
-The canonical workflow names FAST, UNIT, CONTRACT, SECURITY, RAG_EVAL,
-FRONTEND, SUPPLY_CHAIN and RELEASE. Runtime-heavy lanes are conditional or
-scheduled, but a skipped lane remains non-promotable. The release job must
-consume same-run, commit-bound artifacts and return `1` or `2` rather than
-silently skipping an unmet gate.
+Local decision and Professor boundaries enforce citation/evidence contracts,
+bounded tool budgets and conservative failure modes. No production decision is
+authorized without approved provider/corpus metrics, citation support evidence,
+fresh negative cases and the sealed release packet.
 
-The State-of-Art release test environment now pins the provider test
-dependencies and exports a contiguous internal-package `PYTHONPATH`. The
-same-SHA remote run reaches the explicit release checks; its exit `2` is the
-expected external-block classification, while the pinned test suite itself
-passes in a clean venv.
+## 15. Provider
 
-## 8. Disposable production-like lab
+Provider health, model validation, JSON/streaming tool handling, cancellation
+and embedding lifecycle have local contract coverage. The persistent embedding
+loop prevents cached async clients from crossing event loops. Approved live
+provider health, rate-limit, timeout, budget, cancellation and credential
+rotation evidence is not available.
 
-The lab target is Postgres, Redis, Qdrant, S3-compatible object storage, API,
-Worker A/B, Web and OTel/metrics. Compose start must validate configuration,
-wait for health/readiness and emit redacted diagnostics; teardown is
-project-scoped, idempotent and preserves volumes unless explicitly scoped.
-Current live readiness is `BLOCKED_EXTERNAL` when the approved daemon is not
-available.
+## 16. Retrieval
 
-The local ingestion boundary also validates parser output shape and
-provenance, bounds auxiliary sections/metadata, transports the result through
-a bounded JSON-only envelope without unpickling child-controlled bytes, and
-rejects invalid UTF-8 with a bounded `validation_error` instead of a
-permissive fallback at source candidate
-`714355e346adf900960725bb863b99cbfda52900`. This strengthens local
-hostile-file handling; it is not live malicious-corpus, container or runtime
-evidence.
+Retrieval uses the explicit Qdrant adapter and embedding port with bounded
+queries and scope filters. Local fixtures do not establish approved-corpus
+quality, citation precision/recall, unsupported-claim rate or live latency.
 
-## 9. PostgreSQL durability
+## 17. Security
 
-Required evidence covers migration upgrade safety, constraints/indexes/query
-plans, transactions, concurrency, idempotency, DLQ/replay, retention, leases
-and fencing against a real disposable database. Static SQL and unit tests do
-not close this section.
+The source includes bounded parsers, strict JSON boundaries, redaction,
+fail-closed configuration, non-root/read-only Compose intent and explicit
+credential inputs. Hostile-file runtime, live tenant negatives, image scanning,
+signature/provenance inspection and a fresh full security review remain open.
 
-The local canonical PostgreSQL adapter now rejects database JSON larger than
-256 KiB, non-finite constants and recursive decoder failures before applying
-the bounded job contract at source candidate
-`b3229685b432be6c4313609d95f56b316ecc0885`. This is a corruption/DoS
-containment improvement, not evidence of a live database or fencing run.
+## 18. Observability
 
-The legacy SQLite/PostgreSQL queue readers at source candidate
-`594a8474a600f78fe09aa5d3ff52db5ae8c5e02e` apply the same bounded payload
-contract on reads: persisted JSON is capped at 32 KiB, non-finite and malformed
-values are rejected, and arbitrary/non-string mappings are not returned as job
-payloads. This is local corruption/DoS containment only; it does not replace
-the required live PostgreSQL, multi-worker or crash-recovery evidence.
+[`docs/operations/slo.md`](../operations/slo.md) separates `LOCAL OBSERVATION`,
+`STAGING SLO` and `PRODUCTION SLO`; missing measurements stay `no_data`. API
+images include an optional OTLP tracer provider and bounded HTTP middleware
+when `OTEL_TRACES_EXPORTER=otlp` is configured, while local metrics remain
+bounded and redacted. Collector delivery, trace propagation, alert routing,
+SLO windows and no-data behavior were not observed in a live stack.
 
-## 10. Worker A/B behavior
+## 19. Disaster Recovery
 
-Two real worker processes must prove ownership, heartbeat fencing, stale ACK
-and publish rejection, crash/restart recovery, duplicate delivery handling,
-timeouts and reconciliation. A cooperative thread timeout is not a process
-isolation proof.
+The restore contract remains seed → backup → destroy isolated copy → restore →
+verify, including jobs, audit, lineage, object bytes, ACLs and Qdrant rebuild.
+No measured RPO/RTO or current restore packet exists.
 
-## 11. Redis coordination
+## 20. Chaos
 
-Required evidence covers authentication/TLS policy, timeouts, pools,
-reconnect/circuit behavior, namespace and tenant isolation, leases,
-heartbeats, rate limits and replica/failover behavior. The local
-`redis_multi_replica_runtime_gate.py` now starts two independent canonical
-`apps/api` HTTP processes against one Redis URL and checks login, recovery,
-chat and compatibility policies, shared atomic buckets, replay idempotency,
-tenant separation and bucket TTL; its real run remains external evidence.
-Alternating API replicas must consume one shared bucket; a bypass is a
-rejection.
+The operational harness defines owned faults for worker, Redis, Qdrant,
+Postgres, object storage, provider and network boundaries. No disposable fault
+run has established recovery without corruption, duplicate publication, stale
+acknowledgement or tenant leakage.
 
-## 12. Object storage
+## 21. Soak
 
-The S3-compatible authority must prove private scoped access, checksum and
-length integrity, streaming, retention, deletion and restore with synthetic
-owned data. Local filesystem state is not accepted as source of truth.
+Short and extended soak requirements are documented with bounded resource and
+queue observations. No exact-release soak window was run.
 
-## 13. Qdrant projection
+## 22. Performance
 
-Qdrant must prove schema/index/filter behavior, alias swap, reindex, partial
-failure, deletion, rebuild and restore. The durable authority must be able to
-reconstruct the projection without accepting stale or cross-tenant content.
-
-The hermetic SQLite read-model at source candidate
-`8035d9995d6715afa5f4571de9bf26c9ce456b4e` now bounds persisted vector and
-payload JSON before decoding, rejects non-finite/dimension-invalid vectors,
-rejects duplicate object keys and revalidates the canonical payload checksum.
-The follow-up source candidate `bb238b1b4165dc4e580d7d9aa294703ff9c41783`
-proves the duplicate-key regression against a checksum-valid persisted row.
-This is local corruption/DoS containment only and does not substitute for live
-Qdrant projection, rebuild, restore or tenant-isolation evidence.
-
-## 14. Golden ingestion path
-
-`RICK_GOLDEN_RUNTIME_PATH` is the required upload → object → job → worker →
-parse → normalize → chunk → embed → Qdrant → verify → publish → retrieve →
-evidence → professor → decision → response journey. Each transition needs
-lineage, idempotency, fault and recovery evidence; a prompt or offline pack
-cannot stand in for the journey.
-
-## 15. Multi-tenancy
-
-Tenant A/B tests must cover identity, API, durable stores, cache, queue,
-object storage, vector filters, evidence, decision, logs and timing-sensitive
-metadata. Hidden UI elements and local ACL tests are not sufficient.
-
-## 16. Evidence security
-
-Forged IDs, cross-tenant references, stale versions, wrong checksums, unknown
-chunks, poisoned documents, prompt injection and stale publication attempts
-must reject with stable identifiers, including
-`STALE_EVIDENCE_REJECTED`, `WRONG_COMMIT_REJECTED`, `WRONG_TREE_REJECTED`,
-`WRONG_HASH_REJECTED`, `MISSING_GATE_REJECTED`, `BLOCKED_GATE_REJECTED` and
-`SELF_PROMOTED_GATE_REJECTED`.
-
-## 17. Provider and RAG
-
-An approved bounded provider/corpus packet must cover health, streaming,
-timeouts, cancellation, 429/500, retry/backoff, circuit behavior, context,
-tool/JSON handling, budgets, ACL and adversarial RAG. Citation relevance,
-validity, support, faithfulness and unsupported-claim metrics must feed
-conservative answer/retry/clarify/abstain/escalate decisions.
-
-The local source corrections at `2238b99ec797b0b2416208dd0e0b02c74897f7d9`,
-`09a467652c3c9ba85770937e3cdce8c39f545e44`,
-`6095bafcc368a4b7ee7d468bd4bac98e7b153faf`,
-`a480e6cc67ada68fc91e0c7034a37f53f23051b3`,
-`eced09b7431de92fa064d9910d9ff7d489bb5dc1`,
-`7af6d7be4118b9ecbb237d673e39229691901cc9` and
-`e2043c05fb1b064b4618395e3358d2a22a5b2cd0` add a bounded authenticated
-`GET /models` provider-health probe, strict model-list validation, resilient
-delegation, bounded function tools, typed complete/streaming tool calls, JSON
-argument validation, streaming tool-call reassembly and explicit live-health,
-JSON, streaming and normal/streaming tool-call prerequisites in the provider
-runtime gate, including a fail-closed context-budget assertion that rejects an
-over-budget prompt before I/O. The current source candidate has 64 provider
-tests, 6 provider-contract tests, 36 Professor tests, 437 API tests, 295
-State-of-Art tests and 3 provider-runtime tests passing. The Professor
-orchestration seam enforces `max_tool_calls` over complete and distinct
-streaming tool calls without executing over-budget tools and rejects a newly
-over-budget streaming index before publishing its content delta. Integer
-budget fields and timeout booleans are also type-strict. Observability
-redaction also strips credentials and query material from
-JSON-escaped URLs before events are persisted, and inline assignments, bearer
-headers and nested JSON/CLI-style secret values are redacted from free-form
-diagnostic text. The normal
-JSON-object response mode is also
-validated at the client boundary and rejects invalid semantic content without
-retry, and the streaming JSON contract reassembles split deltas as an object.
-This is local contract evidence only; the approved external provider,
-budget/cancellation behavior, corpus metrics and runtime promotion evidence
-remain open.
-
-## 18. Observability and SLO
-
-The required trace is HTTP → auth → retrieval → stores → queue → worker →
-provider → evidence → decision. Redaction, bounded labels, metrics, alerts
-and no-data behavior must be observed. Development, staging and production
-SLOs are separate evidence classes in `docs/operations/slo.md`.
-
-## 19. Disaster recovery and restore
-
-The real drill is seed → backup → destroy isolated copy → restore → verify,
-including schema, jobs, attempts, audit, lineage, object bytes, ACLs and
-Qdrant rebuild. It must report measured RPO/RTO and preserve the previous
-checkpoint; the runbook alone is not evidence.
-
-## 20. Chaos and distributed failure
-
-Owned disposable faults must cover worker, Redis, Qdrant, Postgres, object
-storage, provider and network boundaries. Recovery must show no silent
-corruption, duplicate publication, stale acknowledgement or tenant leak.
-
-## 21. Soak and performance
-
-Short/extended soak and 1/10/50/100 concurrency runs must bind p50/p95/p99,
+Required 1/10/50/100-concurrency measurements include p50/p95/p99,
 throughput, errors, CPU, memory, threads, connections, queue depth, retries
-and starvation to the exact environment. A local fixture is not a production
-SLO claim.
+and starvation. Local fixture timings are not staging or production SLOs; no
+current production-shaped performance packet exists.
 
-## 22. Frontend and accessibility
+## 23. Frontend
 
-The current managed API/browser packet passes login, authenticated workbench
-and chat at 375/768/1440, with keyboard/focus, axe, contrast, reduced-motion,
-touch and console/request checks passing. It is real non-intercepted local
-evidence; it does not prove production runtime or independent visual approval.
-Upload, documents, sources, jobs, offline, interruption, permission and
-degraded provider states plus a fresh independent design review remain
-required for promotion.
+The managed browser surface has local build and visual-matrix coverage at
+375/768/1440. API-backed authenticated, upload, degraded-provider and
+interruption states require a live stack and current same-SHA evidence.
 
-## 23. Supply chain and containers
+## 24. Accessibility
 
-Source lockfiles, source SBOM, secret and license checks pass in the current
-packet. The exact image digests, image SBOM, provenance, signatures,
-non-root/read-only/capability/resource/health hardening and rollback digest
-must still be current. `container-digests` and `container-sbom` are
-`NOT_RUN`, so the scoped supply lane remains `BLOCKED_EXTERNAL`; the packet
-is not a built-image PASS.
+Keyboard/focus, axe, zoom, contrast, reduced-motion, touch and console/network
+checks are represented in the browser contract. A fresh independent visual and
+accessibility review is not approval evidence yet.
 
-## 24. Independent reviews
+## 25. Supply Chain
 
-Fresh reviewers must attempt rejection across architecture, security,
-runtime, database, observability, recovery, RAG, frontend and operations.
-Builder review is not independent approval, and a self-promoted PASS is
-rejected by the evidence contract.
+Source dependency and secret checks are local. Exact image digests, image SBOM,
+provenance, signatures, non-root/read-only/capability/resource inspection and
+rollback digest evidence require the image/runtime authority and remain open.
 
-The current Phase 3 matrix additionally requires each promoted capability to
-bind a hashed, candidate-scoped independent record in the canonical
-verification ledger. The current candidate has no such complete promotion
-packet or fresh full-product reviewer; this local binding is a rejection guard,
-not approval evidence.
+## 26. Independent Reviews
 
-## 25. Risks and residuals
+The fresh composition review recorded **I1 / REJECT** with a clean mutation
+sentinel. It identified the missing migration/bootstrap seams and worker
+readiness/shutdown hazards; those source seams are now corrected. The reviewer
+also confirmed that Docker denial prevents live verification and that the
+multi-worker publication proof is still incomplete. No fresh full-product
+review has approved promotion.
 
-Open residuals are runtime authority, provider/corpus approval, live tenant
-isolation, distributed telemetry, restore/chaos/soak/performance evidence,
-container provenance, exact packet sealing and human release ownership.
-Each residual needs an owner, mitigation, expiry and revalidation trigger
-before promotion.
+## 27. Risk Register
 
-## 26. Rollback and recovery decision
+| Risk | State | Owner | Revalidation trigger |
+| --- | --- | --- | --- |
+| Docker daemon/image authority unavailable | `BLOCKED_EXTERNAL` | Runtime operator | Approved daemon and immutable images |
+| PostgreSQL/Redis/Qdrant/S3 live behavior unobserved | `BLOCKED_EXTERNAL` | Runtime operators | Isolated Compose readiness and gates |
+| Multi-worker outbox/crash matrix incomplete | `BLOCKED_EXTERNAL` | Distributed systems | Independent Worker A/B crash run |
+| Provider/corpus and citation authority absent | `BLOCKED_EXTERNAL` | AI platform | Approved bounded provider/corpus packet |
+| OTLP, restore, chaos, soak and performance not measured | `NOT_RUN` | SRE | Same-release operational packet |
+| Sealed packet and human Go/No-Go absent | `NOT_RUN` | Release authority | All mandatory rows pass |
 
-No deployment or destructive rollback is authorized by this report. A failed
-slice creates a new exact run, preserves prior evidence and uses reviewed
-roll-forward or an isolated restore. Application rollback requires a previous
-immutable digest and migration-compatible boundary.
-
-## 27. Twenty-five-dimension scorecard
+## 28. Scorecard
 
 | # | Dimension | Current state | Required evidence |
 | ---: | --- | --- | --- |
-| 1 | Architecture | `LOCAL_VERIFIED` | current boundary checks and independent architecture review |
-| 2 | Modularity | `PARTIAL` | package/adaptor boundaries plus fresh architecture review |
-| 3 | Jobs | `BLOCKED_EXTERNAL` | real queue, DLQ, replay, retention and recovery run |
-| 4 | Worker | `BLOCKED_EXTERNAL` | two real workers, lease fencing and crash recovery |
-| 5 | PostgreSQL | `BLOCKED_EXTERNAL` | real migration, transaction, constraint and queue run |
-| 6 | Redis | `BLOCKED_EXTERNAL` | real auth, lease, reconnect and multi-replica run |
-| 7 | Qdrant | `BLOCKED_EXTERNAL` | live schema, filters, alias, rebuild and restore |
-| 8 | Object Storage | `BLOCKED_EXTERNAL` | live scoped PUT/GET/checksum/retention/restore |
-| 9 | Ingestion | `BLOCKED_EXTERNAL` | complete named golden ingestion path |
-| 10 | Retrieval | `NOT_RUN` | approved corpus and retrieval-quality metrics |
-| 11 | Evidence | `PARTIAL` | live lineage plus forged/stale/hash/chunk negatives |
-| 12 | Decision | `PARTIAL` | citation support metrics feeding conservative decisions |
-| 13 | Professor | `PARTIAL` | provider-backed reasoning and bounded budget evidence |
-| 14 | Security | `PARTIAL` | live threat, file, redaction and supply-chain review |
-| 15 | Multi-tenancy | `PARTIAL` | live Tenant A/B isolation negatives across every store |
-| 16 | Observability | `PARTIAL` | distributed traces, bounded metrics, alerts and SLO evidence |
-| 17 | Resilience | `NOT_RUN` | distributed failure and bounded recovery packet |
-| 18 | Disaster Recovery | `NOT_RUN` | measured seed/backup/destroy/restore/rebuild drill |
-| 19 | Performance | `NOT_RUN` | 1/10/50/100 concurrency and resource measurements |
-| 20 | Frontend | `PARTIAL` | real API browser states at 375/768/1440 |
-| 21 | Accessibility | `PARTIAL` | keyboard, focus, axe, zoom, contrast, motion and touch review |
-| 22 | CI/CD | `PARTIAL` | current exact-SHA FAST/UNIT/CONTRACT/SECURITY/RAG/FRONTEND/SUPPLY/RELEASE run |
-| 23 | Supply Chain | `BLOCKED_EXTERNAL` | dependency, secret, container, SBOM, digest and signature evidence |
-| 24 | Documentation | `LOCAL_VERIFIED` | current audit, plan, report and `make validate` |
-| 25 | Production Readiness | `BLOCKED_EXTERNAL` | all mandatory gates, zero Critical/High, seal and human Go/No-Go |
+| 1 | Architecture | `PARTIAL` | Current composition/runtime boundary plus independent review |
+| 2 | Modularity | `LOCAL_VERIFIED` | Explicit adapters, ownership and focused tests |
+| 3 | Jobs | `BLOCKED_EXTERNAL` | Real queue, DLQ, replay, retention and recovery |
+| 4 | Worker | `BLOCKED_EXTERNAL` | Two real workers, fencing and crash recovery |
+| 5 | PostgreSQL | `BLOCKED_EXTERNAL` | Migration, transaction, constraint and queue run |
+| 6 | Redis | `BLOCKED_EXTERNAL` | Auth/TLS, lease, reconnect and multi-replica run |
+| 7 | Qdrant | `BLOCKED_EXTERNAL` | Schema, filters, alias, rebuild and restore |
+| 8 | Object Storage | `BLOCKED_EXTERNAL` | Scoped PUT/GET/checksum/retention/restore |
+| 9 | Ingestion | `BLOCKED_EXTERNAL` | Complete named golden path |
+| 10 | Retrieval | `PARTIAL` | Approved corpus and retrieval metrics |
+| 11 | Evidence | `PARTIAL` | Live lineage and forged/stale/hash negatives |
+| 12 | Decision | `PARTIAL` | Citation metrics feeding conservative decisions |
+| 13 | Professor | `PARTIAL` | Provider-backed reasoning and budget evidence |
+| 14 | Provider | `PARTIAL` | Live health, stream, timeout, tool and budget evidence |
+| 15 | Security | `PARTIAL` | Live threat, file, redaction and supply-chain review |
+| 16 | Multi-tenancy | `BLOCKED_EXTERNAL` | Tenant A/B isolation across every store |
+| 17 | Observability | `NOT_RUN` | Distributed traces, metrics, alerts and SLO packet |
+| 18 | Resilience | `NOT_RUN` | Distributed failure and bounded recovery |
+| 19 | Disaster Recovery | `NOT_RUN` | Measured backup/restore/rebuild drill |
+| 20 | Performance | `NOT_RUN` | 1/10/50/100 concurrency measurements |
+| 21 | Frontend | `PARTIAL` | Live API browser states at 375/768/1440 |
+| 22 | Accessibility | `PARTIAL` | Independent keyboard/axe/zoom/contrast/touch review |
+| 23 | CI/CD | `PARTIAL` | Current exact-SHA eight-lane envelope |
+| 24 | Supply Chain | `BLOCKED_EXTERNAL` | Dependency, secret, image, SBOM, digest and signature evidence |
+| 25 | Documentation | `LOCAL_VERIFIED` | Current prompt, audit, plan, report and validation |
+| 26 | Production Readiness | `BLOCKED_EXTERNAL` | All mandatory gates, zero Critical/High, seal and human Go/No-Go |
 
-**Advisory score: `14/100`.** The score uses equal 25-dimension weighting:
-`LOCAL_VERIFIED = 2`, `PARTIAL = 1`, and `PASS`/`VERIFIED_RUNTIME`/
-`PROMOTABLE = 4`; `BLOCKED_EXTERNAL` and `NOT_RUN` score zero. The current
-matrix has two `LOCAL_VERIFIED` dimensions and ten `PARTIAL` dimensions.
-This is a diagnostic measure only; it cannot override a mandatory rejection,
-and the definition-of-done threshold remains `96/100` with all required
-runtime and promotion gates passing.
+**Advisory score:** `14/104` (`13.5/100` when normalized). This diagnostic
+score cannot override the mandatory external blockers; the target remains
+`>=96/100` with every required gate passing.
 
-## 28. Final Go/No-Go and next action
+## 29. Promotion Decision
 
 **Decision:** `NO-GO / NOT PROMOTED`.  
 **Authorized approver:** `NOT_RUN`.  
-**Sealed packet:** `NOT_RUN`.  
-**Executable next action:** provide the approved disposable Docker daemon and
-runtime configuration, rerun the current adapters and real service lanes,
-rebind every artifact to the resulting SHA/tree, obtain fresh independent
-review and an authorized sealed Go/No-Go decision. The current packet's
-PostgreSQL, Redis, provider and release envelopes are fresh
-`BLOCKED_EXTERNAL` observations. Its scoped frontend-e2e and accessibility
-lanes are PASS, while the combined frontend/supply envelope and supply-chain
-lane remain `BLOCKED_EXTERNAL` because image evidence is absent; none is a
-promotion signal. The promotion engine correctly returns `2` for this
-external-only block; local failures and malformed supplied packets remain
-`1`.
+**Sealed packet:** `NOT_RUN`.
+
+The next executable action is to run the approved disposable Docker daemon,
+build/inspect the exact API/worker/web images, execute migrations and bootstrap
+services, run every runtime adapter and operational gate, bind all artifacts to
+the resulting clean SHA/tree, obtain fresh independent review and record the
+authorized Go/No-Go decision. Until then the honest classification is
+`STATE_OF_ART_CANDIDATE`, below `TRIPLE_AAA` promotion.

@@ -44,6 +44,9 @@ The current closure prompt is archived at
 [`phase-3-triple-aaa-closure-2026-09-09.txt`](docs/prompts/phase-3-triple-aaa-closure-2026-09-09.txt);
 the prior request remains preserved at
 [`state-of-art-triple-aaa-2026-09-09.txt`](docs/prompts/state-of-art-triple-aaa-2026-09-09.txt).
+The latest supplied runtime-closure prompt is preserved byte-for-byte at
+[`triple-aaa-runtime-closure-2026-09-10.txt`](docs/prompts/triple-aaa-runtime-closure-2026-09-10.txt)
+and drives the current capability matrix and promotion report.
 
 ## Repository layout
 

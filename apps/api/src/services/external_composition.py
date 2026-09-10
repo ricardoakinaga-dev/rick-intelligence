@@ -16,7 +16,7 @@ import inspect
 import math
 import os
 import re
-from threading import Thread
+from threading import Event, Lock, Thread
 from types import SimpleNamespace
 import time
 from typing import Callable
@@ -57,6 +57,11 @@ class ExternalCompositionInputs:
     worker_temp_root: str | None = None
     worker_id: str | None = None
     worker_scope: tuple[str, str, str] | None = None
+    # The API and worker are separate processes.  The API still exposes the
+    # worker in Providers so contracts remain complete, but it must not claim
+    # that an unstarted in-process worker is ready.  The worker composition
+    # leaves this enabled and performs its own startup/readiness check.
+    worker_health_check_required: bool = True
     parser_runner: object | None = None
     worker_max_concurrency: int = 4
     worker_timeout_seconds: float = 300.0
@@ -94,7 +99,17 @@ def load_external_providers(
         raise ExternalCompositionError("external provider inputs") from None
     if not isinstance(inputs, ExternalCompositionInputs):
         raise ExternalCompositionError("ExternalCompositionInputs")
-    return build_external_providers(settings, inputs)
+    providers = build_external_providers(settings, inputs)
+    # Explicit deployment factories transfer lifecycle ownership to the API
+    # process. Ordinary test/provider injection remains caller-owned.
+    try:
+        providers._composition_owned = True
+        providers._composition_inputs = inputs
+    except (AttributeError, TypeError):
+        # A narrow test seam may return an immutable sentinel; the loader's
+        # contract is still satisfied and the caller retains its ownership.
+        pass
+    return providers
 
 
 class SyncEmbeddingAdapter:
@@ -121,59 +136,31 @@ class SyncEmbeddingAdapter:
         self.model = model
         self.dimensions = dimensions
         self.timeout_seconds = float(timeout_seconds)
+        self._bridge: _AsyncLoopBridge | None = None
+        self._bridge_lock = Lock()
+
+    def _get_bridge(self) -> "_AsyncLoopBridge":
+        with self._bridge_lock:
+            if self._bridge is None:
+                self._bridge = _AsyncLoopBridge()
+            return self._bridge
 
     def _run(self, awaitable: object) -> object:
         if not inspect.isawaitable(awaitable):
             return awaitable
 
-        async def bounded() -> object:
+        return self._get_bridge().run(awaitable, timeout=self.timeout_seconds)
+
+    def close(self) -> None:
+        with self._bridge_lock:
+            bridge, self._bridge = self._bridge, None
+        if bridge is not None:
+            closer = getattr(self.provider, "aclose", None)
             try:
-                return await asyncio.wait_for(awaitable, timeout=self.timeout_seconds)
-            except asyncio.TimeoutError:
-                raise TimeoutError("provider embedding call timed out") from None
-
-        try:
-            asyncio.get_running_loop()
-        except RuntimeError:
-            return asyncio.run(bounded())
-
-        # Retrieval is called from an async API request, while the canonical
-        # package contract is synchronous. Execute the bounded provider call
-        # on a short-lived helper thread rather than nesting event loops. Keep
-        # the loop reachable so a timeout can request cancellation before the
-        # adapter returns; an uncooperative awaitable is never allowed to hold
-        # the request thread indefinitely.
-        result: dict[str, object] = {}
-        loop = asyncio.new_event_loop()
-
-        def run() -> None:
-            asyncio.set_event_loop(loop)
-            try:
-                result["value"] = loop.run_until_complete(bounded())
-            except BaseException as exc:
-                result["error"] = exc
+                if callable(closer):
+                    bridge.run(closer(), timeout=self.timeout_seconds)
             finally:
-                pending = asyncio.all_tasks(loop)
-                for task in pending:
-                    task.cancel()
-                if pending:
-                    try:
-                        loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
-                    except BaseException:
-                        pass
-                loop.close()
-
-        thread = Thread(target=run, name="rick-sync-embedding", daemon=True)
-        thread.start()
-        thread.join(self.timeout_seconds + 0.25)
-        if thread.is_alive():
-            loop.call_soon_threadsafe(lambda: [task.cancel() for task in asyncio.all_tasks(loop)])
-            thread.join(1.0)
-            raise TimeoutError("provider embedding call timed out")
-        error = result.get("error")
-        if isinstance(error, BaseException):
-            raise error
-        return result.get("value")
+                bridge.close()
 
     def embed(self, texts: list[str]) -> list[list[float]]:
         if not isinstance(texts, list) or not texts or len(texts) > 256:
@@ -188,6 +175,67 @@ class SyncEmbeddingAdapter:
                 raise ValueError("embedding dimension mismatch")
             vectors.append(list(vector))
         return vectors
+
+
+class _AsyncLoopBridge:
+    """One owned event loop for sync ingestion calls into async providers."""
+
+    def __init__(self) -> None:
+        self._ready = Event()
+        self._closed = False
+        self._lock = Lock()
+        self._loop: asyncio.AbstractEventLoop | None = None
+        self._thread = Thread(target=self._serve, name="rick-sync-provider-loop", daemon=True)
+        self._thread.start()
+        if not self._ready.wait(2.0) or self._loop is None:
+            self.close()
+            raise ExternalCompositionError("provider event loop")
+
+    def _serve(self) -> None:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        self._loop = loop
+        self._ready.set()
+        try:
+            loop.run_forever()
+        finally:
+            pending = asyncio.all_tasks(loop)
+            for task in pending:
+                task.cancel()
+            if pending:
+                loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+            loop.close()
+
+    def run(self, awaitable: object, *, timeout: float) -> object:
+        if not inspect.isawaitable(awaitable):
+            return awaitable
+        with self._lock:
+            if self._closed or self._loop is None:
+                raise ExternalCompositionError("provider event loop closed")
+            loop = self._loop
+
+        async def bounded() -> object:
+            try:
+                return await asyncio.wait_for(awaitable, timeout=timeout)
+            except asyncio.TimeoutError:
+                raise TimeoutError("provider embedding call timed out") from None
+
+        future = asyncio.run_coroutine_threadsafe(bounded(), loop)
+        try:
+            return future.result(timeout + 0.25)
+        except TimeoutError:
+            future.cancel()
+            raise TimeoutError("provider embedding call timed out") from None
+
+    def close(self) -> None:
+        with self._lock:
+            if self._closed:
+                return
+            self._closed = True
+            loop = self._loop
+        if loop is not None:
+            loop.call_soon_threadsafe(loop.stop)
+        self._thread.join(1.0)
 
 
 def _canonical_job_result(job: object, result: object) -> JobResult:
@@ -251,23 +299,25 @@ def build_external_providers(
 
     rate_limiter = inputs.rate_limiter
     rate_limit_namespace = inputs.rate_limit_namespace
+    expected_environment = settings.environment
     if (
         not isinstance(rate_limiter, RedisRateLimiter)
         or rate_limiter.redis_client is not inputs.redis_client
         or not isinstance(rate_limit_namespace, RedisNamespace)
         or rate_limit_namespace.scope != "global"
-        or rate_limit_namespace.environment != "production"
+        or rate_limit_namespace.environment != expected_environment
         or rate_limiter.namespace != rate_limit_namespace
     ):
         raise ExternalCompositionError(
             "production-safe Redis rate limiter bound to the injected client and global namespace"
         )
-    try:
-        validate_production_capability(rate_limiter)
-    except RedisConfigurationError:
-        raise ExternalCompositionError(
-            "production-safe Redis rate limiter bound to the injected client and global namespace"
-        ) from None
+    if settings.environment == "production":
+        try:
+            validate_production_capability(rate_limiter)
+        except RedisConfigurationError:
+            raise ExternalCompositionError(
+                "production-safe Redis rate limiter bound to the injected client and global namespace"
+            ) from None
 
     from rick_ingestion import IngestionService, ProcessParserRunner
     from rick_jobs import JobResult, JobScope
@@ -498,6 +548,8 @@ def build_external_providers(
         ("provider", provider),
         ("lease", lease),
     ):
+        if name == "worker" and inputs.worker_health_check_required is not True:
+            continue
         method_names = (
             ("health_check", "readiness_check", "check_readiness", "check_health")
             if name == "provider"
@@ -508,7 +560,7 @@ def build_external_providers(
             if callable(method):
                 health_checks[name] = probe(method)
                 break
-    return Providers(
+    providers = Providers(
         settings=settings,
         identity=inputs.identity,
         chat_backend=professor,
@@ -530,6 +582,11 @@ def build_external_providers(
         object_store=object_store,
         password_reset_delivery=inputs.password_reset_delivery,
     )
+    # The sync retrieval bridge owns a persistent event loop for the async
+    # provider client. Expose it only to the explicit composition owner so
+    # application shutdown can stop that loop before closing the provider.
+    providers._embedding_adapter = embeddings
+    return providers
 
 
 __all__ = [

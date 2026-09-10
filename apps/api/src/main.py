@@ -9,9 +9,12 @@ settings = ApiSettings.from_env()
 
 
 def create_entrypoint_app(settings: ApiSettings):
-    """Build the app through the canonical external graph in production."""
+    """Build the app through the explicit external graph when selected."""
 
-    if settings.environment == "production":
+    # The disposable Compose lab intentionally runs the same external graph
+    # under ``RICK_ENV=dev``.  Production still requires the composition, while
+    # local/dev keeps the historical hermetic default when no hook is set.
+    if settings.environment == "production" or os.getenv("RICK_API_COMPOSITION", "").strip():
         return create_app(settings, load_external_providers(settings))
     return create_app(settings)
 

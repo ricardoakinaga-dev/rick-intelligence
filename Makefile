@@ -60,6 +60,7 @@ help:
 	@printf '%s\n' '  make file-security-runtime run the hostile file corpus in an isolated worker'
 	@printf '%s\n' '  make phase3-file-security-runtime emit commit-bound file-security evidence'
 	@printf '%s\n' '  make triple-aaa-verify run the fail-closed integrated verification packet'
+	@printf '%s\n' '  make triple-aaa-capability-matrix validate the current prompt capability matrix'
 	@printf '%s\n' '  make release-evidence generate the ignored commit-bound release manifest'
 	@printf '%s\n' '  make phase3-evidence generate the ignored Phase 3 capability matrix'
 	@printf '%s\n' '  make phase3-evidence-verify require a fully promotable Phase 3 matrix'
@@ -221,6 +222,9 @@ phase3-file-security-runtime:
 
 triple-aaa-verify:
 	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) "$(ROOT)/scripts/state_of_art/triple_aaa_verify.py"
+
+triple-aaa-capability-matrix:
+	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)" $(PYTHON) "$(ROOT)/scripts/state_of_art/triple_aaa_capability_matrix.py"
 
 release-evidence:
 	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) "$(ROOT)/scripts/state_of_art/generate_release_evidence.py" --environment local-hermetic

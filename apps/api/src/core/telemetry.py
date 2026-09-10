@@ -431,7 +431,19 @@ class ApiTelemetry:
         self._recent_errors: deque[bool] = deque(maxlen=MAX_HISTOGRAM_SAMPLES)
         self._events: deque[dict[str, object]] = deque(maxlen=MAX_TELEMETRY_EVENTS)
         self._slo = AlertRule("api.http", max_error_rate=0.05, max_latency_p95=2_000.0)
+        self._export_status = "NOT_CONFIGURED"
+        self._export_destination: str | None = None
         self._lock = RLock()
+
+    def set_export(self, *, status: str, destination: str | None) -> None:
+        """Record exporter configuration without exposing credentials."""
+
+        if status not in {"CONFIGURED", "NOT_CONFIGURED"}:
+            status = "NOT_CONFIGURED"
+        safe_destination = destination if isinstance(destination, str) and len(destination) <= 512 else None
+        with self._lock:
+            self._export_status = status
+            self._export_destination = safe_destination
 
     @staticmethod
     def _method(method: str) -> str:
@@ -694,6 +706,8 @@ class ApiTelemetry:
             total = len(self._recent_errors)
             errors = sum(self._recent_errors)
             events = tuple(deepcopy(event) for event in self._events)
+            export_status = self._export_status
+            export_destination = self._export_destination
         decision = self._slo.evaluate(
             total=total,
             errors=errors,
@@ -701,7 +715,7 @@ class ApiTelemetry:
         )
         return {
             "implementation": _IMPLEMENTATION,
-            "export": {"status": "NOT_CONFIGURED", "destination": None},
+            "export": {"status": export_status, "destination": export_destination},
             "slo": {
                 "name": self._slo.name,
                 "window": "last_requests",

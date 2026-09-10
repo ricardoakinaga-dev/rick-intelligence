@@ -4,7 +4,8 @@ The root files docker-compose.dev.yml and docker-compose.staging.yml are the
 canonical production-shaped topology for API, web, Worker A, Worker B, PostgreSQL, Redis,
 Qdrant, private object storage, OpenTelemetry Collector, Prometheus metrics
 and Jaeger tracing. This directory holds their environment templates,
-collector/metrics configuration and the disposable dependency laboratory.
+collector/metrics configuration, one-shot migration/Qdrant/object-store
+bootstrap jobs and the disposable dependency laboratory.
 
 The root compose files require application image digests, a reviewed
 module:factory composition, external credentials and explicit endpoints. They
@@ -23,6 +24,12 @@ credentials are available. `RICK_OTEL_ENDPOINT` is mandatory in both modes;
 the application services wait for a healthy collector, the collector exports
 traces to Jaeger and metrics to Prometheus, and no application payload is
 written to collector debug logs.
+
+API and worker admission depends on successful `migrate`, `qdrant-init` and
+`object-store-init` jobs. The jobs are idempotent: they apply ordered
+checksummed PostgreSQL migrations, create the configured dense
+collection/indexes and create a bucket-scoped application credential. A
+static render does not prove any job ran successfully.
 
 The reference worker image is a non-HTTP process. Its healthcheck invokes the
 fail-closed worker launcher and requires an externally reviewed

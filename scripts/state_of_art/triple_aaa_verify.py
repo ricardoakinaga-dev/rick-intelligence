@@ -34,7 +34,7 @@ except ImportError:  # pragma: no cover - direct script execution fallback.
 
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_OUTPUT = ".runtime/phase-3/triple-aaa-verify.json"
-SOURCE_PROMPT = "docs/prompts/phase-3-triple-aaa-closure-2026-09-09.txt"
+SOURCE_PROMPT = "docs/prompts/triple-aaa-runtime-closure-2026-09-10.txt"
 QUALITY_BAR = "docs/reports/current-triple-aaa-quality-bar-v1.json"
 PHASE3_EVIDENCE_ARTIFACT = ".runtime/phase-3/capability-matrix.json"
 RELEASE_EVIDENCE_ARTIFACT = "docs/progress/release-evidence.json"

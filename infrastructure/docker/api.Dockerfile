@@ -19,6 +19,9 @@ RUN addgroup --system --gid 10001 rick \
 COPY apps/api/pyproject.toml /opt/rick/apps/api/pyproject.toml
 COPY apps/api/src /opt/rick/apps/api/src
 COPY apps/worker /opt/rick/apps/worker
+COPY infrastructure/migrations /opt/rick/infrastructure/migrations
+COPY infrastructure/scripts/migrate.py /opt/rick/infrastructure/scripts/migrate.py
+COPY infrastructure/compose/bootstrap_qdrant.py /opt/rick/infrastructure/compose/bootstrap_qdrant.py
 COPY packages/jobs/src /opt/rick/packages/jobs/src
 COPY packages/authorization/src /opt/rick/packages/authorization/src
 COPY packages/contracts/src /opt/rick/packages/contracts/src
@@ -48,6 +51,9 @@ RUN python -m pip install --no-cache-dir --disable-pip-version-check \
       "python-docx==1.1.0" \
       "psycopg[binary]==3.2.3" \
       "redis==5.2.1" \
+      "opentelemetry-api==1.29.0" \
+      "opentelemetry-sdk==1.29.0" \
+      "opentelemetry-exporter-otlp-proto-grpc==1.29.0" \
     && python -m compileall -q /opt/rick/apps/api/src /opt/rick/apps/worker /opt/rick/packages \
     && find /opt/rick -type d -name __pycache__ -prune -exec rm -rf {} + \
     && chown -R 10001:10001 /opt/rick

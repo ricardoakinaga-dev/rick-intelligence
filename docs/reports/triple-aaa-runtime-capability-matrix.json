@@ -1,0 +1,219 @@
+{
+  "schema": "rick-triple-aaa-runtime-capability-matrix.v1",
+  "candidate_commit": "4c7b285e36a0b87fd9fb413a60611624955bd5b6",
+  "candidate_tree": "4ec5946032a0022c2efb0d8c53d47b8ef9931cb6",
+  "prompt": "docs/prompts/triple-aaa-runtime-closure-2026-09-10.txt",
+  "rows": [
+    {
+      "CAPABILITY": "Current prompt preservation",
+      "STATE": "DONE_LOCAL_SCOPE",
+      "SOURCE_EVIDENCE": [
+        "docs/prompts/triple-aaa-runtime-closure-2026-09-10.txt"
+      ],
+      "TEST_EVIDENCE": [
+        "Exact source attachment byte/hash comparison"
+      ],
+      "RUNTIME_EVIDENCE": [],
+      "INDEPENDENT_REVIEW": "NOT_RUN",
+      "BLOCKER": "None for archive; downstream requirements are not all implemented",
+      "OWNER": "Verification lead",
+      "PRIORITY": "P0",
+      "PROMOTION_CONDITION": "Exact prompt remains byte-bound to every same-run evidence packet"
+    },
+    {
+      "CAPABILITY": "Control plane and canonical CI",
+      "STATE": "PARTIAL",
+      "SOURCE_EVIDENCE": [
+        "Makefile",
+        ".github/workflows/quality.yml",
+        "docs/ci/check_control_plane.py"
+      ],
+      "TEST_EVIDENCE": [
+        "make validate",
+        "make test-fast"
+      ],
+      "RUNTIME_EVIDENCE": [],
+      "INDEPENDENT_REVIEW": "NOT_RUN",
+      "BLOCKER": "No current same-SHA remote eight-lane envelope",
+      "OWNER": "Verification lead",
+      "PRIORITY": "P0",
+      "PROMOTION_CONDITION": "FAST, UNIT, CONTRACT, SECURITY, RAG_EVAL, FRONTEND, SUPPLY_CHAIN and PHASE3_EVIDENCE pass on the exact candidate"
+    },
+    {
+      "CAPABILITY": "Disposable production-like lab",
+      "STATE": "PARTIAL",
+      "SOURCE_EVIDENCE": [
+        "apps/worker/deployment_composition.py",
+        "docker-compose.dev.yml",
+        "docker-compose.staging.yml",
+        "infrastructure/compose/bootstrap_qdrant.py",
+        "infrastructure/compose/bootstrap_object_store.sh",
+        "scripts/phase11/runner.py"
+      ],
+      "TEST_EVIDENCE": [
+        "make compose-static",
+        "apps/api/tests/test_deployment_composition.py",
+        "apps/api/tests/test_object_store_transport.py"
+      ],
+      "RUNTIME_EVIDENCE": [],
+      "INDEPENDENT_REVIEW": "I1_REJECT",
+      "BLOCKER": "Docker daemon permission denied; image builds and service readiness not observed",
+      "OWNER": "Runtime operator",
+      "PRIORITY": "P0",
+      "PROMOTION_CONDITION": "Postgres, Redis, Qdrant, S3-compatible storage, API, Worker A/B, Web and OTel pass isolated readiness and teardown"
+    },
+    {
+      "CAPABILITY": "PostgreSQL durable queue and worker fencing",
+      "STATE": "BLOCKED_EXTERNAL",
+      "SOURCE_EVIDENCE": [
+        "infrastructure/migrations/0004_durable_jobs_contract.sql",
+        "infrastructure/scripts/migrate.py",
+        "apps/worker/runtime.py",
+        "scripts/phase11/multi_worker_runtime_gate.py"
+      ],
+      "TEST_EVIDENCE": [
+        "scripts/state_of_art/tests/test_multi_worker_runtime.py"
+      ],
+      "RUNTIME_EVIDENCE": [],
+      "INDEPENDENT_REVIEW": "NOT_RUN",
+      "BLOCKER": "No approved disposable PostgreSQL and no publication/outbox crash matrix run",
+      "OWNER": "Database and distributed systems engineers",
+      "PRIORITY": "P0",
+      "PROMOTION_CONDITION": "Two real workers prove leases, stale ACK rejection, durable publication fencing and all requested crash points"
+    },
+    {
+      "CAPABILITY": "Redis coordination and multi-replica rate limit",
+      "STATE": "BLOCKED_EXTERNAL",
+      "SOURCE_EVIDENCE": [
+        "packages/locking/src/rick_locking/redis_config.py",
+        "scripts/phase11/redis_multi_replica_runtime_gate.py"
+      ],
+      "TEST_EVIDENCE": [
+        "scripts/state_of_art/tests/test_redis_multi_replica_runtime.py"
+      ],
+      "RUNTIME_EVIDENCE": [],
+      "INDEPENDENT_REVIEW": "NOT_RUN",
+      "BLOCKER": "No approved live Redis and two API replicas",
+      "OWNER": "Distributed systems engineer",
+      "PRIORITY": "P0",
+      "PROMOTION_CONDITION": "Shared bucket, tenant isolation, replay, TTL, auth/TLS and recovery pass with two replicas"
+    },
+    {
+      "CAPABILITY": "Object storage and Qdrant lifecycle",
+      "STATE": "BLOCKED_EXTERNAL",
+      "SOURCE_EVIDENCE": [
+        "apps/api/src/services/object_store_transport.py",
+        "infrastructure/compose/bootstrap_object_store.sh",
+        "infrastructure/compose/bootstrap_qdrant.py",
+        "packages/storage/src/rick_storage/s3_object_store.py",
+        "packages/retrieval/src/rick_retrieval/qdrant.py"
+      ],
+      "TEST_EVIDENCE": [
+        "apps/api/tests/test_object_store_transport.py",
+        "scripts/state_of_art/tests/test_object_qdrant_runtime.py"
+      ],
+      "RUNTIME_EVIDENCE": [],
+      "INDEPENDENT_REVIEW": "NOT_RUN",
+      "BLOCKER": "No live S3-compatible service or Qdrant endpoint",
+      "OWNER": "Storage engineer",
+      "PRIORITY": "P0",
+      "PROMOTION_CONDITION": "Private PUT/GET/DELETE/checksum/restore and Qdrant alias/filter/rebuild/delete/restore matrices pass"
+    },
+    {
+      "CAPABILITY": "Golden ingestion, lineage and evidence authority",
+      "STATE": "BLOCKED_EXTERNAL",
+      "SOURCE_EVIDENCE": [
+        "scripts/phase11/golden_runtime_gate.py",
+        "infrastructure/migrations/0006_document_lineage_contract.sql",
+        "packages/evidence/src/rick_evidence/validator.py"
+      ],
+      "TEST_EVIDENCE": [
+        "scripts/state_of_art/tests/test_golden_runtime.py",
+        "scripts/phase11/test_adversarial_corpus.py"
+      ],
+      "RUNTIME_EVIDENCE": [],
+      "INDEPENDENT_REVIEW": "NOT_RUN",
+      "BLOCKER": "No approved corpus/provider and no full upload-to-response run",
+      "OWNER": "AI platform and security engineers",
+      "PRIORITY": "P1",
+      "PROMOTION_CONDITION": "Golden path, lineage, negative authority, tenant isolation and citation metrics pass against approved runtime"
+    },
+    {
+      "CAPABILITY": "Provider, Decision and citation verification",
+      "STATE": "PARTIAL",
+      "SOURCE_EVIDENCE": [
+        "packages/providers/src/rick_providers",
+        "packages/decision/src/rick_decision",
+        "scripts/phase11/provider_runtime_gate.py"
+      ],
+      "TEST_EVIDENCE": [
+        "apps/api/tests/test_external_composition.py",
+        "scripts/state_of_art/tests/test_provider_runtime.py"
+      ],
+      "RUNTIME_EVIDENCE": [],
+      "INDEPENDENT_REVIEW": "NOT_RUN",
+      "BLOCKER": "No approved live provider/corpus budget and cancellation run",
+      "OWNER": "AI platform engineer",
+      "PRIORITY": "P1",
+      "PROMOTION_CONDITION": "Health, model, chat, stream, cancellation, budget, tool, citation and decision gates pass"
+    },
+    {
+      "CAPABILITY": "Observability, SLO, DR, chaos, soak and performance",
+      "STATE": "NOT_RUN",
+      "SOURCE_EVIDENCE": [
+        "docs/operations/slo.md",
+        "apps/api/src/core/otel.py",
+        "scripts/phase11/observability_runtime_gate.py",
+        "scripts/phase11/restore_runtime_gate.py",
+        "scripts/state_of_art/run_phase3_operational.py"
+      ],
+      "TEST_EVIDENCE": [
+        "scripts/state_of_art/tests/test_observability_runtime.py",
+        "scripts/state_of_art/tests/test_restore_runtime.py"
+      ],
+      "RUNTIME_EVIDENCE": [],
+      "INDEPENDENT_REVIEW": "NOT_RUN",
+      "BLOCKER": "No isolated runtime for traces, restore, fault injection, load or soak",
+      "OWNER": "SRE",
+      "PRIORITY": "P1",
+      "PROMOTION_CONDITION": "Trace propagation/redaction, measured RPO/RTO, chaos, soak and baseline performance evidence pass"
+    },
+    {
+      "CAPABILITY": "Frontend, accessibility and supply chain",
+      "STATE": "PARTIAL",
+      "SOURCE_EVIDENCE": [
+        "apps/web",
+        ".github/workflows/quality.yml",
+        "scripts/phase11/frontend_supply_runtime_gate.py"
+      ],
+      "TEST_EVIDENCE": [
+        "apps/web/tests/visual-matrix.spec.ts",
+        "apps/web/tests/visual-evidence.spec.ts"
+      ],
+      "RUNTIME_EVIDENCE": [],
+      "INDEPENDENT_REVIEW": "NOT_RUN",
+      "BLOCKER": "No current API-backed browser matrix, image scan/signature or fresh accessibility reviewer",
+      "OWNER": "Frontend and release engineers",
+      "PRIORITY": "P1",
+      "PROMOTION_CONDITION": "Real 375/768/1440 states, keyboard/axe/screen reader/zoom/contrast and supply-chain artifacts pass"
+    },
+    {
+      "CAPABILITY": "Independent reviews and sealed promotion",
+      "STATE": "NOT_RUN",
+      "SOURCE_EVIDENCE": [
+        "scripts/state_of_art/packet_seal.py",
+        "docs/reports/rick-intelligence-triple-aaa-final-promotion.md"
+      ],
+      "TEST_EVIDENCE": [
+        "scripts/state_of_art/tests/test_packet_seal.py",
+        "scripts/state_of_art/tests/test_promotion_engine.py"
+      ],
+      "RUNTIME_EVIDENCE": [],
+      "INDEPENDENT_REVIEW": "NOT_RUN",
+      "BLOCKER": "All mandatory runtime gates and qualified final Go/No-Go are open",
+      "OWNER": "Release authority",
+      "PRIORITY": "P2",
+      "PROMOTION_CONDITION": "Exact candidate packet is immutable/sealed, zero Critical/High, all independent reviews pass and human decision is recorded"
+    }
+  ]
+}

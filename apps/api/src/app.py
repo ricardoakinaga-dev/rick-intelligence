@@ -149,6 +149,33 @@ def _default_owned_resources(providers: Providers) -> tuple[object, ...]:
     return tuple(result)
 
 
+def _composition_owned_resources(providers: Providers) -> tuple[object, ...]:
+    """Return resources explicitly transferred by a deployment factory."""
+
+    inputs = getattr(providers, "_composition_inputs", None)
+    resources = (
+        providers.worker,
+        providers.ingestion,
+        providers.object_store,
+        providers.vector_store,
+        providers.knowledge,
+        providers.audit_sink,
+        providers.chat_history,
+        getattr(providers, "_embedding_adapter", None),
+        providers.provider,
+        providers.lease,
+        getattr(inputs, "redis_client", None),
+    )
+    result: list[object] = []
+    seen: set[int] = set()
+    for resource in resources:
+        if resource is None or id(resource) in seen:
+            continue
+        seen.add(id(resource))
+        result.append(resource)
+    return tuple(result)
+
+
 async def _close_owned_resource(resource: object, *, timeout: float | None = None) -> bool:
     """Close one factory-owned resource with a real wall-clock bound."""
 
@@ -269,11 +296,18 @@ async def _shutdown_owned_resources(app: FastAPI) -> None:
             # resistant worker is bounded and leaves dependent resources open
             # rather than creating a use-after-close race.
             remaining = max(0.0, deadline - time.monotonic())
-            completed = shutdown(
-                wait=True,
-                timeout=remaining,
-            )
-            if completed is False:
+            try:
+                parameters = inspect.signature(shutdown).parameters.values()
+                names = {parameter.name for parameter in parameters}
+            except (TypeError, ValueError):
+                names = set()
+            shutdown_kwargs = {}
+            if "wait" in names:
+                shutdown_kwargs["wait"] = True
+            if "timeout" in names:
+                shutdown_kwargs["timeout"] = remaining
+            completed = shutdown(**shutdown_kwargs)
+            if completed is False or getattr(completed, "timed_out", False) is True:
                 errors.append("ingestion_shutdown_timeout")
         except Exception as exc:  # pragma: no cover - defensive boundary
             errors.append(type(exc).__name__)
@@ -346,7 +380,7 @@ def create_app(settings: ApiSettings | None = None, providers: Providers | None 
     """Create the canonical API app. No Qdrant/OpenAI/Redis init at import time."""
     settings = settings or ApiSettings.from_env()
     settings.validate()
-    factory_owns_resources = providers is None
+    factory_owns_resources = providers is None or getattr(providers, "_composition_owned", False) is True
     # Construct the application-owned sink before default providers so the
     # real root ingestion executor can publish local lifecycle events without
     # introducing a process-global telemetry dependency.
@@ -387,6 +421,7 @@ def create_app(settings: ApiSettings | None = None, providers: Providers | None 
                 "Production API requires explicitly marked Redis coordination capabilities."
             ) from exc
 
+    embeddings = None
     if providers is None:
         from services.audit import InMemoryAuditSink
         from services.case_store import InMemoryClinicalCaseStore, SQLiteClinicalCaseStore
@@ -577,11 +612,27 @@ def create_app(settings: ApiSettings | None = None, providers: Providers | None 
         "production_verified": False,
     }
     app.state.telemetry = telemetry
+    from core.otel import install_otel
+
+    otel_runtime = install_otel(app, telemetry)
     app.state.owned_ingestion = providers.ingestion if factory_owns_resources else None
-    app.state.owned_resources = list(_default_owned_resources(providers)) if factory_owns_resources else []
-    app.state.owned_runtime_resources = []
+    app.state.owned_resources = list(
+        _default_owned_resources(providers)
+        if factory_owns_resources
+        and providers is not None
+        and not getattr(providers, "_composition_owned", False)
+        else _composition_owned_resources(providers)
+        if providers is not None and factory_owns_resources
+        else ()
+    )
+    app.state.owned_runtime_resources = (
+        [otel_runtime] if getattr(otel_runtime, "status", "NOT_CONFIGURED") == "CONFIGURED" else []
+    )
     app.state.owned_shutdown_resources = (
-        [providers.ingestion] if factory_owns_resources and providers.ingestion is not None else []
+        [resource for resource in (providers.worker, providers.ingestion)
+         if resource is not None]
+        if factory_owns_resources and providers is not None
+        else []
     )
     app.state.lifecycle_shutdown_started = False
     app.state.lifecycle_shutdown_in_progress = False

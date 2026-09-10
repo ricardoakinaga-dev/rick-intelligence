@@ -52,6 +52,11 @@ def _resolve_composition(specification: str) -> object:
 
 
 def _worker_from_composition(value: object) -> object:
+    # A deployment may return a lifecycle owner that wraps the worker and
+    # closes shared clients. Prefer that owner when it exposes the worker
+    # contract itself; otherwise retain the historical ``.worker`` shape.
+    if callable(getattr(value, "run_forever", None)):
+        return value
     worker = getattr(value, "worker", value)
     if not callable(getattr(worker, "run_forever", None)):
         _fail("composition did not return a worker with run_forever")
@@ -153,22 +158,21 @@ def main(argv: list[str] | None = None) -> int:
     if args.health_check:
         try:
             _call_startup(worker)
-        except SystemExit:
-            raise
-        except Exception:
-            return 1
-        check = getattr(worker, "readiness_check", None)
-        if not callable(check):
-            check = getattr(worker, "health_check", None)
-        if not callable(check):
-            _fail("configured worker has no readiness or health check")
-        try:
+            check = getattr(worker, "readiness_check", None)
+            if not callable(check):
+                check = getattr(worker, "health_check", None)
+            if not callable(check):
+                _fail("configured worker has no readiness or health check")
             result = check()
             if inspect.isawaitable(result):
                 result = asyncio.run(result)
             return 0 if _health_value(result) else 1
+        except SystemExit:
+            raise
         except Exception:
             return 1
+        finally:
+            _shutdown_worker(worker, timeout=30.0)
     try:
         _call_startup(worker)
     except SystemExit:

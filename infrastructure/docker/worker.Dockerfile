@@ -35,6 +35,7 @@ COPY packages/storage/src /opt/rick/packages/storage/src
 COPY infrastructure/docker/worker-entrypoint.py /opt/rick/docker/worker-entrypoint.py
 
 RUN python -m pip install --no-cache-dir --disable-pip-version-check \
+      "fastapi==0.109.2" \
       "pydantic==2.6.1" \
       "httpx==0.27.0" \
       "anyio==4.15.0" \
@@ -43,6 +44,9 @@ RUN python -m pip install --no-cache-dir --disable-pip-version-check \
       "python-docx==1.1.0" \
       "psycopg[binary]==3.2.3" \
       "redis==5.2.1" \
+      "opentelemetry-api==1.29.0" \
+      "opentelemetry-sdk==1.29.0" \
+      "opentelemetry-exporter-otlp-proto-grpc==1.29.0" \
     && python -m compileall -q /opt/rick/apps/api/src /opt/rick/apps/worker /opt/rick/packages /opt/rick/docker \
     && find /opt/rick -type d -name __pycache__ -prune -exec rm -rf {} + \
     && chown -R 10001:10001 /opt/rick

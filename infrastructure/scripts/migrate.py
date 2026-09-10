@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import os
 from pathlib import Path
 import re
 import sys
@@ -122,7 +123,7 @@ def main() -> int:
     parser.add_argument("directory", type=Path)
     parser.add_argument("--check", action="store_true")
     parser.add_argument("--apply", action="store_true")
-    parser.add_argument("--database-url")
+    parser.add_argument("--database-url", default=os.environ.get("RICK_EXTERNAL_DATABASE_DSN"))
     args = parser.parse_args()
     if args.check == args.apply:
         parser.error("choose exactly one of --check or --apply")

@@ -11,6 +11,9 @@ preserving the frozen Gauntlet bar, Phase 2 history and legacy repositories.
 
 ## Progress
 
+- [x] (2026-09-10) Close the previously unimplemented disposable composition seam: `apps/worker/deployment_composition.py` now constructs the explicit Postgres/Redis/Qdrant/S3/provider/identity graph for API and Worker A/B, `StdlibS3HttpTransport` provides bounded endpoint-confined S3 wire behavior, worker/API images package the shared composition, the API transfers deployment ownership into lifecycle shutdown, and the dev Compose lab selects the external graph in `dev` mode so insecure loopback dependencies cannot be mistaken for production TLS evidence. Focused local tests pass; image build and live startup remain unrun because Docker access is unavailable.
+- [x] (2026-09-10) Close the critic-identified runtime seams locally: Compose now runs checksummed migrations and idempotent Qdrant/bucket bootstrap jobs with scoped object credentials; API readiness excludes the unstarted worker process, shutdown preserves stores after a timeout, and the API image exposes optional OTLP tracing. Static Compose, API (463), fast, lint, typecheck, storage and migration checks pass; Docker/image/runtime evidence remains blocked.
+
 - [x] (2026-09-09) Read the exact Phase 3 prompt and verified its byte-exact copy and SHA-256.
 - [x] (2026-09-09) Froze HEAD `56a76004a75ec94178e35c82eab8405b5ac74729` and completed the current audit.
 - [x] (2026-09-09) Verified the canonical local control, static, API and frontend baseline.
