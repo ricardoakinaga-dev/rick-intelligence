@@ -154,9 +154,12 @@ delegation, bounded function tools, typed complete/streaming tool calls, JSON
 argument validation, streaming tool-call reassembly and explicit live-health,
 JSON, streaming and normal/streaming tool-call prerequisites in the provider
 runtime gate, including a fail-closed context-budget assertion that rejects an
-over-budget prompt before I/O. The current source candidate has 63 provider
-tests, 6 provider-contract tests, 437 API tests, 295 State-of-Art tests and 3
-provider-runtime tests passing. The normal JSON-object response mode is also
+over-budget prompt before I/O. The current source candidate has 64 provider
+tests, 6 provider-contract tests, 29 Professor tests, 437 API tests, 295
+State-of-Art tests and 3 provider-runtime tests passing. The Professor
+orchestration seam enforces `max_tool_calls` over complete and distinct
+streaming tool calls without executing over-budget tools. The normal
+JSON-object response mode is also
 validated at the client boundary and rejects invalid semantic content without
 retry, and the streaming JSON contract reassembles split deltas as an object.
 This is local contract evidence only; the approved external provider,

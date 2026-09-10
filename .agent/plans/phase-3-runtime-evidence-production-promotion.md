@@ -34,6 +34,7 @@ preserving the frozen Gauntlet bar, Phase 2 history and legacy repositories.
 - [x] (2026-09-10) Close the local provider tool/structured-response boundary at source candidate 09a467652c3c9ba85770937e3cdce8c39f545e44 (tree bdb09d2e7ff379e654eac310f3b9f7503c8685a8): bounded function tools are serialized, complete and streaming tool calls are typed, JSON arguments are validated, and the live gate requires a tool-call contract alongside health/chat/JSON/stream/embedding; provider/API/State-of-Art matrices pass 59/437/295, while approved live provider evidence remains external.
 - [x] (2026-09-10) Bind the clean integrated provider-contract packet at candidate de4c9ff0f2895ebce97026f9686acc545abfe031 (tree 09f00954c902e2efa7db970082f8918bafe670ee): `make validate` passes, the packet returns exit 2 with `STATE_OF_ART_CANDIDATE`, 17 foundation lanes PASS and 24 mandatory lanes BLOCKED_EXTERNAL; promotion remains disallowed.
 - [x] (2026-09-10) Extend the provider boundary at source candidate 6095bafcc368a4b7ee7d468bd4bac98e7b153faf (tree 10f363d35567e1c5763652161004a399f02cc51e): streaming function-tool and JSON deltas are reassembled and checked for strict JSON, terminal completion, fragment conflicts and extra indexes; the resilient wrapper rejects an over-budget prompt before I/O; normal `json_object` responses reject invalid semantic content without retry; the hermetic gate, provider and contract suites pass 3/64/6, while approved live provider evidence remains external.
+- [x] (2026-09-10) Enforce the Professor `max_tool_calls` budget at source candidate 63a195a96a588231acf5a885d11916385b438a18 (tree 1ee17a5c2b9cc1dbe26222a0498150ee4a35da1d): normal, provider-fallback and streaming paths count complete/distinct tool calls and fail with `tool_calls_budget_exceeded` before execution or result acceptance; Professor/API/State-of-Art suites pass 29/437/295, while external runtime and promotion evidence remain blocked.
 - [ ] (2026-09-09) Execute the disposable runtime; currently blocked by Docker daemon access and unresolved external authority.
 - [ ] (2026-09-09) Complete independent runtime/design/security reviews and the human Go/No-Go.
 
@@ -185,8 +186,8 @@ made.
 ## Current candidate closure
 
 The current source implementation candidate is
-6095bafcc368a4b7ee7d468bd4bac98e7b153faf with tree
-10f363d35567e1c5763652161004a399f02cc51e. It contains the corrected
+63a195a96a588231acf5a885d11916385b438a18 with tree
+1ee17a5c2b9cc1dbe26222a0498150ee4a35da1d. It contains the corrected
 PostgreSQL worker gate, canonical two-process Redis/API HTTP gate, strict
 release artifact postconditions and manifest consistency checks, plus bounded
 same-run CI envelopes with redacted raw artifacts, exact workflow/run/ref/SHA
@@ -196,11 +197,12 @@ checkout-bound frontend evidence, reproducible release-test dependencies and
 a bounded, cancellation-aware synchronous provider-embedding bridge, plus
 bounded provider function-tool, JSON and streaming-call contracts and a
 streaming function-tool/JSON reassembly assertions, context-budget assertion
-in the live gate and normal JSON-object response validation. The final
+in the live gate, normal JSON-object response validation and Professor
+`max_tool_calls` enforcement across normal/fallback/streaming paths. The final
 documentation/control-plane follow-up is bound to the resulting clean
 checkout, while live provider/runtime evidence remains external.
-The provider, API and State-of-Art suites have 64, 437 and 295 passing tests
-respectively and the relevant static checks pass; the full preserved `make test` remains incomplete
+The provider, Professor, API and State-of-Art suites have 64, 29, 437 and 295
+passing tests respectively and the relevant static checks pass; the full preserved `make test` remains incomplete
 because the CVG dataset and local Playwright browser are unavailable. The
 prior integrated verifier artifact is stale after this source change and is
 not treated as current promotion evidence; live runtime, distributed,

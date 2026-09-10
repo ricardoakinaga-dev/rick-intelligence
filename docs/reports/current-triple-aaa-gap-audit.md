@@ -632,3 +632,19 @@ distributed runtime, corpus, independent review, sealing and human Go/No-Go
 remain unavailable. The prior integrated packet is stale after this source
 commit and must be regenerated on the final clean documentation/control-plane
 candidate; no State of Art, AAA or Triple AAA claim is made.
+
+## 29. Professor tool-budget closure — 2026-09-10
+
+Source implementation candidate `63a195a96a588231acf5a885d11916385b438a18`
+(tree `1ee17a5c2b9cc1dbe26222a0498150ee4a35da1d`) closes a local budget
+enforcement gap in the Professor orchestration seam. `max_tool_calls` now
+counts complete non-streaming tool calls and distinct streaming indexes, and
+returns the bounded `tool_calls_budget_exceeded` failure before tool execution
+or a tool result can be accepted. The normal, fallback and streaming paths
+share the same counter; hermetic negatives cover both response forms.
+
+The Professor suite passes **29**, the API matrix **437**, and the State-of-Art
+suite **295**. This is local orchestration evidence only: the approved
+provider/corpus, distributed runtime, adversarial RAG, independent review,
+sealed packet and human Go/No-Go remain unavailable. No promotion claim is
+made.

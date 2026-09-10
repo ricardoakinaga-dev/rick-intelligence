@@ -435,10 +435,21 @@ deltas, rejects conflicting fragments and unexpected indexes, and validates a
 strict assembled JSON object and terminal finish reason. The same gate also
 asserts that the resilient provider rejects a prompt over its context budget
 before I/O. The hermetic fixture and focused gate tests pass **3**, while the
-provider and contract suites pass **63** and **6**. The client also validates
+provider and contract suites pass **64** and **6**. The client also validates
 normal `json_object` response content at the provider boundary and rejects
 invalid semantic payloads without retry; streaming JSON content is also
 covered by a split-delta reassembly contract. This improves local Phase 3.8
 evidence coverage but does not replace approved provider, corpus, runtime,
 independent-review or promotion evidence; the integrated packet must be
 regenerated after the subsequent documentation/control-plane commit.
+
+## 28. Professor tool-budget closure — 2026-09-10
+
+Source candidate `63a195a96a588231acf5a885d11916385b438a18` (tree
+`1ee17a5c2b9cc1dbe26222a0498150ee4a35da1d`) enforces the declared
+`max_tool_calls` budget in normal, provider-fallback and streaming Professor
+paths. Complete calls and distinct streaming indexes are counted; an exceeded
+budget returns `tool_calls_budget_exceeded` without executing or accepting a
+tool result. The Professor suite passes **29**, while the API and State-of-Art
+suites pass **437** and **295**. This closes a local control boundary only and
+does not replace the approved provider/corpus/runtime or promotion evidence.
