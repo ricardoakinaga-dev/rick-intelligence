@@ -86,11 +86,16 @@ architecture or operational review.
    hazards; migration, bucket, collection, API readiness and shutdown seams
    are now corrected in source and static Compose.
 8. **P0 — multi-worker publication proof is incomplete.**
-   `scripts/phase11/multi_worker_runtime_gate.py` drives `PostgresJobQueue`
-   directly and labels counting acknowledged lifecycle events as
-   recovered-single-publication. Queue ACK count does not prove actual
-   publication or outbox fencing. Extend proof through the real worker and
-   durable result/publication boundary, including every section 16 crash point.
+   `scripts/phase11/multi_worker_runtime_gate.py` now emits explicit
+   `PROCESS_ISOLATION`, `ONE_OWNER_CLAIM`, `HEARTBEAT_FENCING`,
+   `SINGLE_PUBLICATION`, `PUBLICATION_OUTBOX_FENCE`,
+   `STALE_WORKER_ACK_REJECTED`, `STALE_WORKER_PUBLISH_REJECTED`,
+   `DUPLICATE_PUBLICATION_REJECTED`, `LEASE_RECLAIM_AFTER_EXPIRY` and
+   `CRASH_RECOVERY_SUCCEEDS` results, and checks the lifecycle plus durable
+   `rick_outbox` counts. These are source-level and gate-contract closure;
+   they are not a live result in this environment. The gate still does not
+   prove the real `WorkerRuntime` boundary or every section 16 crash point
+   until the disposable PostgreSQL Worker A/B run is executed.
 
 ## Current capability summary
 

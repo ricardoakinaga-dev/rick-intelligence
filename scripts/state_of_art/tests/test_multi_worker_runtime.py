@@ -47,3 +47,15 @@ def test_worker_gate_contains_no_legacy_ack_alias() -> None:
 
     assert ".ack(" not in source
     assert ".acknowledge(" in source
+
+
+def test_worker_gate_names_every_mandatory_fencing_case() -> None:
+    source = (ROOT / "scripts/phase11/multi_worker_runtime_gate.py").read_text(encoding="utf-8")
+    for case in (
+        "STALE_WORKER_ACK_REJECTED",
+        "STALE_WORKER_PUBLISH_REJECTED",
+        "DUPLICATE_PUBLICATION_REJECTED",
+        "LEASE_RECLAIM_AFTER_EXPIRY",
+        "CRASH_RECOVERY_SUCCEEDS",
+    ):
+        assert case in source

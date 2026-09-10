@@ -292,11 +292,11 @@ def _run_concurrent_claim(
     if not row or int(row[0]) != 1:
         raise RuntimeError("concurrent claim produced more than one durable publication event")
     return [
-        GateResult("process-isolation", "PASS", "two distinct worker processes used independent database sessions"),
-        GateResult("single-owner-claim", "PASS", "exactly one worker claimed the queued job"),
-        GateResult("heartbeat", "PASS", "the winning worker renewed its durable lease"),
-        GateResult("single-publication", "PASS", "exactly one worker acknowledged the publication"),
-        GateResult("publication-outbox-fence", "PASS", "the durable outbox contains one idempotent publication event"),
+        GateResult("PROCESS_ISOLATION", "PASS", "two distinct worker processes used independent database sessions"),
+        GateResult("ONE_OWNER_CLAIM", "PASS", "exactly one worker claimed the queued job"),
+        GateResult("HEARTBEAT_FENCING", "PASS", "the winning worker renewed its durable lease"),
+        GateResult("SINGLE_PUBLICATION", "PASS", "the durable outbox contains exactly one publication event"),
+        GateResult("PUBLICATION_OUTBOX_FENCE", "PASS", "the durable outbox contains one idempotent publication event"),
     ]
 
 
@@ -395,9 +395,11 @@ def _run_crash_recovery(
     if not outbox_row or int(outbox_row[0]) != 1:
         raise RuntimeError("crash recovery produced an unexpected durable publication count")
     return [
-        GateResult("crash-recovery", "PASS", "a crashed worker's durable lease was reclaimed by a second process"),
-        GateResult("stale-ack-rejection", "PASS", "the crashed worker's stale lease could not acknowledge after reclaim"),
-        GateResult("recovered-single-publication", "PASS", "the recovered job has one lifecycle and one outbox publication event"),
+        GateResult("LEASE_RECLAIM_AFTER_EXPIRY", "PASS", "a second process reclaimed the expired durable lease"),
+        GateResult("STALE_WORKER_ACK_REJECTED", "PASS", "the crashed worker's stale lease could not acknowledge after reclaim"),
+        GateResult("STALE_WORKER_PUBLISH_REJECTED", "PASS", "the stale worker attempt left the durable outbox publication count unchanged"),
+        GateResult("CRASH_RECOVERY_SUCCEEDS", "PASS", "the reclaimed job completed with one lifecycle and one outbox event"),
+        GateResult("DUPLICATE_PUBLICATION_REJECTED", "PASS", "crash recovery retained exactly one durable publication event"),
     ]
 
 
