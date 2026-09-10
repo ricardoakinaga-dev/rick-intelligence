@@ -12,7 +12,7 @@ WEB_CURRENT_EVIDENCE_DIR := $(ROOT)/.gauntlet-state-of-art/evidence/visual-cycle
 
 .DEFAULT_GOAL := help
 
-.PHONY: help bootstrap validate quality-bar-static dev test test-fast test-integration lint typecheck build up down logs ci eval eval-retrieval eval-retrieval-pack security-adversarial storage-test ops-migration-check ops-static compose-static postgres-runtime phase3-postgres-runtime multi-worker-runtime phase3-multi-worker-runtime redis-multi-replica-runtime phase3-redis-multi-replica-runtime phase3-redis-runtime phase3-object-qdrant-runtime redis-runtime object-qdrant-runtime triple-aaa-verify ops-backup-test jobs-test release-evidence phase3-evidence phase3-evidence-verify phase3-performance phase3-chaos phase3-soak web-install web-lint web-typecheck web-build web-e2e web-validate api-dev api-test api-contract api-security api-benchmark api131-canonical api131-differential api131-full api131-benchmark api14-units api14-differential api14-acl api14-full api14-benchmark api15-contracts api15-provider api15-lock api15-professor api15-root api15-benchmark api15-verify api15-full api15-boundaries api16-domain api16-worker api16-root api16-benchmark api16-full api16-verify
+.PHONY: help bootstrap validate quality-bar-static dev test test-fast test-integration lint typecheck build up down logs ci eval eval-retrieval eval-retrieval-pack security-adversarial storage-test ops-migration-check ops-static compose-static postgres-runtime phase3-postgres-runtime multi-worker-runtime phase3-multi-worker-runtime redis-multi-replica-runtime phase3-redis-multi-replica-runtime phase3-redis-runtime phase3-object-qdrant-runtime redis-runtime object-qdrant-runtime provider-runtime phase3-provider-runtime golden-runtime phase3-golden-runtime provider-rag-runtime tenant-evidence-runtime phase3-tenant-evidence-runtime observability-runtime phase3-observability-runtime frontend-supply-runtime phase3-frontend-supply-runtime triple-aaa-verify ops-backup-test jobs-test release-evidence phase3-evidence phase3-evidence-verify phase3-performance phase3-chaos phase3-soak web-install web-lint web-typecheck web-build web-e2e web-validate api-dev api-test api-contract api-security api-benchmark api131-canonical api131-differential api131-full api131-benchmark api14-units api14-differential api14-acl api14-full api14-benchmark api15-contracts api15-provider api15-lock api15-professor api15-root api15-benchmark api15-verify api15-full api15-boundaries api16-domain api16-worker api16-root api16-benchmark api16-full api16-verify
 
 help:
 	@printf '%s\n' 'RICK Intelligence root commands:'
@@ -44,6 +44,17 @@ help:
 	@printf '%s\n' '  make phase3-redis-runtime emit commit-bound Redis runtime evidence'
 	@printf '%s\n' '  make object-qdrant-runtime run the real object/vector gate from explicit test URLs'
 	@printf '%s\n' '  make phase3-object-qdrant-runtime emit commit-bound object/vector runtime evidence'
+	@printf '%s\n' '  make provider-runtime run the real OpenAI-compatible chat/embedding gate from RICK_TEST_PROVIDER_URL'
+	@printf '%s\n' '  make phase3-provider-runtime emit commit-bound provider runtime evidence'
+	@printf '%s\n' '  make golden-runtime run the real RICK_GOLDEN_RUNTIME_PATH ingestion/RAG gate'
+	@printf '%s\n' '  make phase3-golden-runtime emit commit-bound golden ingestion evidence'
+	@printf '%s\n' '  make provider-rag-runtime require both the live provider and golden RAG runtime gates'
+	@printf '%s\n' '  make tenant-evidence-runtime run the live multi-tenant/evidence negative matrix'
+	@printf '%s\n' '  make phase3-tenant-evidence-runtime emit commit-bound tenant/evidence evidence'
+	@printf '%s\n' '  make observability-runtime run the bounded OTel/metrics/SLO gate'
+	@printf '%s\n' '  make phase3-observability-runtime emit commit-bound observability evidence'
+	@printf '%s\n' '  make frontend-supply-runtime run frontend/accessibility/supply-chain checks'
+	@printf '%s\n' '  make phase3-frontend-supply-runtime emit commit-bound frontend/supply evidence'
 	@printf '%s\n' '  make triple-aaa-verify run the fail-closed integrated verification packet'
 	@printf '%s\n' '  make release-evidence generate the ignored commit-bound release manifest'
 	@printf '%s\n' '  make phase3-evidence generate the ignored Phase 3 capability matrix'
@@ -160,6 +171,38 @@ redis-runtime:
 object-qdrant-runtime:
 	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)/packages/knowledge/src:$(ROOT)/packages/retrieval/src:$(ROOT)/packages/storage/src" $(PYTHON) "$(ROOT)/scripts/phase11/object_qdrant_runtime_gate.py"
 
+provider-runtime:
+	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)/packages/contracts/src:$(ROOT)/packages/providers/src" $(PYTHON) "$(ROOT)/scripts/phase11/provider_runtime_gate.py"
+
+phase3-provider-runtime:
+	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)" $(PYTHON) "$(ROOT)/scripts/state_of_art/run_phase3_provider.py"
+
+golden-runtime:
+	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)" $(PYTHON) "$(ROOT)/scripts/phase11/golden_runtime_gate.py"
+
+phase3-golden-runtime:
+	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)" $(PYTHON) "$(ROOT)/scripts/state_of_art/run_phase3_golden_runtime.py"
+
+provider-rag-runtime: provider-runtime golden-runtime
+
+tenant-evidence-runtime:
+	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)" $(PYTHON) "$(ROOT)/scripts/phase11/tenant_evidence_runtime_gate.py"
+
+phase3-tenant-evidence-runtime:
+	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)" $(PYTHON) "$(ROOT)/scripts/state_of_art/run_phase3_tenant_evidence.py"
+
+observability-runtime:
+	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)" $(PYTHON) "$(ROOT)/scripts/phase11/observability_runtime_gate.py"
+
+phase3-observability-runtime:
+	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)" $(PYTHON) "$(ROOT)/scripts/state_of_art/run_phase3_observability.py"
+
+frontend-supply-runtime:
+	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)" $(PYTHON) "$(ROOT)/scripts/phase11/frontend_supply_runtime_gate.py"
+
+phase3-frontend-supply-runtime:
+	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)" $(PYTHON) "$(ROOT)/scripts/state_of_art/run_phase3_frontend_supply.py"
+
 triple-aaa-verify:
 	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) "$(ROOT)/scripts/state_of_art/triple_aaa_verify.py"
 
@@ -173,13 +216,13 @@ phase3-evidence-verify:
 	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)" $(PYTHON) "$(ROOT)/scripts/state_of_art/generate_phase3_evidence.py" --verify --require-promotable
 
 phase3-performance:
-	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) "$(ROOT)/scripts/state_of_art/phase3_lane.py" --lane performance --strict
+	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)" $(PYTHON) "$(ROOT)/scripts/state_of_art/run_phase3_operational.py" --lane performance
 
 phase3-chaos:
-	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) "$(ROOT)/scripts/state_of_art/phase3_lane.py" --lane chaos --strict
+	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)" $(PYTHON) "$(ROOT)/scripts/state_of_art/run_phase3_operational.py" --lane chaos
 
 phase3-soak:
-	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) "$(ROOT)/scripts/state_of_art/phase3_lane.py" --lane soak --strict
+	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)" $(PYTHON) "$(ROOT)/scripts/state_of_art/run_phase3_operational.py" --lane soak
 
 ops-backup-test:
 	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) -m pytest -q -p no:cacheprovider "$(ROOT)/infrastructure/scripts/tests/test_backup_restore.py"

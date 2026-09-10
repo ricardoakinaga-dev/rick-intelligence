@@ -38,8 +38,8 @@ def run(root: Path = ROOT, *, output: str = DEFAULT_OUTPUT, argv: Sequence[str] 
         capability_id=CAPABILITY_ID,
         output=output,
         raw_output=RAW_OUTPUT,
-        environment="phase3-object-qdrant-local-disposable",
-        procedure="scripts/phase11/object_qdrant_runtime_gate.py against explicitly supplied disposable object/vector endpoints",
+        environment="phase3.5-object-qdrant-local-disposable",
+        procedure="scripts/phase11/object_qdrant_runtime_gate.py against explicitly supplied disposable object/vector and fault endpoints",
         argv=argv,
         checkout_capture=capture_checkout,
     )
@@ -49,6 +49,8 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", default=DEFAULT_OUTPUT)
     parser.add_argument("--qdrant-url", default=None)
+    parser.add_argument("--qdrant-fault-url", default=None)
+    parser.add_argument("--qdrant-timeout-url", default=None)
     parser.add_argument("--object-endpoint", default=None)
     parser.add_argument("--object-bucket", default=None)
     parser.add_argument("--object-region", default=None)
@@ -58,6 +60,8 @@ def main(argv: list[str] | None = None) -> int:
     gate_args: list[str] = []
     for name, value in (
         ("--qdrant-url", args.qdrant_url),
+        ("--qdrant-fault-url", args.qdrant_fault_url),
+        ("--qdrant-timeout-url", args.qdrant_timeout_url),
         ("--object-endpoint", args.object_endpoint),
         ("--object-bucket", args.object_bucket),
         ("--object-region", args.object_region),
