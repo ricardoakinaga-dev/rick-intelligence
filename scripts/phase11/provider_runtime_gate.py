@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run a bounded live OpenAI-compatible health/chat/stream/embedding gate.
+"""Run a bounded live OpenAI-compatible health/chat/stream/tool/embedding gate.
 
 The gate requires an explicitly configured provider URL and uses the canonical
 HTTP client.  It never installs a fake transport, never falls back to the
@@ -174,6 +174,7 @@ async def _run_checks(
     embedding_ok = False
     streaming_ok = False
     json_ok = False
+    tools_ok = False
     try:
         try:
             provider_health_ok = await client.health_check()
@@ -240,6 +241,52 @@ async def _run_checks(
             assertions.append(_Assertion("json-response-contract", FAIL, "live JSON assertion failed"))
 
         try:
+            tool_result = await client.chat_completion(
+                messages=[
+                    ProviderMessage(
+                        role="user",
+                        content="Use the report_status function with status=ok.",
+                    )
+                ],
+                temperature=0,
+                tools=[
+                    {
+                        "type": "function",
+                        "function": {
+                            "name": "report_status",
+                            "description": "Report the provider health status.",
+                            "parameters": {
+                                "type": "object",
+                                "properties": {"status": {"type": "string"}},
+                                "required": ["status"],
+                                "additionalProperties": False,
+                            },
+                        },
+                    }
+                ],
+                correlation_id=f"phase11-provider-tool-{uuid.uuid4().hex[:12]}",
+            )
+            tool_call = (tool_result.tool_calls or [None])[0]
+            decoded_arguments = json.loads(tool_call.function.arguments) if tool_call is not None else None
+            tools_ok = bool(
+                tool_result.model == config.chat_model
+                and tool_call is not None
+                and tool_call.function.name == "report_status"
+                and isinstance(decoded_arguments, dict)
+            )
+            assertions.append(
+                _Assertion(
+                    "tool-call-contract",
+                    PASS if tools_ok else FAIL,
+                    "typed function tool call returned with JSON arguments"
+                    if tools_ok
+                    else "typed function tool call did not satisfy the contract",
+                )
+            )
+        except Exception:
+            assertions.append(_Assertion("tool-call-contract", FAIL, "live tool assertion failed"))
+
+        try:
             deltas: list[str] = []
             finish_reason: str | None = None
             stream = client.chat_completion_stream(
@@ -299,7 +346,7 @@ async def _run_checks(
                 "canonical OpenAI-compatible client is configured",
             )
         )
-        status = PASS if provider_health_ok and chat_ok and json_ok and streaming_ok and embedding_ok else FAIL
+        status = PASS if provider_health_ok and chat_ok and json_ok and tools_ok and streaming_ok and embedding_ok else FAIL
         production_safe = bool(
             status == PASS
             and config.is_production

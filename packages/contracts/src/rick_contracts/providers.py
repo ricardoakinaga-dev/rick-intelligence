@@ -8,6 +8,8 @@ exception causes into a public error.
 from __future__ import annotations
 
 import math
+import json
+import re
 from typing import Literal
 
 from pydantic import ConfigDict, Field, field_validator, model_validator
@@ -15,6 +17,11 @@ from pydantic import ConfigDict, Field, field_validator, model_validator
 from rick_contracts.base import StrictContractModel
 
 PROVIDER_CONTRACT_VERSION = "provider-contract-v1"
+_PROVIDER_CONTROL = re.compile(r"[\x00-\x1f\x7f]")
+
+
+def _reject_json_constant(value: str) -> object:
+    raise ValueError(value)
 
 ProviderErrorCode = Literal[
     "timeout",
@@ -88,15 +95,105 @@ class ProviderUsage(StrictContractModel):
     total_tokens: int = Field(ge=0, le=20_000_000)
 
 
+class ProviderToolCallFunction(StrictContractModel):
+    """A complete function invocation emitted by a chat provider."""
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    name: str = Field(min_length=1, max_length=128)
+    arguments: str = Field(min_length=1, max_length=1_000_000)
+
+    @field_validator("name")
+    @classmethod
+    def safe_name(cls, value: str) -> str:
+        if _PROVIDER_CONTROL.search(value):
+            raise ValueError("tool function name contains control characters")
+        return value
+
+    @field_validator("arguments")
+    @classmethod
+    def valid_json_arguments(cls, value: str) -> str:
+        try:
+            decoded = json.loads(value, parse_constant=_reject_json_constant)
+        except (TypeError, ValueError, json.JSONDecodeError, RecursionError):
+            raise ValueError("tool arguments must be valid JSON") from None
+        if not isinstance(decoded, dict):
+            raise ValueError("tool arguments must be a JSON object")
+        return value
+
+
+class ProviderToolCall(StrictContractModel):
+    """A bounded, validated function call from a provider response."""
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    id: str = Field(min_length=1, max_length=256)
+    type: Literal["function"]
+    function: ProviderToolCallFunction
+
+    @field_validator("id")
+    @classmethod
+    def safe_id(cls, value: str) -> str:
+        if _PROVIDER_CONTROL.search(value):
+            raise ValueError("tool call id contains control characters")
+        return value
+
+
+class ProviderToolCallDeltaFunction(StrictContractModel):
+    """A partial function invocation emitted by a streaming response."""
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    name: str | None = Field(default=None, max_length=128)
+    arguments: str = Field(default="", max_length=1_000_000)
+
+    @field_validator("name")
+    @classmethod
+    def safe_name(cls, value: str | None) -> str | None:
+        if value is not None and (not value or _PROVIDER_CONTROL.search(value)):
+            raise ValueError("tool function name contains control characters")
+        return value
+
+
+class ProviderToolCallDelta(StrictContractModel):
+    """A typed stream delta for a provider tool call.
+
+    Tool arguments are intentionally not parsed here because providers emit
+    them over multiple chunks. The completed result contract validates the
+    assembled JSON object before application code can execute it.
+    """
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    index: int = Field(ge=0, le=31)
+    id: str | None = Field(default=None, max_length=256)
+    type: Literal["function"] | None = None
+    function: ProviderToolCallDeltaFunction
+
+    @field_validator("id")
+    @classmethod
+    def safe_id(cls, value: str | None) -> str | None:
+        if value is not None and (not value or _PROVIDER_CONTROL.search(value)):
+            raise ValueError("tool call id contains control characters")
+        return value
+
+
 class ChatCompletionResult(StrictContractModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
     contract_version: Literal[PROVIDER_CONTRACT_VERSION] = PROVIDER_CONTRACT_VERSION
     model: str = Field(min_length=1, max_length=256)
-    content: str = Field(min_length=1, max_length=1_000_000)
+    content: str = Field(default="", max_length=1_000_000)
+    tool_calls: list[ProviderToolCall] | None = Field(default=None, max_length=32)
     finish_reason: Literal["stop", "length", "content_filter", "unknown"] = "stop"
     correlation_id: str = Field(min_length=1, max_length=128)
     usage: ProviderUsage | None = None
+
+    @model_validator(mode="after")
+    def has_content_or_tool_calls(self) -> "ChatCompletionResult":
+        if not self.content.strip() and not self.tool_calls:
+            raise ValueError("chat completion must contain content or tool calls")
+        return self
 
 
 class ChatCompletionChunk(StrictContractModel):
@@ -111,6 +208,7 @@ class ChatCompletionChunk(StrictContractModel):
     contract_version: Literal[PROVIDER_CONTRACT_VERSION] = PROVIDER_CONTRACT_VERSION
     model: str = Field(min_length=1, max_length=256)
     delta: str = Field(default="", max_length=1_000_000)
+    tool_calls: list[ProviderToolCallDelta] | None = Field(default=None, max_length=32)
     finish_reason: Literal["stop", "length", "content_filter", "unknown"] | None = None
     correlation_id: str = Field(min_length=1, max_length=128)
     usage: ProviderUsage | None = None

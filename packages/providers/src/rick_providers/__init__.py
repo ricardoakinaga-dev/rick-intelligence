@@ -12,6 +12,10 @@ from rick_contracts.providers import (
     ProviderErrorCode,
     ProviderErrorDto,
     ProviderMessage,
+    ProviderToolCall,
+    ProviderToolCallDelta,
+    ProviderToolCallDeltaFunction,
+    ProviderToolCallFunction,
 )
 
 from rick_providers.client import (
@@ -54,6 +58,10 @@ __all__ = [
     "ProviderErrorCode",
     "ProviderErrorDto",
     "EmbeddingResult",
+    "ProviderToolCall",
+    "ProviderToolCallFunction",
+    "ProviderToolCallDelta",
+    "ProviderToolCallDeltaFunction",
     "ChatCompletionChunk",
     "ChatCompletionResult",
     "ProviderConfig",

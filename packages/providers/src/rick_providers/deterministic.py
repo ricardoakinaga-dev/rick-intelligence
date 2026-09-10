@@ -19,6 +19,7 @@ from rick_providers.client import (
     _resolve_correlation_id,
     _serialize_messages,
     _serialize_response_format,
+    _serialize_tools,
     _validate_model,
     _validate_temperature,
 )
@@ -106,6 +107,7 @@ class DeterministicProvider:
         messages: Sequence[MessageInput] | None = None,
         temperature: int | float | None = 0.2,
         response_format: Mapping[str, object] | None = None,
+        tools: Sequence[Mapping[str, object]] | None = None,
         *,
         model: str | None = None,
         correlation_id: str | None = None,
@@ -132,12 +134,14 @@ class DeterministicProvider:
         serialized_messages = _serialize_messages(messages, operation, correlation)
         normalized_temperature = _validate_temperature(temperature, operation, correlation)
         normalized_format = _serialize_response_format(response_format, operation, correlation)
+        normalized_tools = _serialize_tools(tools, operation, correlation)
         fingerprint = hashlib.sha256(
             json.dumps(
                 {
                     "messages": serialized_messages,
                     "temperature": normalized_temperature,
                     "response_format": normalized_format,
+                    "tools": normalized_tools,
                 },
                 sort_keys=True,
                 separators=(",", ":"),
@@ -195,13 +199,14 @@ class DeterministicProvider:
         messages: Sequence[MessageInput] | None = None,
         temperature: int | float | None = 0.2,
         response_format: Mapping[str, object] | None = None,
+        tools: Sequence[Mapping[str, object]] | None = None,
         *,
         model: str | None = None,
         correlation_id: str | None = None,
     ) -> AsyncIterator[ChatCompletionChunk]:
         async def stream() -> AsyncIterator[ChatCompletionChunk]:
             result = await self.chat_completion(
-                model_or_messages, messages, temperature, response_format,
+                model_or_messages, messages, temperature, response_format, tools,
                 model=model, correlation_id=correlation_id,
             )
             # This is a deterministic test transport. It still emits through
@@ -258,6 +263,7 @@ class DeterministicProvider:
         model: str | None = None,
         temperature: int | float | None = 0.2,
         response_format: Mapping[str, object] | None = None,
+        tools: Sequence[Mapping[str, object]] | None = None,
         correlation_id: str | None = None,
     ) -> ChatCompletionResult:
         return await self.chat_completion(
@@ -265,6 +271,7 @@ class DeterministicProvider:
             messages,
             temperature,
             response_format,
+            tools,
             correlation_id=correlation_id,
         )
 

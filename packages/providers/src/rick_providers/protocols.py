@@ -17,6 +17,7 @@ class AsyncProvider(Protocol):
         messages: Sequence[ProviderMessage | Mapping[str, object]] | None = None,
         temperature: int | float | None = 0.2,
         response_format: Mapping[str, object] | None = None,
+        tools: Sequence[Mapping[str, object]] | None = None,
         *,
         model: str | None = None,
         correlation_id: str | None = None,
@@ -36,6 +37,7 @@ class AsyncProvider(Protocol):
         messages: Sequence[ProviderMessage | Mapping[str, object]] | None = None,
         temperature: int | float | None = 0.2,
         response_format: Mapping[str, object] | None = None,
+        tools: Sequence[Mapping[str, object]] | None = None,
         *, model: str | None = None, correlation_id: str | None = None,
     ) -> AsyncIterator[ChatCompletionChunk]: ...
 

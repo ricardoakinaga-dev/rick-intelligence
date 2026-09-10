@@ -25,6 +25,10 @@ from rick_contracts.providers import (
     ChatCompletionResult,
     EmbeddingResult,
     ProviderMessage,
+    ProviderToolCall,
+    ProviderToolCallDelta,
+    ProviderToolCallDeltaFunction,
+    ProviderToolCallFunction,
 )
 
 from rick_providers.config import ProviderConfig, ProviderConfigurationError
@@ -43,6 +47,10 @@ from rick_providers.errors import (
 
 
 MAX_RESPONSE_BYTES = 1_000_000
+MAX_TOOL_COUNT = 128
+MAX_TOOL_SCHEMA_BYTES = 262_144
+MAX_TOOLS_BYTES = 1_000_000
+MAX_TOOL_CALL_COUNT = 32
 _ALLOWED_FINISH_REASONS = frozenset({"stop", "length", "content_filter", "unknown"})
 _CORRELATION_CONTROL = re.compile(r"[\x00-\x1f\x7f]")
 
@@ -197,6 +205,7 @@ class OpenAICompatibleClient:
         messages: Sequence[MessageInput] | None = None,
         temperature: int | float | None = 0.2,
         response_format: Mapping[str, object] | None = None,
+        tools: Sequence[Mapping[str, object]] | None = None,
         *,
         model: str | None = None,
         correlation_id: str | None = None,
@@ -230,12 +239,15 @@ class OpenAICompatibleClient:
         serialized_messages = _serialize_messages(messages, operation, correlation)
         normalized_temperature = _validate_temperature(temperature, operation, correlation)
         normalized_format = _serialize_response_format(response_format, operation, correlation)
+        normalized_tools = _serialize_tools(tools, operation, correlation)
         payload: dict[str, object] = {
             "model": normalized_model,
             "messages": serialized_messages,
             "temperature": normalized_temperature,
             "response_format": normalized_format,
         }
+        if normalized_tools is not None:
+            payload["tools"] = normalized_tools
 
         async def attempt_request(attempt: int) -> ChatCompletionResult:
             body = await self._post_json(
@@ -321,6 +333,7 @@ class OpenAICompatibleClient:
         messages: Sequence[MessageInput] | None = None,
         temperature: int | float | None = 0.2,
         response_format: Mapping[str, object] | None = None,
+        tools: Sequence[Mapping[str, object]] | None = None,
         *,
         model: str | None = None,
         correlation_id: str | None = None,
@@ -333,7 +346,7 @@ class OpenAICompatibleClient:
         escaped, the stream fails closed instead of duplicating a prefix.
         """
         return self._chat_completion_stream(
-            model_or_messages, messages, temperature, response_format,
+            model_or_messages, messages, temperature, response_format, tools,
             model=model, correlation_id=correlation_id,
         )
 
@@ -343,6 +356,7 @@ class OpenAICompatibleClient:
         messages: Sequence[MessageInput] | None,
         temperature: int | float | None,
         response_format: Mapping[str, object] | None,
+        tools: Sequence[Mapping[str, object]] | None,
         *,
         model: str | None,
         correlation_id: str | None,
@@ -368,11 +382,14 @@ class OpenAICompatibleClient:
         serialized_messages = _serialize_messages(messages, operation, correlation)
         normalized_temperature = _validate_temperature(temperature, operation, correlation)
         normalized_format = _serialize_response_format(response_format, operation, correlation)
+        normalized_tools = _serialize_tools(tools, operation, correlation)
         payload: dict[str, object] = {
             "model": normalized_model, "messages": serialized_messages,
             "temperature": normalized_temperature, "response_format": normalized_format,
             "stream": True,
         }
+        if normalized_tools is not None:
+            payload["tools"] = normalized_tools
 
         for attempt in range(1, self.config.max_attempts + 1):
             emitted = False
@@ -462,6 +479,7 @@ class OpenAICompatibleClient:
         model: str | None = None,
         temperature: int | float | None = 0.2,
         response_format: Mapping[str, object] | None = None,
+        tools: Sequence[Mapping[str, object]] | None = None,
         correlation_id: str | None = None,
     ) -> ChatCompletionResult:
         """Short alias with messages-first argument order."""
@@ -471,6 +489,7 @@ class OpenAICompatibleClient:
             messages,
             temperature,
             response_format,
+            tools,
             correlation_id=correlation_id,
         )
 
@@ -773,6 +792,69 @@ def _serialize_response_format(
     return result
 
 
+def _serialize_tools(
+    value: Sequence[Mapping[str, object]] | None,
+    operation: ProviderOperation,
+    correlation_id: str,
+) -> list[dict[str, object]] | None:
+    """Normalize function tools without allowing arbitrary payload passthrough."""
+
+    if value is None:
+        return None
+    if isinstance(value, (str, bytes)) or not isinstance(value, Sequence):
+        raise provider_error("malformed_response", operation, correlation_id, 0)
+    if not value or len(value) > MAX_TOOL_COUNT:
+        raise provider_error("malformed_response", operation, correlation_id, 0)
+
+    normalized: list[dict[str, object]] = []
+    total_bytes = 0
+    for tool in value:
+        if not isinstance(tool, Mapping) or any(not isinstance(key, str) for key in tool):
+            raise provider_error("malformed_response", operation, correlation_id, 0)
+        if tool.get("type") != "function":
+            raise provider_error("malformed_response", operation, correlation_id, 0)
+        function = tool.get("function")
+        if not isinstance(function, Mapping) or any(not isinstance(key, str) for key in function):
+            raise provider_error("malformed_response", operation, correlation_id, 0)
+        name = function.get("name")
+        if not isinstance(name, str) or not name.strip() or len(name) > 128 or _CORRELATION_CONTROL.search(name):
+            raise provider_error("malformed_response", operation, correlation_id, 0)
+        description = function.get("description")
+        if description is not None and (
+            not isinstance(description, str)
+            or len(description) > 4_096
+            or _CORRELATION_CONTROL.search(description)
+        ):
+            raise provider_error("malformed_response", operation, correlation_id, 0)
+        parameters = function.get("parameters", {"type": "object", "properties": {}})
+        if not isinstance(parameters, Mapping) or any(not isinstance(key, str) for key in parameters):
+            raise provider_error("malformed_response", operation, correlation_id, 0)
+        strict = function.get("strict")
+        if strict is not None and type(strict) is not bool:
+            raise provider_error("malformed_response", operation, correlation_id, 0)
+        normalized_function: dict[str, object] = {
+            "name": name.strip(),
+            "parameters": dict(parameters),
+        }
+        if description is not None:
+            normalized_function["description"] = description
+        if strict is not None:
+            normalized_function["strict"] = strict
+        candidate = {"type": "function", "function": normalized_function}
+        try:
+            encoded = json.dumps(candidate, allow_nan=False, separators=(",", ":"))
+        except (TypeError, ValueError, OverflowError, RecursionError):
+            raise provider_error("malformed_response", operation, correlation_id, 0) from None
+        encoded_size = len(encoded.encode("utf-8"))
+        if encoded_size > MAX_TOOL_SCHEMA_BYTES:
+            raise provider_error("malformed_response", operation, correlation_id, 0)
+        total_bytes += encoded_size
+        if total_bytes > MAX_TOOLS_BYTES:
+            raise provider_error("malformed_response", operation, correlation_id, 0)
+        normalized.append(candidate)
+    return normalized
+
+
 def _extract_chat_result(
     body: object,
     expected_model: str,
@@ -795,10 +877,15 @@ def _extract_chat_result(
     message = choice["message"]
     if not isinstance(message, Mapping):
         raise provider_error("malformed_response", operation, correlation_id, attempt)
-    if "content" not in message:
+    if "content" not in message and "tool_calls" not in message:
         raise provider_error("missing_field", operation, correlation_id, attempt)
-    content = message["content"]
-    if not isinstance(content, str) or not content.strip():
+    content = message.get("content", "")
+    if content is None:
+        content = ""
+    if not isinstance(content, str) or len(content) > MAX_RESPONSE_BYTES:
+        raise provider_error("missing_field", operation, correlation_id, attempt)
+    tool_calls = _extract_tool_calls(message.get("tool_calls"), operation, correlation_id, attempt)
+    if not content.strip() and not tool_calls:
         raise provider_error("missing_field", operation, correlation_id, attempt)
     model = body["model"]
     if not isinstance(model, str) or not model.strip() or len(model) > 256 or _CORRELATION_CONTROL.search(model):
@@ -820,6 +907,7 @@ def _extract_chat_result(
         return ChatCompletionResult(
             model=model,
             content=content,
+            tool_calls=tool_calls,
             finish_reason=finish_reason,
             correlation_id=correlation_id,
             usage=usage,
@@ -860,17 +948,123 @@ def _extract_chat_chunk(
     if not isinstance(content, str):
         raise provider_error("malformed_response", operation, correlation_id, attempt)
     finish_reason = choice.get("finish_reason")
+    tool_calls = _extract_tool_call_deltas(delta.get("tool_calls"), operation, correlation_id, attempt)
+    if not content and not tool_calls and finish_reason is None:
+        return None
     if finish_reason is not None and finish_reason not in _ALLOWED_FINISH_REASONS:
         raise provider_error("malformed_response", operation, correlation_id, attempt)
     try:
         return ChatCompletionChunk(
             model=expected_model,
             delta=content,
+            tool_calls=tool_calls,
             finish_reason=finish_reason,
             correlation_id=correlation_id,
         )
     except ValidationError:
         raise provider_error("malformed_response", operation, correlation_id, attempt) from None
+
+
+def _extract_tool_calls(
+    value: object,
+    operation: ProviderOperation,
+    correlation_id: str,
+    attempt: int,
+) -> list[ProviderToolCall] | None:
+    if value is None:
+        return None
+    if not isinstance(value, list) or not value or len(value) > MAX_TOOL_CALL_COUNT:
+        raise provider_error("malformed_response", operation, correlation_id, attempt)
+    calls: list[ProviderToolCall] = []
+    for raw_call in value:
+        if not isinstance(raw_call, Mapping):
+            raise provider_error("malformed_response", operation, correlation_id, attempt)
+        raw_id = raw_call.get("id")
+        raw_type = raw_call.get("type")
+        raw_function = raw_call.get("function")
+        if not isinstance(raw_id, str) or not raw_id.strip() or len(raw_id) > 256 or _CORRELATION_CONTROL.search(raw_id):
+            raise provider_error("malformed_response", operation, correlation_id, attempt)
+        if raw_type != "function" or not isinstance(raw_function, Mapping):
+            raise provider_error("malformed_response", operation, correlation_id, attempt)
+        raw_name = raw_function.get("name")
+        raw_arguments = raw_function.get("arguments")
+        if not isinstance(raw_name, str) or not raw_name.strip() or len(raw_name) > 128 or _CORRELATION_CONTROL.search(raw_name):
+            raise provider_error("malformed_response", operation, correlation_id, attempt)
+        if not isinstance(raw_arguments, str) or not raw_arguments.strip() or len(raw_arguments) > MAX_RESPONSE_BYTES:
+            raise provider_error("malformed_response", operation, correlation_id, attempt)
+        try:
+            decoded_arguments = json.loads(raw_arguments, parse_constant=_reject_json_constant)
+        except (TypeError, ValueError, RecursionError):
+            raise provider_error("invalid_json", operation, correlation_id, attempt) from None
+        if not isinstance(decoded_arguments, dict):
+            raise provider_error("malformed_response", operation, correlation_id, attempt)
+        try:
+            calls.append(
+                ProviderToolCall(
+                    id=raw_id.strip(),
+                    type="function",
+                    function=ProviderToolCallFunction(
+                        name=raw_name.strip(),
+                        arguments=raw_arguments,
+                    ),
+                )
+            )
+        except ValidationError:
+            raise provider_error("malformed_response", operation, correlation_id, attempt) from None
+    return calls
+
+
+def _extract_tool_call_deltas(
+    value: object,
+    operation: ProviderOperation,
+    correlation_id: str,
+    attempt: int,
+) -> list[ProviderToolCallDelta] | None:
+    if value is None:
+        return None
+    if not isinstance(value, list) or not value or len(value) > MAX_TOOL_CALL_COUNT:
+        raise provider_error("malformed_response", operation, correlation_id, attempt)
+    deltas: list[ProviderToolCallDelta] = []
+    for raw_call in value:
+        if not isinstance(raw_call, Mapping):
+            raise provider_error("malformed_response", operation, correlation_id, attempt)
+        index = raw_call.get("index")
+        raw_id = raw_call.get("id")
+        raw_type = raw_call.get("type")
+        raw_function = raw_call.get("function", {})
+        if type(index) is not int or not 0 <= index < MAX_TOOL_CALL_COUNT:
+            raise provider_error("malformed_response", operation, correlation_id, attempt)
+        if raw_id is not None and (
+            not isinstance(raw_id, str) or not raw_id.strip() or len(raw_id) > 256 or _CORRELATION_CONTROL.search(raw_id)
+        ):
+            raise provider_error("malformed_response", operation, correlation_id, attempt)
+        if raw_type is not None and raw_type != "function":
+            raise provider_error("malformed_response", operation, correlation_id, attempt)
+        if not isinstance(raw_function, Mapping):
+            raise provider_error("malformed_response", operation, correlation_id, attempt)
+        raw_name = raw_function.get("name")
+        arguments = raw_function.get("arguments", "")
+        if raw_name is not None and (
+            not isinstance(raw_name, str) or not raw_name.strip() or len(raw_name) > 128 or _CORRELATION_CONTROL.search(raw_name)
+        ):
+            raise provider_error("malformed_response", operation, correlation_id, attempt)
+        if not isinstance(arguments, str) or len(arguments) > MAX_RESPONSE_BYTES:
+            raise provider_error("malformed_response", operation, correlation_id, attempt)
+        try:
+            deltas.append(
+                ProviderToolCallDelta(
+                    index=index,
+                    id=raw_id.strip() if isinstance(raw_id, str) else None,
+                    type="function" if raw_type == "function" else None,
+                    function=ProviderToolCallDeltaFunction(
+                        name=raw_name.strip() if isinstance(raw_name, str) else None,
+                        arguments=arguments,
+                    ),
+                )
+            )
+        except ValidationError:
+            raise provider_error("malformed_response", operation, correlation_id, attempt) from None
+    return deltas
 
 
 def _extract_embedding_result(

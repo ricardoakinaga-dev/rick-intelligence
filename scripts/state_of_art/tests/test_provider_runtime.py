@@ -55,6 +55,37 @@ class _ProviderHandler(BaseHTTPRequestHandler):
             self.wfile.write(encoded)
             return
         if self.path.endswith("/chat/completions"):
+            if body.get("tools"):
+                payload = {
+                    "model": body["model"],
+                    "choices": [
+                        {
+                            "message": {
+                                "role": "assistant",
+                                "content": None,
+                                "tool_calls": [
+                                    {
+                                        "id": "call-phase11",
+                                        "type": "function",
+                                        "function": {
+                                            "name": "report_status",
+                                            "arguments": '{"status":"ok"}',
+                                        },
+                                    }
+                                ],
+                            },
+                            "finish_reason": "stop",
+                        }
+                    ],
+                }
+                encoded = json.dumps(payload).encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(encoded)))
+                self.send_header("Connection", "close")
+                self.end_headers()
+                self.wfile.write(encoded)
+                return
             content = (
                 json.dumps({"status": "ok"})
                 if body.get("response_format") == {"type": "json_object"}
@@ -136,6 +167,7 @@ def test_real_openai_compatible_endpoint_passes_semantic_checks(provider_url: st
         "provider-health-probe",
         "chat-completion-contract",
         "json-response-contract",
+        "tool-call-contract",
         "streaming-contract",
         "embedding-contract",
     }

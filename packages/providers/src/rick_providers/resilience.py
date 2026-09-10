@@ -15,7 +15,14 @@ from collections.abc import AsyncIterator, Mapping, Sequence
 from threading import RLock
 from typing import Any, Callable
 
-from rick_contracts.providers import ChatCompletionChunk, ChatCompletionResult, EmbeddingResult, ProviderMessage
+from rick_contracts.providers import (
+    ChatCompletionChunk,
+    ChatCompletionResult,
+    EmbeddingResult,
+    ProviderMessage,
+    ProviderToolCallDelta,
+    ProviderToolCallDeltaFunction,
+)
 from rick_providers.errors import ProviderError, provider_error
 from rick_providers.protocols import AsyncProvider
 
@@ -156,6 +163,7 @@ class ResilientProvider:
         messages: Sequence[ProviderMessage | Mapping[str, object]] | None = None,
         temperature: int | float | None = 0.2,
         response_format: Mapping[str, object] | None = None,
+        tools: Sequence[Mapping[str, object]] | None = None,
         *,
         model: str | None = None,
         correlation_id: str | None = None,
@@ -168,6 +176,7 @@ class ResilientProvider:
                 messages,
                 temperature,
                 response_format,
+                tools,
                 model=model,
                 correlation_id=correlation,
             )
@@ -203,10 +212,11 @@ class ResilientProvider:
         messages: Sequence[ProviderMessage | Mapping[str, object]] | None = None,
         temperature: int | float | None = 0.2,
         response_format: Mapping[str, object] | None = None,
+        tools: Sequence[Mapping[str, object]] | None = None,
         *, model: str | None = None, correlation_id: str | None = None,
     ) -> AsyncIterator[ChatCompletionChunk]:
         return self._chat_completion_stream(
-            model_or_messages, messages, temperature, response_format,
+            model_or_messages, messages, temperature, response_format, tools,
             model=model, correlation_id=correlation_id,
         )
 
@@ -216,6 +226,7 @@ class ResilientProvider:
         messages: Sequence[ProviderMessage | Mapping[str, object]] | None,
         temperature: int | float | None,
         response_format: Mapping[str, object] | None,
+        tools: Sequence[Mapping[str, object]] | None,
         *, model: str | None, correlation_id: str | None,
     ) -> AsyncIterator[ChatCompletionChunk]:
         self._validate_prompt(model_or_messages, messages)
@@ -223,17 +234,32 @@ class ResilientProvider:
         target = getattr(self.provider, "chat_completion_stream", None)
         if not callable(target):
             result = await self.chat_completion(
-                model_or_messages, messages, temperature, response_format,
+                model_or_messages, messages, temperature, response_format, tools,
                 model=model, correlation_id=correlation,
             )
             yield ChatCompletionChunk(
                 model=result.model, delta=result.content, finish_reason=result.finish_reason,
+                tool_calls=(
+                    [
+                        ProviderToolCallDelta(
+                            index=index,
+                            id=call.id,
+                            type=call.type,
+                            function=ProviderToolCallDeltaFunction(
+                                name=call.function.name,
+                                arguments=call.function.arguments,
+                            ),
+                        )
+                        for index, call in enumerate(result.tool_calls or [])
+                    ]
+                    or None
+                ),
                 correlation_id=result.correlation_id, usage=result.usage,
             )
             return
         try:
             stream = target(
-                model_or_messages, messages, temperature, response_format,
+                model_or_messages, messages, temperature, response_format, tools,
                 model=model, correlation_id=correlation,
             )
             if inspect.isawaitable(stream):

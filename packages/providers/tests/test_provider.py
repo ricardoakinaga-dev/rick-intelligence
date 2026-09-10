@@ -214,6 +214,166 @@ async def test_streaming_contract_emits_typed_deltas_and_terminal_finish_reason(
 
 
 @pytest.mark.asyncio
+async def test_function_tools_are_serialized_and_typed_calls_are_returned() -> None:
+    requests: list[httpx.Request] = []
+    tool = {
+        "type": "function",
+        "function": {
+            "name": "report_status",
+            "description": "Report a bounded status.",
+            "parameters": {
+                "type": "object",
+                "properties": {"status": {"type": "string"}},
+                "required": ["status"],
+                "additionalProperties": False,
+            },
+            "strict": True,
+        },
+    }
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        payload = json.loads(request.content)
+        assert payload["tools"] == [tool]
+        return _response(
+            request,
+            200,
+            {
+                "model": "chat-test-model",
+                "choices": [
+                    {
+                        "message": {
+                            "role": "assistant",
+                            "content": None,
+                            "tool_calls": [
+                                {
+                                    "id": "call-status",
+                                    "type": "function",
+                                    "function": {
+                                        "name": "report_status",
+                                        "arguments": '{"status":"ok"}',
+                                    },
+                                }
+                            ],
+                        },
+                        "finish_reason": "stop",
+                    }
+                ],
+            },
+        )
+
+    provider = OpenAICompatibleClient(_config(), transport=httpx.MockTransport(handler))
+    try:
+        result = await provider.chat_completion(
+            messages=[{"role": "user", "content": "status"}],
+            tools=[tool],
+            correlation_id=CORRELATION,
+        )
+    finally:
+        await _close(provider)
+
+    assert len(requests) == 1
+    assert result.content == ""
+    assert result.tool_calls is not None
+    assert result.tool_calls[0].id == "call-status"
+    assert result.tool_calls[0].function.name == "report_status"
+    assert json.loads(result.tool_calls[0].function.arguments) == {"status": "ok"}
+
+
+@pytest.mark.asyncio
+async def test_streaming_tool_call_deltas_are_typed_without_parsing_partial_arguments() -> None:
+    events = [
+        {
+            "model": "chat-test-model",
+            "choices": [
+                {
+                    "delta": {
+                        "tool_calls": [
+                            {
+                                "index": 0,
+                                "id": "call-status",
+                                "type": "function",
+                                "function": {"name": "report_status", "arguments": '{"sta'},
+                            }
+                        ]
+                    },
+                    "finish_reason": None,
+                }
+            ],
+        },
+        {
+            "model": "chat-test-model",
+            "choices": [
+                {
+                    "delta": {
+                        "tool_calls": [
+                            {"index": 0, "function": {"arguments": 'tus":"ok"}'}}
+                        ]
+                    },
+                    "finish_reason": "stop",
+                }
+            ],
+        },
+    ]
+    body = "".join(f"data: {json.dumps(event)}\n\n" for event in events).encode() + b"data: [DONE]\n\n"
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            content=body,
+            headers={"content-type": "text/event-stream"},
+            request=request,
+        )
+
+    provider = OpenAICompatibleClient(_config(), transport=httpx.MockTransport(handler))
+    try:
+        chunks = [
+            chunk
+            async for chunk in provider.chat_completion_stream(
+                messages=[{"role": "user", "content": "status"}],
+                tools=[
+                    {
+                        "type": "function",
+                        "function": {"name": "report_status", "parameters": {"type": "object"}},
+                    }
+                ],
+            )
+        ]
+    finally:
+        await _close(provider)
+
+    assert chunks[0].tool_calls is not None
+    assert chunks[0].tool_calls[0].function.arguments == '{"sta'
+    assert chunks[1].tool_calls is not None
+    assert chunks[1].tool_calls[0].function.arguments == 'tus":"ok"}'
+    assert chunks[1].finish_reason == "stop"
+
+
+@pytest.mark.asyncio
+async def test_invalid_function_tool_is_rejected_before_network() -> None:
+    calls = 0
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        return _response(request, 200, _chat_payload())
+
+    provider = OpenAICompatibleClient(_config(), transport=httpx.MockTransport(handler))
+    try:
+        with pytest.raises(ProviderError) as caught:
+            await provider.chat_completion(
+                messages=[{"role": "user", "content": "status"}],
+                tools=[{"type": "function", "function": {"name": "bad\nname"}}],
+            )
+    finally:
+        await _close(provider)
+
+    assert caught.value.code == "malformed_response"
+    assert caught.value.attempts == 0
+    assert calls == 0
+
+
+@pytest.mark.asyncio
 async def test_streaming_cancellation_propagates_without_retry_or_conversion() -> None:
     started = asyncio.Event()
     calls = 0

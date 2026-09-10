@@ -12,6 +12,7 @@ from rick_contracts import (
     ProfessorRequest,
     ProfessorResponse,
     ProviderMessage,
+    ProviderToolCall,
     RetrievalContext,
 )
 from rick_contracts.chat import Citation
@@ -55,6 +56,29 @@ def test_embedding_contract_requires_finite_exact_dimension():
         EmbeddingResult(model="m", dimensions=2, vector=[1.0], correlation_id="corr")
     with pytest.raises(ValidationError):
         EmbeddingResult(model="m", dimensions=2, vector=[1.0, math.inf], correlation_id="corr")
+
+
+def test_provider_tool_call_requires_safe_json_arguments_and_content_or_call():
+    call = ProviderToolCall(
+        id="call-1",
+        type="function",
+        function={"name": "report_status", "arguments": '{"status":"ok"}'},
+    )
+    result = ChatCompletionResult(
+        model="m",
+        content="",
+        tool_calls=[call],
+        correlation_id="corr",
+    )
+    assert result.tool_calls[0].function.name == "report_status"
+    with pytest.raises(ValidationError):
+        ProviderToolCall(
+            id="call-1",
+            type="function",
+            function={"name": "report_status", "arguments": "not-json"},
+        )
+    with pytest.raises(ValidationError):
+        ChatCompletionResult(model="m", content="", correlation_id="corr")
 
 
 def test_lease_contract_requires_only_the_operation_outcome():
