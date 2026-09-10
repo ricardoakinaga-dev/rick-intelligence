@@ -811,7 +811,8 @@
         "scripts/state_of_art/phase3_evidence.py",
         "scripts/state_of_art/tests/test_phase3_evidence.py",
         ".agent/verification.jsonl#VER-PH3-2-INDEPENDENT-REVIEW-BINDING-20260910",
-        ".agent/verification.jsonl#VER-PH3-2-CURRENT-HEAD-INTEGRATED-VERIFY-20260910"
+        ".agent/verification.jsonl#VER-PH3-2-CURRENT-HEAD-INTEGRATED-VERIFY-20260910",
+        ".agent/verification.jsonl#VER-PH3-2-COMPOSE-HARDENING-INTEGRATED-VERIFY-20260910"
       ],
       "next_action": {
         "id": "PH3-2-LAB-READINESS:WAIT_RUNTIME",
@@ -824,7 +825,7 @@
         "Docker daemon access to /var/run/docker.sock is denied in the current session",
         "Disposable runtime secrets and endpoint authority are unavailable"
       ],
-      "reason": "The current local implementation and fail-closed API/Redis, worker, citation-support, release, same-run CI evidence, authenticated promotion-seal, shared-runtime-preflight, current-artifact promotion binding, promoted-capability independent-review binding and canonical accessibility gates are covered by 300 State-of-Art/Phase 11 tests, web lint/typecheck, 15 canonical browser checks, make validate and git diff --check. The exact implementation candidate is 7f11eab54bc588d263e0d77ec56e567ce85d5cad with tree b7cb338f33c53869424c5336edba18a0754d6032; the clean integrated verifier classifies it as STATE_OF_ART_CANDIDATE with exit 1 because release evidence and the sealed packet are not promotable while live runtime lanes remain blocked. The preserved full make test, real Docker/Compose startup, readiness, PostgreSQL/Redis/object/vector execution, distributed service checks, frontend runtime authority, teardown, production authority and human Go/No-Go remain unavailable without approved external runtime access"
+      "reason": "The current local implementation and fail-closed API/Redis, worker, citation-support, release, same-run CI evidence, authenticated promotion-seal, shared-runtime-preflight, current-artifact promotion binding, promoted-capability independent-review binding, canonical accessibility gates and Compose resource/capability hardening are covered by 302 State-of-Art/Phase 11 tests, 21 Compose lifecycle checks, web lint/typecheck, 15 historical canonical browser checks, make validate, make ops-static, make compose-static and git diff --check. The exact source implementation candidate is 57b243ca3250e97b49c2af761e7940f5cd85db5b with tree d4bbf0368af50a2e034f8ef847d95db333ea04de; the current clean integrated verifier at published HEAD 8b488ae59ec85403ae7f9eda162a0a5d9d67fe57 classifies STATE_OF_ART_CANDIDATE with JSON exit 1 because release evidence and the sealed packet are not promotable while live runtime lanes remain blocked. The preserved full make test, real Docker/Compose startup, readiness, PostgreSQL/Redis/object/vector execution, distributed service checks, frontend runtime authority, teardown, production authority and human Go/No-Go remain unavailable without approved external runtime access"
     }
   ]
 }
