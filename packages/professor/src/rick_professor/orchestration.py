@@ -579,6 +579,7 @@ class ProfessorOrchestrator:
                 conversation_id=request.conversation_id,
             )
             completion = raw_completion if isinstance(raw_completion, ChatCompletionResult) else ChatCompletionResult.model_validate(raw_completion)
+            self._consume_tool_calls(budget, len(completion.tool_calls or []))
         except _BudgetExceeded as error:
             return self._failed(
                 request,
@@ -915,6 +916,7 @@ class ProfessorOrchestrator:
                     messages=messages, conversation_id=request.conversation_id,
                 )
                 completion = raw_completion if isinstance(raw_completion, ChatCompletionResult) else ChatCompletionResult.model_validate(raw_completion)
+                self._consume_tool_calls(budget, len(completion.tool_calls or []))
                 if not _completion_within_token_budget(completion, messages, self.limits.max_tokens):
                     yield {"kind": "final", "response": self._failed(request, "token_budget_exceeded", evidence, metadata=decision_metadata)}
                     return
@@ -942,6 +944,7 @@ class ProfessorOrchestrator:
         finish_reason = "unknown"
         correlation_id = f"chat-{request.conversation_id}"[:128]
         usage = None
+        stream_tool_indexes: set[int] = set()
         try:
             self._consume_provider_call(budget)
             stream = await _call_maybe_async(
@@ -953,6 +956,7 @@ class ProfessorOrchestrator:
                 correlation_id = chunk.correlation_id
                 if chunk.usage is not None:
                     usage = chunk.usage
+                stream_tool_indexes.update(delta.index for delta in chunk.tool_calls or [])
                 if chunk.delta:
                     content_parts.append(chunk.delta)
                     yield {"kind": "delta", "delta": chunk.delta}
@@ -962,6 +966,12 @@ class ProfessorOrchestrator:
             raise
         except Exception:
             yield {"kind": "final", "response": self._failed(request, "provider_failed", evidence, metadata=decision_metadata)}
+            return
+
+        try:
+            self._consume_tool_calls(budget, len(stream_tool_indexes))
+        except _BudgetExceeded as error:
+            yield {"kind": "final", "response": self._failed(request, f"{error.budget_name}_budget_exceeded", evidence, metadata=decision_metadata)}
             return
 
         content = "".join(content_parts).strip()
@@ -1002,6 +1012,13 @@ class ProfessorOrchestrator:
         budget.provider_calls += 1
         if budget.provider_calls > self.limits.max_provider_calls:
             raise _BudgetExceeded("provider_calls")
+
+    def _consume_tool_calls(self, budget: _RequestBudget, count: int) -> None:
+        if type(count) is not int or count < 0:
+            raise _BudgetExceeded("tool_calls")
+        budget.tool_calls += count
+        if budget.tool_calls > self.limits.max_tool_calls:
+            raise _BudgetExceeded("tool_calls")
 
     async def _retrieve(self, request: ProfessorRequest, *, budget: _RequestBudget) -> object:
         self._consume_retrieval_round(budget)

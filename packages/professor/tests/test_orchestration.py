@@ -441,6 +441,72 @@ async def test_provider_token_budget_is_enforced_from_reported_usage() -> None:
 
 
 @pytest.mark.asyncio
+async def test_provider_tool_calls_are_counted_and_rejected_without_execution() -> None:
+    class ToolProvider(ProviderDouble):
+        async def complete(self, *, messages, conversation_id: str) -> ChatCompletionResult:
+            return ChatCompletionResult.model_validate(
+                {
+                    "model": "tool-provider",
+                    "content": "",
+                    "tool_calls": [
+                        {
+                            "id": "call-1",
+                            "type": "function",
+                            "function": {"name": "report_status", "arguments": "{}"},
+                        },
+                        {
+                            "id": "call-2",
+                            "type": "function",
+                            "function": {"name": "report_status", "arguments": "{}"},
+                        },
+                    ],
+                    "correlation_id": "corr-tools",
+                }
+            )
+
+    response = await ProfessorOrchestrator(
+        retrieval=RetrievalDouble([_evidence()]),
+        chat_provider=ToolProvider(),
+        limits=ProfessorLimits(max_tool_calls=1),
+    ).run(_request())
+
+    assert response.evidence_status == "GENERATION_FAILED"
+    assert response.metadata["failure_stage"] == "tool_calls_budget_exceeded"
+
+
+@pytest.mark.asyncio
+async def test_streaming_provider_tool_calls_are_budgeted_before_content_is_published() -> None:
+    class ToolStreamingProvider(ProviderDouble):
+        async def stream(self, *, messages, conversation_id: str):
+            yield ChatCompletionChunk(
+                model="tool-stream-provider",
+                delta="",
+                tool_calls=[
+                    {
+                        "index": 0,
+                        "id": "call-stream-1",
+                        "type": "function",
+                        "function": {"name": "report_status", "arguments": "{}"},
+                    }
+                ],
+                finish_reason="stop",
+                correlation_id="corr-stream-tools",
+            )
+
+    events = [
+        event
+        async for event in ProfessorOrchestrator(
+            retrieval=RetrievalDouble([_evidence()]),
+            chat_provider=ToolStreamingProvider(),
+            limits=ProfessorLimits(max_tool_calls=0),
+        ).stream(_request())
+    ]
+
+    assert events[-1]["kind"] == "final"
+    assert events[-1]["response"].metadata["failure_stage"] == "tool_calls_budget_exceeded"
+
+
+@pytest.mark.asyncio
 async def test_stream_reasoning_timeout_emits_safe_terminal_response() -> None:
     class SlowStreamingProvider(ProviderDouble):
         async def stream(self, *, messages, conversation_id: str):
