@@ -334,23 +334,25 @@ The focused crash/worker tests pass **14** cases and the full State-of-Art
 suite passes **336** tests. No external database or distributed runtime claim
 is made.
 
-## 77. Final exact-candidate revalidation — 2026-09-10
+## 77. Final source-candidate revalidation — 2026-09-10
 
-The current clean candidate is `6d2f7998527805c17e3c30eb67937704a4dc2606`
-with tree `4259796dd45a567c31be5a7e927a0e3c222e01e5`. The archived prompt
-still matches the supplied attachment byte-for-byte (27,366 bytes; SHA-256
+The implementation candidate immediately before this report-only editorial
+update was `6d2f7998527805c17e3c30eb67937704a4dc2606` with tree
+`4259796dd45a567c31be5a7e927a0e3c222e01e5`. The archived prompt still
+matches the supplied attachment byte-for-byte (27,366 bytes; SHA-256
 `064be5e04ed483d5d95ef803a66faf6675f7c1f00633cdea83d5abfdd5370d5f`).
 
 Fresh local validation passes: `make validate`,
 `make triple-aaa-capability-matrix` and `make eval-retrieval-pack`. The
-release manifest and integrated verifier are bound to this clean candidate;
-the artifact-set digest is
+pre-update release manifest and integrated verifier were bound to that clean
+candidate; its artifact-set digest was
 `0caba7cb80ce3b81e3fb9e9b1546ef82bcd588fcfa57dc36af1f8dffa8bd26e0` and the
-checkout fingerprint is
+its checkout fingerprint was
 `c5200b2a32f5393bed0602d27c86b64d4cac46dde8aca2bdbc4ab06d145e518f`.
 
-The verifier remains `STATE_OF_ART_CANDIDATE`, exit **2**, with **17** local
-PASS lanes and **24** `BLOCKED_EXTERNAL` mandatory lanes; promotion is
-`false`. Docker still cannot be accessed from this environment, so no live
-service, distributed failure/recovery, independent-review or sealed-promotion
-claim is made. The candidate remains **NO-GO**.
+That verifier was `STATE_OF_ART_CANDIDATE`, exit **2**, with **17** local PASS
+lanes and **24** `BLOCKED_EXTERNAL` mandatory lanes. The post-update packet is
+the authoritative source for the final commit/tree binding. Docker still
+cannot be accessed from this environment, so no live service, distributed
+failure/recovery, independent-review or sealed-promotion claim is made. The
+candidate remains **NO-GO**.
