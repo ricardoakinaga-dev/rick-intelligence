@@ -1,7 +1,7 @@
 {
   "schema": "rick-triple-aaa-runtime-capability-matrix.v1",
-  "candidate_commit": "4c7b285e36a0b87fd9fb413a60611624955bd5b6",
-  "candidate_tree": "4ec5946032a0022c2efb0d8c53d47b8ef9931cb6",
+  "candidate_commit": "d7daacbd33794c555aea4b55416bc58cabffa530",
+  "candidate_tree": "1f3a1ed48bc76dcec24dd1f9595f7d7c3bdc6cf2",
   "prompt": "docs/prompts/triple-aaa-runtime-closure-2026-09-10.txt",
   "rows": [
     {
