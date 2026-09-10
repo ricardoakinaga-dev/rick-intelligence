@@ -609,3 +609,22 @@ It classifies the candidate as `STATE_OF_ART_CANDIDATE`, returns `2`, keeps
 `promotion_allowed=false`, and reports 17 foundation lanes `PASS` with 24
 mandatory lanes `BLOCKED_EXTERNAL`. The clean packet is diagnostic evidence;
 the next documentation/control-plane commit requires another integrated run.
+
+## 28. Streaming tool-call gate closure — 2026-09-10
+
+Source implementation candidate `e6aba35afcb2fb0fe277494b63742decb6b4390d`
+(tree `779bce9e5774cd0a705012bafac83b2e0e47e963`) closes a remaining local
+Phase 3.8 evidence gap. The provider runtime gate now performs a separate
+streaming function-tool probe, reassembles typed deltas by index, rejects
+unexpected extra calls and conflicting id/type/name fragments, requires a
+terminal finish reason and validates the assembled arguments as a strict JSON
+object with the expected semantic value. The hermetic endpoint fixture emits
+split tool arguments so the same path is exercised locally.
+
+The focused provider runtime fixture passes **3 tests**; the provider suite
+passes **59** and the provider contract suite passes **6**. This is local
+contract evidence only. The approved external provider, production budgets,
+distributed runtime, corpus, independent review, sealing and human Go/No-Go
+remain unavailable. The prior integrated packet is stale after this source
+commit and must be regenerated on the final clean documentation/control-plane
+candidate; no State of Art, AAA or Triple AAA claim is made.

@@ -852,7 +852,8 @@
     "scripts/phase11/provider_runtime_gate.py",
     "scripts/state_of_art/tests/test_provider_runtime.py",
     ".agent/verification.jsonl#VER-PH3-2-PROVIDER-TOOLS-JSON-STREAM-20260910",
-    ".agent/verification.jsonl#VER-PH3-2-CURRENT-PACKET-PROVIDER-TOOLS-20260910"
+    ".agent/verification.jsonl#VER-PH3-2-CURRENT-PACKET-PROVIDER-TOOLS-20260910",
+    ".agent/verification.jsonl#VER-PH3-2-PROVIDER-STREAM-TOOLS-20260910"
       ],
       "next_action": {
         "id": "PH3-2-LAB-READINESS:WAIT_RUNTIME",
