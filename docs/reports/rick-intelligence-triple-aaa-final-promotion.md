@@ -99,6 +99,14 @@ complete tool arguments before typed projection or tool execution. This is
 local provider evidence only; live endpoint, corpus and budget authority remain
 required.
 
+At source candidate `99d37eaee6b4e7507bbb49f50c37703c0b245e1b`, the Phase 3
+matrix/release readers, packet verifier, runtime adapter, operational harness
+and offline evaluators share a bounded strict JSON decoder. Duplicate object
+keys, non-finite constants, invalid UTF-8 and inputs above 1 MiB fail closed
+before evidence status or candidate fields are projected. This protects local
+promotion integrity only; it does not turn blocked runtime or review lanes into
+promotion evidence.
+
 ## 7. CI and release lanes
 
 The canonical workflow names FAST, UNIT, CONTRACT, SECURITY, RAG_EVAL,

@@ -191,6 +191,14 @@ canonical target and same-run identity across all successful envelopes, rather
 than trusting the adapter's self-report. A blocked or failed gate remains
 blocked or failed; the preflight never upgrades it.
 
+All Phase 3 evidence, release-envelope, packet and offline-evaluation readers
+share a strict JSON boundary: UTF-8 is decoded explicitly, input is capped at
+1 MiB before projection, non-finite constants are rejected, and duplicate
+object keys fail closed. This prevents an evidence producer from changing a
+status, candidate binding or gate field by relying on the last duplicate key;
+the boundary is local integrity protection and does not create runtime or
+independent-review evidence.
+
 ## Checkout fingerprint
 
 The JSON output contains `HEAD`, worktree status, a status fingerprint, and a

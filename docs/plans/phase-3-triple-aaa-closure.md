@@ -840,3 +840,19 @@ knowledge/ingestion/retrieval domain suite **166**; compilation and
 Approved PostgreSQL durability, distributed recovery, tenant runtime,
 independent review, sealed packet and human Go/No-Go remain unavailable;
 promotion remains disallowed.
+
+## 55. Phase 3 evidence JSON boundary closure — 2026-09-10
+
+Source candidate `99d37eaee6b4e7507bbb49f50c37703c0b245e1b` (tree
+`a068c1a2e213eb1d6beaaf4826fad948084c9c13`) closes the evidence-integrity
+boundary across the Phase 3 matrix reader, release-evidence generator, packet
+verifier, runtime adapter, operational harness and offline evaluators. A shared
+decoder now enforces strict UTF-8, a 1 MiB input ceiling, finite JSON values and
+unique object keys before status, candidate, gate or observation fields are
+projected.
+
+The focused evidence slice passes **82** tests and the complete State-of-Art
+suite passes **300**; compilation and `git diff --check` pass. This is local
+evidence-integrity hardening only. It does not supply Docker/services,
+provider/corpus, production runtime, fresh independent review, sealed packet or
+human Go/No-Go authority; promotion remains disallowed.
