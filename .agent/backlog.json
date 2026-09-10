@@ -748,7 +748,7 @@
         "PH3-1-CI-RELEASE-CLOSURE"
       ],
       "owner": "Codex lead",
-      "acceptance_summary": "Canonical dev/staging Compose renders the required 11-service topology, make up validates inventory and waits for health/readiness, failure diagnostics are bounded/redacted, make down is project-scoped and volume-preserving, the local P0 worker implementation includes a real two-process PostgreSQL fencing/crash-reclaim/stale-ACK gate, and the canonical API boundary includes a real two-process Redis rate-limit gate with replay, tenant and bounded-TTL assertions; live startup and runtime execution remain external evidence",
+      "acceptance_summary": "Canonical dev/staging Compose renders the required 11-service topology, make up validates inventory and waits for health/readiness, failure diagnostics are bounded/redacted, make down is project-scoped and volume-preserving, the local P0 worker implementation includes a real two-process PostgreSQL fencing/crash-reclaim/stale-ACK gate, and the canonical API boundary includes a real two-process Redis rate-limit gate with replay, tenant and bounded-TTL assertions. Citation-support metrics are strict Decision inputs, release generation is artifact-status fail-closed, named runtime envelopes are bound to mandatory runtime gates, and runtime diagnostics are transported by the same CI run; live startup and runtime execution remain external evidence",
       "evidence_refs": [
         "docs/prompts/phase-3-runtime-evidence-production-promotion-2026-09-09.txt",
         "docs/reports/phase-3-runtime-evidence-current-audit.md",
@@ -776,7 +776,12 @@
         "docker-compose.staging.yml",
         "infrastructure/compose/README.md",
         ".agent/verification.jsonl#VER-PH3-2-CURRENT-SOURCE-LOCAL-20260910",
-        ".agent/verification.jsonl#VER-PH3-2-REDIS-HTTP-GATE-20260910"
+        ".agent/verification.jsonl#VER-PH3-2-REDIS-HTTP-GATE-20260910",
+        "packages/decision/src/rick_decision/layer.py",
+        "scripts/state_of_art/triple_aaa_verify.py",
+        "scripts/state_of_art/generate_release_evidence.py",
+        ".github/workflows/quality.yml",
+        ".agent/verification.jsonl#VER-PH3-2-RELEASE-FAIL-CLOSED-20260910"
       ],
       "next_action": {
         "id": "PH3-2-LAB-READINESS:WAIT_RUNTIME",
@@ -789,7 +794,7 @@
         "Docker daemon access to /var/run/docker.sock is denied in the current session",
         "Disposable runtime secrets and endpoint authority are unavailable"
       ],
-      "reason": "The current local implementation and fail-closed API/Redis and worker gates are covered by the API (432 passed), locking (52 passed) and State-of-Art (148 passed) suites plus static checks. The real two-process Redis/API run returns BLOCKED_EXTERNAL, and live startup, readiness, PostgreSQL execution, distributed service checks and teardown cannot be executed without approved external runtime access"
+      "reason": "The current local implementation and fail-closed API/Redis, worker, citation-support and release gates are covered by the combined State-of-Art/API/evidence/Decision/Professor suites (297 passed) plus static checks and an independent patch review. The integrated verifier returns ADVANCED_ENGINEERING with promotion disallowed; the real two-process Redis/API run returns BLOCKED_EXTERNAL, and live startup, readiness, PostgreSQL execution, distributed service checks, frontend runtime and teardown cannot be executed without approved external runtime access"
     }
   ]
 }
