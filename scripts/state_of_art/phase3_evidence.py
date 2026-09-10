@@ -17,8 +17,10 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 
 try:
+    from scripts.state_of_art.json_boundary import load_json, loads_json
     from scripts.state_of_art.runtime_preflight import load_preflight
 except ImportError:  # pragma: no cover - direct script execution fallback.
+    from json_boundary import load_json, loads_json
     from runtime_preflight import load_preflight
 
 
@@ -417,7 +419,7 @@ def _review_binding_errors(
         for line in target.read_text(encoding="utf-8").splitlines():
             if not line.strip():
                 continue
-            candidate_record = json.loads(line)
+            candidate_record = loads_json(line)
             if isinstance(candidate_record, Mapping) and candidate_record.get("id") == record_id:
                 record = candidate_record
                 break
@@ -467,7 +469,7 @@ def evaluate_matrix(
         )
         return result
     try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
+        payload = load_json(path)
         matrix = parse_matrix(payload, require_complete=require_complete)
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         result.update({"classification": "FAILED", "reason": f"matrix is not readable JSON: {exc}"})
@@ -609,7 +611,7 @@ def evaluate_matrix(
                     rejection_codes.add("WRONG_HASH_REJECTED")
                 if field == "runtime_evidence":
                     try:
-                        runtime_record = json.loads(target.read_text(encoding="utf-8"))
+                        runtime_record = load_json(target)
                     except (OSError, UnicodeDecodeError, json.JSONDecodeError):
                         failures.append(f"{capability_id}: runtime evidence is not a readable JSON envelope: {ref['path']}")
                         rejection_codes.add("MISSING_EVIDENCE_REJECTED")
@@ -748,7 +750,7 @@ def evaluate_matrix(
                                 envelope_errors.append(f"raw_artifacts[{raw_index}].sha256")
                                 rejection_codes.add("WRONG_HASH_REJECTED")
                             try:
-                                raw_payload = json.loads(raw_target.read_text(encoding="utf-8"))
+                                raw_payload = load_json(raw_target)
                             except (OSError, UnicodeDecodeError, json.JSONDecodeError):
                                 envelope_errors.append(f"raw_artifacts[{raw_index}].json")
                                 rejection_codes.add("MISSING_EVIDENCE_REJECTED")

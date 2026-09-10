@@ -20,6 +20,7 @@ from collections.abc import Callable, Mapping, Sequence
 from typing import Any
 
 try:
+    from scripts.state_of_art.json_boundary import load_json
     from scripts.state_of_art.release_integrity import capture_checkout
     from scripts.state_of_art.runtime_preflight import (
         DEFAULT_COMPOSE_FILE,
@@ -28,6 +29,7 @@ try:
         load_preflight,
     )
 except ImportError:  # pragma: no cover - direct script execution fallback.
+    from json_boundary import load_json
     from release_integrity import capture_checkout
     from runtime_preflight import DEFAULT_COMPOSE_FILE, DEFAULT_PATH, canonical_compose_project, load_preflight
 
@@ -264,7 +266,7 @@ def run_gate_adapter(
         _write_json(raw_path, raw_payload)
     else:
         try:
-            raw_payload_value = json.loads(raw_path.read_text(encoding="utf-8"))
+            raw_payload_value = load_json(raw_path)
         except (OSError, UnicodeDecodeError, json.JSONDecodeError, TypeError, ValueError) as exc:
             raw_payload = _fallback_payload(type(exc).__name__)
             exit_status = 1

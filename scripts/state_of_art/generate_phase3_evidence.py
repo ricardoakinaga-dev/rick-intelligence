@@ -14,6 +14,7 @@ import sys
 from typing import Any
 
 try:
+    from scripts.state_of_art.json_boundary import load_json
     from scripts.state_of_art.phase3_evidence import (
         MATRIX_SCHEMA,
         RUNTIME_EVIDENCE_STATUSES,
@@ -24,6 +25,7 @@ try:
     from scripts.state_of_art.phase3_runtime_adapter import redact_runtime_value
     from scripts.state_of_art.release_integrity import capture_checkout
 except ImportError:  # pragma: no cover - direct script execution fallback.
+    from json_boundary import load_json
     from phase3_evidence import MATRIX_SCHEMA, RUNTIME_EVIDENCE_STATUSES, build_capability, evaluate_matrix, parse_matrix
     from phase3_runtime_adapter import redact_runtime_value
     from release_integrity import capture_checkout
@@ -296,7 +298,7 @@ def build_matrix(root: Path, *, environment: str = "local-hermetic") -> dict[str
                 continue
             runtime_paths.append((runtime_path, runtime_description))
             try:
-                runtime_observation = json.loads(runtime_target.read_text(encoding="utf-8"))
+                runtime_observation = load_json(runtime_target)
             except (OSError, UnicodeDecodeError, json.JSONDecodeError):
                 runtime_observation = None
             if isinstance(runtime_observation, dict) and runtime_observation.get("status") in {

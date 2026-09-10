@@ -21,10 +21,12 @@ import subprocess
 import sys
 
 try:
+    from scripts.state_of_art.json_boundary import load_json
     from scripts.state_of_art import packet_seal
     from scripts.state_of_art import promotion_engine
     from scripts.state_of_art.release_integrity import capture_checkout
 except ImportError:  # pragma: no cover - direct script execution fallback.
+    from json_boundary import load_json
     import packet_seal
     import promotion_engine
     from release_integrity import capture_checkout
@@ -92,7 +94,7 @@ def _sha256_file(path: Path) -> str | None:
 
 def _manifest_artifact_hash() -> str | None:
     try:
-        payload = json.loads((ROOT / "docs/progress/release-evidence.json").read_text(encoding="utf-8"))
+        payload = load_json(ROOT / "docs/progress/release-evidence.json")
     except (OSError, UnicodeDecodeError, json.JSONDecodeError):
         return None
     binding = payload.get("commit_binding") if isinstance(payload, dict) else None
@@ -143,7 +145,7 @@ def _read_lane_artifact(lane_id: str) -> tuple[str, str, str] | None:
     if not path.is_file():
         return "NOT_RUN", "NOT_RUN", f"{relative_path} is absent"
     try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
+        payload = load_json(path)
     except (OSError, UnicodeDecodeError, json.JSONDecodeError):
         return "FAIL", "FAIL", f"{relative_path} is not readable JSON"
     if not isinstance(payload, dict):
@@ -187,7 +189,7 @@ def _read_frontend_runtime_artifact(
     if not path.is_file():
         return None, None, "NOT_RUN", f"{relative_path} is absent"
     try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
+        payload = load_json(path)
     except (OSError, UnicodeDecodeError, json.JSONDecodeError):
         return None, None, "FAIL", f"{relative_path} is not readable JSON"
     if not isinstance(payload, dict):
@@ -552,7 +554,7 @@ def _load_packet(
     if path_error or path is None:
         return None, {"supplied": True, "path": raw_path, "status": "INVALID_PATH", "error": path_error}
     try:
-        value = json.loads(path.read_text(encoding="utf-8"))
+        value = load_json(path)
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         return None, {"supplied": True, "path": str(path.relative_to(ROOT)), "status": "UNREADABLE", "error": type(exc).__name__}
     if not isinstance(value, dict):

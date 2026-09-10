@@ -68,6 +68,21 @@ def test_zero_exit_without_structured_pass_fails_closed(tmp_path: Path) -> None:
     assert artifact["exit_status"] == 1
 
 
+def test_duplicate_status_keys_fail_closed(tmp_path: Path) -> None:
+    raw = (
+        b'{"schema_version":"rick-phase3-operational-observation.v1",'
+        b'"lane":"performance","status":"FAIL","status":"PASS",'
+        b'"runtime":{"disposable":true},"budgets":{"timeout_seconds":5},'
+        b'"measurements":{"p95_ms":42}}'
+    )
+
+    status, observation, reason = phase3_lane._parse_observation(raw, "performance")
+
+    assert status == "FAIL"
+    assert observation == {}
+    assert "valid JSON object" in reason
+
+
 def test_chaos_requires_recovery_and_soak_requires_duration(tmp_path: Path) -> None:
     chaos = phase3_lane.run_lane(
         tmp_path,

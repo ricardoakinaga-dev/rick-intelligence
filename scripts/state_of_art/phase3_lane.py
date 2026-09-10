@@ -22,6 +22,11 @@ import signal
 import subprocess
 from typing import Any
 
+try:
+    from scripts.state_of_art.json_boundary import loads_json
+except ImportError:  # pragma: no cover - direct script execution fallback.
+    from json_boundary import loads_json
+
 
 ROOT = Path(__file__).resolve().parents[2]
 LANES = frozenset({"performance", "chaos", "soak"})
@@ -96,7 +101,7 @@ def _parse_observation(raw: bytes, lane: str) -> tuple[str, dict[str, object], s
     if not raw or len(raw) > MAX_OUTPUT_BYTES:
         return "FAIL", {}, "harness output is absent or exceeds the bounded output limit"
     try:
-        payload = json.loads(raw.decode("utf-8"))
+        payload = loads_json(raw, maximum_bytes=MAX_OUTPUT_BYTES)
     except (UnicodeDecodeError, json.JSONDecodeError, RecursionError):
         return "FAIL", {}, "harness output is not one valid JSON object"
     if not isinstance(payload, dict):

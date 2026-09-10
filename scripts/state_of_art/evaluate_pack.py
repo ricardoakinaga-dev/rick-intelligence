@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 try:  # package import for tests and module callers
+    from .json_boundary import load_json
     from .evaluate_retrieval import (
         FAIL,
         INCONCLUSIVE,
@@ -29,6 +30,7 @@ try:  # package import for tests and module callers
         parse_k_values,
     )
 except ImportError:  # direct script execution with PYTHONPATH=scripts/state_of_art
+    from json_boundary import load_json
     from evaluate_retrieval import (
         FAIL,
         INCONCLUSIVE,
@@ -59,12 +61,8 @@ class PackError(ValueError):
     """A malformed pack that cannot produce a quality result."""
 
 
-def _reject_json_constant(value: str) -> None:
-    raise ValueError(f"non-finite JSON number is not allowed: {value}")
-
-
 def _load_json(path: Path) -> Any:
-    return json.loads(path.read_text(encoding="utf-8"), parse_constant=_reject_json_constant)
+    return load_json(path)
 
 
 def _text(value: Any, *, field: str) -> str:

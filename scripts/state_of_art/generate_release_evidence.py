@@ -21,6 +21,7 @@ import sys
 from typing import Sequence
 
 try:
+    from scripts.state_of_art.json_boundary import load_json
     from scripts.state_of_art.release_integrity import capture_checkout
     from scripts.state_of_art.release_manifest import (
         ArtifactFingerprint,
@@ -33,6 +34,7 @@ try:
         artifact_set_digest,
     )
 except ImportError:  # pragma: no cover - direct script execution fallback.
+    from json_boundary import load_json
     from release_integrity import capture_checkout
     from release_manifest import (
         ArtifactFingerprint,
@@ -287,7 +289,7 @@ def _runtime_result(
         command = ("runtime-envelope", relative)
         procedure = f"validate the supplied runtime envelope for {gate_id} against this checkout"
         try:
-            raw = json.loads((root / relative).read_text(encoding="utf-8"))
+            raw = load_json(root / relative)
         except (OSError, UnicodeDecodeError, json.JSONDecodeError):
             raw = None
         if isinstance(raw, dict):
@@ -321,7 +323,7 @@ def _runtime_result(
                 _evidence_ref(root, supplemental_ci_relative, f"same-run CI supplement for {gate_id}"),
             )
             try:
-                ci_raw = json.loads(ci_path.read_text(encoding="utf-8"))
+                ci_raw = load_json(ci_path)
             except (OSError, UnicodeDecodeError, json.JSONDecodeError):
                 ci_raw = None
             ci_result = "INVALID"
@@ -388,7 +390,7 @@ def _ci_result(
         command = ("ci-envelope", relative)
         procedure = f"validate the supplied same-run CI envelope for {gate_id} against this checkout"
         try:
-            raw = json.loads(path.read_text(encoding="utf-8"))
+            raw = load_json(path)
         except (OSError, UnicodeDecodeError, json.JSONDecodeError):
             raw = None
         if isinstance(raw, dict) and raw.get("schema_version") == "state-of-art-ci-evidence.v1":

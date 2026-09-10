@@ -18,6 +18,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+try:
+    from scripts.state_of_art.json_boundary import loads_json
+except ImportError:  # pragma: no cover - direct script execution fallback.
+    from json_boundary import loads_json
+
 
 RESULT_SCHEMA_VERSION = "retrieval-evaluation-result.v1"
 FIXTURE_SCHEMA_VERSION = "retrieval-evaluation.v1"
@@ -92,12 +97,8 @@ def _round_ms(value: float | None) -> float | None:
     return round(float(value), 3)
 
 
-def _reject_json_constant(value: str) -> None:
-    raise ValueError(f"non-finite JSON number is not allowed: {value}")
-
-
 def _loads(text: str) -> Any:
-    return json.loads(text, parse_constant=_reject_json_constant)
+    return loads_json(text)
 
 
 def parse_k_values(value: Any) -> tuple[int, ...]:
