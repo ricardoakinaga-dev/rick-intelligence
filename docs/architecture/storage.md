@@ -17,6 +17,11 @@ parser/chunker/embedding/index versions and tenant/workspace/collection scope.
 Writes are bounded, streamed, checksum-verified and idempotent. Deletion and
 retention are policy operations, not an implicit filesystem unlink.
 
+The local and PostgreSQL chat-history read models cap persisted JSON before
+decoding, reject non-finite or malformed values and omit corrupt response rows;
+this protects the API read boundary without claiming that local history is the
+production durability authority.
+
 The local object store is intentionally rejected in production. The S3 adapter
 signs requests with AWS Signature Version 4, keeps credentials outside the
 package, supports S3-compatible endpoints and validates response sizes and

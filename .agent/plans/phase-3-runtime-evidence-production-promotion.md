@@ -45,6 +45,7 @@ preserving the frozen Gauntlet bar, Phase 2 history and legacy repositories.
 - [x] (2026-09-10) Bound durable-job JSON decoding at source candidate b3229685b432be6c4313609d95f56b316ecc0885 (tree 43cf3eff8bfbcca3500887c729d5ddd6d99364d5): reject database JSON above 256 KiB, non-finite constants and recursive decoder failures as corruption before job-contract parsing; worker tests pass 50, while API/State-of-Art suites remain green at 437/295 and external runtime evidence remains blocked.
 - [x] (2026-09-10) Bound legacy durable-queue payload decoding at source candidate 594a8474a600f78fe09aa5d3ff52db5ae8c5e02e (tree d4de0a8d3ef4487b4377bcdc143c0719bd9575a7): SQLite and PostgreSQL queue reads now cap persisted JSON at 32 KiB, reject non-finite constants and malformed/recursive or non-string payload values through the write contract; focused queue tests pass 14, the full worker suite 52 and API/State-of-Art suites 437/295, while live runtime evidence remains blocked.
 - [x] (2026-09-10) Bound persisted SQLite vector decoding at source candidate 8035d9995d6715afa5f4571de9bf26c9ce456b4e (tree 0f7010ceaa716670340f3445c9fe41c852c3c445): read-side JSON is capped before parsing, non-finite/invalid vectors and oversized payloads fail closed, and checksum validation remains canonical; retrieval tests pass 37, the combined knowledge/ingestion/retrieval domain suite 158 and API/State-of-Art suites 437/295, while live Qdrant evidence remains blocked.
+- [x] (2026-09-10) Bound persisted chat-history JSON at source candidate 3ce7bc177046d4d4675278ab4bbfc44cdff85874 (tree b2d2661e0ae385e08e00329fd9a6f2633dacf260): SQLite and PostgreSQL history reads cap JSON before parsing, reject non-finite/recursive data and skip corrupt response rows; history tests pass 13, the API matrix 439 and State-of-Art 295, while live PostgreSQL/runtime evidence remains blocked.
 - [ ] (2026-09-09) Execute the disposable runtime; currently blocked by Docker daemon access and unresolved external authority.
 - [ ] (2026-09-09) Complete independent runtime/design/security reviews and the human Go/No-Go.
 
@@ -196,8 +197,8 @@ made.
 ## Current candidate closure
 
 The current source implementation candidate is
-8035d9995d6715afa5f4571de9bf26c9ce456b4e with tree
-0f7010ceaa716670340f3445c9fe41c852c3c445. It contains the corrected
+3ce7bc177046d4d4675278ab4bbfc44cdff85874 with tree
+b2d2661e0ae385e08e00329fd9a6f2633dacf260. It contains the corrected
 PostgreSQL worker gate, canonical two-process Redis/API HTTP gate, strict
 release artifact postconditions and manifest consistency checks, plus bounded
 same-run CI envelopes with redacted raw artifacts, exact workflow/run/ref/SHA
@@ -219,11 +220,12 @@ unpickles child-controlled bytes, and rejects invalid UTF-8 with a bounded
 parser error instead of silently decoding text with a permissive fallback,
 and bounds durable-job JSON decoding before applying the canonical job
 contract, plus bounded legacy SQLite/PostgreSQL queue payload decoding at
-the adapter read boundary and bounded persisted SQLite vector decoding with
-finite vector/canonical checksum checks. The final
+the adapter read boundary, bounded persisted SQLite vector decoding with
+finite vector/canonical checksum checks, and bounded persisted chat-history
+decoding across SQLite/PostgreSQL. The final
 documentation/control-plane follow-up is bound to the resulting clean
 checkout, while live provider/runtime evidence remains external.
-The provider, Professor, API and State-of-Art suites have 64, 36, 437 and 295
+The provider, Professor, API and State-of-Art suites have 64, 36, 439 and 295
 passing tests respectively and the relevant static checks pass; the full preserved `make test` remains incomplete
 because the CVG dataset and local Playwright browser are unavailable. The
 prior integrated verifier artifact is stale after this source change and is

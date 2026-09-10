@@ -602,3 +602,18 @@ domain suite **158**, the API matrix **437**, and the State-of-Art suite
 evidence only. Live Qdrant schema/ACL/rebuild/restore, approved corpus,
 independent review and promotion authority remain unavailable; promotion
 remains disallowed.
+
+## 39. Persisted chat-history JSON decoding closure — 2026-09-10
+
+Source candidate `3ce7bc177046d4d4675278ab4bbfc44cdff85874` (tree
+`b2d2661e0ae385e08e00329fd9a6f2633dacf260`) closes a history read-boundary
+gap across the local SQLite and canonical PostgreSQL adapters. Persisted JSON
+is capped at 256 KiB before parsing, non-finite/recursive/malformed values are
+rejected, and corrupt response rows are skipped instead of being turned into
+synthetic conversation turns.
+
+The SQLite/PostgreSQL history suite passes **13**, the API matrix **439**, and
+the State-of-Art suite **295**; compilation and `git diff --check` pass. This
+is local history read-model evidence only. Live PostgreSQL durability,
+tenant-isolation/recovery drills, provider/corpus, independent review and
+promotion authority remain unavailable; promotion remains disallowed.

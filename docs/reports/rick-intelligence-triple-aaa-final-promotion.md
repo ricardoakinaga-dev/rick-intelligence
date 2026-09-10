@@ -54,6 +54,12 @@ storage holds immutable bytes, Qdrant is a rebuildable projection, and the
 evidence/decision layer is the authority for supported responses. Every
 protected boundary must carry tenant/workspace scope and server-derived IDs.
 
+The local and PostgreSQL chat-history read models at source candidate
+`3ce7bc177046d4d4675278ab4bbfc44cdff85874` cap persisted JSON before decoding,
+reject non-finite/malformed values and omit corrupt response rows. This is a
+local read-boundary safeguard only; it does not prove live history durability,
+tenant isolation or recovery.
+
 ## 7. CI and release lanes
 
 The canonical workflow names FAST, UNIT, CONTRACT, SECURITY, RAG_EVAL,

@@ -812,3 +812,19 @@ domain suite **158**, the API matrix **437**, and the State-of-Art suite
 evidence only. Approved disposable Qdrant/runtime and corpus/provider
 authority, live projection/rebuild/restore, independent review, sealed packet
 and human Go/No-Go remain unavailable; promotion remains disallowed.
+
+## 40. Persisted chat-history JSON decoding closure — 2026-09-10
+
+Source implementation candidate `3ce7bc177046d4d4675278ab4bbfc44cdff85874`
+(tree `b2d2661e0ae385e08e00329fd9a6f2633dacf260`) closes a concrete history
+read-boundary gap. Shared SQLite/PostgreSQL decoding now caps persisted JSON at
+256 KiB before parsing, rejects non-finite/recursive/malformed values and
+skips corrupt response rows rather than exposing synthetic turns. The
+adversarial regression covers oversized and non-finite history values.
+
+The history suite passes **13**, the API matrix **439**, and the State-of-Art
+suite **295**; compilation and `git diff --check` pass. This is local history
+read-model evidence only. Approved disposable PostgreSQL/runtime, live
+history durability and tenant drills, provider/corpus, independent review,
+sealed packet and human Go/No-Go remain unavailable; promotion remains
+disallowed.
