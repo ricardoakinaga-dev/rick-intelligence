@@ -36,6 +36,30 @@ SOURCE_PROMPT = "docs/prompts/phase-3-triple-aaa-closure-2026-09-09.txt"
 QUALITY_BAR = "docs/reports/current-triple-aaa-quality-bar-v1.json"
 PHASE3_EVIDENCE_ARTIFACT = ".runtime/phase-3/capability-matrix.json"
 RELEASE_EVIDENCE_ARTIFACT = "docs/progress/release-evidence.json"
+FRONTEND_RUNTIME_ARTIFACT = ".runtime/phase-3/frontend-supply-runtime-evidence.json"
+FRONTEND_RUNTIME_COMMAND = ("make", "phase3-frontend-supply-runtime")
+
+_FRONTEND_LANE_IDS = frozenset({"frontend-e2e", "frontend-accessibility", "supply-chain"})
+_FRONTEND_BROWSER_CHECKS = (
+    "browser-api-backed-states",
+    "viewport-matrix",
+    "keyboard",
+    "focus",
+    "axe",
+    "reduced-motion",
+    "contrast",
+    "touch",
+)
+_FRONTEND_ACCESSIBILITY_CHECKS = (
+    "viewport-matrix",
+    "keyboard",
+    "focus",
+    "axe",
+    "reduced-motion",
+    "contrast",
+    "touch",
+)
+_FRONTEND_SUPPLY_CHECKS = ("container-digests", "container-sbom")
 
 
 _ARTIFACT_LANE_PATHS = {
@@ -152,6 +176,134 @@ def _read_lane_artifact(lane_id: str) -> tuple[str, str, str] | None:
     return "FAIL", classification, f"{relative_path} reports {classification}"
 
 
+def _read_frontend_runtime_artifact() -> tuple[dict[str, object] | None, dict[str, str] | None, str, str]:
+    """Read the combined frontend envelope without collapsing its lanes."""
+
+    relative_path = FRONTEND_RUNTIME_ARTIFACT
+    path = ROOT / relative_path
+    if not path.is_file():
+        return None, None, "NOT_RUN", f"{relative_path} is absent"
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return None, None, "FAIL", f"{relative_path} is not readable JSON"
+    if not isinstance(payload, dict):
+        return None, None, "FAIL", f"{relative_path} does not contain a JSON object"
+    if payload.get("schema_version") != "state-of-art-runtime-evidence.v1":
+        return None, None, "FAIL", f"{relative_path} has no approved runtime evidence schema"
+    gate = payload.get("gate")
+    if not isinstance(gate, dict):
+        return None, None, "FAIL", f"{relative_path} has no gate envelope"
+    raw_checks = gate.get("checks")
+    if not isinstance(raw_checks, list):
+        return None, None, "FAIL", f"{relative_path} has no gate checks"
+    checks: dict[str, str] = {}
+    for item in raw_checks:
+        if not isinstance(item, dict) or not isinstance(item.get("name"), str) or not isinstance(item.get("status"), str):
+            return None, None, "FAIL", f"{relative_path} contains a malformed gate check"
+        name = item["name"]
+        if name in checks:
+            return None, None, "FAIL", f"{relative_path} contains a duplicate gate check: {name}"
+        checks[name] = item["status"].upper()
+    return payload, checks, "READY", f"{relative_path} is current and structurally readable"
+
+
+def _frontend_requirements_status(
+    checks: dict[str, str],
+    required_checks: tuple[str, ...],
+) -> tuple[str, str]:
+    missing = [name for name in required_checks if name not in checks]
+    if missing:
+        return "FAIL", f"frontend runtime evidence is missing scoped checks: {', '.join(missing)}"
+    statuses = [checks[name] for name in required_checks]
+    if any(status == "FAIL" for status in statuses):
+        return "FAIL", "one or more scoped frontend checks failed"
+    if any(status in {"BLOCKED_EXTERNAL", "NOT_RUN", "WARN"} for status in statuses):
+        return "BLOCKED_EXTERNAL", "one or more scoped frontend checks are externally blocked or not run"
+    if all(status == "PASS" for status in statuses):
+        return "PASS", "all scoped frontend checks passed"
+    return "FAIL", "one or more scoped frontend checks has an unsupported status"
+
+
+def _frontend_browser_claim_status(payload: dict[str, object]) -> tuple[str, str]:
+    gate = payload.get("gate")
+    browser = gate.get("browser_evidence") if isinstance(gate, dict) else None
+    if not isinstance(browser, dict):
+        return "FAIL", "frontend runtime evidence has no browser evidence object"
+    browser_status = browser.get("status")
+    if not isinstance(browser_status, str):
+        return "FAIL", "browser evidence has no typed status"
+    browser_status = browser_status.upper()
+    if browser_status in {"BLOCKED_EXTERNAL", "NOT_RUN"}:
+        return "BLOCKED_EXTERNAL", "browser evidence is externally blocked or not run"
+    if browser_status != "PASS":
+        return "FAIL", "browser evidence did not report PASS"
+    if browser.get("runtime_claim") is not True or browser.get("fixture_interception") is not False:
+        return "FAIL", "browser evidence does not prove a real non-intercepted runtime"
+    return "PASS", "real non-intercepted browser evidence passed"
+
+
+def _apply_frontend_lane_observation(
+    lane: Lane,
+    command_result: dict[str, object],
+) -> dict[str, object]:
+    """Project one scoped lane from the combined frontend/supply envelope."""
+
+    result = dict(command_result)
+    source_return_code = command_result.get("return_code")
+    source_status = command_result.get("status")
+    source_detail = command_result.get("detail")
+    result["source_return_code"] = source_return_code
+    result["source_status"] = source_status
+    result["source_detail"] = source_detail
+    payload, checks, artifact_state, artifact_detail = _read_frontend_runtime_artifact()
+    result["artifact_path"] = FRONTEND_RUNTIME_ARTIFACT
+    result["artifact_classification"] = artifact_state if artifact_state != "READY" else (payload or {}).get("status", "UNKNOWN")
+
+    if artifact_state != "READY" or payload is None or checks is None:
+        if artifact_state == "FAIL":
+            scoped_status = "FAIL"
+        elif source_status in {"BLOCKED_EXTERNAL", "FAIL"}:
+            scoped_status = str(source_status)
+        else:
+            scoped_status = "NOT_RUN"
+        result["status"] = scoped_status
+        result["detail"] = artifact_detail
+        return result
+
+    if lane.lane_id in {"frontend-e2e", "frontend-accessibility"}:
+        browser_status, browser_detail = _frontend_browser_claim_status(payload)
+        if browser_status != "PASS":
+            result["status"] = browser_status
+            result["detail"] = browser_detail
+            return result
+        required_checks = _FRONTEND_BROWSER_CHECKS if lane.lane_id == "frontend-e2e" else _FRONTEND_ACCESSIBILITY_CHECKS
+    else:
+        required_checks = _FRONTEND_SUPPLY_CHECKS
+
+    scoped_status, scoped_detail = _frontend_requirements_status(checks, required_checks)
+    result["status"] = scoped_status
+    result["detail"] = f"{scoped_detail}; {artifact_detail}"
+    if scoped_status == "PASS":
+        # The combined adapter may return 2 because a different scoped lane is
+        # blocked.  The projected lane has its own return contract.
+        result["return_code"] = 0
+    return result
+
+
+def _reuse_frontend_command_result(lane: Lane, source_result: dict[str, object]) -> dict[str, object]:
+    """Project a second lane without executing the shared adapter again."""
+
+    source = dict(source_result)
+    source["id"] = lane.lane_id
+    source["required"] = lane.required
+    source["external"] = lane.external
+    source["return_code"] = source_result.get("source_return_code", source_result.get("return_code"))
+    source["status"] = source_result.get("source_status", source_result.get("status"))
+    source["detail"] = source_result.get("source_detail", source_result.get("detail"))
+    return _apply_frontend_lane_observation(lane, source)
+
+
 def _run(lane: Lane, *, timeout_seconds: int) -> dict[str, object]:
     if lane.command is None:
         status = "BLOCKED_EXTERNAL" if lane.blocked_if_not_run else "NOT_RUN"
@@ -224,6 +376,8 @@ def _run(lane: Lane, *, timeout_seconds: int) -> dict[str, object]:
         if return_code == 0:
             result["status"] = artifact_status
             result["detail"] = artifact_detail
+    if lane.lane_id in _FRONTEND_LANE_IDS:
+        return _apply_frontend_lane_observation(lane, result)
     return result
 
 
@@ -274,7 +428,7 @@ def _external_lanes() -> tuple[Lane, ...]:
     # The Phase 3 adapter owns the blocked/not-run classification and always
     # refreshes the shared frontend/supply envelope. Skipping it when a browser
     # is absent would leave a previous commit's envelope in the release packet.
-    frontend_command = ("make", "phase3-frontend-supply-runtime")
+    frontend_command = FRONTEND_RUNTIME_COMMAND
     return (
         Lane("release-integrity", None, external=True, detail="clean checkout and current mandatory evidence are required", blocked_if_not_run=True),
         Lane("lab-readiness", None, external=True, detail="approved disposable Docker daemon is unavailable", blocked_if_not_run=True),
@@ -510,9 +664,18 @@ def main(argv: list[str] | None = None) -> int:
     # Phase 3 matrix and the typed release manifest.  They must run first;
     # otherwise release-integrity observes the previous run's envelopes and
     # correctly rejects an internally inconsistent packet as stale.
+    frontend_command_result: dict[str, object] | None = None
     for lane in _external_lanes():
-        if lane.lane_id != "release-integrity":
-            results.append(_run(lane, timeout_seconds=args.lane_timeout))
+        if lane.lane_id == "release-integrity":
+            continue
+        if lane.command == FRONTEND_RUNTIME_COMMAND:
+            if frontend_command_result is None:
+                frontend_command_result = _run(lane, timeout_seconds=args.lane_timeout)
+                results.append(frontend_command_result)
+            else:
+                results.append(_reuse_frontend_command_result(lane, frontend_command_result))
+            continue
+        results.append(_run(lane, timeout_seconds=args.lane_timeout))
 
     results.append(_run(Lane("phase3-evidence", ("make", "phase3-evidence")), timeout_seconds=args.lane_timeout))
     results.append(

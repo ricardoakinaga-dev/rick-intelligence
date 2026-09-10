@@ -22,6 +22,52 @@ FIXTURE_CHECKOUT = {
 }
 
 
+def _write_frontend_runtime_artifact(
+    root: Path,
+    *,
+    browser_status: str = "PASS",
+    browser_runtime_claim: bool = True,
+    fixture_interception: bool = False,
+    overrides: dict[str, str] | None = None,
+    omit: tuple[str, ...] = (),
+) -> None:
+    check_names = (
+        "browser-api-backed-states",
+        "viewport-matrix",
+        "keyboard",
+        "focus",
+        "axe",
+        "reduced-motion",
+        "contrast",
+        "touch",
+        "container-digests",
+        "container-sbom",
+    )
+    statuses = {name: "PASS" for name in check_names}
+    statuses.update({"container-digests": "NOT_RUN", "container-sbom": "NOT_RUN"})
+    statuses.update(overrides or {})
+    payload = {
+        "schema_version": "state-of-art-runtime-evidence.v1",
+        "status": "BLOCKED_EXTERNAL",
+        "gate": {
+            "status": "BLOCKED_EXTERNAL",
+            "browser_evidence": {
+                "status": browser_status,
+                "runtime_claim": browser_runtime_claim,
+                "fixture_interception": fixture_interception,
+            },
+            "checks": [
+                {"name": name, "status": status}
+                for name, status in statuses.items()
+                if name not in omit
+            ],
+        },
+    }
+    artifact_path = root / triple_aaa_verify.FRONTEND_RUNTIME_ARTIFACT
+    artifact_path.parent.mkdir(parents=True, exist_ok=True)
+    artifact_path.write_text(json.dumps(payload), encoding="utf-8")
+
+
 def _results(*, status: str = "PASS", external: bool = False) -> list[dict[str, object]]:
     return [
         {
@@ -328,6 +374,9 @@ def test_integrated_verifier_refreshes_runtime_before_release_artifacts(
     assert order.index("phase3-evidence") < order.index("phase3-evidence-verify")
     assert order.index("phase3-evidence-verify") < order.index("release-evidence-generation")
     assert order.index("release-evidence-generation") < order.index("release-integrity")
+    assert order.count("frontend-e2e") == 1
+    assert "frontend-accessibility" not in order
+    assert "supply-chain" not in order
 
 
 def test_integrated_verifier_uses_commit_bound_adapters_for_manifest_lanes() -> None:
@@ -339,6 +388,101 @@ def test_integrated_verifier_uses_commit_bound_adapters_for_manifest_lanes() -> 
     for lane_id in ("frontend-e2e", "frontend-accessibility", "supply-chain"):
         assert lanes[lane_id].command == ("make", "phase3-frontend-supply-runtime")
         assert lanes[lane_id].blocked_if_not_run is False
+
+
+def test_frontend_e2e_projects_browser_pass_from_combined_blocked_adapter(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(triple_aaa_verify, "ROOT", tmp_path)
+    _write_frontend_runtime_artifact(tmp_path)
+
+    result = triple_aaa_verify._run(
+        triple_aaa_verify.Lane(
+            "frontend-e2e",
+            ("/bin/sh", "-c", "exit 2"),
+            external=True,
+            blocked_return_codes=frozenset({2}),
+        ),
+        timeout_seconds=10,
+    )
+
+    assert result["status"] == "PASS"
+    assert result["return_code"] == 0
+    assert result["source_return_code"] == 2
+    assert result["source_status"] == "BLOCKED_EXTERNAL"
+
+
+@pytest.mark.parametrize(
+    ("overrides", "omit"),
+    (({"axe": "FAIL"}, ()), ({}, ("keyboard",))),
+)
+def test_frontend_accessibility_rejects_failed_or_missing_scoped_check(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    overrides: dict[str, str],
+    omit: tuple[str, ...],
+) -> None:
+    monkeypatch.setattr(triple_aaa_verify, "ROOT", tmp_path)
+    _write_frontend_runtime_artifact(tmp_path, overrides=overrides, omit=omit)
+
+    result = triple_aaa_verify._run(
+        triple_aaa_verify.Lane(
+            "frontend-accessibility",
+            ("/bin/sh", "-c", "exit 2"),
+            external=True,
+            blocked_return_codes=frozenset({2}),
+        ),
+        timeout_seconds=10,
+    )
+
+    assert result["status"] == "FAIL"
+    assert result["return_code"] == 2
+
+
+def test_supply_chain_remains_blocked_when_container_evidence_is_not_run(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(triple_aaa_verify, "ROOT", tmp_path)
+    _write_frontend_runtime_artifact(tmp_path)
+
+    result = triple_aaa_verify._run(
+        triple_aaa_verify.Lane(
+            "supply-chain",
+            ("/bin/sh", "-c", "exit 2"),
+            external=True,
+            blocked_return_codes=frozenset({2}),
+        ),
+        timeout_seconds=10,
+    )
+
+    assert result["status"] == "BLOCKED_EXTERNAL"
+    assert result["return_code"] == 2
+    assert result["source_return_code"] == 2
+
+
+def test_malformed_frontend_artifact_is_not_upgraded_by_exit_two(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(triple_aaa_verify, "ROOT", tmp_path)
+    artifact_path = tmp_path / triple_aaa_verify.FRONTEND_RUNTIME_ARTIFACT
+    artifact_path.parent.mkdir(parents=True, exist_ok=True)
+    artifact_path.write_text("not-json", encoding="utf-8")
+
+    result = triple_aaa_verify._run(
+        triple_aaa_verify.Lane(
+            "frontend-e2e",
+            ("/bin/sh", "-c", "exit 2"),
+            external=True,
+            blocked_return_codes=frozenset({2}),
+        ),
+        timeout_seconds=10,
+    )
+
+    assert result["status"] == "FAIL"
+    assert result["return_code"] == 2
 
 
 @pytest.mark.parametrize(
