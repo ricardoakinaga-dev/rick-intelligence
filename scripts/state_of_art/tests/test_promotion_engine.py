@@ -20,6 +20,13 @@ FIXTURE_CHECKOUT = {
     "artifact_set_sha256": "d" * 64,
     "status": "CLEAN",
 }
+FRONTEND_CHECKOUT = {
+    "available": True,
+    "head": "a" * 40,
+    "tree": "b" * 40,
+    "fingerprint": "c" * 64,
+    "status": "CLEAN",
+}
 
 
 def _write_frontend_runtime_artifact(
@@ -30,6 +37,11 @@ def _write_frontend_runtime_artifact(
     fixture_interception: bool = False,
     overrides: dict[str, str] | None = None,
     omit: tuple[str, ...] = (),
+    commit_sha: str = "a" * 40,
+    tree_sha: str = "b" * 40,
+    checkout_fingerprint: str = "c" * 64,
+    freshness: str = "CURRENT",
+    clean_worktree: bool = True,
 ) -> None:
     check_names = (
         "browser-api-backed-states",
@@ -49,6 +61,12 @@ def _write_frontend_runtime_artifact(
     payload = {
         "schema_version": "state-of-art-runtime-evidence.v1",
         "status": "BLOCKED_EXTERNAL",
+        "commit_sha": commit_sha,
+        "tree_sha": tree_sha,
+        "checkout_fingerprint": checkout_fingerprint,
+        "checkout_available": True,
+        "clean_worktree": clean_worktree,
+        "freshness": freshness,
         "gate": {
             "status": "BLOCKED_EXTERNAL",
             "browser_evidence": {
@@ -301,6 +319,7 @@ def test_external_failure_is_not_relabelled_as_external_block() -> None:
             external=True,
         ),
         timeout_seconds=10,
+        expected_checkout=FRONTEND_CHECKOUT,
     )
 
     assert result["status"] == "FAIL"
@@ -342,8 +361,14 @@ def test_integrated_verifier_refreshes_runtime_before_release_artifacts(
 ) -> None:
     order: list[str] = []
 
-    def fake_run(lane: triple_aaa_verify.Lane, *, timeout_seconds: int) -> dict[str, object]:
+    def fake_run(
+        lane: triple_aaa_verify.Lane,
+        *,
+        timeout_seconds: int,
+        expected_checkout: dict[str, object] | None = None,
+    ) -> dict[str, object]:
         del timeout_seconds
+        del expected_checkout
         order.append(lane.lane_id)
         return {
             "id": lane.lane_id,
@@ -411,6 +436,29 @@ def test_frontend_e2e_projects_browser_pass_from_combined_blocked_adapter(
     assert result["return_code"] == 0
     assert result["source_return_code"] == 2
     assert result["source_status"] == "BLOCKED_EXTERNAL"
+
+
+def test_frontend_projection_rejects_artifact_from_another_commit(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(triple_aaa_verify, "ROOT", tmp_path)
+    _write_frontend_runtime_artifact(tmp_path, commit_sha="d" * 40)
+
+    result = triple_aaa_verify._run(
+        triple_aaa_verify.Lane(
+            "frontend-e2e",
+            ("/bin/sh", "-c", "exit 2"),
+            external=True,
+            blocked_return_codes=frozenset({2}),
+        ),
+        timeout_seconds=10,
+        expected_checkout=FRONTEND_CHECKOUT,
+    )
+
+    assert result["status"] == "FAIL"
+    assert result["return_code"] == 2
+    assert "commit_sha" in str(result["detail"])
 
 
 @pytest.mark.parametrize(

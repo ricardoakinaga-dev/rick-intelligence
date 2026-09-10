@@ -176,7 +176,10 @@ def _read_lane_artifact(lane_id: str) -> tuple[str, str, str] | None:
     return "FAIL", classification, f"{relative_path} reports {classification}"
 
 
-def _read_frontend_runtime_artifact() -> tuple[dict[str, object] | None, dict[str, str] | None, str, str]:
+def _read_frontend_runtime_artifact(
+    *,
+    expected_checkout: dict[str, object] | None = None,
+) -> tuple[dict[str, object] | None, dict[str, str] | None, str, str]:
     """Read the combined frontend envelope without collapsing its lanes."""
 
     relative_path = FRONTEND_RUNTIME_ARTIFACT
@@ -191,6 +194,26 @@ def _read_frontend_runtime_artifact() -> tuple[dict[str, object] | None, dict[st
         return None, None, "FAIL", f"{relative_path} does not contain a JSON object"
     if payload.get("schema_version") != "state-of-art-runtime-evidence.v1":
         return None, None, "FAIL", f"{relative_path} has no approved runtime evidence schema"
+    if expected_checkout is not None:
+        if (
+            expected_checkout.get("available") is not True
+            or expected_checkout.get("status") != "CLEAN"
+            or not isinstance(expected_checkout.get("head"), str)
+            or not isinstance(expected_checkout.get("tree"), str)
+            or not isinstance(expected_checkout.get("fingerprint"), str)
+        ):
+            return None, None, "FAIL", "the verifier checkout is unavailable or not clean"
+        for artifact_field, checkout_field in (
+            ("commit_sha", "head"),
+            ("tree_sha", "tree"),
+            ("checkout_fingerprint", "fingerprint"),
+        ):
+            if payload.get(artifact_field) != expected_checkout.get(checkout_field):
+                return None, None, "FAIL", f"{relative_path} is not bound to the verifier checkout ({artifact_field})"
+        if payload.get("checkout_available") is not True or payload.get("clean_worktree") is not True:
+            return None, None, "FAIL", f"{relative_path} does not attest to a clean checkout"
+        if payload.get("freshness") != "CURRENT":
+            return None, None, "FAIL", f"{relative_path} is not marked CURRENT"
     gate = payload.get("gate")
     if not isinstance(gate, dict):
         return None, None, "FAIL", f"{relative_path} has no gate envelope"
@@ -246,6 +269,8 @@ def _frontend_browser_claim_status(payload: dict[str, object]) -> tuple[str, str
 def _apply_frontend_lane_observation(
     lane: Lane,
     command_result: dict[str, object],
+    *,
+    expected_checkout: dict[str, object] | None = None,
 ) -> dict[str, object]:
     """Project one scoped lane from the combined frontend/supply envelope."""
 
@@ -256,7 +281,9 @@ def _apply_frontend_lane_observation(
     result["source_return_code"] = source_return_code
     result["source_status"] = source_status
     result["source_detail"] = source_detail
-    payload, checks, artifact_state, artifact_detail = _read_frontend_runtime_artifact()
+    payload, checks, artifact_state, artifact_detail = _read_frontend_runtime_artifact(
+        expected_checkout=expected_checkout,
+    )
     result["artifact_path"] = FRONTEND_RUNTIME_ARTIFACT
     result["artifact_classification"] = artifact_state if artifact_state != "READY" else (payload or {}).get("status", "UNKNOWN")
 
@@ -291,7 +318,12 @@ def _apply_frontend_lane_observation(
     return result
 
 
-def _reuse_frontend_command_result(lane: Lane, source_result: dict[str, object]) -> dict[str, object]:
+def _reuse_frontend_command_result(
+    lane: Lane,
+    source_result: dict[str, object],
+    *,
+    expected_checkout: dict[str, object] | None = None,
+) -> dict[str, object]:
     """Project a second lane without executing the shared adapter again."""
 
     source = dict(source_result)
@@ -301,10 +333,15 @@ def _reuse_frontend_command_result(lane: Lane, source_result: dict[str, object])
     source["return_code"] = source_result.get("source_return_code", source_result.get("return_code"))
     source["status"] = source_result.get("source_status", source_result.get("status"))
     source["detail"] = source_result.get("source_detail", source_result.get("detail"))
-    return _apply_frontend_lane_observation(lane, source)
+    return _apply_frontend_lane_observation(lane, source, expected_checkout=expected_checkout)
 
 
-def _run(lane: Lane, *, timeout_seconds: int) -> dict[str, object]:
+def _run(
+    lane: Lane,
+    *,
+    timeout_seconds: int,
+    expected_checkout: dict[str, object] | None = None,
+) -> dict[str, object]:
     if lane.command is None:
         status = "BLOCKED_EXTERNAL" if lane.blocked_if_not_run else "NOT_RUN"
         return {
@@ -377,7 +414,7 @@ def _run(lane: Lane, *, timeout_seconds: int) -> dict[str, object]:
             result["status"] = artifact_status
             result["detail"] = artifact_detail
     if lane.lane_id in _FRONTEND_LANE_IDS:
-        return _apply_frontend_lane_observation(lane, result)
+        return _apply_frontend_lane_observation(lane, result, expected_checkout=expected_checkout)
     return result
 
 
@@ -657,6 +694,7 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--seal-reference requires --sealed-packet; the verifier cannot self-seal a promotion packet")
 
     results: list[dict[str, object]] = []
+    verifier_checkout = capture_checkout(ROOT)
     for lane in _local_lanes():
         results.append(_run(lane, timeout_seconds=args.lane_timeout))
 
@@ -670,10 +708,20 @@ def main(argv: list[str] | None = None) -> int:
             continue
         if lane.command == FRONTEND_RUNTIME_COMMAND:
             if frontend_command_result is None:
-                frontend_command_result = _run(lane, timeout_seconds=args.lane_timeout)
+                frontend_command_result = _run(
+                    lane,
+                    timeout_seconds=args.lane_timeout,
+                    expected_checkout=verifier_checkout,
+                )
                 results.append(frontend_command_result)
             else:
-                results.append(_reuse_frontend_command_result(lane, frontend_command_result))
+                results.append(
+                    _reuse_frontend_command_result(
+                        lane,
+                        frontend_command_result,
+                        expected_checkout=verifier_checkout,
+                    )
+                )
             continue
         results.append(_run(lane, timeout_seconds=args.lane_timeout))
 
