@@ -249,3 +249,14 @@ correction is covered by the new runner tests and the combined **308-test**
 State-of-Art/Phase 11 regression. It is a classification/evidence-integrity
 correction only: it neither supplies the approved corpus nor closes runtime
 or promotion gates.
+
+## 16. Clean integrated verification — 2026-09-10
+
+The exact clean candidate `22d0d780fde9a149c5195d577b24c3f01abc1f19` (tree
+`0a81754dab24ea859f0283b2eeb1acbc57cab76e`) passed `make validate` and bound a
+current `make triple-aaa-verify` packet. Fifteen local foundation lanes passed;
+the verifier classified the candidate as `STATE_OF_ART_CANDIDATE` with JSON
+exit `1` and Make exit `2`. Runtime, release-integrity, provider/corpus,
+image, restore, chaos, soak, independent-review, sealing and human Go/No-Go
+evidence remain required. The source-of-truth correction is therefore
+published without promoting the candidate.

@@ -366,3 +366,25 @@ external-block meaning. This correction removes misleading derivative red
 noise without claiming that the preserved CVG suite or the overall promotion
 gate is green. The approved corpus, disposable runtime, immutable image
 proof, independent review, sealed packet and human Go/No-Go remain open.
+
+## 18. Clean integrated verification after source-of-truth reconciliation — 2026-09-10
+
+The exact clean candidate `22d0d780fde9a149c5195d577b24c3f01abc1f19`
+(tree `0a81754dab24ea859f0283b2eeb1acbc57cab76e`, checkout fingerprint
+`60dc9ebb91f9ad6740875ed14307b89967208de4f4c4a62ef903fa86dd834d06`) was
+verified with `make validate` and `make triple-aaa-verify`. The packet
+(`.runtime/phase-3/triple-aaa-verify.json`, SHA-256
+`b2f4401243bf152f5aa673b61b143c3d79c940e259f8f5fbbc04bfdb3cb2d9c1`)
+bound the clean checkout, artifact set
+`a61a404dc15ffa7e8d8cf458beee25d5ae23ae2fb6b92f02ab8bdb4e2449e470` and
+quality-bar hash
+`cf4218d15aa2a45ec454fd7403edbacc2ad4d7beca7f12fe163e14784981af61`.
+
+Fifteen foundation lanes passed. The derived classification is
+`STATE_OF_ART_CANDIDATE` with verifier JSON exit `1`; GNU Make returned `2`
+for the non-zero recipe. Release evidence generation is externally blocked,
+release-integrity and `phase3-evidence-verify` correctly reject the current
+non-promotable evidence, and all live service, provider/corpus, image-proof,
+restore, chaos, soak, independent-review, sealed-packet and final Go/No-Go
+lanes remain blocked or non-promotable. The packet is diagnostic evidence only;
+no `STATE_OF_ART`, `AAA` or `TRIPLE_AAA` claim is made.
