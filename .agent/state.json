@@ -14,7 +14,7 @@
   "active_execplan": ".agent/plans/phase-3-runtime-evidence-production-promotion.md",
   "active_task": "PH3-2-LAB-READINESS",
   "verification_state": "PARTIAL",
-  "repository_state": "Current Phase 3 source implementation candidate is 7f11eab54bc588d263e0d77ec56e567ce85d5cad (tree b7cb338f33c53869424c5336edba18a0754d6032). It binds shared disposable-runtime preflight, canonical Compose targeting, explicit promotion exits, current-checkout/artifact-set/gate/capability/path/raw-artifact binding, hashed candidate-bound independent-review ledger records for promoted capabilities, fail-closed CI promotion and accessible canonical web targets. Local verification passes, but the clean integrated verifier remains STATE_OF_ART_CANDIDATE with exit 1 because release evidence and the sealed packet are not promotable and live runtime lanes, production authority and human promotion remain blocked; no Triple AAA claim is made.",
+  "repository_state": "Current Phase 3 source implementation candidate is 7f11eab54bc588d263e0d77ec56e567ce85d5cad (tree b7cb338f33c53869424c5336edba18a0754d6032). It binds shared disposable-runtime preflight, canonical Compose targeting, explicit promotion exits, current-checkout/artifact-set/gate/capability/path/raw-artifact binding, hashed candidate-bound independent-review ledger records for promoted capabilities, fail-closed CI promotion and accessible canonical web targets. The latest clean published HEAD 1b1bbd7fb0544986d4d444e2cc492d1bc5b4cebc produced a current STATE_OF_ART_CANDIDATE packet with verifier JSON exit 1; release evidence, the sealed packet, live runtime lanes, production authority and human promotion remain blocked, so no Triple AAA claim is made.",
   "instruction_scope_refs": [
     ".agent/PLANS.md",
     "cvg-master-rag-v2/AGENTS.md",
@@ -23,8 +23,8 @@
     "docs/plans/phase-3-runtime-evidence-production-promotion.md"
   ],
   "last_gate_record": ".agent/gates/phase-3-2-lab-readiness-implementation-ready.json",
-  "last_event_id": "EVT-PH3-2-INDEPENDENT-REVIEW-BINDING-20260910",
-  "state_revision": 246,
+  "last_event_id": "EVT-PH3-2-CURRENT-HEAD-INTEGRATED-VERIFY-20260910",
+  "state_revision": 247,
   "next_gate": "VERIFIED",
   "active_action_id": "PH3-2-LAB-READINESS:WAIT_RUNTIME",
   "blocked_by": [
@@ -32,5 +32,5 @@
     "Disposable runtime secrets and endpoint authority are unavailable"
   ],
   "human_approval_required": [],
-  "updated_at": "2026-09-10T08:08:51Z"
+  "updated_at": "2026-09-10T08:17:10Z"
 }

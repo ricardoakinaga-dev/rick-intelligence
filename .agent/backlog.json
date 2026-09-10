@@ -810,7 +810,8 @@
         ".agent/verification.jsonl#VER-PH3-2-FAIL-CLOSED-PROMOTION-A11Y-20260910",
         "scripts/state_of_art/phase3_evidence.py",
         "scripts/state_of_art/tests/test_phase3_evidence.py",
-        ".agent/verification.jsonl#VER-PH3-2-INDEPENDENT-REVIEW-BINDING-20260910"
+        ".agent/verification.jsonl#VER-PH3-2-INDEPENDENT-REVIEW-BINDING-20260910",
+        ".agent/verification.jsonl#VER-PH3-2-CURRENT-HEAD-INTEGRATED-VERIFY-20260910"
       ],
       "next_action": {
         "id": "PH3-2-LAB-READINESS:WAIT_RUNTIME",
