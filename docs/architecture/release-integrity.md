@@ -160,6 +160,37 @@ malformed, self-promoted, untrusted or mismatched packets remain
 non-promotable. The immutable artifact reference must still be retained by an
 authorized artifact system.
 
+## Shared disposable-runtime preflight
+
+The Phase 3 runtime adapters also require one common lab attestation before a
+service-specific `PASS` can become runtime evidence. `make up` starts only the
+owned local Compose project, invalidates any previous attestation, and then
+records `.runtime/phase-3/preflight.json` only after all eleven canonical
+services (`postgres`, `redis`, `qdrant`, `object-store`, `jaeger`,
+`otel-collector`, `metrics`, `api`, `worker`, `worker-b` and `web`) are reported
+by `docker compose ps` as running and healthy. It additionally probes the
+loopback API readiness endpoint and the loopback Web login endpoint.
+
+The preflight binds a generated `run_id`, exact commit/tree/checkout
+fingerprint, clean worktree, deterministic Compose project, redacted rendered
+configuration hash, the exact Compose-file hash, service readiness records,
+endpoint status, disposable scope and a bounded expiry window. Rendered
+Compose output is hashed in memory after redaction and is never persisted as
+evidence. The API and Web probes are fixed to the canonical loopback paths
+and ports and do not follow redirects. The preflight must exist before a gate
+starts and have the same bytes after it finishes; a gate cannot create or
+replace its own attestation. `make down` invalidates the attestation before
+teardown, so an old healthy lab cannot be reused accidentally.
+
+Every Phase 3 adapter carries the preflight path/hash/run metadata in its
+envelope and refuses to emit `PASS` or `production_safe=true` when the
+attestation is missing, stale, changed, dirty, wrong-project, incomplete or
+not bound to the current checkout. The release-integrity and Phase 3 matrix
+validators repeat this check, including the artifact hash, Compose-file hash,
+canonical target and same-run identity across all successful envelopes, rather
+than trusting the adapter's self-report. A blocked or failed gate remains
+blocked or failed; the preflight never upgrades it.
+
 ## Checkout fingerprint
 
 The JSON output contains `HEAD`, worktree status, a status fingerprint, and a

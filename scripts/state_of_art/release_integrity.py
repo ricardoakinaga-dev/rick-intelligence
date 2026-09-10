@@ -29,8 +29,10 @@ try:  # Package import for tests; script-directory fallback for direct execution
         REQUIRED_GATES,
         ReleaseEvidenceManifest,
     )
+    from scripts.state_of_art.runtime_preflight import load_preflight
 except ImportError:  # pragma: no cover - exercised by the workflow's direct script call.
     from release_manifest import MANIFEST_SCHEMA, ManifestValidationError, REQUIRED_GATES, ReleaseEvidenceManifest
+    from runtime_preflight import load_preflight
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -542,6 +544,7 @@ def _evaluate_typed_manifest(
     manifest_relative = path.relative_to(root).as_posix() if path.is_relative_to(root) else ""
     ci_run_ids: set[str] = set()
     ci_run_attempts: set[str] = set()
+    runtime_preflight_identities: set[tuple[str, str, str, str, str, str]] = set()
     expected_ci_run_id = os.environ.get("GITHUB_RUN_ID", "").strip()
     expected_ci_run_attempt = os.environ.get("GITHUB_RUN_ATTEMPT", "").strip()
     expected_ci_metadata = {
@@ -618,6 +621,75 @@ def _evaluate_typed_manifest(
             failures.append(
                 f"gate {gate.gate_id} PASS runtime envelope is not production-safe"
             )
+        requires_preflight = gate.result == PASS or envelope.get("production_safe") is True
+        if requires_preflight:
+            preflight_path = envelope.get("preflight_path")
+            preflight_hash = envelope.get("preflight_sha256")
+            if not isinstance(preflight_path, str) or not preflight_path.strip():
+                failures.append(f"gate {gate.gate_id} runtime envelope has no shared preflight path")
+            elif preflight_path == evidence_path:
+                failures.append(f"gate {gate.gate_id} runtime preflight must not self-reference its envelope")
+            else:
+                preflight_safe, preflight_path_error = _safe_evidence_path(root, preflight_path)
+                if preflight_path_error or preflight_safe is None or not preflight_safe.is_file():
+                    failures.append(
+                        f"gate {gate.gate_id} runtime preflight is absent or unsafe"
+                    )
+                else:
+                    expected_checkout = {
+                        "status": "CLEAN",
+                        "clean_worktree": True,
+                        "head": binding.commit_sha,
+                        "tree": binding.tree_sha,
+                        "fingerprint": binding.checkout_fingerprint,
+                    }
+                    preflight, preflight_errors, actual_preflight_hash = load_preflight(
+                        root,
+                        preflight_path,
+                        expected_checkout=expected_checkout,
+                    )
+                    if not isinstance(preflight_hash, str) or actual_preflight_hash != preflight_hash:
+                        failures.append(
+                            f"gate {gate.gate_id} runtime preflight hash does not match its envelope"
+                        )
+                    if preflight is None or preflight_errors:
+                        detail = "; ".join(preflight_errors[:3]) or "invalid shared preflight"
+                        failures.append(
+                            f"gate {gate.gate_id} runtime preflight is not valid: {detail}"
+                        )
+                    summary = envelope.get("preflight")
+                    if not isinstance(summary, Mapping) or summary.get("status") != "PASS":
+                        failures.append(
+                            f"gate {gate.gate_id} runtime envelope does not record a PASS shared preflight"
+                        )
+                    elif summary.get("unchanged") is not True:
+                        failures.append(
+                            f"gate {gate.gate_id} runtime preflight changed while the gate was running"
+                        )
+                    elif preflight is not None and not preflight_errors:
+                        for field in (
+                            "run_id",
+                            "target_id",
+                            "compose_file",
+                            "compose_project",
+                            "compose_config_sha256",
+                            "compose_source_sha256",
+                        ):
+                            if summary.get(field) != preflight.get(field):
+                                failures.append(
+                                    f"gate {gate.gate_id} runtime preflight summary {field} does not match the artifact"
+                                )
+                        if gate.result == PASS:
+                            runtime_preflight_identities.add(
+                                (
+                                    str(preflight.get("run_id")),
+                                    str(preflight.get("target_id")),
+                                    str(preflight.get("compose_file")),
+                                    str(preflight.get("compose_project")),
+                                    str(preflight.get("compose_config_sha256")),
+                                    str(preflight.get("compose_source_sha256")),
+                                )
+                            )
         if not isinstance(envelope.get("procedure"), str) or not envelope["procedure"].strip():
             failures.append(f"gate {gate.gate_id} runtime envelope has no procedure")
         observed_at = envelope.get("observed_at")
@@ -825,6 +897,8 @@ def _evaluate_typed_manifest(
         failures.append("CI gate envelopes are from different GitHub workflow runs")
     if len(ci_run_attempts) > 1:
         failures.append("CI gate envelopes are from different GitHub workflow attempts")
+    if len(runtime_preflight_identities) > 1:
+        failures.append("runtime gate envelopes are from different shared Phase 3 preflight runs/targets")
 
     blocking_gates = [gate for gate in manifest.gates if gate.result != "PASS"]
     if failures:

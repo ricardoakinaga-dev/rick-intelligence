@@ -18,6 +18,12 @@ from scripts.state_of_art.phase3_evidence import (
     evaluate_matrix,
     parse_matrix,
 )
+from scripts.state_of_art.runtime_preflight import (
+    REQUIRED_SERVICES,
+    build_preflight,
+    canonical_compose_project,
+    write_preflight,
+)
 
 
 HEAD = "a" * 40
@@ -59,6 +65,31 @@ def _runtime_sentinel() -> dict[str, object]:
         "status": "CLEAN",
     }
     return {"before": snapshot, "after": dict(snapshot), "unchanged": True}
+
+
+def _write_valid_preflight(root: Path) -> str:
+    (root / "docker-compose.dev.yml").write_text("services:\n", encoding="utf-8")
+    now = datetime.now(timezone.utc)
+    project = canonical_compose_project(root, "docker-compose.dev.yml")
+    payload = build_preflight(
+        run_id="run-matrix-12345678",
+        target_id=f"phase3-compose:{project}:docker-compose.dev.yml",
+        compose_file="docker-compose.dev.yml",
+        compose_project=project,
+        compose_config_sha256="d" * 64,
+        compose_source_sha256=sha256((root / "docker-compose.dev.yml").read_bytes()).hexdigest(),
+        required_services=[
+            {"name": name, "state": "running", "health": "healthy", "ready": True}
+            for name in REQUIRED_SERVICES
+        ],
+        required_service_names=REQUIRED_SERVICES,
+        endpoints=[
+            {"name": "api-readiness", "url": "http://127.0.0.1:18000/health/ready", "status": "PASS", "reachable": True, "http_status": 200, "verified_at": now.isoformat()},
+            {"name": "web-readiness", "url": "http://127.0.0.1:13000/login", "status": "PASS", "reachable": True, "http_status": 200, "verified_at": now.isoformat()},
+        ],
+        checkout={"head": HEAD, "tree": TREE, "fingerprint": CHECKOUT, "status": "CLEAN", "clean_worktree": True},
+    )
+    return write_preflight(root, ".runtime/phase-3/preflight.json", payload)
 
 
 def _runtime_record(
@@ -276,6 +307,7 @@ def test_verified_runtime_is_not_promotable_without_explicit_production_promotio
     path, payload, checkout = _fixture(tmp_path)
     raw_ref = _raw_ref(tmp_path, "raw-success.json")
     runtime = tmp_path / "runtime.json"
+    preflight_hash = _write_valid_preflight(tmp_path)
     runtime.write_text(json.dumps({
         "schema_version": "state-of-art-runtime-evidence.v1",
         "record_id": "runtime-fixture-1",
@@ -295,6 +327,20 @@ def test_verified_runtime_is_not_promotable_without_explicit_production_promotio
         "raw_artifacts": [raw_ref],
         "freshness": "CURRENT",
         "production_safe": False,
+        "preflight_path": ".runtime/phase-3/preflight.json",
+        "preflight_sha256": preflight_hash,
+        "preflight": {
+            "status": "PASS",
+            "path": ".runtime/phase-3/preflight.json",
+            "sha256": preflight_hash,
+            "run_id": "run-matrix-12345678",
+            "target_id": f"phase3-compose:{canonical_compose_project(tmp_path, 'docker-compose.dev.yml')}:docker-compose.dev.yml",
+            "compose_file": "docker-compose.dev.yml",
+            "compose_project": canonical_compose_project(tmp_path, "docker-compose.dev.yml"),
+            "compose_config_sha256": "d" * 64,
+            "compose_source_sha256": sha256((tmp_path / "docker-compose.dev.yml").read_bytes()).hexdigest(),
+            "unchanged": True,
+        },
         "reviewer": {"id": "runner", "kind": "automated", "name": "fixture runner", "independent": False},
         "limitations": "fixture is local only",
         "next_action": "run an independent review",
@@ -335,8 +381,28 @@ def test_explicit_production_safe_promotable_capability_classifies_promotable(tm
     path, payload, checkout = _fixture(tmp_path)
     raw_ref = _raw_ref(tmp_path, "raw-production-safe.json")
     runtime = tmp_path / "runtime-production-safe.json"
+    preflight_hash = _write_valid_preflight(tmp_path)
+    runtime_record = _runtime_record(raw_ref, production_safe=True)
+    runtime_record.update(
+        {
+            "preflight_path": ".runtime/phase-3/preflight.json",
+            "preflight_sha256": preflight_hash,
+            "preflight": {
+                "status": "PASS",
+                "path": ".runtime/phase-3/preflight.json",
+                "sha256": preflight_hash,
+                "run_id": "run-matrix-12345678",
+                "target_id": f"phase3-compose:{canonical_compose_project(tmp_path, 'docker-compose.dev.yml')}:docker-compose.dev.yml",
+                "compose_file": "docker-compose.dev.yml",
+                "compose_project": canonical_compose_project(tmp_path, "docker-compose.dev.yml"),
+                "compose_config_sha256": "d" * 64,
+                "compose_source_sha256": sha256((tmp_path / "docker-compose.dev.yml").read_bytes()).hexdigest(),
+                "unchanged": True,
+            },
+        }
+    )
     runtime.write_text(
-        json.dumps(_runtime_record(raw_ref, production_safe=True)),
+        json.dumps(runtime_record),
         encoding="utf-8",
     )
     payload["capabilities"][0]["status"] = "PROMOTABLE"  # type: ignore[index]

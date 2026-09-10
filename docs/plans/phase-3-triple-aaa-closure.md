@@ -135,3 +135,31 @@ coverage, current-checkout binding and a 24-hour freshness window. Unknown
 keys, missing trust, stale/future timestamps, mutated metadata and absent
 checkout binding remain non-promotable. The local State-of-Art suite now has
 264 passing tests; this does not close live runtime or human promotion gates.
+
+## 9. Shared runtime attestation correction — 2026-09-10
+
+The disposable-lab boundary is now explicit and shared. `make up` removes any
+previous Phase 3 preflight, starts the project-scoped Compose topology, hashes
+the redacted rendered configuration in memory, verifies all eleven required
+services as running/healthy, and probes the loopback API and Web readiness
+surfaces without following redirects before atomically writing
+`.runtime/phase-3/preflight.json`. The record is bound to one run ID, clean
+commit/tree/fingerprint, canonical Compose project, source/configuration
+hashes, service inventory, endpoint observations, disposable scope and
+expiry. It must exist unchanged before and after each service gate. `make down`
+invalidates it before teardown.
+
+All Phase 3 runtime adapters now require that attestation for a successful
+runtime envelope. Missing preflight is `BLOCKED_EXTERNAL`; a present but
+contradictory or stale preflight is `FAILED`. Release-integrity and matrix
+validation re-load and re-hash the artifact, so an adapter cannot promote a
+self-declared `production_safe` result; successful envelopes must share one
+preflight run/target. Hermetic preflight, adapter, Compose, matrix and release
+tests cover wrong identity/project/configuration, unhealthy services, unsafe
+endpoints, stale records, missing artifacts, symlink paths, gate-created
+attestations and mutated hashes.
+
+This is local release hardening only. Docker daemon access, disposable secrets,
+live endpoint probes, service gates, independent review and human Go/No-Go are
+still unavailable; the honest status remains blocked and no Triple AAA claim
+is made.

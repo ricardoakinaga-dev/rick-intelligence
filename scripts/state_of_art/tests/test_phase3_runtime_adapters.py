@@ -1,11 +1,21 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
+from hashlib import sha256
 import importlib.util
 import json
 from pathlib import Path
 from types import ModuleType
 
 import pytest
+
+from scripts.state_of_art.runtime_preflight import (
+    DEFAULT_PATH,
+    REQUIRED_SERVICES,
+    build_preflight,
+    canonical_compose_project,
+    write_preflight,
+)
 
 
 ROOT = Path(__file__).parents[3]
@@ -39,6 +49,48 @@ def _checkout(_root: Path) -> dict[str, object]:
         "status": "CLEAN",
         "errors": [],
     }
+
+
+@pytest.fixture(autouse=True)
+def valid_shared_preflight(tmp_path: Path) -> None:
+    """Give PASS-path adapter tests an explicit same-run lab attestation."""
+
+    (tmp_path / "docker-compose.dev.yml").write_text("services:\n", encoding="utf-8")
+    now = datetime.now(timezone.utc)
+    project = canonical_compose_project(tmp_path, "docker-compose.dev.yml")
+    payload = build_preflight(
+        run_id="run-adapter-12345678",
+        target_id=f"phase3-compose:{project}:docker-compose.dev.yml",
+        compose_file="docker-compose.dev.yml",
+        compose_project=project,
+        compose_config_sha256="d" * 64,
+        compose_source_sha256=sha256((tmp_path / "docker-compose.dev.yml").read_bytes()).hexdigest(),
+        required_services=[
+            {"name": name, "state": "running", "health": "healthy", "ready": True}
+            for name in REQUIRED_SERVICES
+        ],
+        required_service_names=REQUIRED_SERVICES,
+        endpoints=[
+            {
+                "name": "api-readiness",
+                "url": "http://127.0.0.1:18000/health/ready",
+                "status": "PASS",
+                "reachable": True,
+                "http_status": 200,
+                "verified_at": now.isoformat(),
+            },
+            {
+                "name": "web-readiness",
+                "url": "http://127.0.0.1:13000/login",
+                "status": "PASS",
+                "reachable": True,
+                "http_status": 200,
+                "verified_at": now.isoformat(),
+            },
+        ],
+        checkout=_checkout(tmp_path),
+    )
+    write_preflight(tmp_path, DEFAULT_PATH, payload)
 
 
 def _gate_module(adapter: ModuleType) -> ModuleType:
@@ -120,6 +172,58 @@ def test_missing_raw_output_cannot_reuse_a_stale_pass(
     assert envelope["status"] == "FAILED"
     assert envelope["exit_status"] == 1
     assert envelope["production_safe"] is False
+
+
+def test_pass_without_shared_preflight_is_blocked_external(
+    adapter: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    (tmp_path / DEFAULT_PATH).unlink()
+
+    def fake_gate(argv: list[str]) -> int:
+        output = tmp_path / Path(argv[argv.index("--output") + 1])
+        output.write_text(json.dumps({"status": "PASS", "production_safe": True}), encoding="utf-8")
+        return 0
+
+    monkeypatch.setattr(adapter, "RAW_OUTPUT", "raw.json")
+    monkeypatch.setattr(adapter, "capture_checkout", _checkout)
+    monkeypatch.setattr(_gate_module(adapter), "main", fake_gate)
+
+    envelope = adapter.run(tmp_path, output="evidence.json")
+
+    assert envelope["status"] == "BLOCKED_EXTERNAL"
+    assert envelope["exit_status"] == 2
+    assert envelope["production_safe"] is False
+    assert envelope["preflight"]["status"] == "MISSING"
+
+
+def test_gate_cannot_create_shared_preflight_after_it_started(
+    adapter: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    preflight_path = tmp_path / DEFAULT_PATH
+    preflight_bytes = preflight_path.read_bytes()
+    preflight_path.unlink()
+
+    def fake_gate(argv: list[str]) -> int:
+        output = tmp_path / Path(argv[argv.index("--output") + 1])
+        output.write_text(json.dumps({"status": "PASS", "production_safe": True}), encoding="utf-8")
+        preflight_path.parent.mkdir(parents=True, exist_ok=True)
+        preflight_path.write_bytes(preflight_bytes)
+        return 0
+
+    monkeypatch.setattr(adapter, "RAW_OUTPUT", "raw.json")
+    monkeypatch.setattr(adapter, "capture_checkout", _checkout)
+    monkeypatch.setattr(_gate_module(adapter), "main", fake_gate)
+
+    envelope = adapter.run(tmp_path, output="evidence.json")
+
+    assert envelope["status"] == "FAILED"
+    assert envelope["exit_status"] == 1
+    assert envelope["production_safe"] is False
+    assert envelope["preflight"]["status"] == "INVALID"
 
 
 def test_missing_checkout_identity_cannot_emit_a_successful_runtime_envelope(

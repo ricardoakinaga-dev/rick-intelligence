@@ -12,6 +12,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 import uuid
@@ -20,8 +21,15 @@ from typing import Any
 
 try:
     from scripts.state_of_art.release_integrity import capture_checkout
+    from scripts.state_of_art.runtime_preflight import (
+        DEFAULT_COMPOSE_FILE,
+        DEFAULT_PATH,
+        canonical_compose_project,
+        load_preflight,
+    )
 except ImportError:  # pragma: no cover - direct script execution fallback.
     from release_integrity import capture_checkout
+    from runtime_preflight import DEFAULT_COMPOSE_FILE, DEFAULT_PATH, canonical_compose_project, load_preflight
 
 
 SCHEMA_VERSION = "state-of-art-runtime-evidence.v1"
@@ -193,6 +201,17 @@ def _fallback_payload(error_name: str) -> dict[str, Any]:
     }
 
 
+def _expected_compose_target(root: Path) -> tuple[str | None, str | None]:
+    raw = os.environ.get("RICK_COMPOSE_FILE", DEFAULT_COMPOSE_FILE).strip()
+    candidate = Path(raw)
+    if candidate.is_absolute() or any(part in {"", ".", ".."} for part in candidate.parts):
+        return None, None
+    normalized = candidate.as_posix()
+    if normalized != raw.replace("\\", "/") or not (root / candidate).is_file():
+        return None, None
+    return normalized, canonical_compose_project(root, normalized)
+
+
 def run_gate_adapter(
     root: Path,
     gate_main: Callable[[list[str]], int],
@@ -204,6 +223,7 @@ def run_gate_adapter(
     procedure: str,
     argv: Sequence[str] = (),
     checkout_capture: Callable[[Path], dict[str, Any]] = capture_checkout,
+    preflight_path: str | None = None,
 ) -> dict[str, Any]:
     """Execute one gate and emit a typed, commit-bound evidence envelope."""
 
@@ -213,6 +233,18 @@ def run_gate_adapter(
     if output_path == raw_base_path:
         raise ValueError("envelope and raw gate output must be different files")
     checkout_before = _capture_checkout(root, checkout_capture)
+    selected_preflight = preflight_path or os.environ.get("RICK_PHASE3_PREFLIGHT") or DEFAULT_PATH
+    try:
+        selected_preflight = str(Path(selected_preflight).as_posix())
+    except (TypeError, ValueError):
+        selected_preflight = ""
+    preflight_before_payload, preflight_before_errors, preflight_before_digest = load_preflight(
+        root,
+        selected_preflight,
+        expected_checkout=checkout_before,
+        expected_compose_file=_expected_compose_target(root)[0],
+        expected_compose_project=_expected_compose_target(root)[1],
+    )
     raw_path = raw_base_path.with_name(
         f"{raw_base_path.stem}-{uuid.uuid4().hex[:12]}{raw_base_path.suffix or '.json'}"
     )
@@ -256,11 +288,52 @@ def run_gate_adapter(
         exit_status = 2
     elif status == "FAILED" and exit_status == 0:
         exit_status = 1
+
+    preflight_payload, preflight_after_errors, preflight_digest = load_preflight(
+        root,
+        selected_preflight,
+        expected_checkout=checkout_after,
+        expected_compose_file=_expected_compose_target(root)[0],
+        expected_compose_project=_expected_compose_target(root)[1],
+    )
+    preflight_unchanged = preflight_before_digest == preflight_digest
+    preflight_errors = [
+        *(f"before: {error}" for error in preflight_before_errors),
+        *(f"after: {error}" for error in preflight_after_errors),
+    ]
+    if not preflight_unchanged:
+        preflight_errors.append("preflight artifact changed while the gate was running")
+    preflight_before_valid = (
+        preflight_before_payload is not None
+        and not preflight_before_errors
+        and preflight_before_digest is not None
+    )
+    preflight_after_valid = (
+        preflight_payload is not None
+        and not preflight_after_errors
+        and preflight_digest is not None
+    )
+    preflight_is_valid = preflight_before_valid and preflight_after_valid and preflight_unchanged
+    preflight_status = "PASS" if preflight_is_valid else (
+        "MISSING"
+        if preflight_before_payload is None
+        and preflight_payload is None
+        and preflight_before_digest is None
+        and preflight_digest is None
+        else "INVALID"
+    )
+    if status == "PASS" and not preflight_is_valid:
+        # A service gate cannot upgrade a run into runtime evidence without the
+        # same-run shared lab attestation.  Missing infrastructure is an
+        # external block; a present but contradictory attestation is a failure.
+        status = "BLOCKED_EXTERNAL" if preflight_status == "MISSING" else "FAILED"
+        exit_status = 2 if status == "BLOCKED_EXTERNAL" else 1
     production_safe = (
         checkout_unchanged
         and raw_digest_value is not None
         and status in {"PASS", "VERIFIED_RUNTIME", "PROMOTABLE"}
         and raw_payload.get("production_safe") is True
+        and preflight_is_valid
     )
 
     if status == "PASS":
@@ -301,6 +374,22 @@ def run_gate_adapter(
             "DIRTY_CHECKOUT" if checkout_after.get("status") != "CLEAN" else "INVALID_CHECKOUT"
         ),
         "production_safe": production_safe,
+        "preflight_path": selected_preflight or None,
+        "preflight_sha256": preflight_digest,
+        "preflight": {
+            "status": preflight_status,
+            "path": selected_preflight or None,
+            "sha256": preflight_digest,
+            "before_sha256": preflight_before_digest,
+            "unchanged": preflight_unchanged,
+            "run_id": preflight_payload.get("run_id") if isinstance(preflight_payload, dict) else None,
+            "target_id": preflight_payload.get("target_id") if isinstance(preflight_payload, dict) else None,
+            "compose_file": preflight_payload.get("compose_file") if isinstance(preflight_payload, dict) else None,
+            "compose_project": preflight_payload.get("compose_project") if isinstance(preflight_payload, dict) else None,
+            "compose_config_sha256": preflight_payload.get("compose_config_sha256") if isinstance(preflight_payload, dict) else None,
+            "compose_source_sha256": preflight_payload.get("compose_source_sha256") if isinstance(preflight_payload, dict) else None,
+            "errors": preflight_errors,
+        },
         "reviewer": {
             "id": f"automated-phase3-{capability_id.lower()}",
             "kind": "automated",

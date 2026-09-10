@@ -16,6 +16,11 @@ import re
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+try:
+    from scripts.state_of_art.runtime_preflight import load_preflight
+except ImportError:  # pragma: no cover - direct script execution fallback.
+    from runtime_preflight import load_preflight
+
 
 MATRIX_SCHEMA = "state-of-art-phase-3-evidence.v1"
 STATUSES = frozenset(
@@ -412,6 +417,7 @@ def evaluate_matrix(
 
     failures: list[str] = []
     rejection_codes: set[str] = set()
+    runtime_preflight_identities: set[tuple[str, str, str, str, str, str]] = set()
     evaluation_time = datetime.now(timezone.utc)
     generated_at = datetime.fromisoformat(matrix["generated_at"].replace("Z", "+00:00"))
     generated_age_seconds = (
@@ -704,6 +710,58 @@ def evaluate_matrix(
                         envelope_errors.append("production_safe")
                     if runtime_status == "PROMOTABLE" and runtime_record.get("production_safe") is not True:
                         envelope_errors.append("promotable runtime evidence requires production_safe=true")
+                    if runtime_status in {"PASS", "VERIFIED_RUNTIME", "PROMOTABLE"} or item["status"] == "PROMOTABLE":
+                        preflight_path = runtime_record.get("preflight_path")
+                        preflight_hash = runtime_record.get("preflight_sha256")
+                        if not isinstance(preflight_path, str) or not preflight_path.strip():
+                            envelope_errors.append("shared_preflight.path")
+                            rejection_codes.add("MISSING_EVIDENCE_REJECTED")
+                        else:
+                            expected_checkout = {
+                                "status": "CLEAN",
+                                "clean_worktree": True,
+                                "head": candidate["commit_sha"],
+                                "tree": candidate["tree_sha"],
+                                "fingerprint": candidate["checkout_fingerprint"],
+                            }
+                            preflight, preflight_errors, actual_preflight_hash = load_preflight(
+                                root,
+                                preflight_path,
+                                expected_checkout=expected_checkout,
+                            )
+                            if not isinstance(preflight_hash, str) or actual_preflight_hash != preflight_hash:
+                                envelope_errors.append("shared_preflight.sha256")
+                                rejection_codes.add("WRONG_HASH_REJECTED")
+                            if preflight is None or preflight_errors:
+                                envelope_errors.append("shared_preflight.invalid")
+                                rejection_codes.add("MISSING_EVIDENCE_REJECTED")
+                            summary = runtime_record.get("preflight")
+                            if not isinstance(summary, Mapping) or summary.get("status") != "PASS":
+                                envelope_errors.append("shared_preflight.status")
+                                rejection_codes.add("MISSING_EVIDENCE_REJECTED")
+                            elif summary.get("unchanged") is not True:
+                                envelope_errors.append("shared_preflight.changed")
+                            elif preflight is not None and not preflight_errors:
+                                for field in (
+                                    "run_id",
+                                    "target_id",
+                                    "compose_file",
+                                    "compose_project",
+                                    "compose_config_sha256",
+                                    "compose_source_sha256",
+                                ):
+                                    if summary.get(field) != preflight.get(field):
+                                        envelope_errors.append(f"shared_preflight.{field}")
+                                runtime_preflight_identities.add(
+                                    (
+                                        str(preflight.get("run_id")),
+                                        str(preflight.get("target_id")),
+                                        str(preflight.get("compose_file")),
+                                        str(preflight.get("compose_project")),
+                                        str(preflight.get("compose_config_sha256")),
+                                        str(preflight.get("compose_source_sha256")),
+                                    )
+                                )
                     observed_at = runtime_record.get("observed_at")
                     if not isinstance(observed_at, str):
                         envelope_errors.append("observed_at")
@@ -747,6 +805,8 @@ def evaluate_matrix(
         if item["status"] == "FAILED":
             rejection_codes.add("FAILED_RUNTIME_REJECTED")
 
+    if len(runtime_preflight_identities) > 1:
+        failures.append("runtime evidence envelopes are from different shared Phase 3 preflight runs/targets")
     if failures:
         result.update(
             {

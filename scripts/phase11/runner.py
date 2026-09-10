@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 from hashlib import sha256
 import signal
@@ -15,6 +16,8 @@ import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable, Sequence
+from urllib.parse import urlsplit
+import uuid
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -27,9 +30,31 @@ NPM = os.environ.get("NPM", "npm")
 NODE = os.environ.get("NODE", "node")
 try:
     from scripts.state_of_art.phase3_runtime_adapter import redact_runtime_value
+    from scripts.state_of_art.release_integrity import capture_checkout
+    from scripts.state_of_art.runtime_preflight import (
+        DEFAULT_PATH as PREFLIGHT_PATH,
+        ENDPOINT_CONTRACT,
+        REQUIRED_SERVICES,
+        build_preflight,
+        canonical_compose_project,
+        sha256_path,
+        validate_preflight,
+        write_preflight,
+    )
 except ModuleNotFoundError:  # Direct execution from the scripts/phase11 directory.
     sys.path.insert(0, str(ROOT))
     from scripts.state_of_art.phase3_runtime_adapter import redact_runtime_value
+    from scripts.state_of_art.release_integrity import capture_checkout
+    from scripts.state_of_art.runtime_preflight import (
+        DEFAULT_PATH as PREFLIGHT_PATH,
+        ENDPOINT_CONTRACT,
+        REQUIRED_SERVICES,
+        build_preflight,
+        canonical_compose_project,
+        sha256_path,
+        validate_preflight,
+        write_preflight,
+    )
 GENERATED_COMPONENT_ARTIFACTS = (
     PROFESSOR / "test/artifacts/phase-0.6-provider-contract.json",
     FRONTEND / "next-env.d.ts",
@@ -37,21 +62,6 @@ GENERATED_COMPONENT_ARTIFACTS = (
 LOCAL_DOCKER_HOST = "unix:///var/run/docker.sock"
 COMPOSE_WAIT_TIMEOUT_DEFAULT = 180
 COMPOSE_RUNTIME_DIR = ROOT / ".runtime/phase-3/compose"
-COMPOSE_REQUIRED_SERVICES = frozenset(
-    {
-        "postgres",
-        "redis",
-        "qdrant",
-        "object-store",
-        "jaeger",
-        "otel-collector",
-        "metrics",
-        "api",
-        "worker",
-        "worker-b",
-        "web",
-    }
-)
 COMPOSE_ENV_REMOVE = (
     "DOCKER_HOST",
     "DOCKER_CONTEXT",
@@ -65,6 +75,7 @@ COMPOSE_PROJECTS = {
     "docker-compose.dev.yml": "rick-intelligence-dev",
     "docker-compose.staging.yml": "rick-intelligence-staging",
 }
+COMPOSE_REQUIRED_SERVICES = frozenset(REQUIRED_SERVICES)
 COMPOSE_ENV_EXAMPLES = {
     "docker-compose.dev.yml": "infrastructure/compose/.env.dev.example",
     "docker-compose.staging.yml": "infrastructure/compose/.env.staging.example",
@@ -110,11 +121,9 @@ def run_case(
 
 def _compose_project(compose: Path) -> str:
     relative = compose.relative_to(ROOT).as_posix()
-    base = COMPOSE_PROJECTS.get(relative, "rick-intelligence-local")
     # The project name is stable for this checkout path but cannot collide
     # with another worktree/user that runs the same topology concurrently.
-    suffix = sha256(str(ROOT.resolve()).encode("utf-8")).hexdigest()[:10]
-    return f"{base}-{suffix}"
+    return canonical_compose_project(ROOT, relative)
 
 
 def _compose_environment(source: dict[str, str] | None = None) -> dict[str, str]:
@@ -244,6 +253,241 @@ def _redact_diagnostic_output(value: str) -> str:
             redacted = redacted.replace(secret, "[REDACTED]")
     sanitized = redact_runtime_value(redacted)
     return sanitized if isinstance(sanitized, str) else str(sanitized)
+
+
+def _phase3_preflight_path() -> str | None:
+    """Return the only allowed relative path for the shared attestation."""
+
+    raw = os.environ.get("RICK_PHASE3_PREFLIGHT", PREFLIGHT_PATH).strip()
+    candidate = Path(raw)
+    if candidate.is_absolute() or any(part in {"", ".", ".."} for part in candidate.parts):
+        return None
+    normalized = candidate.as_posix()
+    if normalized != raw.replace("\\", "/") or normalized != PREFLIGHT_PATH:
+        return None
+    return normalized
+
+
+def _invalidate_phase3_preflight() -> None:
+    """Remove only the selected attestation so a new run cannot reuse it."""
+
+    relative = _phase3_preflight_path()
+    if relative is None:
+        return
+    target = ROOT / relative
+    try:
+        if target.is_file() or target.is_symlink():
+            target.unlink()
+    except OSError as exc:
+        print(f"Could not invalidate Phase 3 preflight: {exc}", file=sys.stderr, flush=True)
+
+
+def _compose_config_sha256(compose: Path) -> str | None:
+    """Hash a redacted rendered Compose config without persisting its contents."""
+
+    ok, output = _compose_capture(
+        "root compose rendered configuration fingerprint",
+        _compose_command(compose, "config", "--format", "json"),
+        timeout=120,
+    )
+    if not ok or not output.strip():
+        return None
+    redacted = _redact_diagnostic_output(output)
+    return sha256(redacted.encode("utf-8")).hexdigest()
+
+
+def _parse_compose_json_records(output: str) -> list[dict[str, object]]:
+    try:
+        decoded = json.loads(output)
+    except json.JSONDecodeError:
+        decoded = None
+    if isinstance(decoded, dict):
+        return [decoded]
+    if isinstance(decoded, list) and all(isinstance(item, dict) for item in decoded):
+        return [dict(item) for item in decoded]
+    records: list[dict[str, object]] = []
+    for line in output.splitlines():
+        try:
+            item = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(item, dict):
+            records.append(item)
+    return records
+
+
+def _compose_health_records(compose: Path) -> tuple[list[dict[str, object]], list[str]]:
+    ok, output = _compose_capture(
+        "root compose service health/readiness inventory",
+        _compose_command(compose, "ps", "--all", "--format", "json"),
+        timeout=120,
+    )
+    if not ok:
+        return [], ["docker compose ps did not return a service inventory"]
+    records = _parse_compose_json_records(output)
+    errors: list[str] = []
+    observations: list[dict[str, object]] = []
+    project = _compose_project(compose)
+    for item in records:
+        service_name = item.get("Service", item.get("service"))
+        if not isinstance(service_name, str) or not service_name.strip():
+            errors.append("Compose service inventory contains a record without Service")
+        elif service_name not in COMPOSE_REQUIRED_SERVICES:
+            errors.append(f"Compose service inventory contains unexpected service {service_name}")
+    for service in sorted(COMPOSE_REQUIRED_SERVICES):
+        matches = [
+            item for item in records
+            if item.get("Service", item.get("service")) == service
+        ]
+        if len(matches) != 1:
+            errors.append(f"service {service} has {len(matches)} Compose records")
+            continue
+        item = matches[0]
+        declared_project = item.get("Project", item.get("project"))
+        if declared_project != project:
+            errors.append(f"service {service} belongs to the wrong Compose project")
+        state = str(item.get("State", item.get("state", ""))).strip().lower()
+        health = str(item.get("Health", item.get("health", ""))).strip().lower()
+        ready = state == "running" and health == "healthy"
+        if not ready:
+            errors.append(f"service {service} is not running and healthy")
+        observations.append(
+            {
+                "name": service,
+                "state": state,
+                "health": health,
+                "ready": ready,
+            }
+        )
+    return observations, errors
+
+
+def _phase3_endpoint_timeout() -> float:
+    raw = os.environ.get("RICK_PHASE3_ENDPOINT_TIMEOUT", "5").strip()
+    try:
+        timeout = float(raw)
+    except ValueError:
+        return 5.0
+    return min(max(timeout, 0.5), 30.0)
+
+
+def _probe_phase3_endpoint(name: str, url: str) -> dict[str, object]:
+    verified_at = datetime.now(timezone.utc).isoformat()
+    try:
+        parsed = urlsplit(url)
+    except ValueError:
+        parsed = None
+    expected_path, expected_port = ENDPOINT_CONTRACT.get(name, (None, None))
+    try:
+        actual_port = parsed.port if parsed is not None else None
+    except ValueError:
+        actual_port = None
+    if (
+        parsed is None
+        or expected_path is None
+        or expected_port is None
+        or parsed.scheme not in {"http", "https"}
+        or parsed.username
+        or parsed.password
+        or parsed.query
+        or parsed.fragment
+        or parsed.hostname not in {"127.0.0.1", "localhost", "::1"}
+        or parsed.path != expected_path
+        or actual_port != expected_port
+    ):
+        return {
+            "name": name,
+            "url": url,
+            "status": "FAIL",
+            "reachable": False,
+            "http_status": 0,
+            "verified_at": verified_at,
+        }
+    try:
+        class _NoRedirect(urllib.request.HTTPRedirectHandler):
+            def redirect_request(self, *_args: object, **_kwargs: object):
+                return None
+
+        opener = urllib.request.build_opener(_NoRedirect)
+        with opener.open(urllib.request.Request(url, method="GET"), timeout=_phase3_endpoint_timeout()) as response:
+            status_code = int(response.status)
+    except urllib.error.HTTPError as exc:
+        status_code = int(exc.code)
+    except (urllib.error.URLError, OSError, ValueError):
+        status_code = 0
+    return {
+        "name": name,
+        "url": url,
+        "status": "PASS" if status_code == 200 else "FAIL",
+        "reachable": status_code == 200,
+        "http_status": status_code,
+        "verified_at": verified_at,
+    }
+
+
+def _write_phase3_preflight(compose: Path, run_id: str) -> bool:
+    relative_preflight = _phase3_preflight_path()
+    if relative_preflight is None:
+        print("NOT_READY: RICK_PHASE3_PREFLIGHT must be a normalized repository-relative path.", file=sys.stderr)
+        return False
+    config_hash = _compose_config_sha256(compose)
+    compose_relative = compose.relative_to(ROOT).as_posix()
+    source_hash = sha256_path(ROOT, compose_relative)
+    services, service_errors = _compose_health_records(compose)
+    endpoints = [
+        _probe_phase3_endpoint(
+            "api-readiness",
+            os.environ.get("RICK_PHASE3_API_URL", "http://127.0.0.1:18000/health/ready"),
+        ),
+        _probe_phase3_endpoint(
+            "web-readiness",
+            os.environ.get("RICK_PHASE3_WEB_URL", "http://127.0.0.1:13000/login"),
+        ),
+    ]
+    endpoint_errors = [
+        f"endpoint {item['name']} did not pass its local readiness probe"
+        for item in endpoints
+        if item.get("status") != "PASS"
+    ]
+    checkout = capture_checkout(ROOT)
+    if config_hash is None or source_hash is None:
+        print("NOT_READY: rendered Compose configuration could not be fingerprinted.", file=sys.stderr)
+        return False
+    payload = build_preflight(
+        run_id=run_id,
+        target_id=f"phase3-compose:{_compose_project(compose)}:{compose_relative}",
+        compose_file=compose_relative,
+        compose_project=_compose_project(compose),
+        compose_config_sha256=config_hash,
+        compose_source_sha256=source_hash,
+        required_services=services,
+        required_service_names=REQUIRED_SERVICES,
+        endpoints=endpoints,
+        checkout=checkout,
+    )
+    errors = validate_preflight(
+        payload,
+        root=ROOT,
+        expected_checkout=checkout,
+        expected_compose_file=compose_relative,
+        expected_compose_project=_compose_project(compose),
+        expected_config_sha256=config_hash,
+    )
+    errors.extend(service_errors)
+    errors.extend(endpoint_errors)
+    if errors:
+        print("NOT_READY: shared Phase 3 preflight rejected: " + "; ".join(errors), file=sys.stderr, flush=True)
+        return False
+    try:
+        digest = write_preflight(ROOT, relative_preflight, payload)
+    except (OSError, ValueError) as exc:
+        print(f"NOT_READY: could not persist shared Phase 3 preflight: {exc}", file=sys.stderr, flush=True)
+        return False
+    print(
+        f"<== shared Phase 3 preflight: PASS run_id={run_id} sha256={digest}",
+        flush=True,
+    )
+    return True
 
 
 def _collect_compose_diagnostics(compose: Path) -> Path | None:
@@ -650,6 +894,7 @@ def mode_compose(action: str) -> int:
         except ValueError as error:
             print(f"NOT_READY: {error}", file=sys.stderr)
             return 2
+        _invalidate_phase3_preflight()
         if not _validate_compose_before_start(compose):
             print("NOT_READY: Compose configuration is not ready; no services were started.", file=sys.stderr)
             return 1
@@ -669,7 +914,17 @@ def mode_compose(action: str) -> int:
             timeout=wait_timeout + 120,
         )
         if started:
-            return 0
+            run_id = os.environ.get("RICK_PHASE3_RUN_ID", "").strip() or uuid.uuid4().hex
+            if _write_phase3_preflight(compose, run_id):
+                return 0
+            diagnostics = _collect_compose_diagnostics(compose)
+            suffix = f" Diagnostics: {diagnostics}." if diagnostics else ""
+            print(
+                "NOT_READY: Compose services started, but the shared Phase 3 preflight did not pass."
+                + suffix,
+                file=sys.stderr,
+            )
+            return 1
         diagnostics = _collect_compose_diagnostics(compose)
         suffix = f" Diagnostics: {diagnostics}." if diagnostics else ""
         print(
@@ -679,6 +934,7 @@ def mode_compose(action: str) -> int:
         )
         return 1
     if action == "down":
+        _invalidate_phase3_preflight()
         command = _compose_command(
             compose,
             "down",

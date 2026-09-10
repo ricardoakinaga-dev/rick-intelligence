@@ -25,7 +25,7 @@ help:
 	@printf '%s\n' '  make lint             root/static/frontend lint checks'
 	@printf '%s\n' '  make typecheck        TypeScript compiler and Python compilation checks'
 	@printf '%s\n' '  make build            preserved Professor/frontend/Python build checks'
-	@printf '%s\n' '  make up|down|logs     guarded dev compose lifecycle (RICK_COMPOSE_FILE selects another file)'
+	@printf '%s\n' '  make up|down|logs     guarded dev compose lifecycle; up writes the shared Phase 3 preflight'
 	@printf '%s\n' '  make ci               validate + fast tests + lint + typecheck + build'
 	@printf '%s\n' '  make eval             deterministic non-live Phase 0.5 plumbing evaluation'
 	@printf '%s\n' '  make eval-retrieval   offline retrieval/ACL/provenance evaluation fixture'

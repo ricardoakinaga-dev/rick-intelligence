@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
+from hashlib import sha256
 import json
 from pathlib import Path
 import textwrap
@@ -11,12 +13,43 @@ import pytest
 
 from scripts.phase11 import file_security_runtime_gate as gate
 from scripts.state_of_art import run_phase3_file_security as adapter
+from scripts.state_of_art.runtime_preflight import (
+    REQUIRED_SERVICES,
+    build_preflight,
+    canonical_compose_project,
+    write_preflight,
+)
 
 
 def _write_runtime(tmp_path: Path, body: str) -> Path:
     path = tmp_path / "external_file_security_runtime.py"
     path.write_text(textwrap.dedent(body), encoding="utf-8")
     return path
+
+
+def _write_shared_preflight(tmp_path: Path) -> None:
+    (tmp_path / "docker-compose.dev.yml").write_text("services:\n", encoding="utf-8")
+    now = datetime.now(timezone.utc)
+    project = canonical_compose_project(tmp_path, "docker-compose.dev.yml")
+    payload = build_preflight(
+        run_id="run-file-security-12345678",
+        target_id=f"phase3-compose:{project}:docker-compose.dev.yml",
+        compose_file="docker-compose.dev.yml",
+        compose_project=project,
+        compose_config_sha256="d" * 64,
+        compose_source_sha256=sha256((tmp_path / "docker-compose.dev.yml").read_bytes()).hexdigest(),
+        required_services=[
+            {"name": name, "state": "running", "health": "healthy", "ready": True}
+            for name in REQUIRED_SERVICES
+        ],
+        required_service_names=REQUIRED_SERVICES,
+        endpoints=[
+            {"name": "api-readiness", "url": "http://127.0.0.1:18000/health/ready", "status": "PASS", "reachable": True, "http_status": 200, "verified_at": now.isoformat()},
+            {"name": "web-readiness", "url": "http://127.0.0.1:13000/login", "status": "PASS", "reachable": True, "http_status": 200, "verified_at": now.isoformat()},
+        ],
+        checkout={"head": "a" * 40, "tree": "b" * 40, "fingerprint": "c" * 64, "status": "CLEAN", "clean_worktree": True},
+    )
+    write_preflight(tmp_path, ".runtime/phase-3/preflight.json", payload)
 
 
 _VALID_RUNTIME = """
@@ -266,6 +299,7 @@ def test_adapter_emits_commit_bound_envelope_without_editing_gate_output_contrac
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     runtime_path = _write_runtime(tmp_path, _VALID_RUNTIME)
+    _write_shared_preflight(tmp_path)
     monkeypatch.setattr(adapter, "ROOT", tmp_path)
     monkeypatch.setattr(adapter, "capture_checkout", lambda _root: {
         "available": True,

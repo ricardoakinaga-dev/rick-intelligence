@@ -22,6 +22,12 @@ from scripts.state_of_art.release_manifest import (
     ReviewerRef,
     artifact_set_digest,
 )
+from scripts.state_of_art.runtime_preflight import (
+    REQUIRED_SERVICES,
+    build_preflight,
+    canonical_compose_project,
+    write_preflight,
+)
 
 
 class ReleaseManifestTests(unittest.TestCase):
@@ -68,6 +74,43 @@ class ReleaseManifestTests(unittest.TestCase):
             "fingerprint": self.CHECKOUT,
             "status": "CLEAN",
         }
+        compose_path = root / "docker-compose.dev.yml"
+        compose_path.write_text("services:\n", encoding="utf-8")
+        compose_project = canonical_compose_project(root, "docker-compose.dev.yml")
+        preflight = build_preflight(
+            run_id="run-release-fixture-12345678",
+            target_id=f"phase3-compose:{compose_project}:docker-compose.dev.yml",
+            compose_file="docker-compose.dev.yml",
+            compose_project=compose_project,
+            compose_config_sha256="d" * 64,
+            compose_source_sha256=sha256(compose_path.read_bytes()).hexdigest(),
+            required_services=[
+                {"name": name, "state": "running", "health": "healthy", "ready": True}
+                for name in REQUIRED_SERVICES
+            ],
+            required_service_names=REQUIRED_SERVICES,
+            endpoints=[
+                {
+                    "name": "api-readiness",
+                    "url": "http://127.0.0.1:18000/health/ready",
+                    "status": "PASS",
+                    "reachable": True,
+                    "http_status": 200,
+                    "verified_at": observed_at,
+                },
+                {
+                    "name": "web-readiness",
+                    "url": "http://127.0.0.1:13000/login",
+                    "status": "PASS",
+                    "reachable": True,
+                    "http_status": 200,
+                    "verified_at": observed_at,
+                },
+            ],
+            checkout=checkout_snapshot,
+            generated_at=datetime.fromisoformat(observed_at),
+        )
+        preflight_hash = write_preflight(root, ".runtime/phase-3/preflight.json", preflight)
         for runtime_gate_id in REQUIRED_GATES:
             if runtime_gate_id == "release-integrity":
                 continue
@@ -100,6 +143,20 @@ class ReleaseManifestTests(unittest.TestCase):
                         },
                         "clean_worktree": True,
                         "production_safe": gate_result == "PASS",
+                        "preflight_path": ".runtime/phase-3/preflight.json",
+                        "preflight_sha256": preflight_hash,
+                        "preflight": {
+                            "status": "PASS",
+                            "path": ".runtime/phase-3/preflight.json",
+                            "sha256": preflight_hash,
+                            "run_id": preflight["run_id"],
+                            "target_id": preflight["target_id"],
+                            "compose_file": preflight["compose_file"],
+                            "compose_project": preflight["compose_project"],
+                            "compose_config_sha256": preflight["compose_config_sha256"],
+                            "compose_source_sha256": preflight["compose_source_sha256"],
+                            "unchanged": True,
+                        },
                         "procedure": f"fixture runtime procedure for {runtime_gate_id}",
                         "environment": "fixture",
                         "limitations": ["fixture is not a production run"],
@@ -438,6 +495,36 @@ class ReleaseManifestTests(unittest.TestCase):
 
         self.assertEqual(result["classification"], release_integrity.FAIL)
         self.assertIn("not production-safe", result["reason"])
+
+    def test_runtime_pass_rejects_missing_shared_preflight(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="release-manifest-") as directory:
+            path, checkout = self._fixture(directory)
+            (Path(directory) / ".runtime/phase-3/preflight.json").unlink()
+            result = release_integrity.evaluate_evidence(path, checkout, root=Path(directory))
+
+        self.assertEqual(result["classification"], release_integrity.FAIL)
+        self.assertIn("runtime preflight", result["reason"])
+
+    def test_runtime_pass_rejects_mutated_shared_preflight_hash(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="release-manifest-") as directory:
+            path, checkout = self._fixture(directory)
+            runtime_path = Path(directory) / ".runtime/architecture.json"
+            runtime = json.loads(runtime_path.read_text(encoding="utf-8"))
+            runtime["preflight_sha256"] = "e" * 64
+            runtime_path.write_text(json.dumps(runtime), encoding="utf-8")
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            architecture = next(
+                gate for gate in payload["gates"] if gate["gate_id"] == "architecture"
+            )
+            architecture["evidence_paths"][0]["sha256"] = sha256(
+                runtime_path.read_bytes()
+            ).hexdigest()
+            architecture["evidence_path"] = architecture["evidence_paths"]
+            path.write_text(json.dumps(payload), encoding="utf-8")
+            result = release_integrity.evaluate_evidence(path, checkout, root=Path(directory))
+
+        self.assertEqual(result["classification"], release_integrity.FAIL)
+        self.assertIn("preflight hash", result["reason"])
 
     def test_ci_pass_requires_same_run_bound_raw_artifact(self) -> None:
         with tempfile.TemporaryDirectory(prefix="release-manifest-") as directory:

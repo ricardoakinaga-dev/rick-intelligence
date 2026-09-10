@@ -219,3 +219,22 @@ packet/promotion suite, YAML parsing, `git diff --check` and `make validate`
 pass. It does not provide live runtime, independent production authority or a
 Triple AAA promotion decision. The runtime blocker and the requirement for a
 fresh exact-candidate review remain unchanged.
+
+## 11. Shared runtime attestation correction — 2026-09-10
+
+The Compose boundary now has one shared fail-closed preflight. `make up`
+invalidates stale state, fingerprints the redacted rendered configuration,
+requires all eleven canonical services to be reported running/healthy, and
+probes the canonical loopback API and Web readiness endpoints without
+redirects before writing the run-bound `.runtime/phase-3/preflight.json`.
+Every Phase 3 adapter requires the same artifact before and after the gate and
+validates its source/configuration hash and checkout binding; release-integrity
+and matrix verification repeat the check and reject mixed run/target sets.
+
+Hermetic contract, adapter, Compose lifecycle, matrix and release tests cover
+missing/stale/wrong preflight, wrong commit/tree/fingerprint/project/config,
+unhealthy services, unsafe endpoint URLs, symlink paths and mutated hashes.
+This closes a local evidence-integrity gap only. Docker daemon access,
+disposable secrets, live service probes, full runtime lanes, independent
+reviews and human Go/No-Go remain unavailable, so the candidate remains
+blocked and is not Triple AAA.
