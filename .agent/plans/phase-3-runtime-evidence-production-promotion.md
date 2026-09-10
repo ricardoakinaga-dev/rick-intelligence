@@ -30,6 +30,7 @@ preserving the frozen Gauntlet bar, Phase 2 history and legacy repositories.
 - [x] (2026-09-10) Make the release-test environment reproducible at source candidate 39c391b3d8ee252f88f1474df39e257a92258ec7 (tree ec80ca7ff803c216863c0a02bb4283fcff1732f9): pin the provider test dependencies, export a contiguous internal-package `PYTHONPATH` in both canonical workflows, and validate the full clean venv suite; the same-SHA remote release run reaches explicit checks and returns typed `2` for external blockers.
 - [x] (2026-09-10) Reconcile the current control plane and public pointers at checkout candidate 928bcd10cde225bedb6c237c0cc979a259919989 (tree 8da40a5b95bfa9787c2314aa89b7a0d3563c6eee): the exact packet is current and clean with 17 local foundation lanes PASS and 24 mandatory lanes `BLOCKED_EXTERNAL`; this documentation-only reconciliation does not authorize promotion.
 - [x] (2026-09-10) Bound synchronous provider embeddings at source candidate ea6fd613ffcc8b18fc11d55941266e28387f9b92 (tree c8ae0fb2614bee70a4e096c6676c8e4d1a9f782e): provider timeout is validated and enforced both outside and inside an active event loop, cancellation is requested before return, and clean API/State-of-Art matrices pass 437/295 tests; live provider/runtime evidence remains external.
+- [x] (2026-09-10) Execute the canonical `make up` readiness attempt: Compose rejected the missing required `RICK_WORKER_IMAGE` before starting services, and the Docker daemon remains inaccessible at `/var/run/docker.sock`; no runtime readiness claim or promotion inference was made.
 - [ ] (2026-09-09) Execute the disposable runtime; currently blocked by Docker daemon access and unresolved external authority.
 - [ ] (2026-09-09) Complete independent runtime/design/security reviews and the human Go/No-Go.
 
@@ -66,6 +67,7 @@ access, so no live claim can be made.
 - 2026-09-10: Require the integrated verifier to bind the frontend envelope to the checkout captured before lane execution. Cross-commit, dirty, unavailable or non-current identity now fails closed; the browser/accessibility projection remains diagnostic only and never authorizes promotion.
 - 2026-09-10: Treat CI dependency/path reproducibility as a release prerequisite. A clean venv must import the real provider boundary; missing `httpx`/`pydantic` or whitespace-corrupted package paths are CI defects, while the remote release gate may still return `2` for genuine external runtime blockers.
 - 2026-09-10: Treat the synchronous embedding bridge as a bounded reliability boundary. A provider awaitable that exceeds the configured timeout must cancel cooperatively and raise a typed timeout instead of blocking API/ingestion indefinitely; this local correction does not replace live provider and budget evidence.
+- 2026-09-10: Treat the canonical Compose start as an evidence-producing gate. A missing immutable image reference or unavailable daemon must stop before service startup and remain `BLOCKED_EXTERNAL`; no local environment failure may be relabeled as runtime PASS.
 
 ## Outcomes & Retrospective
 

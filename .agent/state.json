@@ -23,8 +23,8 @@
     "docs/plans/phase-3-runtime-evidence-production-promotion.md"
   ],
   "last_gate_record": ".agent/gates/phase-3-2-lab-readiness-implementation-ready.json",
-  "last_event_id": "EVT-PH3-2-PROVIDER-EMBEDDING-TIMEOUT-20260910",
-  "state_revision": 258,
+  "last_event_id": "EVT-PH3-2-COMPOSE-READINESS-PREFLIGHT-20260910",
+  "state_revision": 259,
   "next_gate": "VERIFIED",
   "active_action_id": "PH3-2-LAB-READINESS:WAIT_RUNTIME",
   "blocked_by": [
@@ -32,5 +32,5 @@
     "Disposable runtime secrets and endpoint authority are unavailable"
   ],
   "human_approval_required": [],
-  "updated_at": "2026-09-10T11:03:39Z"
+  "updated_at": "2026-09-10T11:10:46Z"
 }

@@ -53,6 +53,26 @@ daemon access denied at `/var/run/docker.sock` and unavailable disposable
 runtime configuration. Those blockers remain external facts; they are not
 converted to PASS by the presence of host processes.
 
+### Current clean revalidation — 2026-09-10
+
+The latest exact clean checkout is commit
+`6252f886c4b995808618ad7b67f86b6398f0ad66` with tree
+`71ffe90a8757fb21342de25f3d5e2d1e47cde6af`. Its integrated packet reports
+`17` foundation PASS results and `24` mandatory `BLOCKED_EXTERNAL` results,
+classification `STATE_OF_ART_CANDIDATE`, JSON exit `2`,
+`promotion_allowed=false`, artifact set
+`e49c81982cc05afd0e7de4bd12f74a69ccd4b7f6897cce10b0eb8938dc8497ec`, and
+packet SHA-256
+`1b0595a71a2c28405a06af1f8dec8acf7d78aa83ca7daaec14e4748cd14d1773`.
+The worktree is clean and `HEAD` equals `origin/main`.
+
+The current API matrix has **437 passed** tests and the State-of-Art suite has
+**295 passed** tests. `make validate`, `make compose-static`, `make ops-static`,
+`make security-adversarial` and `make api-contract` pass. The canonical
+`make up` attempt failed closed before service startup because the required
+`RICK_WORKER_IMAGE` environment value is absent; Docker daemon access remains
+denied independently. No runtime readiness or promotion evidence is inferred.
+
 ## 3. Evidence snapshot
 
 | Observation | Result | Evidence class | Consequence |
@@ -68,8 +88,9 @@ converted to PASS by the presence of host processes.
 
 ### Local checks observed
 
-The current source already has useful local controls: the state-of-art tests
-pass (`90 passed` in the last current-source run), `make validate`,
+The current source already has useful local controls: the State-of-Art suite
+passes (`295 passed`) and the canonical API matrix passes (`437 passed`), while
+`make validate`,
 `make ops-static`, `make compose-static`, `make security-adversarial`, Python
 compilation and `git diff --check` pass. These results prove local contracts
 only. They do not prove live service behavior.

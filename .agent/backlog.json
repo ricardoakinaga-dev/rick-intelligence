@@ -839,7 +839,8 @@
     "scripts/state_of_art/tests/test_phase3_runtime_adapters.py",
     ".agent/verification.jsonl#VER-PH3-2-RUNTIME-ENVELOPE-FRESHNESS-20260910",
     "scripts/state_of_art/promotion_engine.py",
-    ".agent/verification.jsonl#VER-PH3-2-PROMOTION-EXIT-CONTRACT-20260910"
+    ".agent/verification.jsonl#VER-PH3-2-PROMOTION-EXIT-CONTRACT-20260910",
+    ".agent/verification.jsonl#VER-PH3-2-COMPOSE-READINESS-PREFLIGHT-20260910"
       ],
       "next_action": {
         "id": "PH3-2-LAB-READINESS:WAIT_RUNTIME",
@@ -852,7 +853,7 @@
         "Docker daemon access to /var/run/docker.sock is denied in the current session",
         "Disposable runtime secrets and endpoint authority are unavailable"
       ],
-      "reason": "The current local implementation and fail-closed API/Redis, worker, citation-support, release, same-run CI evidence, authenticated promotion-seal, shared-runtime-preflight, current-artifact promotion binding, promoted-capability independent-review binding, canonical accessibility gates, deterministic real frontend browser probe, Compose resource/capability hardening, preserved-CVG corpus preflight, runtime-before-release ordering, commit-bound manifest adapters, raw status/exit-status synchronization and the external-only promotion return-code contract are covered by the affected 174-test closure suite plus make validate and git diff --check. The source implementation candidate is 3343c02bfbddb960e8642f4ef16db2566e4c5b38 with tree 4d06a929ed7893dff4cad59ad885a039f70ee9e3; the integrated packet at the same candidate has checkout fingerprint 3ede4e0941bdee4553a694566af0bc987a971cd2c0dbeb628da7d896e4924c99, artifact set ead4ef718b88258a69da69b92a7a6594610e0b741a30db441af556d08c084709 and packet SHA-256 94ac8941c705104100c493f299fbaf544caee2883bf0568754fd93b2ced99c60. It classifies STATE_OF_ART_CANDIDATE with JSON and Make exit 2; 15 foundation lanes pass, every non-pass mandatory lane is BLOCKED_EXTERNAL and no invalid/failing gate remains. Docker/runtime, provider/corpus, image-proof, independent-review, sealing and human Go/No-Go remain unavailable. No promotion claim is made."
+      "reason": "The current local implementation and fail-closed API/Redis, worker, citation-support, release, same-run CI evidence, authenticated promotion-seal, shared-runtime-preflight, current-artifact promotion binding, promoted-capability independent-review binding, canonical accessibility gates, deterministic real frontend browser probe, Compose resource/capability hardening, preserved-CVG corpus preflight, runtime-before-release ordering, commit-bound manifest adapters, raw status/exit-status synchronization, bounded provider embeddings and the external-only promotion return-code contract are covered by the current local matrices, make validate and targeted static gates. Source implementation candidate ea6fd613ffcc8b18fc11d55941266e28387f9b92 has tree c8ae0fb2614bee70a4e096c6676c8e4d1a9f782e3; the current clean documentation/control-plane candidate is 6252f886c4b995808618ad7b67f86b6398f0ad66 with tree 71ffe90a8757fb21342de25f3d5e2d1e47cde6af. Its packet has artifact set e49c81982cc05afd0e7de4bd12f74a69ccd4b7f6897cce10b0eb8938dc8497ec and SHA-256 1b0595a71a2c28405a06af1f8dec8acf7d78aa83ca7daaec14e4748cd14d1773; it classifies STATE_OF_ART_CANDIDATE with JSON/Make exit 2, 17 foundation lanes pass and 24 mandatory lanes are BLOCKED_EXTERNAL. The canonical make up attempt failed closed before startup because RICK_WORKER_IMAGE is missing, while Docker daemon access, runtime/provider/corpus, image proof, independent review, sealing and human Go/No-Go remain unavailable. No promotion claim is made."
     }
   ]
 }
