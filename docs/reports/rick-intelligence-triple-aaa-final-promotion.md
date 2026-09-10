@@ -215,36 +215,36 @@ immutable digest and migration-compatible boundary.
 
 | # | Dimension | Current state | Required evidence |
 | ---: | --- | --- | --- |
-| 1 | Architecture | `LOCAL_VERIFIED` | independent boundary review |
-| 2 | CI control | `PARTIAL` | current exact-SHA workflow run |
-| 3 | Release truth | `NOT_RUN` | clean manifest, seal and negative probes |
-| 4 | Disposable lab | `BLOCKED_EXTERNAL` | live health/readiness/teardown |
-| 5 | PostgreSQL | `BLOCKED_EXTERNAL` | real migration/transaction/queue run |
-| 6 | Durable jobs | `BLOCKED_EXTERNAL` | DLQ/replay/retention/recovery |
-| 7 | Worker fencing | `BLOCKED_EXTERNAL` | real A/B crash and stale ACK |
-| 8 | Redis coordination | `BLOCKED_EXTERNAL` | auth/lease/reconnect/failover |
-| 9 | Object authority | `BLOCKED_EXTERNAL` | checksum/ACL/restore |
-| 10 | Vector projection | `BLOCKED_EXTERNAL` | alias/rebuild/restore |
-| 11 | Golden ingestion | `BLOCKED_EXTERNAL` | full named runtime path |
-| 12 | Lineage | `PARTIAL` | source-to-response lineage packet |
-| 13 | Tenancy | `PARTIAL` | live A/B isolation negatives |
-| 14 | Evidence security | `PARTIAL` | forged/stale/hash/chunk negatives |
-| 15 | Provider runtime | `BLOCKED_EXTERNAL` | bounded approved provider matrix |
-| 16 | Retrieval/RAG | `NOT_RUN` | approved corpus metrics |
-| 17 | Citation support | `NOT_RUN` | support/faithfulness metrics |
-| 18 | Decision policy | `PARTIAL` | conservative live decision matrix |
-| 19 | OTel propagation | `PARTIAL` | distributed trace export |
-| 20 | SLO/alerts | `PARTIAL` | env-separated telemetry/alerts |
-| 21 | DR/restore | `NOT_RUN` | measured isolated drill |
-| 22 | Chaos | `NOT_RUN` | fault/recovery packet |
-| 23 | Soak/performance | `NOT_RUN` | declared load/resource budgets |
-| 24 | Frontend/a11y | `PARTIAL` | real browser matrix + critic |
-| 25 | Supply/review/promotion | `NOT_RUN` | scans, independent review, Go/No-Go |
+| 1 | Architecture | `LOCAL_VERIFIED` | current boundary checks and independent architecture review |
+| 2 | Modularity | `PARTIAL` | package/adaptor boundaries plus fresh architecture review |
+| 3 | Jobs | `BLOCKED_EXTERNAL` | real queue, DLQ, replay, retention and recovery run |
+| 4 | Worker | `BLOCKED_EXTERNAL` | two real workers, lease fencing and crash recovery |
+| 5 | PostgreSQL | `BLOCKED_EXTERNAL` | real migration, transaction, constraint and queue run |
+| 6 | Redis | `BLOCKED_EXTERNAL` | real auth, lease, reconnect and multi-replica run |
+| 7 | Qdrant | `BLOCKED_EXTERNAL` | live schema, filters, alias, rebuild and restore |
+| 8 | Object Storage | `BLOCKED_EXTERNAL` | live scoped PUT/GET/checksum/retention/restore |
+| 9 | Ingestion | `BLOCKED_EXTERNAL` | complete named golden ingestion path |
+| 10 | Retrieval | `NOT_RUN` | approved corpus and retrieval-quality metrics |
+| 11 | Evidence | `PARTIAL` | live lineage plus forged/stale/hash/chunk negatives |
+| 12 | Decision | `PARTIAL` | citation support metrics feeding conservative decisions |
+| 13 | Professor | `PARTIAL` | provider-backed reasoning and bounded budget evidence |
+| 14 | Security | `PARTIAL` | live threat, file, redaction and supply-chain review |
+| 15 | Multi-tenancy | `PARTIAL` | live Tenant A/B isolation negatives across every store |
+| 16 | Observability | `PARTIAL` | distributed traces, bounded metrics, alerts and SLO evidence |
+| 17 | Resilience | `NOT_RUN` | distributed failure and bounded recovery packet |
+| 18 | Disaster Recovery | `NOT_RUN` | measured seed/backup/destroy/restore/rebuild drill |
+| 19 | Performance | `NOT_RUN` | 1/10/50/100 concurrency and resource measurements |
+| 20 | Frontend | `PARTIAL` | real API browser states at 375/768/1440 |
+| 21 | Accessibility | `PARTIAL` | keyboard, focus, axe, zoom, contrast, motion and touch review |
+| 22 | CI/CD | `PARTIAL` | current exact-SHA FAST/UNIT/CONTRACT/SECURITY/RAG/FRONTEND/SUPPLY/RELEASE run |
+| 23 | Supply Chain | `BLOCKED_EXTERNAL` | dependency, secret, container, SBOM, digest and signature evidence |
+| 24 | Documentation | `LOCAL_VERIFIED` | current audit, plan, report and `make validate` |
+| 25 | Production Readiness | `BLOCKED_EXTERNAL` | all mandatory gates, zero Critical/High, seal and human Go/No-Go |
 
-**Advisory score: `10/100`.** The score uses equal 25-dimension weighting:
+**Advisory score: `14/100`.** The score uses equal 25-dimension weighting:
 `LOCAL_VERIFIED = 2`, `PARTIAL = 1`, and `PASS`/`VERIFIED_RUNTIME`/
 `PROMOTABLE = 4`; `BLOCKED_EXTERNAL` and `NOT_RUN` score zero. The current
-matrix has one `LOCAL_VERIFIED` dimension and eight `PARTIAL` dimensions.
+matrix has two `LOCAL_VERIFIED` dimensions and ten `PARTIAL` dimensions.
 This is a diagnostic measure only; it cannot override a mandatory rejection,
 and the definition-of-done threshold remains `96/100` with all required
 runtime and promotion gates passing.
