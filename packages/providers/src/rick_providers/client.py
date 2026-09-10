@@ -257,7 +257,14 @@ class OpenAICompatibleClient:
                 correlation,
                 attempt,
             )
-            return _extract_chat_result(body, normalized_model, correlation, attempt)
+            result = _extract_chat_result(body, normalized_model, correlation, attempt)
+            return _validate_response_format_result(
+                result,
+                normalized_format,
+                operation,
+                correlation,
+                attempt,
+            )
 
         return await self._with_retry(operation, correlation, attempt_request)
 
@@ -789,6 +796,28 @@ def _serialize_response_format(
         json.dumps(result, allow_nan=False)
     except (TypeError, ValueError, OverflowError):
         raise provider_error("malformed_response", operation, correlation_id, 0) from None
+    return result
+
+
+def _validate_response_format_result(
+    result: ChatCompletionResult,
+    response_format: Mapping[str, object],
+    operation: ProviderOperation,
+    correlation_id: str,
+    attempt: int,
+) -> ChatCompletionResult:
+    """Validate the response body promised by the supported JSON mode."""
+
+    if response_format.get("type") != "json_object":
+        return result
+    if not result.content.strip():
+        raise provider_error("missing_field", operation, correlation_id, attempt)
+    try:
+        decoded = json.loads(result.content, parse_constant=_reject_json_constant)
+    except (TypeError, ValueError, RecursionError):
+        raise provider_error("invalid_json", operation, correlation_id, attempt) from None
+    if not isinstance(decoded, dict):
+        raise provider_error("malformed_response", operation, correlation_id, attempt)
     return result
 
 

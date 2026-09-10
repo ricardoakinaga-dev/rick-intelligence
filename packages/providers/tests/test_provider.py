@@ -558,6 +558,49 @@ async def test_chat_response_validation_is_typed_and_not_retried(body: object, e
     assert caught.value.code == expected_code
     assert caught.value.attempts == 1
     assert caught.value.retryable is False
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("content", "expected_code"),
+    [
+        ('{"status":"ok"}', None),
+        ("not-json", "invalid_json"),
+        ("[]", "malformed_response"),
+        ("NaN", "invalid_json"),
+    ],
+)
+async def test_json_object_response_format_is_validated_at_the_provider_boundary(
+    content: str,
+    expected_code: str | None,
+) -> None:
+    calls = 0
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        return _response(request, 200, _chat_payload(content=content))
+
+    provider = OpenAICompatibleClient(_config(max_attempts=3), transport=httpx.MockTransport(handler))
+    try:
+        if expected_code is None:
+            result = await provider.chat_completion(
+                messages=[{"role": "user", "content": "return JSON"}],
+                response_format={"type": "json_object"},
+            )
+            assert result.content == content
+        else:
+            with pytest.raises(ProviderError) as caught:
+                await provider.chat_completion(
+                    messages=[{"role": "user", "content": "return JSON"}],
+                    response_format={"type": "json_object"},
+                )
+            assert caught.value.code == expected_code
+            assert caught.value.attempts == 1
+            assert caught.value.retryable is False
+    finally:
+        await _close(provider)
+
     assert calls == 1
 
 
