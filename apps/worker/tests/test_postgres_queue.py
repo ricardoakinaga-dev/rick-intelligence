@@ -33,6 +33,7 @@ def test_database_payload_decoder_rejects_unbounded_and_nonfinite_json():
 
     assert PostgresIngestionQueue._decode({**job_row(), "payload": oversized}).payload == {}
     assert PostgresIngestionQueue._decode({**job_row(), "payload": '{"filename":NaN}'}).payload == {}
+    assert PostgresIngestionQueue._decode({**job_row(), "payload": '{"filename":"first","filename":"second"}'}).payload == {}
 
 
 class ScriptedCursor:

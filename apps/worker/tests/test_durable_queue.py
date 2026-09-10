@@ -50,6 +50,7 @@ def test_stored_payload_decoder_rejects_unbounded_and_nonfinite_json() -> None:
 
     assert SQLiteDurableQueue._decode(_stored_row(oversized)).payload == {}
     assert SQLiteDurableQueue._decode(_stored_row('{"filename":NaN}')).payload == {}
+    assert SQLiteDurableQueue._decode(_stored_row('{"filename":"first","filename":"second"}')).payload == {}
 
 
 def test_idempotency_and_payload_boundary(tmp_path: Path) -> None:

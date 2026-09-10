@@ -52,6 +52,8 @@ def test_database_json_decoder_rejects_oversized_and_nonfinite_values() -> None:
         _json_object(oversized, field="payload")
     with pytest.raises(PostgresJobCorruptionError):
         _json_object('{"completed_at":NaN}', field="result")
+    with pytest.raises(PostgresJobCorruptionError):
+        _json_object('{"document_id":"first","document_id":"second"}', field="result")
 
 
 class FakeConnection:

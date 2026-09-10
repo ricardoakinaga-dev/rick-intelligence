@@ -111,6 +111,15 @@ def _reject_json_constant(_value: str) -> object:
     raise ValueError("non-finite JSON constants are not allowed")
 
 
+def _reject_duplicate_json_keys(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    result: dict[str, object] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("duplicate JSON object key")
+        result[key] = value
+    return result
+
+
 def _decode_payload(value: object) -> dict[str, str]:
     """Decode database payloads through the same bounded contract as writes."""
 
@@ -119,7 +128,11 @@ def _decode_payload(value: object) -> dict[str, str]:
         try:
             if len(value.encode("utf-8")) > MAX_PAYLOAD_BYTES:
                 return {}
-            parsed = json.loads(value, parse_constant=_reject_json_constant)
+            parsed = json.loads(
+                value,
+                object_pairs_hook=_reject_duplicate_json_keys,
+                parse_constant=_reject_json_constant,
+            )
         except (TypeError, UnicodeError, ValueError, RecursionError):
             return {}
     if not isinstance(parsed, Mapping):

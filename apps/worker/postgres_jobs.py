@@ -150,6 +150,15 @@ def _reject_json_constant(value: str) -> object:
     raise ValueError(f"non-finite JSON constant is not allowed: {value}")
 
 
+def _reject_duplicate_json_keys(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    result: dict[str, object] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("duplicate JSON object key")
+        result[key] = value
+    return result
+
+
 def _json_value(value: object, *, field: str, default: object = None) -> object:
     if value is None:
         return default
@@ -157,7 +166,11 @@ def _json_value(value: object, *, field: str, default: object = None) -> object:
         try:
             if len(value.encode("utf-8")) > MAX_DURABLE_JSON_BYTES:
                 raise PostgresJobCorruptionError(f"{field} exceeds the JSON size limit")
-            return json.loads(value, parse_constant=_reject_json_constant)
+            return json.loads(
+                value,
+                object_pairs_hook=_reject_duplicate_json_keys,
+                parse_constant=_reject_json_constant,
+            )
         except PostgresJobCorruptionError:
             raise
         except (TypeError, UnicodeError, ValueError, RecursionError) as exc:
