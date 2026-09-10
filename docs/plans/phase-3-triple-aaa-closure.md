@@ -500,3 +500,20 @@ State-of-Art suite **295**; compilation and `git diff --check` pass. This is
 local redaction evidence only: approved collector/backend, distributed
 runtime, provider/corpus, independent review, sealed packet and human
 Go/No-Go evidence remain unavailable, so no promotion claim is made.
+
+## 33. Parser result transport closure — 2026-09-10
+
+Source candidate `19ca87d987a2348a0be6346221bb1d2b61d2b831` (tree
+`a9bc35f7809ed7529c9e8f46ce2727cfecfa96dc`) closes an ingestion process-boundary
+gap. `ProcessParserRunner` and the generic `execute_parser` seam now validate
+text, page provenance, sections and metadata before downstream use; auxiliary
+values have bounded depth/nodes/characters, and the child envelope is capped
+at 32 MiB before it enters the pipe. Oversized or malformed custom parser
+output fails closed without exposing parser exception text.
+
+The ingestion security/admission/full regression passes **100**, the focused
+file-security/runtime adapter tests pass **79**, the API matrix **437**, and
+the State-of-Art suite **295**; compilation and `git diff --check` pass. This
+is local parser-boundary evidence only. The approved disposable runtime,
+malicious corpus, distributed file-security drill, independent review and
+promotion authority remain unavailable.

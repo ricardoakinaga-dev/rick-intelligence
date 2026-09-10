@@ -709,3 +709,21 @@ State-of-Art suite **295**; compilation and `git diff --check` pass. This
 remains local fail-closed evidence only. Approved collector/backend,
 distributed runtime, provider/corpus, independent review, sealed packet and
 human Go/No-Go evidence remain unavailable; promotion is still disallowed.
+
+## 34. Parser result transport closure — 2026-09-10
+
+Source implementation candidate `19ca87d987a2348a0be6346221bb1d2b61d2b831`
+(tree `a9bc35f7809ed7529c9e8f46ce2727cfecfa96dc`) closes a concrete P1 file
+security boundary. A parser or injected runner cannot return an unbounded or
+malformed `ParsedDocument` anymore: text and page output, section/metadata
+structure and auxiliary budgets are checked before use, and the process runner
+refuses a serialized envelope larger than 32 MiB before sending it through the
+child pipe. Adversarial tests cover oversized process output and oversized
+custom-runner output.
+
+The ingestion security/admission/full regression passes **100**, the focused
+file-security/runtime adapter tests **79**, the API matrix **437**, and the
+State-of-Art suite **295**; compilation and `git diff --check` pass. This is
+local fail-closed evidence only. The approved disposable runtime, malicious
+corpus, distributed process-kill drill, independent review and human Go/No-Go
+remain unavailable; promotion remains disallowed.

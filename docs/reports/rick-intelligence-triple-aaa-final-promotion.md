@@ -77,6 +77,12 @@ project-scoped, idempotent and preserves volumes unless explicitly scoped.
 Current live readiness is `BLOCKED_EXTERNAL` when the approved daemon is not
 available.
 
+The local ingestion boundary also now validates parser output shape and
+provenance, bounds auxiliary sections/metadata, and caps the serialized
+process-runner result before child transport at source candidate
+`19ca87d987a2348a0be6346221bb1d2b61d2b831`. This strengthens local hostile-file
+handling; it is not live malicious-corpus, container or runtime evidence.
+
 ## 9. PostgreSQL durability
 
 Required evidence covers migration upgrade safety, constraints/indexes/query
