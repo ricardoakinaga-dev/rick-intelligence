@@ -4,11 +4,17 @@
 **Prompt snapshot:** [`phase-3-triple-aaa-closure-2026-09-09.txt`](../prompts/phase-3-triple-aaa-closure-2026-09-09.txt)  
 **Source attachment SHA-256:** `0d431cf3ec75e4d6455735d32f135b3270b59996866a28fd7296d73a18cabf3d`  
 **Stored copy SHA-256:** `0b1703fe10e63ed6c68c543bdfdea33e92dfa1300e7422d0adb954d85ddeb987`  
-**Candidate commit:** `2d0b177f7745463c9457dc4da6f9dfc769b6c78d`  
-**Candidate tree:** `6fc8b92c5a4c14147915aae787f8143fd81ec8ee`  
+**Entry candidate commit:** `2d0b177f7745463c9457dc4da6f9dfc769b6c78d`
+**Entry candidate tree:** `6fc8b92c5a4c14147915aae787f8143fd81ec8ee`
 **Branch / remote:** `main` / `origin/main` (same SHA at snapshot)  
 **Current classification:** `STATE_OF_ART_CANDIDATE`  
 **Promotion decision:** `NO-GO` — required runtime and production evidence is incomplete
+
+This report is the frozen entry audit for the closure slice. Its candidate is
+the pre-closure baseline, so it deliberately does not self-reference the
+commit that stores this report or any later implementation commit. The exact
+current candidate is always captured by the same-run evidence packet and
+release manifest.
 
 ## 1. Scope and audit rule
 
@@ -51,7 +57,7 @@ converted to PASS by the presence of host processes.
 
 | Observation | Result | Evidence class | Consequence |
 | --- | --- | --- | --- |
-| Git candidate and remote | `2d0b177...` on both `HEAD` and `origin/main`; tree `6fc8b92...` | `CONFIRMED` / `HIGH` | Exact artifact can be bound |
+| Git entry candidate and remote at audit time | `2d0b177...` on both `HEAD` and `origin/main`; tree `6fc8b92...` | `CONFIRMED` / `HIGH` | Entry baseline can be bound; later candidates require a new same-run packet |
 | Worktree | Clean at audit snapshot | `CONFIRMED` / `HIGH` | Release binding is possible after changes |
 | Python/Node/npm/Docker CLI | Available | `CONFIRMED` / `HIGH` | Local and static gates can run |
 | Docker daemon | Permission denied on `/var/run/docker.sock` | `CONFIRMED` / `HIGH` | No Compose health, worker, crash, restore or distributed runtime proof |
