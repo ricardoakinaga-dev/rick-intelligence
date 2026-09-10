@@ -50,11 +50,13 @@ ownership still require the disposable lab.
 
 ## 5. CI
 
-`make validate`, `make test-fast`, the API suite, focused composition/transport
-tests, matrix validation and `make compose-static` are local checks. The
-canonical FAST, UNIT, CONTRACT, SECURITY, RAG_EVAL, FRONTEND, SUPPLY_CHAIN and
-release envelope has no current same-SHA remote result in this environment;
-skipped or unavailable lanes remain non-promotable.
+The exact candidate passed `make ci` locally, including foundation
+validation, contract/security regression, Professor, Locker, lint, typecheck,
+Python compilation and the frontend production build. Focused current suites
+also pass for observability, rate limiting, provider, Qdrant, S3 transport and
+storage. The canonical FAST, UNIT, CONTRACT, SECURITY, RAG_EVAL, FRONTEND,
+SUPPLY_CHAIN and release envelope has no current same-SHA remote result in this
+environment; skipped or unavailable lanes remain non-promotable.
 
 ## 6. PostgreSQL
 

@@ -214,3 +214,24 @@ tests), while the live Redis/multi-replica trace remains an external gate.
 This completes the source-level trace stage list for the Redis boundary without
 claiming a live collector chain, latency metrics, failover behavior or
 promotion. The candidate remains **BLOCKED_EXTERNAL / NO-GO**.
+
+## 69. Current exact-candidate revalidation — 2026-09-10
+
+The current clean candidate is `5723884a9de9b0a7ac1aa55f077ef798a2e2ab7e`
+with tree `d6e5af4a73c2d2b559ad45bc58d842f3cc4bd16e`. The archived prompt
+still matches the supplied attachment byte-for-byte (27,366 bytes; SHA-256
+`064be5e04ed483d5d95ef803a66faf6675f7c1f00633cdea83d5abfdd5370d5f`).
+
+Fresh same-candidate local evidence is green: `make ci`,
+`make triple-aaa-capability-matrix`, focused observability **11**, rate-limit
+**10**, provider **63**, Qdrant **16**, S3 transport **15** and storage **15**
+tests. The release manifest is clean and bound to the same commit/tree with
+artifact digest `14545fb432847375dc3dbdc3bc006d17ab2100446ed310fcf39b628b9a4963ac`.
+
+The integrated verifier produced `STATE_OF_ART_CANDIDATE`, exit **2**, with
+**17** local PASS lanes and **24** `BLOCKED_EXTERNAL` mandatory lanes. A fresh
+`make up` attempt failed closed before starting services because immutable image
+configuration was absent; the independent Docker probe still returns
+permission denied for `/run/docker.sock`. No host services were adopted and no
+runtime, distributed failure, recovery, independent-review or sealed-promotion
+claim is made. Promotion remains **NO-GO**.
