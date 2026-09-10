@@ -872,3 +872,18 @@ This is local runtime-gate integrity evidence only. It does not supply the
 approved live Qdrant/object runtime, distributed projection/recovery,
 independent review, sealed packet or human Go/No-Go authority; promotion
 remains disallowed.
+
+## 57. Phase 11 provider runtime JSON boundary closure — 2026-09-10
+
+Source implementation candidate `4fee8ebe88611c1b7139e37f1130ec18b90bf924`
+(tree `f373e62f6b243dbb5c71aa87260554c92264828c`) closes the remaining
+permissive JSON paths in the Phase 11 provider runtime gate. JSON-mode content,
+complete function-tool arguments, reassembled streaming JSON and reassembled
+streaming tool arguments now share the strict UTF-8, finite-value and
+duplicate-key decoder before contract projection.
+
+The focused provider runtime suite passes **4** tests and the complete
+State-of-Art suite passes **302**; compilation and `git diff --check` pass.
+This is local provider-gate integrity evidence only. It does not supply an
+approved live provider endpoint/corpus/budget, independent review, sealed
+packet or human Go/No-Go authority; promotion remains disallowed.

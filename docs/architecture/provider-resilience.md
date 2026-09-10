@@ -18,3 +18,10 @@ closed before chat/embedding response projection, streaming delta extraction,
 model-error classification or tool-argument validation. This is local provider
 contract evidence; a live endpoint, approved corpus and runtime budget remain
 separate promotion requirements.
+
+The Phase 11 provider runtime gate uses the same strict decoder for JSON-mode
+content, complete function-tool arguments, reassembled streaming JSON and
+reassembled streaming tool arguments. Duplicate keys, non-finite values,
+invalid UTF-8 and inputs above the shared byte ceiling fail closed before the
+gate can record a contract pass. This strengthens local gate integrity only;
+it does not establish live provider, corpus or budget authority.

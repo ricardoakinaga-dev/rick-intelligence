@@ -115,6 +115,13 @@ or recorded scope observations. This closes a local gate-integrity ambiguity;
 it does not provide the authorized live Qdrant/object runtime or promote the
 candidate.
 
+At source candidate `4fee8ebe88611c1b7139e37f1130ec18b90bf924`, the Phase 11
+provider runtime gate applies the same strict boundary to JSON-mode content,
+function-tool arguments and both streaming reassembly paths. Ambiguous or
+non-finite provider-controlled JSON cannot become a local contract pass. This
+is local provider-gate hardening only; live endpoint, corpus, budget and
+promotion authority remain required.
+
 ## 7. CI and release lanes
 
 The canonical workflow names FAST, UNIT, CONTRACT, SECURITY, RAG_EVAL,
