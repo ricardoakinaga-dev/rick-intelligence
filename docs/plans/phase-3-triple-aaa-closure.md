@@ -134,7 +134,7 @@ versioned Ed25519 seal, an explicit public-key trust store, full seal-metadata
 coverage, current-checkout binding and a 24-hour freshness window. Unknown
 keys, missing trust, stale/future timestamps, mutated metadata and absent
 checkout binding remain non-promotable. The current combined State-of-Art/
-Phase 11 suite now has 300 passing tests; this does not close live runtime or
+Phase 11 suite now has 302 passing tests; this does not close live runtime or
 human promotion gates.
 
 ## 9. Shared runtime attestation correction — 2026-09-10
@@ -180,7 +180,7 @@ projects.
 The web boundary also gained a focusable skip-link destination, deterministic
 composer readiness assertions across mobile/tablet/desktop, and narrower
 live-region semantics for completed and streaming chat content. The combined
-State-of-Art/Phase 11 suite is 300 passing tests; the exact live runtime,
+State-of-Art/Phase 11 suite is 302 passing tests; the exact live runtime,
 browser authority, supply-chain evidence, independent reviews and final human
 Go/No-Go remain external blockers.
 
@@ -194,3 +194,14 @@ executed PASS with exit `0`, and bind the record to the candidate commit.
 Missing or forged review references produce `SELF_PROMOTED_GATE_REJECTED` and
 `MISSING_EVIDENCE_REJECTED`. This is a local anti-gaming control; it does not
 create independent review, live runtime evidence or human promotion authority.
+
+## 12. Compose resource and container hardening — 2026-09-10
+
+Both canonical eleven-service Compose topologies now apply explicit finite
+CPU/memory limits to every service. Stateless services use a read-only root
+filesystem with a bounded no-exec `/tmp`; stateful services keep write access
+only to their declared data volumes while still enabling an init process,
+dropping all Linux capabilities and forbidding privilege escalation. The
+static Compose gate renders JSON and rejects missing limits, privileged mode,
+host/none networking and missing hardening. This is configuration evidence
+only; actual container behavior still requires the approved disposable lab.

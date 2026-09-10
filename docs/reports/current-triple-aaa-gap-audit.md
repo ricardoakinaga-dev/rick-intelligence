@@ -283,3 +283,18 @@ the clean integrated verifier remains `STATE_OF_ART_CANDIDATE` with exit `1`
 because release evidence, sealed packet and all live runtime lanes are absent,
 blocked or non-promotable. No independent approval, runtime authority or
 Triple AAA claim is inferred from this correction.
+
+## 14. Compose resource and container hardening — 2026-09-10
+
+The current source candidate `57b243ca3250e97b49c2af761e7940f5cd85db5b`
+(tree `d4bbf0368af50a2e034f8ef847d95db333ea04de`) adds finite CPU/memory
+limits to all eleven services in both canonical Compose topologies. The static
+rendered-config gate now requires `no-new-privileges`, `cap_drop: ALL`, an
+init process, read-only roots for stateless services, and rejects privileged or
+host/none network modes. The focused lifecycle checks pass 21 tests and the
+combined State-of-Art/Phase 11 regression passes 302 tests; `make validate`,
+`make ops-static`, `make compose-static` and `git diff --check` pass.
+
+This closes a local configuration boundary only. No live container, health,
+resource-usage, image-scan, SBOM, signature, runtime or promotion authority is
+inferred; the candidate remains `STATE_OF_ART_CANDIDATE` / `NO-GO`.
