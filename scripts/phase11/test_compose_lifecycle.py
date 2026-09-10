@@ -60,6 +60,7 @@ def test_compose_inventory_parser_rejects_duplicate_fields() -> None:
     output = '{"Service":"api","Service":"worker"}'
 
     assert runner._parse_compose_json_records(output) == []
+    assert check_compose._parse_rendered_config('{"services":{},"services":{"api":{}}}') is None
 
 
 @pytest.mark.parametrize(

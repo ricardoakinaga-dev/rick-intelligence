@@ -12,6 +12,13 @@ import sys
 
 
 ROOT = Path(__file__).resolve().parents[2]
+
+try:
+    from scripts.state_of_art.json_boundary import loads_json
+except ModuleNotFoundError:  # Direct execution from the scripts/phase11 directory.
+    sys.path.insert(0, str(ROOT))
+    from scripts.state_of_art.json_boundary import loads_json
+
 REQUIRED_SERVICES = {
     "postgres",
     "redis",
@@ -92,6 +99,13 @@ def _validate_rendered_services(compose: str, payload: object) -> list[str]:
     return errors
 
 
+def _parse_rendered_config(output: str) -> object | None:
+    try:
+        return loads_json(output)
+    except json.JSONDecodeError:
+        return None
+
+
 def main() -> int:
     if shutil.which("docker") is None:
         print("BLOCKED_EXTERNAL: docker executable is unavailable", file=sys.stderr)
@@ -111,8 +125,11 @@ def main() -> int:
             errors.append(f"{compose}: config --format json failed: {output}")
             continue
         try:
-            rendered = json.loads(output)
+            rendered = _parse_rendered_config(output)
         except json.JSONDecodeError:
+            errors.append(f"{compose}: config --format json did not return JSON")
+            continue
+        if rendered is None:
             errors.append(f"{compose}: config --format json did not return JSON")
             continue
         errors.extend(_validate_rendered_services(compose, rendered))

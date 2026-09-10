@@ -16,6 +16,12 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
+
+try:
+    from scripts.state_of_art.json_boundary import load_json
+except ModuleNotFoundError:  # Direct execution from the scripts/phase11 directory.
+    sys.path.insert(0, str(ROOT))
+    from scripts.state_of_art.json_boundary import load_json
 BOUNDARIES = ROOT / "docs/architecture/dependency-boundaries.json"
 PRESERVATION_MANIFEST = ROOT / "docs/architecture/preserved-components.json"
 
@@ -127,7 +133,7 @@ def _root_snapshot_contains(component: str) -> bool:
 
 def _load_json(path: Path, errors: list[str]) -> dict:
     try:
-        value = json.loads(path.read_text(encoding="utf-8"))
+        value = load_json(path)
     except (OSError, json.JSONDecodeError) as exc:
         errors.append(f"{path.relative_to(ROOT)}: invalid JSON ({exc})")
         return {}

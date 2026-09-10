@@ -10,6 +10,13 @@ import sys
 
 
 ROOT = Path(__file__).resolve().parents[2]
+
+try:
+    from scripts.state_of_art.json_boundary import loads_json
+except ModuleNotFoundError:  # Direct execution from the scripts/phase11 directory.
+    sys.path.insert(0, str(ROOT))
+    from scripts.state_of_art.json_boundary import loads_json
+
 CORPUS = ROOT / "tests/security/rag_adversarial/corpus.jsonl"
 REQUIRED_CATEGORIES = {
     "direct_prompt_injection",
@@ -34,7 +41,7 @@ def main() -> int:
         if not line.strip():
             continue
         try:
-            record = json.loads(line)
+            record = loads_json(line)
         except json.JSONDecodeError:
             errors.append(f"line {line_number}: invalid JSON")
             continue

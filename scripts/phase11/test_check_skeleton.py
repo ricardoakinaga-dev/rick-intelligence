@@ -22,6 +22,16 @@ class SkeletonValidatorTests(unittest.TestCase):
         )
         self.assertTrue(manifest["policy"]["root_snapshot_required"])
 
+    def test_strict_json_rejects_duplicate_manifest_fields(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="phase11-json-boundary-") as temporary:
+            path = Path(temporary) / "manifest.json"
+            path.write_text('{"schema_version":1,"schema_version":2}', encoding="utf-8")
+            errors: list[str] = []
+
+            with mock.patch.object(check_skeleton, "ROOT", path.parent):
+                self.assertEqual(check_skeleton._load_json(path, errors), {})
+            self.assertTrue(any("invalid JSON" in error for error in errors))
+
     def test_root_snapshot_is_required_even_with_nested_git_metadata(self) -> None:
         with mock.patch.object(
             check_skeleton,
