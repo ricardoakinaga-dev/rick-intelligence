@@ -19,6 +19,7 @@ from threading import RLock
 from typing import Iterator
 
 from services.audit import _ALLOWED_FIELDS, _SAFE_STRING, _strip_url_credentials
+from services.json_boundary import decode_bounded_json
 
 
 SCHEMA_VERSION = 1
@@ -434,7 +435,9 @@ class SQLiteAuditSink:
         if limit == 0:
             return []
 
-        clauses: list[str] = []
+        # Keep SQLite's JSON1 predicates away from malformed rows. The Python
+        # decoder below applies the stricter finite/byte-bounded contract.
+        clauses: list[str] = ["json_valid(event_json)"]
         parameters_list: list[object] = []
         if tenant_id is not None:
             if not isinstance(tenant_id, str) or not tenant_id.strip():
@@ -462,10 +465,9 @@ class SQLiteAuditSink:
 
         events: list[dict[str, object]] = []
         for row in rows:
-            try:
-                decoded = json.loads(row["event_json"])
-            except (TypeError, ValueError, json.JSONDecodeError):
-                continue
+            decoded = decode_bounded_json(
+                row["event_json"], None, max_bytes=_MAX_EVENT_BYTES
+            )
             if isinstance(decoded, dict):
                 events.append(decoded)
         return events

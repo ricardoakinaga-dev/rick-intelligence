@@ -15,6 +15,7 @@ from typing import Iterator, Protocol
 import uuid
 
 from services.audit import _ALLOWED_FIELDS
+from services.json_boundary import decode_bounded_json
 from services.sqlite_audit import _sanitise_event
 
 
@@ -31,6 +32,9 @@ class PostgresAuditError(RuntimeError):
         super().__init__(self.code)
 
 
+MAX_AUDIT_METADATA_BYTES = 64 * 1024
+
+
 def _row_dict(cursor: object, row: object) -> dict[str, object]:
     if isinstance(row, Mapping):
         return {str(key): value for key, value in row.items()}
@@ -40,15 +44,8 @@ def _row_dict(cursor: object, row: object) -> dict[str, object]:
 
 
 def _json_value(value: object) -> dict[str, object]:
-    if isinstance(value, Mapping):
-        return dict(value)
-    if isinstance(value, str):
-        try:
-            decoded = json.loads(value)
-        except (TypeError, ValueError, json.JSONDecodeError):
-            return {}
-        return dict(decoded) if isinstance(decoded, Mapping) else {}
-    return {}
+    decoded = decode_bounded_json(value, {}, max_bytes=MAX_AUDIT_METADATA_BYTES)
+    return dict(decoded) if isinstance(decoded, Mapping) else {}
 
 
 def _text(value: object, *, maximum: int = 512, required: bool = False) -> str | None:

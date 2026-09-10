@@ -97,3 +97,20 @@ def test_malformed_or_unscoped_events_are_dropped_without_database_access():
     store = PostgresAuditSink(factory)
     assert not store.append({"action": "document.publish", "target_id": "doc-a"})
     assert not calls
+
+
+def test_persisted_metadata_json_is_bounded_and_finite():
+    for metadata in (
+        '{"status":NaN}',
+        '{"status":"ok"}' + (" " * (64 * 1024)),
+    ):
+        read = Connection([("FROM rick_audit_events", [{
+            "action": "document.publish",
+            "tenant_id": "tenant-a",
+            "metadata": metadata,
+        }])])
+        store = PostgresAuditSink(factory_for(read))
+
+        events = store.list(tenant_id="tenant-a")
+
+        assert events == [{"action": "document.publish", "tenant_id": "tenant-a"}]

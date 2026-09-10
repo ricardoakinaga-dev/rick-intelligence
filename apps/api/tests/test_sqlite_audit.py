@@ -145,3 +145,30 @@ def test_malformed_events_are_safe_and_secrets_are_redacted(tmp_path: Path):
     oversized = {"payload": ["x" * 512 for _ in range(64)], "second": ["y" * 512 for _ in range(64)]}
     assert sink.append(oversized) is False
     sink.close()
+
+
+def test_persisted_event_json_is_bounded_and_finite(tmp_path: Path):
+    database = tmp_path / "audit" / "events.sqlite3"
+    sink = SQLiteAuditSink(database)
+    assert sink.append({"action": "persisted.boundary", "status": "ok"}) is True
+    sink.close()
+
+    with sqlite3.connect(database) as connection:
+        oversized = '{"action":"persisted.boundary"}' + (" " * (64 * 1024))
+        connection.execute("UPDATE audit_events SET event_json=?", (oversized,))
+        connection.commit()
+
+    reopened = SQLiteAuditSink(database)
+    assert reopened.events == []
+    reopened.close()
+
+    with sqlite3.connect(database) as connection:
+        connection.execute(
+            "UPDATE audit_events SET event_json=?",
+            ('{"action":"persisted.boundary","status":NaN}',),
+        )
+        connection.commit()
+
+    reopened = SQLiteAuditSink(database)
+    assert reopened.events == []
+    reopened.close()
