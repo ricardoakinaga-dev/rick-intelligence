@@ -13,6 +13,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from importlib import import_module
 import inspect
+import math
 import os
 import re
 from threading import Thread
@@ -33,6 +34,7 @@ class ExternalCompositionError(RuntimeError):
 
 
 _COMPOSITION_REFERENCE = re.compile(r"^[A-Za-z_][A-Za-z0-9_.]*:[A-Za-z_][A-Za-z0-9_]*$")
+_MAX_PROVIDER_TIMEOUT_SECONDS = 120.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -98,36 +100,76 @@ def load_external_providers(
 class SyncEmbeddingAdapter:
     """Bridge the async provider embedding port to sync ingestion/retrieval."""
 
-    def __init__(self, provider: object, *, model: str, dimensions: int) -> None:
+    def __init__(
+        self,
+        provider: object,
+        *,
+        model: str,
+        dimensions: int,
+        timeout_seconds: float = 30.0,
+    ) -> None:
         if not callable(getattr(provider, "get_embedding", None)):
             raise ExternalCompositionError("provider embeddings")
+        if (
+            isinstance(timeout_seconds, bool)
+            or not isinstance(timeout_seconds, (int, float))
+            or not math.isfinite(float(timeout_seconds))
+            or not 0.001 <= float(timeout_seconds) <= _MAX_PROVIDER_TIMEOUT_SECONDS
+        ):
+            raise ExternalCompositionError("provider embedding timeout")
         self.provider = provider
         self.model = model
         self.dimensions = dimensions
+        self.timeout_seconds = float(timeout_seconds)
 
-    @staticmethod
-    def _run(awaitable: object) -> object:
+    def _run(self, awaitable: object) -> object:
         if not inspect.isawaitable(awaitable):
             return awaitable
+
+        async def bounded() -> object:
+            try:
+                return await asyncio.wait_for(awaitable, timeout=self.timeout_seconds)
+            except asyncio.TimeoutError:
+                raise TimeoutError("provider embedding call timed out") from None
+
         try:
             asyncio.get_running_loop()
         except RuntimeError:
-            return asyncio.run(awaitable)
+            return asyncio.run(bounded())
 
         # Retrieval is called from an async API request, while the canonical
         # package contract is synchronous. Execute the bounded provider call
-        # on a short-lived helper thread rather than nesting event loops.
+        # on a short-lived helper thread rather than nesting event loops. Keep
+        # the loop reachable so a timeout can request cancellation before the
+        # adapter returns; an uncooperative awaitable is never allowed to hold
+        # the request thread indefinitely.
         result: dict[str, object] = {}
+        loop = asyncio.new_event_loop()
 
         def run() -> None:
+            asyncio.set_event_loop(loop)
             try:
-                result["value"] = asyncio.run(awaitable)
+                result["value"] = loop.run_until_complete(bounded())
             except BaseException as exc:
                 result["error"] = exc
+            finally:
+                pending = asyncio.all_tasks(loop)
+                for task in pending:
+                    task.cancel()
+                if pending:
+                    try:
+                        loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+                    except BaseException:
+                        pass
+                loop.close()
 
         thread = Thread(target=run, name="rick-sync-embedding", daemon=True)
         thread.start()
-        thread.join()
+        thread.join(self.timeout_seconds + 0.25)
+        if thread.is_alive():
+            loop.call_soon_threadsafe(lambda: [task.cancel() for task in asyncio.all_tasks(loop)])
+            thread.join(1.0)
+            raise TimeoutError("provider embedding call timed out")
         error = result.get("error")
         if isinstance(error, BaseException):
             raise error
@@ -339,6 +381,7 @@ def build_external_providers(
         provider,
         model=settings.provider_embedding_model,
         dimensions=settings.provider_embedding_dimensions,
+        timeout_seconds=max(0.1, settings.provider_timeout_ms / 1_000),
     )
     retrieval = RetrievalApplicationService(
         knowledge=knowledge,

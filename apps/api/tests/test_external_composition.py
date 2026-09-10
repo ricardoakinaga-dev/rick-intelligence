@@ -248,3 +248,35 @@ def test_external_composition_rejects_structural_rate_limiter_spoof(tmp_path):
 
     with pytest.raises(ExternalCompositionError, match="bound to the injected client"):
         build_external_providers(settings(), inputs)
+
+
+@pytest.mark.parametrize("inside_event_loop", [False, True])
+def test_sync_embedding_adapter_enforces_a_bounded_provider_call(inside_event_loop):
+    import asyncio
+    import time
+
+    class SlowProvider:
+        async def get_embedding(self, text, *, model):
+            await asyncio.sleep(0.2)
+            return SimpleNamespace(vector=[1.0])
+
+    adapter = external_composition.SyncEmbeddingAdapter(
+        SlowProvider(),
+        model="embedding-model",
+        dimensions=1,
+        timeout_seconds=0.02,
+    )
+
+    def invoke():
+        started = time.monotonic()
+        with pytest.raises(TimeoutError, match="embedding call timed out"):
+            adapter.embed(["bounded input"])
+        assert time.monotonic() - started < 1.0
+
+    if inside_event_loop:
+        async def run_inside_loop():
+            invoke()
+
+        asyncio.run(run_inside_loop())
+    else:
+        invoke()
