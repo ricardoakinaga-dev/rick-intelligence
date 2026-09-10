@@ -58,6 +58,7 @@ def _runtime_dependencies() -> tuple[Any, ...] | None:
     try:
         from postgres_jobs import PostgresJobLeaseError, PostgresJobQueue
         from rick_jobs import Job, JobId, JobLease, JobResult, JobScope, LeaseToken, WorkerId
+        from runtime import RealWorkerRuntime  # Verify the real execution dependency too.
     except ImportError:
         return None
     return (
@@ -90,6 +91,61 @@ def _send(channel: Any, value: dict[str, object]) -> None:
         pass
 
 
+def _run_runtime_cycle(queue: Any, scope: Any, job_id: str, worker_id: str, result_type: Any) -> dict[str, object]:
+    """Execute a real handler, requiring a runtime-owned heartbeat before ACK.
+
+    The handler publishes only a metadata result. PostgreSQL remains the
+    authority for lease ownership and the transactional acknowledgement.
+    """
+
+    from runtime import RealWorkerRuntime
+
+    def handler(job: Any, _lease: Any, *, cancelled: Any) -> Any:
+        if str(job.job_id) != job_id:
+            raise RuntimeError("worker claimed an unexpected fixture")
+        deadline = time.monotonic() + WORKER_WAIT_SECONDS / 2
+        while runtime.metrics().heartbeats < 1:
+            cancelled.checkpoint()
+            if time.monotonic() >= deadline:
+                raise RuntimeError("runtime heartbeat was not observed")
+            time.sleep(0.01)
+        return result_type(
+            output_refs={"publication_ref": f"runtime-publication:{job_id}"},
+            completed_at=time.time(),
+        )
+
+    runtime = RealWorkerRuntime(
+        queue,
+        worker_id=worker_id,
+        scope=scope,
+        handlers={"runtime_multi_worker": handler},
+        max_concurrency=1,
+        heartbeat_interval_seconds=LEASE_SECONDS / 3,
+        poll_interval_seconds=0.01,
+        handler_timeout_seconds=WORKER_WAIT_SECONDS / 2,
+        shutdown_timeout_seconds=2.0,
+    )
+    try:
+        runtime.start()
+        result = runtime.run_once(wait=True)
+        metrics = runtime.metrics()
+        if result.queue_errors or result.failed or result.lease_lost or result.timed_out:
+            raise RuntimeError("canonical worker execution failed")
+        return {
+            "kind": "completed",
+            "worker_id": worker_id,
+            "pid": os.getpid(),
+            "claimed": result.claimed == 1,
+            "heartbeat": metrics.heartbeats > 0,
+            "acked": result.succeeded == 1,
+            "runtime": "RealWorkerRuntime",
+        }
+    finally:
+        stopped = runtime.shutdown(timeout=2.0)
+        if not stopped.drained:
+            raise RuntimeError("canonical worker did not drain")
+
+
 def _claim_and_ack_worker(
     dsn: str,
     scope_values: tuple[str, str, str],
@@ -98,7 +154,7 @@ def _claim_and_ack_worker(
     ready: Any,
     channel: Any,
 ) -> None:
-    """Claim, heartbeat and acknowledge one job in an isolated process."""
+    """Run the canonical claim/handler/heartbeat/ACK cycle in one process."""
 
     try:
         dependencies = _runtime_dependencies()
@@ -111,38 +167,7 @@ def _claim_and_ack_worker(
             return
         queue = _queue_for(dsn, dependencies)
         scope = scope_type(*scope_values)
-        claimed = queue.claim(
-            worker_id=worker_type(worker_id),
-            scope=scope,
-            expected_versions={},
-            limit=1,
-            now=time.time(),
-        )
-        if not claimed:
-            _send(channel, {"kind": "completed", "worker_id": worker_id, "pid": os.getpid(), "claimed": False})
-            return
-        job, lease = claimed[0]
-        renewed = queue.heartbeat(lease, now=time.time(), expected_version=job.version)
-        completed = queue.acknowledge(
-            renewed,
-            result_type(
-                output_refs={"publication_ref": f"runtime-publication:{job_id}"},
-                completed_at=time.time(),
-            ),
-            now=time.time(),
-            expected_version=job.version,
-        )
-        _send(
-            channel,
-            {
-                "kind": "completed",
-                "worker_id": worker_id,
-                "pid": os.getpid(),
-                "claimed": True,
-                "heartbeat": True,
-                "acked": completed.state.value == "SUCCEEDED",
-            },
-        )
+        _send(channel, _run_runtime_cycle(queue, scope, job_id, worker_id, result_type))
     except Exception as exc:  # pragma: no cover - exercised by a live dependency.
         _send(channel, {"kind": "error", "error": type(exc).__name__})
     finally:
@@ -271,6 +296,8 @@ def _run_concurrent_claim(
             _finish_process(process)
     if any(item.get("kind") == "error" for item in observations):
         raise RuntimeError("isolated worker process failed during concurrent claim")
+    if any(item.get("runtime") != "RealWorkerRuntime" for item in observations):
+        raise RuntimeError("isolated processes did not execute the canonical runtime")
     claimed = [item for item in observations if item.get("claimed") is True]
     if len(claimed) != 1 or sum(item.get("acked") is True for item in claimed) != 1:
         raise RuntimeError("two isolated workers did not produce exactly one owner and publication")
@@ -292,7 +319,7 @@ def _run_concurrent_claim(
     if not row or int(row[0]) != 1:
         raise RuntimeError("concurrent claim produced more than one durable publication event")
     return [
-        GateResult("PROCESS_ISOLATION", "PASS", "two distinct worker processes used independent database sessions"),
+        GateResult("PROCESS_ISOLATION", "PASS", "two distinct RealWorkerRuntime processes used independent database sessions"),
         GateResult("ONE_OWNER_CLAIM", "PASS", "exactly one worker claimed the queued job"),
         GateResult("HEARTBEAT_FENCING", "PASS", "the winning worker renewed its durable lease"),
         GateResult("SINGLE_PUBLICATION", "PASS", "the durable outbox contains exactly one publication event"),

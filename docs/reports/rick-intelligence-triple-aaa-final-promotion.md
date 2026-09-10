@@ -67,10 +67,12 @@ constraint, queue, DLQ, replay, backup and fencing evidence was not observed.
 
 The canonical worker validates scope, leases, heartbeats, cooperative
 cancellation and stale acknowledgement boundaries. Two worker services are
-declared and share the durable queue. The runtime gate now checks both the
-lifecycle acknowledgement and the durable outbox publication fence, but it
-still does not prove every requested crash point in a live Worker A/B run.
-That runtime evidence is therefore blocked.
+declared and share the durable queue. The multi-worker gate's happy path now
+executes `RealWorkerRuntime.start()`, `run_once()` and `shutdown()` in each
+isolated process and requires a runtime-owned heartbeat before the result is
+acknowledged. The gate still does not prove every requested crash point in a
+live Worker A/B run, and no external PostgreSQL result is present. That
+runtime evidence is therefore blocked.
 
 ## 8. Redis
 

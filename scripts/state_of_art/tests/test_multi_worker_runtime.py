@@ -4,6 +4,7 @@ import importlib.util
 import json
 from pathlib import Path
 import sys
+import time
 
 import pytest
 
@@ -59,3 +60,75 @@ def test_worker_gate_names_every_mandatory_fencing_case() -> None:
         "CRASH_RECOVERY_SUCCEEDS",
     ):
         assert case in source
+
+
+@pytest.fixture
+def local_runtime_contract(monkeypatch: pytest.MonkeyPatch):
+    """Reuse the canonical runtime's queue double; this is not live evidence."""
+    for relative in ("apps/worker", "packages/jobs/src", "packages/observability/src"):
+        monkeypatch.syspath_prepend(str(ROOT / relative))
+    name = "multi_worker_local_runtime_contract"
+    spec = importlib.util.spec_from_file_location(name, ROOT / "apps/worker/tests/test_runtime.py")
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    monkeypatch.setitem(sys.modules, name, module)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_gate_cycle_uses_real_runtime_heartbeat_and_result(local_runtime_contract) -> None:
+    contract = local_runtime_contract
+    job = contract.Job.create(
+        job_id="runtime-contract",
+        tenant_id=contract.SCOPE.tenant_id,
+        workspace_id=contract.SCOPE.workspace_id,
+        collection_id=contract.SCOPE.collection_id,
+        operation="runtime_multi_worker",
+        idempotency_key="runtime-contract",
+        payload={"source_ref": "runtime:contract"},
+        now=time.time(),
+    )
+    queue = contract.FakeQueue([job.transition(contract.JobState.QUEUED, now=time.time())])
+
+    observed = gate._run_runtime_cycle(queue, contract.SCOPE, str(job.job_id), "worker-contract", contract.JobResult)
+
+    assert observed["runtime"] == "RealWorkerRuntime"
+    assert observed["claimed"] is True
+    assert observed["heartbeat"] is True
+    assert observed["acked"] is True
+    assert queue.heartbeat_calls >= 1
+    assert len(queue.acknowledged) == 1
+    assert queue.acknowledged[0][1].output_refs == {"publication_ref": "runtime-publication:runtime-contract"}
+
+
+def test_idle_real_runtime_does_not_claim_heartbeat_or_ack(local_runtime_contract) -> None:
+    contract = local_runtime_contract
+    queue = contract.FakeQueue([])
+
+    observed = gate._run_runtime_cycle(queue, contract.SCOPE, "runtime-contract", "worker-idle", contract.JobResult)
+
+    assert observed["claimed"] is False
+    assert observed["heartbeat"] is False
+    assert observed["acked"] is False
+    assert queue.acknowledged == []
+
+
+def test_runtime_heartbeat_failure_cannot_report_publication(local_runtime_contract) -> None:
+    contract = local_runtime_contract
+    job = contract.Job.create(
+        job_id="runtime-failed-heartbeat",
+        tenant_id=contract.SCOPE.tenant_id,
+        workspace_id=contract.SCOPE.workspace_id,
+        collection_id=contract.SCOPE.collection_id,
+        operation="runtime_multi_worker",
+        idempotency_key="runtime-failed-heartbeat",
+        payload={"source_ref": "runtime:contract"},
+        now=time.time(),
+    )
+    queue = contract.FakeQueue([job.transition(contract.JobState.QUEUED, now=time.time())], heartbeat_error=True)
+
+    with pytest.raises(RuntimeError, match="canonical worker execution failed"):
+        gate._run_runtime_cycle(queue, contract.SCOPE, str(job.job_id), "worker-failure", contract.JobResult)
+
+    assert queue.heartbeat_calls >= 1
+    assert queue.acknowledged == []

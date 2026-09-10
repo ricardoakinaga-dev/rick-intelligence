@@ -164,3 +164,18 @@ prove collector delivery, a single live API→queue→worker trace, alert/SLO
 authority, measured DR, independent review or promotion. Docker remains
 inaccessible (`permission denied` on the configured daemon socket), so the
 runtime evidence columns remain blocked and promotion remains **NO-GO**.
+
+## 66. RealWorkerRuntime multi-process gate closure — 2026-09-10
+
+The multi-worker gate now executes the canonical `RealWorkerRuntime` in each
+isolated worker process for its concurrent claim path. The handler waits for a
+heartbeat emitted by the runtime before returning a bounded `JobResult`, and
+the observed runtime result plus durable outbox count are required before the
+local fencing cases can pass. Hermetic tests cover success, an idle worker and
+heartbeat loss preventing publication; **17** runtime/gate tests pass.
+
+This strengthens the executable gate contract without claiming external proof.
+The crash fixture remains a queue-level after-claim termination, the complete
+eight-point crash matrix is still absent, and the PostgreSQL Worker A/B run,
+stale publish result and production publication path remain unobserved. The
+candidate therefore stays **BLOCKED_EXTERNAL / NO-GO**.
