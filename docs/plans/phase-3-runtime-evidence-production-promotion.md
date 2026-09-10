@@ -6,7 +6,7 @@
 **Prompt copy:** [`docs/prompts/phase-3-runtime-evidence-production-promotion-2026-09-09.txt`](../prompts/phase-3-runtime-evidence-production-promotion-2026-09-09.txt)
 **Current audit:** [`docs/reports/phase-3-runtime-evidence-current-audit.md`](../reports/phase-3-runtime-evidence-current-audit.md)
 **Living ExecPlan:** [`../../.agent/plans/phase-3-runtime-evidence-production-promotion.md`](../../.agent/plans/phase-3-runtime-evidence-production-promotion.md)
-**Current source implementation candidate:** `3fae7e6c7d993d03e71cdf79f43393fcffb1ca0c` (tree `f092dedf17683ecc2468fa6263df004a205af815`)
+**Current source implementation candidate:** `8f2741d39d83622dc966b859fac06630848d916b` (tree `2bf66ea20c2d7c2d0f92d3c343c6f4a2e2907d72`)
 
 ## Purpose
 
@@ -221,14 +221,17 @@ rollback owner and final promotion.
 ## Current candidate closure
 
 The current source implementation candidate is
-3fae7e6c7d993d03e71cdf79f43393fcffb1ca0c with tree
-f092dedf17683ecc2468fa6263df004a205af815. It has 153 passing local
-State-of-Art tests, corrected PostgreSQL acknowledgement wiring and a real
-two-process claim/heartbeat/crash-reclaim/stale-ACK gate that fails closed
-without an approved disposable runtime. The 7ea1f287f452ac14d6126060f5811d2fc00920a7
-review remains historical; live runtime, distributed, operational,
-provider/corpus, frontend-runtime, supply-chain and human-approval gates
-remain open, so no Triple AAA claim is made.
+8f2741d39d83622dc966b859fac06630848d916b with tree
+2bf66ea20c2d7c2d0f92d3c343c6f4a2e2907d72. It has the corrected PostgreSQL
+acknowledgement wiring and a canonical two-process Redis/API HTTP gate with
+request-ID replay, tenant isolation, bounded TTL, strict injected
+client/namespace binding and production admission checks. The API (432),
+locking (52) and State-of-Art (148) local suites pass, while the real Redis
+run fails closed as BLOCKED_EXTERNAL. A fresh independent read-only review
+found residual runtime/telemetry risks and did not approve promotion; live
+runtime, distributed, operational, provider/corpus, frontend-runtime,
+supply-chain and human-approval gates remain open, so no Triple AAA claim is
+made.
 
 ## Current next action
 

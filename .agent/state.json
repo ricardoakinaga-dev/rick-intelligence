@@ -14,7 +14,7 @@
   "active_execplan": ".agent/plans/phase-3-runtime-evidence-production-promotion.md",
   "active_task": "PH3-2-LAB-READINESS",
   "verification_state": "PARTIAL",
-  "repository_state": "Current Phase 3 source implementation candidate is 3fae7e6c7d993d03e71cdf79f43393fcffb1ca0c (tree f092dedf17683ecc2468fa6263df004a205af815). Its 153 local tests and fail-closed static checks pass; it includes the real PostgreSQL multi-worker claim/heartbeat/crash-reclaim/stale-ACK gate, which correctly returns BLOCKED_EXTERNAL without an approved disposable DSN/runtime. The earlier 7ea1f287f452ac14d6126060f5811d2fc00920a7 review remains historical. Phase 3.2 live Compose, PostgreSQL, Redis, object/vector, multi-worker and live supervisor gates remain BLOCKED_EXTERNAL",
+  "repository_state": "Current Phase 3 source implementation candidate is 8f2741d39d83622dc966b859fac06630848d916b (tree 2bf66ea20c2d7c2d0f92d3c343c6f4a2e2907d72). Its canonical two-process Redis/API HTTP gate, request-ID propagation, tenant isolation, bounded TTL checks, strict Redis client/namespace composition binding and production admission gate are covered by the local API, locking and State-of-Art suites; the real Redis run correctly returns BLOCKED_EXTERNAL without an approved disposable runtime. The fresh independent read-only review identified residual external runtime/telemetry risks and did not approve promotion. Phase 3.2 live Compose, PostgreSQL, Redis, object/vector, multi-worker and live supervisor gates remain BLOCKED_EXTERNAL",
   "instruction_scope_refs": [
     ".agent/PLANS.md",
     "cvg-master-rag-v2/AGENTS.md",
@@ -23,8 +23,8 @@
     "docs/plans/phase-3-runtime-evidence-production-promotion.md"
   ],
   "last_gate_record": ".agent/gates/phase-3-2-lab-readiness-implementation-ready.json",
-  "last_event_id": "EVT-PH3-2-CURRENT-SOURCE-RECONCILIATION-20260910",
-  "state_revision": 238,
+  "last_event_id": "EVT-PH3-2-REDIS-HTTP-GATE-20260910",
+  "state_revision": 239,
   "next_gate": "VERIFIED",
   "active_action_id": "PH3-2-LAB-READINESS:WAIT_RUNTIME",
   "blocked_by": [
@@ -32,5 +32,5 @@
     "Disposable runtime secrets and endpoint authority are unavailable"
   ],
   "human_approval_required": [],
-  "updated_at": "2026-09-10T03:33:56Z"
+  "updated_at": "2026-09-10T04:07:36Z"
 }

@@ -748,7 +748,7 @@
         "PH3-1-CI-RELEASE-CLOSURE"
       ],
       "owner": "Codex lead",
-      "acceptance_summary": "Canonical dev/staging Compose renders the required 11-service topology, make up validates inventory and waits for health/readiness, failure diagnostics are bounded/redacted, make down is project-scoped and volume-preserving, and the local P0 worker implementation includes a real two-process PostgreSQL fencing/crash-reclaim/stale-ACK gate; live startup and runtime execution remain external evidence",
+      "acceptance_summary": "Canonical dev/staging Compose renders the required 11-service topology, make up validates inventory and waits for health/readiness, failure diagnostics are bounded/redacted, make down is project-scoped and volume-preserving, the local P0 worker implementation includes a real two-process PostgreSQL fencing/crash-reclaim/stale-ACK gate, and the canonical API boundary includes a real two-process Redis rate-limit gate with replay, tenant and bounded-TTL assertions; live startup and runtime execution remain external evidence",
       "evidence_refs": [
         "docs/prompts/phase-3-runtime-evidence-production-promotion-2026-09-09.txt",
         "docs/reports/phase-3-runtime-evidence-current-audit.md",
@@ -760,13 +760,23 @@
         "scripts/phase11/check_compose.py",
         "scripts/phase11/postgres_runtime_gate.py",
         "scripts/phase11/multi_worker_runtime_gate.py",
+        "scripts/phase11/redis_multi_replica_runtime_gate.py",
         "scripts/state_of_art/run_phase3_multi_worker.py",
+        "scripts/state_of_art/run_phase3_redis_multi_replica.py",
         "scripts/state_of_art/tests/test_phase3_postgres_runtime.py",
         "scripts/state_of_art/tests/test_multi_worker_runtime.py",
+        "scripts/state_of_art/tests/test_redis_multi_replica_runtime.py",
+        "apps/api/src/app.py",
+        "apps/api/src/routes/auth.py",
+        "apps/api/src/routes/chat.py",
+        "apps/api/src/services/external_composition.py",
+        "packages/locking/src/rick_locking/rate_limit.py",
+        "packages/locking/src/rick_locking/redis.py",
         "docker-compose.dev.yml",
         "docker-compose.staging.yml",
         "infrastructure/compose/README.md",
-        ".agent/verification.jsonl#VER-PH3-2-CURRENT-SOURCE-LOCAL-20260910"
+        ".agent/verification.jsonl#VER-PH3-2-CURRENT-SOURCE-LOCAL-20260910",
+        ".agent/verification.jsonl#VER-PH3-2-REDIS-HTTP-GATE-20260910"
       ],
       "next_action": {
         "id": "PH3-2-LAB-READINESS:WAIT_RUNTIME",
@@ -779,7 +789,7 @@
         "Docker daemon access to /var/run/docker.sock is denied in the current session",
         "Disposable runtime secrets and endpoint authority are unavailable"
       ],
-      "reason": "The current local implementation and fail-closed two-process worker gate are covered by 153 local tests and static checks, but live startup, readiness probes, real PostgreSQL execution, distributed service checks and teardown cannot be executed without approved external runtime access"
+      "reason": "The current local implementation and fail-closed API/Redis and worker gates are covered by the API (432 passed), locking (52 passed) and State-of-Art (148 passed) suites plus static checks. The real two-process Redis/API run returns BLOCKED_EXTERNAL, and live startup, readiness, PostgreSQL execution, distributed service checks and teardown cannot be executed without approved external runtime access"
     }
   ]
 }
