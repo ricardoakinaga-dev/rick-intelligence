@@ -39,6 +39,7 @@ STATUSES = frozenset(
 PRIORITIES = frozenset({"P0", "P1", "P2"})
 SHA1_RE = re.compile(r"^[0-9a-f]{40}$", re.IGNORECASE)
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$", re.IGNORECASE)
+REVIEW_REF_RE = re.compile(r"^\.agent/verification\.jsonl#[A-Za-z0-9_.-]+$")
 REQUIRED_CAPABILITY_IDS = frozenset(
     {f"P0-{index:02d}" for index in range(1, 9)}
     | {f"P1-{index:02d}" for index in range(1, 10)}
@@ -180,12 +181,22 @@ def _parse_reviewer(value: Any, field: str) -> dict[str, Any]:
     independent = value.get("independent")
     if not isinstance(independent, bool):
         raise MatrixValidationError((f"{field}.independent must be boolean",))
-    return {
+    parsed = {
         "id": _text(value.get("id"), f"{field}.id"),
         "kind": _text(value.get("kind"), f"{field}.kind"),
         "name": _text(value.get("name"), f"{field}.name"),
         "independent": independent,
     }
+    review_ref = value.get("review_ref")
+    review_sha256 = value.get("review_sha256")
+    if review_ref is not None:
+        review_ref = _text(review_ref, f"{field}.review_ref")
+        if REVIEW_REF_RE.fullmatch(review_ref) is None:
+            raise MatrixValidationError((f"{field}.review_ref must bind .agent/verification.jsonl",))
+        parsed["review_ref"] = review_ref
+    if review_sha256 is not None:
+        parsed["review_sha256"] = _sha(review_sha256, f"{field}.review_sha256", SHA256_RE)
+    return parsed
 
 
 def _validate_timestamp(value: str, field: str, errors: list[str]) -> None:
@@ -368,6 +379,68 @@ def _classify_capabilities(capabilities: Sequence[Mapping[str, Any]]) -> tuple[s
     return "FAILED", "matrix contains an unsupported promotion state"
 
 
+def _review_binding_errors(
+    root: Path,
+    reviewer: Mapping[str, Any],
+    *,
+    candidate_sha: str,
+) -> list[str]:
+    """Require a current, candidate-bound ledger record for promoted rows.
+
+    ``reviewer.independent`` is declarative metadata and is therefore not
+    sufficient evidence on its own.  The signed promotion packet remains the
+    final authority, but the capability matrix must also reject a row that
+    promotes itself by merely flipping that boolean.
+    """
+
+    errors: list[str] = []
+    review_ref = reviewer.get("review_ref")
+    review_sha256 = reviewer.get("review_sha256")
+    if not isinstance(review_ref, str) or REVIEW_REF_RE.fullmatch(review_ref) is None:
+        return ["reviewer.review_ref is required for a promoted capability"]
+    if not isinstance(review_sha256, str) or SHA256_RE.fullmatch(review_sha256) is None:
+        errors.append("reviewer.review_sha256 is required for a promoted capability")
+        return errors
+    raw_path, record_id = review_ref.split("#", 1)
+    target, path_error = _safe_path(root, raw_path)
+    if path_error or target is None or not target.is_file():
+        return [f"reviewer.review_ref is absent or unsafe: {review_ref}"]
+    try:
+        actual_hash = _hash_file(target)
+    except OSError as exc:
+        return [f"reviewer.review_ref could not be hashed: {exc}"]
+    if actual_hash != review_sha256:
+        errors.append("reviewer.review_sha256 does not match the ledger")
+    record: Mapping[str, Any] | None = None
+    try:
+        for line in target.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            candidate_record = json.loads(line)
+            if isinstance(candidate_record, Mapping) and candidate_record.get("id") == record_id:
+                record = candidate_record
+                break
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        errors.append("reviewer.review_ref is not a readable JSONL ledger")
+    if record is None:
+        errors.append("reviewer.review_ref does not identify a ledger record")
+        return errors
+    if record.get("result") != "PASS" or record.get("procedure_status") != "EXECUTED":
+        errors.append("reviewer ledger record is not an executed PASS")
+    if record.get("exit_status") != 0 or record.get("freshness") != "CURRENT":
+        errors.append("reviewer ledger record is not current with exit_status=0")
+    independence = record.get("independence")
+    if independence not in {"I1", "I2", "I3", "INDEPENDENT"}:
+        errors.append("reviewer ledger record is not independently reviewed")
+    if record.get("reviewer_id") != reviewer.get("id"):
+        errors.append("reviewer ledger identity does not match the matrix reviewer")
+    scope = record.get("scope")
+    source_candidate = record.get("source_candidate")
+    if source_candidate != candidate_sha and (not isinstance(scope, str) or candidate_sha not in scope):
+        errors.append("reviewer ledger record is not bound to the candidate commit")
+    return errors
+
+
 def evaluate_matrix(
     path: Path,
     checkout: Mapping[str, Any],
@@ -489,6 +562,16 @@ def evaluate_matrix(
             failures.append(f"{capability_id}: capability commit does not match candidate")
             rejection_codes.add("WRONG_COMMIT_REJECTED")
             rejection_codes.add("WRONG_COMMIT_EVIDENCE_REJECTED")
+        if item["status"] in {"VERIFIED_RUNTIME", "PROMOTABLE"}:
+            review_errors = _review_binding_errors(
+                root,
+                item["reviewer"],
+                candidate_sha=candidate["commit_sha"],
+            )
+            if review_errors:
+                failures.append(f"{capability_id}: independent reviewer evidence invalid ({'; '.join(review_errors)})")
+                rejection_codes.add("SELF_PROMOTED_GATE_REJECTED")
+                rejection_codes.add("MISSING_EVIDENCE_REJECTED")
         if artifact_set_digest(item["artifact_refs"]) != item["artifact_sha256"]:
             failures.append(f"{capability_id}: artifact set hash does not match declaration")
             rejection_codes.add("WRONG_HASH_REJECTED")

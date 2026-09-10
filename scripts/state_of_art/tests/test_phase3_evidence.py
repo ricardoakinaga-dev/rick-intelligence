@@ -126,6 +126,32 @@ def _runtime_record(
     }
 
 
+def _independent_review(root: Path, *, reviewer_id: str = "independent-fixture-reviewer") -> dict[str, str]:
+    ledger = root / ".agent" / "verification.jsonl"
+    ledger.parent.mkdir(parents=True, exist_ok=True)
+    ledger.write_text(
+        json.dumps(
+            {
+                "id": "VER-FIXTURE-INDEPENDENT-1",
+                "task": "P0-TEST",
+                "scope": f"candidate {HEAD}",
+                "procedure_status": "EXECUTED",
+                "result": "PASS",
+                "exit_status": 0,
+                "freshness": "CURRENT",
+                "independence": "I1",
+                "reviewer_id": reviewer_id,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return {
+        "review_ref": ".agent/verification.jsonl#VER-FIXTURE-INDEPENDENT-1",
+        "review_sha256": sha256(ledger.read_bytes()).hexdigest(),
+    }
+
+
 def _fixture(tmp_path: Path) -> tuple[Path, dict[str, object], dict[str, object]]:
     (tmp_path / "audit.md").write_text("audit\n", encoding="utf-8")
     (tmp_path / "test.py").write_text("assert True\n", encoding="utf-8")
@@ -347,6 +373,8 @@ def test_verified_runtime_is_not_promotable_without_explicit_production_promotio
     }), encoding="utf-8")
     payload["capabilities"][0]["status"] = "VERIFIED_RUNTIME"  # type: ignore[index]
     payload["capabilities"][0]["reviewer"]["independent"] = True  # type: ignore[index]
+    payload["capabilities"][0]["reviewer"]["id"] = "independent-fixture-reviewer"  # type: ignore[index]
+    payload["capabilities"][0]["reviewer"].update(_independent_review(tmp_path))  # type: ignore[index]
     payload["capabilities"][0]["runtime_evidence"] = [_ref(tmp_path, "runtime.json", "runtime envelope")]  # type: ignore[index]
     path.write_text(json.dumps(payload), encoding="utf-8")
 
@@ -407,6 +435,8 @@ def test_explicit_production_safe_promotable_capability_classifies_promotable(tm
     )
     payload["capabilities"][0]["status"] = "PROMOTABLE"  # type: ignore[index]
     payload["capabilities"][0]["reviewer"]["independent"] = True  # type: ignore[index]
+    payload["capabilities"][0]["reviewer"]["id"] = "independent-fixture-reviewer"  # type: ignore[index]
+    payload["capabilities"][0]["reviewer"].update(_independent_review(tmp_path))  # type: ignore[index]
     payload["capabilities"][0]["runtime_evidence"] = [_ref(  # type: ignore[index]
         tmp_path,
         "runtime-production-safe.json",
@@ -418,6 +448,47 @@ def test_explicit_production_safe_promotable_capability_classifies_promotable(tm
 
     assert result["classification"] == "PROMOTABLE"
     assert result["rejection_codes"] == []
+
+
+def test_promotable_cannot_self_assert_independent_reviewer(tmp_path: Path) -> None:
+    path, payload, checkout = _fixture(tmp_path)
+    raw_ref = _raw_ref(tmp_path, "raw-self-promoted.json")
+    runtime = tmp_path / "runtime-self-promoted.json"
+    preflight_hash = _write_valid_preflight(tmp_path)
+    runtime_record = _runtime_record(raw_ref, production_safe=True)
+    runtime_record.update(
+        {
+            "preflight_path": ".runtime/phase-3/preflight.json",
+            "preflight_sha256": preflight_hash,
+            "preflight": {
+                "status": "PASS",
+                "path": ".runtime/phase-3/preflight.json",
+                "sha256": preflight_hash,
+                "run_id": "run-matrix-12345678",
+                "target_id": f"phase3-compose:{canonical_compose_project(tmp_path, 'docker-compose.dev.yml')}:docker-compose.dev.yml",
+                "compose_file": "docker-compose.dev.yml",
+                "compose_project": canonical_compose_project(tmp_path, "docker-compose.dev.yml"),
+                "compose_config_sha256": "d" * 64,
+                "compose_source_sha256": sha256((tmp_path / "docker-compose.dev.yml").read_bytes()).hexdigest(),
+                "unchanged": True,
+            },
+        }
+    )
+    runtime.write_text(json.dumps(runtime_record), encoding="utf-8")
+    payload["capabilities"][0]["status"] = "PROMOTABLE"  # type: ignore[index]
+    payload["capabilities"][0]["reviewer"]["independent"] = True  # type: ignore[index]
+    payload["capabilities"][0]["runtime_evidence"] = [_ref(  # type: ignore[index]
+        tmp_path,
+        runtime.name,
+        "runtime envelope with self-asserted independent review",
+    )]
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = evaluate_matrix(path, checkout, root=tmp_path, require_complete=False)
+
+    assert result["classification"] == "FAILED"
+    assert "SELF_PROMOTED_GATE_REJECTED" in result["rejection_codes"]
+    assert "reviewer.review_ref is required" in result["reason"]
 
 
 def test_runtime_envelope_requires_checkout_sentinel(tmp_path: Path) -> None:
