@@ -2,13 +2,19 @@ from __future__ import annotations
 
 import pytest
 
-from rick_contracts.providers import ChatCompletionResult, EmbeddingResult
+from rick_contracts.providers import (
+    ChatCompletionResult,
+    EmbeddingResult,
+    ProviderToolCall,
+    ProviderToolCallFunction,
+)
 from rick_providers import ProviderError, ProviderMessage, ProviderBudgetError, ResilientProvider
 
 
 class FakeProvider:
-    def __init__(self, failures: int = 0):
+    def __init__(self, failures: int = 0, tool_calls: int = 0):
         self.failures = failures
+        self.tool_calls = tool_calls
         self.calls = 0
 
     async def chat_completion(self, *args, correlation_id=None, **kwargs):
@@ -16,7 +22,20 @@ class FakeProvider:
         if self.failures:
             self.failures -= 1
             raise ProviderError("server_error", "chat_completion", correlation_id or "corr", 1)
-        return ChatCompletionResult(model="test", content="ok", correlation_id=correlation_id or "corr")
+        calls = [
+            ProviderToolCall(
+                id=f"call-{index}",
+                type="function",
+                function=ProviderToolCallFunction(name="report_status", arguments='{"status":"ok"}'),
+            )
+            for index in range(self.tool_calls)
+        ]
+        return ChatCompletionResult(
+            model="test",
+            content="ok" if not calls else "",
+            tool_calls=calls or None,
+            correlation_id=correlation_id or "corr",
+        )
 
     async def get_embedding(self, text, *, model=None, correlation_id=None):
         return EmbeddingResult(model="test", dimensions=1, vector=[1.0], correlation_id=correlation_id or "corr")
@@ -64,6 +83,35 @@ async def test_resilient_provider_enforces_budgets_without_calling_backend():
     with pytest.raises(ProviderBudgetError):
         await provider.get_embedding("too long")
     assert fake.calls == 0
+
+
+@pytest.mark.asyncio
+async def test_resilient_provider_rejects_oversized_tool_definitions_before_backend() -> None:
+    fake = FakeProvider()
+    provider = ResilientProvider(fake, max_tool_calls=1)
+    tools = [
+        {"type": "function", "function": {"name": "first"}},
+        {"type": "function", "function": {"name": "second"}},
+    ]
+
+    with pytest.raises(ProviderBudgetError, match="tool budget"):
+        await provider.chat_completion(
+            messages=[{"role": "user", "content": "hello"}],
+            tools=tools,
+        )
+
+    assert fake.calls == 0
+
+
+@pytest.mark.asyncio
+async def test_resilient_provider_rejects_oversized_tool_response_at_boundary() -> None:
+    fake = FakeProvider(tool_calls=2)
+    provider = ResilientProvider(fake, max_tool_calls=1)
+
+    with pytest.raises(ProviderBudgetError, match="tool-call budget"):
+        await provider.chat_completion(messages=[{"role": "user", "content": "hello"}])
+
+    assert fake.calls == 1
 
 
 @pytest.mark.asyncio

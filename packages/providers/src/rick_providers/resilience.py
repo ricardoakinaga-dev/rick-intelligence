@@ -43,6 +43,7 @@ class ResilientProvider:
         max_messages: int = 64,
         max_prompt_chars: int = 100_000,
         max_embedding_chars: int = 1_000_000,
+        max_tool_calls: int = 32,
         clock: Callable[[], float] = time.monotonic,
     ) -> None:
         if provider is None or not callable(getattr(provider, "chat_completion", None)) or not callable(getattr(provider, "get_embedding", None)):
@@ -58,6 +59,8 @@ class ResilientProvider:
         ):
             if type(value) is not int or not 1 <= value <= maximum:
                 raise ValueError(f"{name} is out of range")
+        if type(max_tool_calls) is not int or not 0 <= max_tool_calls <= 32:
+            raise ValueError("max_tool_calls is out of range")
         if not callable(clock):
             raise ValueError("clock is invalid")
         self.provider = provider
@@ -69,6 +72,7 @@ class ResilientProvider:
         self.max_messages = max_messages
         self.max_prompt_chars = max_prompt_chars
         self.max_embedding_chars = max_embedding_chars
+        self.max_tool_calls = max_tool_calls
         self._clock = clock
         self._lock = RLock()
         self._consecutive_failures = 0
@@ -157,6 +161,23 @@ class ResilientProvider:
             if total > self.max_prompt_chars:
                 raise ProviderBudgetError("provider prompt budget exceeded")
 
+    def _validate_tools(self, tools: Sequence[Mapping[str, object]] | None) -> None:
+        """Bound tool definitions before a request reaches the provider."""
+
+        if tools is None:
+            return
+        if isinstance(tools, (str, bytes)) or not isinstance(tools, Sequence):
+            raise ProviderBudgetError("provider tool budget exceeded")
+        if len(tools) > self.max_tool_calls:
+            raise ProviderBudgetError("provider tool budget exceeded")
+
+    def _validate_result_tool_budget(self, result: ChatCompletionResult) -> ChatCompletionResult:
+        """Reject an oversized provider tool response at the local boundary."""
+
+        if result.tool_calls is not None and len(result.tool_calls) > self.max_tool_calls:
+            raise ProviderBudgetError("provider tool-call budget exceeded")
+        return result
+
     async def chat_completion(
         self,
         model_or_messages: str | Sequence[ProviderMessage | Mapping[str, object]] | None = None,
@@ -169,6 +190,7 @@ class ResilientProvider:
         correlation_id: str | None = None,
     ) -> ChatCompletionResult:
         self._validate_prompt(model_or_messages, messages)
+        self._validate_tools(tools)
         correlation = self._guard("chat_completion", correlation_id)
         try:
             result = await self.provider.chat_completion(
@@ -185,7 +207,7 @@ class ResilientProvider:
             raise
         else:
             self._record_success()
-            return result
+            return self._validate_result_tool_budget(result)
 
     async def get_embedding(
         self,
@@ -230,6 +252,7 @@ class ResilientProvider:
         *, model: str | None, correlation_id: str | None,
     ) -> AsyncIterator[ChatCompletionChunk]:
         self._validate_prompt(model_or_messages, messages)
+        self._validate_tools(tools)
         correlation = self._guard("chat_completion", correlation_id)
         target = getattr(self.provider, "chat_completion_stream", None)
         if not callable(target):
@@ -237,6 +260,7 @@ class ResilientProvider:
                 model_or_messages, messages, temperature, response_format, tools,
                 model=model, correlation_id=correlation,
             )
+            self._validate_result_tool_budget(result)
             yield ChatCompletionChunk(
                 model=result.model, delta=result.content, finish_reason=result.finish_reason,
                 tool_calls=(
@@ -264,11 +288,18 @@ class ResilientProvider:
             )
             if inspect.isawaitable(stream):
                 stream = await stream
+            tool_call_indices: set[int] = set()
             async for chunk in stream:
                 if not isinstance(chunk, ChatCompletionChunk):
                     chunk = ChatCompletionChunk.model_validate(chunk)
+                for tool_call in chunk.tool_calls or []:
+                    tool_call_indices.add(tool_call.index)
+                if len(tool_call_indices) > self.max_tool_calls:
+                    raise ProviderBudgetError("provider tool-call budget exceeded")
                 yield chunk
         except asyncio.CancelledError:
+            raise
+        except ProviderBudgetError:
             raise
         except ProviderError as exc:
             self._record_failure(exc)
