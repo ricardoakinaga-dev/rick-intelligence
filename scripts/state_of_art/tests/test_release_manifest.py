@@ -237,6 +237,49 @@ class ReleaseManifestTests(unittest.TestCase):
         self.assertEqual(result["classification"], release_integrity.FAIL)
         self.assertIn("missing mandatory gate results", result["reason"])
 
+    def test_conflicting_evidence_aliases_are_rejected(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="release-manifest-") as directory:
+            path, checkout = self._fixture(directory)
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            architecture = next(
+                gate for gate in payload["gates"] if gate["gate_id"] == "architecture"
+            )
+            architecture["evidence_path"] = []
+            path.write_text(json.dumps(payload), encoding="utf-8")
+            result = release_integrity.evaluate_evidence(path, checkout, root=Path(directory))
+
+        self.assertEqual(result["classification"], release_integrity.FAIL)
+        self.assertIn("evidence_path and", result["reason"])
+
+    def test_manifest_status_must_match_gate_aggregate(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="release-manifest-") as directory:
+            path, checkout = self._fixture(
+                directory,
+                gate_result="BLOCKED_EXTERNAL",
+                status="PASS",
+            )
+            result = release_integrity.evaluate_evidence(path, checkout, root=Path(directory))
+
+        self.assertEqual(result["classification"], release_integrity.FAIL)
+        self.assertIn(
+            "manifest status PASS does not match mandatory gate aggregate BLOCKED_EXTERNAL",
+            result["reason"],
+        )
+
+    def test_gate_reviewer_must_match_declared_reviewer(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="release-manifest-") as directory:
+            path, checkout = self._fixture(directory)
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            architecture = next(
+                gate for gate in payload["gates"] if gate["gate_id"] == "architecture"
+            )
+            architecture["reviewer"]["name"] = "spoofed reviewer identity"
+            path.write_text(json.dumps(payload), encoding="utf-8")
+            result = release_integrity.evaluate_evidence(path, checkout, root=Path(directory))
+
+        self.assertEqual(result["classification"], release_integrity.FAIL)
+        self.assertIn("reviewer identity does not match", result["reason"])
+
     def test_WRONG_HASH_REJECTED(self) -> None:
         with tempfile.TemporaryDirectory(prefix="release-manifest-") as directory:
             path, checkout = self._fixture(directory)
@@ -251,7 +294,7 @@ class ReleaseManifestTests(unittest.TestCase):
 
     def test_STALE_RELEASE_EVIDENCE_REJECTED(self) -> None:
         with tempfile.TemporaryDirectory(prefix="release-manifest-") as directory:
-            path, checkout = self._fixture(directory, gate_result="STALE")
+            path, checkout = self._fixture(directory, gate_result="STALE", status="FAIL")
             result = release_integrity.evaluate_evidence(path, checkout, root=Path(directory))
 
         self.assertEqual(result["classification"], release_integrity.FAIL)

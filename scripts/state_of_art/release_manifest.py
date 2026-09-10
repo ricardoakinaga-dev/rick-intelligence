@@ -239,7 +239,20 @@ class GateResult:
             raise ManifestValidationError((f"{field}.exit_status is required",))
         command = _string_list(item.get("command"), f"{field}.command")
         limitations = _string_list(item.get("limitations", ()), f"{field}.limitations")
-        evidence = item.get("evidence_paths", item.get("evidence_path"))
+        has_evidence_paths = "evidence_paths" in item
+        has_evidence_path = "evidence_path" in item
+        raw_evidence_paths = item.get("evidence_paths")
+        raw_evidence_path = item.get("evidence_path")
+        if has_evidence_paths and has_evidence_path:
+            if raw_evidence_paths != raw_evidence_path:
+                raise ManifestValidationError(
+                    (f"{field}.evidence_path and {field}.evidence_paths disagree",)
+                )
+        evidence = (
+            raw_evidence_paths
+            if has_evidence_paths
+            else raw_evidence_path
+        )
         if not isinstance(evidence, Sequence) or isinstance(evidence, (str, bytes, bytearray)):
             raise ManifestValidationError((f"{field}.evidence_paths must be a list",))
         evidence_paths = tuple(
@@ -430,14 +443,19 @@ class ReleaseEvidenceManifest:
         expected_artifact_set = artifact_set_digest(self.artifacts)
         if self.commit_binding.artifact_set_sha256 != expected_artifact_set:
             errors.append("commit binding artifact_set_sha256 does not match artifact fingerprints")
-        reviewers = {item.reviewer_id for item in self.reviewers}
+        reviewers = {item.reviewer_id: item for item in self.reviewers}
         for gate in self.gates:
             if gate.commit_sha != self.commit_binding.commit_sha:
                 errors.append(f"gate {gate.gate_id} is bound to the wrong commit")
             if gate.tree_sha != self.commit_binding.tree_sha:
                 errors.append(f"gate {gate.gate_id} is bound to the wrong tree")
-            if gate.reviewer.reviewer_id not in reviewers:
+            declared_reviewer = reviewers.get(gate.reviewer.reviewer_id)
+            if declared_reviewer is None:
                 errors.append(f"gate {gate.gate_id} references an undeclared reviewer")
+            elif declared_reviewer != gate.reviewer:
+                errors.append(
+                    f"gate {gate.gate_id} reviewer identity does not match the declared reviewer"
+                )
             if gate.gate_id in {"independent-reviews", "final-go-no-go"} and gate.result == "PASS" and not gate.reviewer.independent:
                 errors.append(
                     f"gate {gate.gate_id} PASS requires an independent reviewer; self-promotion is rejected"
@@ -454,6 +472,16 @@ class ReleaseEvidenceManifest:
                 errors.append(f"gate {gate.gate_id} is {gate.result} but exit_status is zero")
             if gate.result != "PASS" and not gate.limitations:
                 errors.append(f"gate {gate.gate_id} must document limitations when result is {gate.result}")
-        if self.status != "PASS" and all(item.result == "PASS" for item in self.gates):
-            errors.append(f"manifest status is {self.status} even though every gate is PASS")
+        if all(item.result == "PASS" for item in self.gates):
+            expected_status = "PASS"
+        elif any(item.result in {"FAIL", "STALE", "INVALID"} for item in self.gates):
+            expected_status = "FAIL"
+        elif any(item.result == "BLOCKED_EXTERNAL" for item in self.gates):
+            expected_status = "BLOCKED_EXTERNAL"
+        else:
+            expected_status = "NOT_RUN"
+        if self.status != expected_status:
+            errors.append(
+                f"manifest status {self.status} does not match mandatory gate aggregate {expected_status}"
+            )
         return errors
