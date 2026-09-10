@@ -21,6 +21,13 @@ import uuid
 
 
 ROOT = Path(__file__).resolve().parents[2]
+
+try:
+    from scripts.state_of_art.json_boundary import loads_json
+except ModuleNotFoundError:  # Direct execution from the scripts/phase11 directory.
+    sys.path.insert(0, str(ROOT))
+    from scripts.state_of_art.json_boundary import loads_json
+
 CVG = ROOT / "cvg-master-rag-v2"
 FRONTEND = CVG / "frontend"
 PROFESSOR = ROOT / "rick-professor"
@@ -313,7 +320,7 @@ def _compose_config_sha256(compose: Path) -> str | None:
 
 def _parse_compose_json_records(output: str) -> list[dict[str, object]]:
     try:
-        decoded = json.loads(output)
+        decoded = loads_json(output)
     except json.JSONDecodeError:
         decoded = None
     if isinstance(decoded, dict):
@@ -323,7 +330,7 @@ def _parse_compose_json_records(output: str) -> list[dict[str, object]]:
     records: list[dict[str, object]] = []
     for line in output.splitlines():
         try:
-            item = json.loads(line)
+            item = loads_json(line)
         except json.JSONDecodeError:
             continue
         if isinstance(item, dict):

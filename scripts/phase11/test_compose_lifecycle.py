@@ -56,6 +56,12 @@ def test_compose_environment_removes_ambient_remote_context(monkeypatch: pytest.
     assert environment["COMPOSE_INTERACTIVE_NO_CLI"] == "1"
 
 
+def test_compose_inventory_parser_rejects_duplicate_fields() -> None:
+    output = '{"Service":"api","Service":"worker"}'
+
+    assert runner._parse_compose_json_records(output) == []
+
+
 @pytest.mark.parametrize(
     "name",
     ["OBJECT_STORE_SECRET_ACCESS_KEY", "RICK_OBJECT_STORE_SECRET_ACCESS_KEY"],
