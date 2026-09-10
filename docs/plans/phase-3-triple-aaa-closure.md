@@ -4,7 +4,7 @@
 **Prompt:** [`phase-3-triple-aaa-closure-2026-09-09.txt`](../prompts/phase-3-triple-aaa-closure-2026-09-09.txt)  
 **Source attachment SHA-256:** `0d431cf3ec75e4d6455735d32f135b3270b59996866a28fd7296d73a18cabf3d`  
 **Stored copy SHA-256:** `0d431cf3ec75e4d6455735d32f135b3270b59996866a28fd7296d73a18cabf3d`
-**Candidate:** `ca54b4ab9db1f39f94a14ad600f690d438cd144b` / tree `354485c5e88aacf9b9217cc92b6d87c68e60bfbc`
+**Candidate:** `ecacaef23b82aba893f78ed6895df929e8c27eb0` / tree `1672da38c9e07ec3cd68b3c19ac4adaaeadfea20`
 **Entry audit:** [`current-triple-aaa-gap-audit.md`](../reports/current-triple-aaa-gap-audit.md)
 
 ## 1. Outcome and constraints
