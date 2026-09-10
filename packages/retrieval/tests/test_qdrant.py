@@ -371,6 +371,24 @@ def test_malformed_and_oversized_success_responses_are_safe_errors() -> None:
         bounded.health()
 
 
+@pytest.mark.parametrize(
+    "content",
+    [
+        b'{"result":true,"metadata":NaN}',
+        b'{"result":false,"result":true}',
+    ],
+)
+def test_ambiguous_or_nonfinite_success_responses_are_safe_errors(content: bytes) -> None:
+    transport = FakeTransport(lambda *_: HttpResponse(200, content))
+    store = QdrantHttpVectorStore(
+        base_url="http://qdrant.test",
+        collection="rag_phase0",
+        transport=transport,
+    )
+    with pytest.raises(QdrantMalformedResponseError):
+        store.upsert_points([_point()])
+
+
 def test_points_query_payload_and_response_bounds_are_enforced() -> None:
     transport = FakeTransport(lambda *_: _json_response({"result": True}))
     store = QdrantHttpVectorStore(

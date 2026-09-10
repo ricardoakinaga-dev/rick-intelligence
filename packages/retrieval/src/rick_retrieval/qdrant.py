@@ -56,6 +56,19 @@ JsonScalar: TypeAlias = str | int | float | bool | None
 JsonValue: TypeAlias = JsonScalar | list["JsonValue"] | dict[str, "JsonValue"]
 
 
+def _reject_json_constant(_value: str) -> object:
+    raise ValueError("non-finite JSON constants are not allowed")
+
+
+def _reject_duplicate_json_keys(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    result: dict[str, object] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("duplicate JSON object key")
+        result[key] = value
+    return result
+
+
 class QdrantError(Exception):
     """Base class for safe, typed adapter failures.
 
@@ -1143,8 +1156,12 @@ class QdrantHttpVectorStore:
         malformed = False
         value: object = None
         try:
-            value = json.loads(content.decode("utf-8"))
-        except (UnicodeDecodeError, json.JSONDecodeError):
+            value = json.loads(
+                content.decode("utf-8"),
+                object_pairs_hook=_reject_duplicate_json_keys,
+                parse_constant=_reject_json_constant,
+            )
+        except (RecursionError, UnicodeDecodeError, ValueError):
             malformed = True
         if malformed:
             raise QdrantMalformedResponseError(operation)
