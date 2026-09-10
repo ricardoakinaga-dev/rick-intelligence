@@ -166,11 +166,20 @@
       "SOURCE_EVIDENCE": [
         "docs/operations/slo.md",
         "apps/api/src/core/otel.py",
+        "apps/api/src/services/postgres_ingestion.py",
+        "apps/api/src/services/professor_backend.py",
+        "apps/worker/runtime.py",
+        "apps/worker/deployment_composition.py",
+        "packages/jobs/src/rick_jobs/contracts.py",
         "scripts/phase11/observability_runtime_gate.py",
         "scripts/phase11/restore_runtime_gate.py",
         "scripts/state_of_art/run_phase3_operational.py"
       ],
       "TEST_EVIDENCE": [
+        "apps/api/tests/test_otel.py",
+        "apps/api/tests/test_postgres_ingestion.py",
+        "apps/worker/tests/test_runtime.py",
+        "packages/jobs/tests/test_contracts.py",
         "scripts/state_of_art/tests/test_observability_runtime.py",
         "scripts/state_of_art/tests/test_restore_runtime.py"
       ],

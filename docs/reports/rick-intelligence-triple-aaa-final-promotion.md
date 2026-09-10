@@ -153,11 +153,16 @@ signature/provenance inspection and a fresh full security review remain open.
 [`docs/operations/slo.md`](../operations/slo.md) separates `LOCAL OBSERVATION`,
 `STAGING SLO` and `PRODUCTION SLO`; missing measurements stay `no_data`. API
 images include an optional OTLP tracer provider and bounded HTTP middleware
-when `OTEL_TRACES_EXPORTER=otlp` is configured. The middleware accepts only
-bounded W3C propagation headers, and Compose exposes a private `/metrics`
-scrape target with Prometheus configured for the API. Collector delivery,
-trace propagation across the live graph, alert routing, SLO windows and
-no-data behavior were not observed in a live stack.
+when `OTEL_TRACES_EXPORTER=otlp` is configured. API stage spans cover identity,
+authorization, retrieval, evidence validation, decision policy, provider,
+object storage and queue boundaries; the worker configures its own exporter,
+attaches only flat W3C `traceparent`/`tracestate` fields and emits an ingestion
+stage span. Automatic exception payloads are disabled and error spans retain
+only bounded type/code identity. Compose exposes a private `/metrics` scrape
+target with Prometheus configured for the API. Collector delivery, propagation
+across a live API→queue→worker graph, alert routing, SLO windows and no-data
+behavior were not observed in a live stack, so this remains source/local
+evidence rather than runtime promotion evidence.
 
 ## 19. Disaster Recovery
 

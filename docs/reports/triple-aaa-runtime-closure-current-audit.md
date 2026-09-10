@@ -145,3 +145,22 @@ access/configuration changes; do not use host services or fake a live gate.
 
 Promotion remains **NO-GO**. This audit does not establish STATE_OF_ART, AAA
 or TRIPLE_AAA, and the full objective remains active.
+
+## 65. Distributed trace boundary closure — 2026-09-10
+
+Source candidate `d29a4504493de0363d7acf3712171e6e92327774` (tree
+`b4e22d5e92f9aaea0b54bad86364664f5303d87e`) adds process-owned OTLP setup for
+the API and worker, bounded W3C `traceparent`/`tracestate` propagation across
+the durable upload job, and stage spans at identity, authorization, retrieval,
+evidence, decision, provider, storage, queue and worker boundaries. Baggage,
+request payloads and automatic exception messages/stack traces are excluded;
+error spans retain only bounded type/code identity. Idempotency comparison
+ignores trace lineage so retries remain the same request.
+
+Focused local evidence passes: API matrix **471**, worker runtime **10**,
+ingestion **9**, jobs contracts **14**, lint and typecheck. This closes the
+source and hermetic-test portion of the observability contract. It does not
+prove collector delivery, a single live API→queue→worker trace, alert/SLO
+authority, measured DR, independent review or promotion. Docker remains
+inaccessible (`permission denied` on the configured daemon socket), so the
+runtime evidence columns remain blocked and promotion remains **NO-GO**.
