@@ -8,12 +8,12 @@ real transactional store while the Postgres/object-storage rollout is gated.
 from __future__ import annotations
 
 from contextlib import contextmanager
-import json
 from pathlib import Path
 import sqlite3
 from threading import RLock
 from typing import Iterable, Iterator
 
+from rick_knowledge.json_boundary import decode_metadata, encode_metadata
 from rick_knowledge.models import (
     DOCUMENT_STATUSES,
     Chunk,
@@ -28,17 +28,11 @@ SCHEMA_VERSION = 3
 
 
 def _metadata(value: object) -> str:
-    if not isinstance(value, dict):
-        raise ValueError("metadata must be a mapping")
-    try:
-        return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
-    except (TypeError, ValueError) as exc:
-        raise ValueError("metadata must be JSON serializable") from exc
+    return encode_metadata(value)
 
 
-def _metadata_value(value: str) -> dict:
-    decoded = json.loads(value or "{}")
-    return decoded if isinstance(decoded, dict) else {}
+def _metadata_value(value: object) -> dict | None:
+    return decode_metadata(value)
 
 
 class SQLiteKnowledgeStore:
@@ -212,8 +206,10 @@ class SQLiteKnowledgeStore:
         self.close()
 
     @staticmethod
-    def _collection(row: sqlite3.Row) -> Collection:
+    def _collection(row: sqlite3.Row) -> Collection | None:
         metadata = _metadata_value(row["metadata_json"])
+        if metadata is None:
+            return None
         status = metadata.pop("__rick_status", "active")
         version = metadata.pop("__rick_version", 1)
         return Collection(
@@ -225,7 +221,10 @@ class SQLiteKnowledgeStore:
         )
 
     @staticmethod
-    def _document(row: sqlite3.Row) -> Document:
+    def _document(row: sqlite3.Row) -> Document | None:
+        metadata = _metadata_value(row["metadata_json"])
+        if metadata is None:
+            return None
         return Document(
             document_id=row["document_id"], workspace_id=row["workspace_id"],
             collection_id=row["collection_id"], tenant_id=row["tenant_id"],
@@ -235,7 +234,7 @@ class SQLiteKnowledgeStore:
             language=row["language"], status=row["status"],
             parser_version=row["parser_version"], chunker_version=row["chunker_version"],
             embedding_model=row["embedding_model"], embedding_version=row["embedding_version"],
-            metadata=_metadata_value(row["metadata_json"]),
+            metadata=metadata,
             ingestion_version=row["ingestion_version"] or row["document_version"],
             object_ref=row["object_ref"] or row["filename"] or row["display_filename"] or row["document_id"],
             created_at=row["created_at"],
@@ -243,7 +242,10 @@ class SQLiteKnowledgeStore:
         )
 
     @staticmethod
-    def _chunk(row: sqlite3.Row) -> Chunk:
+    def _chunk(row: sqlite3.Row) -> Chunk | None:
+        metadata = _metadata_value(row["metadata_json"])
+        if metadata is None:
+            return None
         return Chunk(
             chunk_id=row["chunk_id"], document_id=row["document_id"], tenant_id=row["tenant_id"],
             parent_chunk_id=row["parent_chunk_id"], chunk_index=row["chunk_index"], text=row["text"],
@@ -251,7 +253,7 @@ class SQLiteKnowledgeStore:
             heading=row["heading"], token_count=row["token_count"], checksum=row["checksum"],
             parser_version=row["parser_version"], chunker_version=row["chunker_version"],
             embedding_version=row["embedding_version"], index_version=row["index_version"],
-            metadata=_metadata_value(row["metadata_json"]),
+            metadata=metadata,
         )
 
     def upsert_collection(self, collection: Collection) -> None:
@@ -300,7 +302,7 @@ class SQLiteKnowledgeStore:
         query += " ORDER BY collection_id"
         with self._read() as connection:
             rows = connection.execute(query, params).fetchall()
-        return [self._collection(row) for row in rows]
+        return [item for row in rows if (item := self._collection(row)) is not None]
 
     def upsert_document(self, document: Document) -> None:
         if document.status not in DOCUMENT_STATUSES:
@@ -412,7 +414,7 @@ class SQLiteKnowledgeStore:
             params.append(limit)
         with self._read() as connection:
             rows = connection.execute(query, params).fetchall()
-        return [self._document(row) for row in rows]
+        return [item for row in rows if (item := self._document(row)) is not None]
 
     def set_document_status(self, document_id: str, status: str) -> None:
         if status not in DOCUMENT_STATUSES:
@@ -473,4 +475,4 @@ class SQLiteKnowledgeStore:
             rows = connection.execute(
                 "SELECT * FROM chunks WHERE document_id = ? ORDER BY chunk_index, chunk_id", (document_id,)
             ).fetchall()
-        return [self._chunk(row) for row in rows]
+        return [item for row in rows if (item := self._chunk(row)) is not None]

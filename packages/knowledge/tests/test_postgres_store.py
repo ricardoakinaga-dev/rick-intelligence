@@ -54,6 +54,7 @@ def test_reads_are_tenant_and_workspace_scoped_and_connections_close() -> None:
     connection = Connection([{
         "tenant_id": "tenant-a", "workspace_id": "workspace-a", "collection_id": "clinical",
         "title": "Clinical", "description": "", "status": "active", "version": 2,
+        "metadata": {},
     }])
     store = PostgresKnowledgeStore(lambda: connection)
     item = store.get_collection("workspace-a", "clinical", tenant_id="tenant-a")
@@ -122,3 +123,40 @@ def test_chunk_replacement_is_transactional_and_requires_stable_order() -> None:
     assert error.value.code == "invalid_input"
     assert connection.rollbacks == 1
     assert connection.commits == 0
+
+
+def test_persisted_metadata_json_fails_closed_for_document_reads() -> None:
+    for metadata in (
+        '{"source":NaN}',
+        '{"source":"test"}' + (" " * (256 * 1024)),
+    ):
+        connection = Connection([{
+            "document_id": "doc-boundary",
+            "tenant_id": "tenant-a",
+            "workspace_id": "workspace-a",
+            "collection_id": "c1",
+            "document_version": "v1",
+            "metadata": metadata,
+            "status": "published",
+        }])
+        store = PostgresKnowledgeStore(lambda: connection)
+
+        assert store.list_documents("workspace-a", tenant_id="tenant-a") == []
+
+
+def test_knowledge_metadata_writes_reject_nonfinite_and_oversized_values() -> None:
+    for metadata in ({"value": float("nan")}, {"blob": "x" * (256 * 1024)}):
+        connection = Connection([])
+        store = PostgresKnowledgeStore(lambda: connection, created_by="operator-1")
+        with pytest.raises(PostgresKnowledgeError) as error:
+            store.upsert_document(
+                Document(
+                    document_id="doc-invalid",
+                    tenant_id="tenant-a",
+                    workspace_id="workspace-a",
+                    collection_id="c1",
+                    metadata=metadata,
+                )
+            )
+        assert error.value.code == "invalid_input"
+        assert connection.commits == 0

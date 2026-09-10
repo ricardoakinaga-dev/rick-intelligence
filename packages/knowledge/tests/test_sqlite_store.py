@@ -174,3 +174,71 @@ def test_replace_chunks_is_atomic_on_invalid_child(tmp_path):
         store.replace_document_chunks("doc-atomic", [Chunk(chunk_id="new", document_id="other", tenant_id="tenant-a", text="bad")])
     assert [chunk.chunk_id for chunk in store.get_chunks("doc-atomic")] == ["old"]
     store.close()
+
+
+def test_persisted_metadata_json_fails_closed_for_all_knowledge_rows(tmp_path):
+    database = tmp_path / "state.sqlite3"
+    store = SQLiteKnowledgeStore(database)
+    store.upsert_collection(
+        Collection(workspace_id="workspace-a", collection_id="c1", tenant_id="tenant-a", title="C1")
+    )
+    store.upsert_document(_document("doc-boundary"))
+    store.replace_document_chunks(
+        "doc-boundary",
+        [Chunk(chunk_id="chunk-boundary", document_id="doc-boundary", tenant_id="tenant-a", text="evidence")],
+    )
+    store.close()
+
+    with sqlite3.connect(database) as connection:
+        oversized = '{"source":"test"}' + (" " * (256 * 1024))
+        connection.execute(
+            "UPDATE collections SET metadata_json=? WHERE collection_id=?",
+            (oversized, "c1"),
+        )
+        connection.commit()
+
+    reopened = SQLiteKnowledgeStore(database)
+    assert reopened.get_collection("workspace-a", "c1", tenant_id="tenant-a") is None
+    assert reopened.list_collections("workspace-a", tenant_id="tenant-a") == []
+    reopened.close()
+
+    with sqlite3.connect(database) as connection:
+        connection.execute(
+            "UPDATE documents SET metadata_json=? WHERE document_id=?",
+            ('{"source":NaN}', "doc-boundary"),
+        )
+        connection.commit()
+
+    reopened = SQLiteKnowledgeStore(database)
+    assert reopened.get_document("doc-boundary", tenant_id="tenant-a", workspace_id="workspace-a") is None
+    assert reopened.list_documents("workspace-a", tenant_id="tenant-a") == []
+    reopened.close()
+
+    with sqlite3.connect(database) as connection:
+        connection.execute(
+            "UPDATE chunks SET metadata_json=? WHERE chunk_id=?",
+            ('{"source":NaN}', "chunk-boundary"),
+        )
+        connection.commit()
+
+    reopened = SQLiteKnowledgeStore(database)
+    assert reopened.get_chunks("doc-boundary") == []
+    reopened.close()
+
+
+def test_knowledge_metadata_writes_reject_nonfinite_and_oversized_values(tmp_path):
+    store = SQLiteKnowledgeStore(tmp_path / "state.sqlite3")
+    invalid = _document("nan-write")
+    invalid.metadata = {"value": float("nan")}
+    with pytest.raises(ValueError, match="metadata"):
+        store.upsert_document(invalid)
+    with pytest.raises(ValueError, match="metadata"):
+        store.upsert_collection(
+            Collection(
+                workspace_id="workspace-a",
+                collection_id="large",
+                tenant_id="tenant-a",
+                metadata={"blob": "x" * (256 * 1024)},
+            )
+        )
+    store.close()

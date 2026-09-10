@@ -11,10 +11,9 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from contextlib import contextmanager
 from datetime import datetime
-import json
-import math
 from typing import Protocol
 
+from rick_knowledge.json_boundary import decode_metadata, encode_metadata
 from rick_knowledge.models import (
     DOCUMENT_STATUSES,
     Chunk,
@@ -40,16 +39,8 @@ class PostgresKnowledgeError(RuntimeError):
         super().__init__(self.code)
 
 
-def _json_value(value: object, default: object) -> object:
-    if isinstance(value, Mapping):
-        return dict(value)
-    if isinstance(value, str):
-        try:
-            parsed = json.loads(value)
-        except (TypeError, ValueError, json.JSONDecodeError):
-            return default
-        return parsed if isinstance(parsed, (dict, list)) else default
-    return default
+def _json_value(value: object) -> dict[str, object] | None:
+    return decode_metadata(value)
 
 
 def _row_timestamp(value: object) -> str | None:
@@ -162,8 +153,10 @@ class PostgresKnowledgeStore:
         return value.strip()
 
     @staticmethod
-    def _collection(row: Mapping[str, object]) -> Collection:
-        metadata = _json_value(row.get("metadata"), {})
+    def _collection(row: Mapping[str, object]) -> Collection | None:
+        metadata = _json_value(row.get("metadata"))
+        if metadata is None:
+            return None
         return Collection(
             tenant_id=str(row.get("tenant_id") or ""),
             workspace_id=str(row.get("workspace_id") or ""),
@@ -172,12 +165,14 @@ class PostgresKnowledgeStore:
             description=str(row.get("description") or ""),
             status=str(row.get("status") or "active"),
             version=int(row.get("version") or 1),
-            metadata=dict(metadata) if isinstance(metadata, Mapping) else {},
+            metadata=metadata,
         )
 
     @staticmethod
-    def _document(row: Mapping[str, object]) -> Document:
-        metadata = _json_value(row.get("metadata"), {})
+    def _document(row: Mapping[str, object]) -> Document | None:
+        metadata = _json_value(row.get("metadata"))
+        if metadata is None:
+            return None
         return Document(
             document_id=str(row.get("document_id") or ""),
             tenant_id=str(row.get("tenant_id") or ""),
@@ -196,7 +191,7 @@ class PostgresKnowledgeStore:
             chunker_version=str(row.get("chunker_version") or ""),
             embedding_model=str(row.get("embedding_model") or ""),
             embedding_version=str(row.get("embedding_version") or ""),
-            metadata=dict(metadata) if isinstance(metadata, Mapping) else {},
+            metadata=metadata,
             ingestion_version=str(row.get("ingestion_version") or row.get("document_version") or ""),
             object_ref=str(
                 row.get("object_ref")
@@ -210,8 +205,10 @@ class PostgresKnowledgeStore:
         )
 
     @staticmethod
-    def _chunk(row: Mapping[str, object]) -> Chunk:
-        metadata = _json_value(row.get("metadata"), {})
+    def _chunk(row: Mapping[str, object]) -> Chunk | None:
+        metadata = _json_value(row.get("metadata"))
+        if metadata is None:
+            return None
         return Chunk(
             chunk_id=str(row.get("chunk_id") or ""),
             document_id=str(row.get("document_id") or ""),
@@ -229,7 +226,7 @@ class PostgresKnowledgeStore:
             chunker_version=str(row.get("chunker_version") or ""),
             embedding_version=str(row.get("embedding_version") or ""),
             index_version=str(row.get("index_version") or ""),
-            metadata=dict(metadata) if isinstance(metadata, Mapping) else {},
+            metadata=metadata,
         )
 
     def health_check(self) -> bool:
@@ -243,6 +240,12 @@ class PostgresKnowledgeStore:
     def upsert_collection(self, collection: Collection) -> None:
         if collection.status not in {"active", "archived"} or collection.version <= 0:
             raise PostgresKnowledgeError("invalid_input")
+        if not isinstance(collection.metadata, Mapping):
+            raise PostgresKnowledgeError("invalid_input")
+        try:
+            metadata_json = encode_metadata(collection.metadata)
+        except ValueError:
+            raise PostgresKnowledgeError("invalid_input") from None
         creator = self._creator(collection.metadata, self._created_by)
         with self._session(write=True) as (_connection, cursor):
             self._execute(cursor, """
@@ -255,7 +258,7 @@ class PostgresKnowledgeStore:
                     metadata = EXCLUDED.metadata, updated_at = NOW()
             """, (collection.tenant_id, collection.workspace_id, collection.collection_id,
                    collection.title, collection.description, collection.status, collection.version, creator,
-                   json.dumps(dict(collection.metadata or {}), ensure_ascii=False, sort_keys=True)))
+                   metadata_json))
 
     def get_collection(self, workspace_id: str, collection_id: str, *, tenant_id: str) -> Collection | None:
         with self._session() as (_connection, cursor):
@@ -276,7 +279,7 @@ class PostgresKnowledgeStore:
                 ORDER BY collection_id
             """, (tenant_id, workspace_id))
             rows = self._fetchall(cursor)
-        return [self._collection(row) for row in rows]
+        return [item for row in rows if (item := self._collection(row)) is not None]
 
     def upsert_document(self, document: Document) -> None:
         if document.status not in DOCUMENT_STATUSES:
@@ -285,8 +288,14 @@ class PostgresKnowledgeStore:
             materialize_lineage(document, published=document.status == "published")
         except ValueError:
             raise PostgresKnowledgeError("invalid_input") from None
+        if not isinstance(document.metadata, Mapping):
+            raise PostgresKnowledgeError("invalid_input")
         creator = self._creator(document.metadata, self._created_by)
         metadata = dict(document.metadata or {})
+        try:
+            metadata_json = encode_metadata(metadata)
+        except ValueError:
+            raise PostgresKnowledgeError("invalid_input") from None
         object_key = str(metadata.get("object_key") or document.object_ref or document.filename or document.document_id)
         byte_size = metadata.get("byte_size", 0)
         if isinstance(byte_size, bool) or not isinstance(byte_size, int) or byte_size < 0:
@@ -340,7 +349,7 @@ class PostgresKnowledgeStore:
                 document.title, document.display_filename or document.filename, document.mime_type,
                 document.status, document.parser_version, document.chunker_version,
                 document.embedding_model, document.embedding_version, creator, document.filename,
-                document.source_type, document.language, json.dumps(metadata, ensure_ascii=False, sort_keys=True),
+                document.source_type, document.language, metadata_json,
                 document.created_at, document.published_at,
             ))
 
@@ -424,7 +433,7 @@ class PostgresKnowledgeStore:
         with self._session() as (_connection, cursor):
             self._execute(cursor, f"SELECT * FROM rick_documents WHERE {' AND '.join(clauses)} ORDER BY document_id LIMIT %s", tuple(params + [result_limit]))
             rows = self._fetchall(cursor)
-        return [self._document(row) for row in rows]
+        return [item for row in rows if (item := self._document(row)) is not None]
 
     def count_documents(self, workspace_id: str, *, tenant_id: str, collection_id: str | None = None,
                         allowed_collection_ids: Iterable[str] | None = None) -> int:
@@ -514,6 +523,14 @@ class PostgresKnowledgeStore:
     ) -> None:
         if not isinstance(chunks, list) or len(chunks) > 100_000:
             raise PostgresKnowledgeError("invalid_input")
+        chunk_metadata_json: list[str] = []
+        for chunk in chunks:
+            if not isinstance(chunk.metadata, Mapping):
+                raise PostgresKnowledgeError("invalid_input")
+            try:
+                chunk_metadata_json.append(encode_metadata(chunk.metadata))
+            except ValueError:
+                raise PostgresKnowledgeError("invalid_input") from None
         where, params = self._document_scope_where(
             document_id, tenant_id=tenant_id, workspace_id=workspace_id
         )
@@ -528,7 +545,6 @@ class PostgresKnowledgeStore:
                     raise PostgresKnowledgeError("invalid_input")
                 if chunk.tenant_id != document["tenant_id"]:
                     raise PostgresKnowledgeError("invalid_input")
-                metadata = dict(chunk.metadata or {})
                 self._execute(cursor, """
                     INSERT INTO rick_chunks
                         (chunk_id, document_id, tenant_id, workspace_id, collection_id,
@@ -542,7 +558,7 @@ class PostgresKnowledgeStore:
                     chunk.page_start, chunk.page_end, chunk.section, chunk.embedding_version,
                     chunk.index_version, chunk.parent_chunk_id, chunk.token_count,
                     chunk.parser_version, chunk.chunker_version,
-                    json.dumps(metadata, ensure_ascii=False, sort_keys=True),
+                    chunk_metadata_json[index],
                 ))
 
     def get_chunks(
@@ -558,7 +574,7 @@ class PostgresKnowledgeStore:
         with self._session() as (_connection, cursor):
             self._execute(cursor, f"SELECT * FROM rick_chunks WHERE {where} ORDER BY chunk_index, chunk_id", params)
             rows = self._fetchall(cursor)
-        return [self._chunk(row) for row in rows]
+        return [item for row in rows if (item := self._chunk(row)) is not None]
 
 
 __all__ = ["DbConnection", "PostgresKnowledgeError", "PostgresKnowledgeStore"]
