@@ -25,7 +25,7 @@ from rick_jobs import (
     JobScope,
     JobState,
 )
-from postgres_jobs import _parse_result
+from postgres_jobs import _json_object, _parse_result
 
 
 def _json(value: object) -> object:
@@ -43,6 +43,15 @@ def test_result_decoder_rejects_non_string_metadata_and_document_references() ->
         _parse_result({"output_refs": {}, "document_id": 7, "completed_at": 100.0})
     restored = _parse_result({"output_refs": {}, "document_id": None, "completed_at": 100.0}, document_id="doc-1")
     assert restored is not None and restored.document_id == "doc-1"
+
+
+def test_database_json_decoder_rejects_oversized_and_nonfinite_values() -> None:
+    oversized = '{"source_key":"' + ("a" * (256 * 1024)) + '"}'
+
+    with pytest.raises(PostgresJobCorruptionError):
+        _json_object(oversized, field="payload")
+    with pytest.raises(PostgresJobCorruptionError):
+        _json_object('{"completed_at":NaN}', field="result")
 
 
 class FakeConnection:

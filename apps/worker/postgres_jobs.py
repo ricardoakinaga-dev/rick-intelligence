@@ -95,6 +95,7 @@ class PostgresJobCorruptionError(PostgresJobError):
 
 
 _KEEP_LEASE = object()
+MAX_DURABLE_JSON_BYTES = 256 * 1024
 _LEGACY_STATES = {
     "queued": JobState.QUEUED,
     "leased": JobState.RUNNING,
@@ -145,13 +146,21 @@ def _time(value: object, *, field: str = "time") -> float:
     return result
 
 
+def _reject_json_constant(value: str) -> object:
+    raise ValueError(f"non-finite JSON constant is not allowed: {value}")
+
+
 def _json_value(value: object, *, field: str, default: object = None) -> object:
     if value is None:
         return default
     if isinstance(value, str):
         try:
-            return json.loads(value)
-        except json.JSONDecodeError as exc:
+            if len(value.encode("utf-8")) > MAX_DURABLE_JSON_BYTES:
+                raise PostgresJobCorruptionError(f"{field} exceeds the JSON size limit")
+            return json.loads(value, parse_constant=_reject_json_constant)
+        except PostgresJobCorruptionError:
+            raise
+        except (TypeError, UnicodeError, ValueError, RecursionError) as exc:
             raise PostgresJobCorruptionError(f"{field} is not valid JSON") from exc
     return value
 
