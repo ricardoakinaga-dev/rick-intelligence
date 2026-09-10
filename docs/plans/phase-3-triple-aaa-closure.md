@@ -678,3 +678,18 @@ the State-of-Art suite **295**; compilation and `git diff --check` pass. This
 is local audit read-model evidence only. Approved external audit durability,
 multi-instance recovery, provider/corpus, independent review and promotion
 authority remain unavailable; promotion remains disallowed.
+
+## 44. Persisted knowledge metadata JSON closure — 2026-09-10
+
+Source candidate `134ec271097c32caa33b774be1b5f3e3974ffb08` (tree
+`aa93b2f1bc7ebd59355dfdfcc74b28c558857fbf`) closes the metadata boundary in
+the SQLite and PostgreSQL knowledge adapters. Collection, document and chunk
+metadata writes use canonical finite JSON capped at 256 KiB; read-side values
+are bounded and corrupt rows fail closed instead of becoming partial domain
+objects.
+
+The knowledge suite passes **22**, the API matrix **443**, and the State-of-Art
+suite **295**; compilation and `git diff --check` pass. This is local knowledge
+read-model/adapter evidence only. Approved PostgreSQL durability, tenant and
+recovery drills, provider/corpus, independent review and promotion authority
+remain unavailable; promotion remains disallowed.

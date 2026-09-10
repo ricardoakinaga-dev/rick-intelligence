@@ -50,6 +50,7 @@ preserving the frozen Gauntlet bar, Phase 2 history and legacy repositories.
 - [x] (2026-09-10) Hardened persisted PostgreSQL identity JSON at source candidate b075d446b41a259b08a4106294c57fe99a586a8e (tree a919928f99aaf093a0f399d8a229a58b95d50bcc): user ACLs and authoritative session snapshots now reject oversized, non-finite and structurally invalid values, writes are bounded before `jsonb` casts, and corrupt rows fail closed; identity/authorization tests pass 31 and the API matrix 440, while live PostgreSQL/runtime evidence remains blocked.
 - [x] (2026-09-10) Bound persisted local job-journal JSON at source candidate 12a473c6b661c04a8d565fefddc490faad91aa96 (tree a398e479e6eefa6b47fbb6fbc98e4b8526ed1e28): journal reads cap JSON at 32 KiB, reject non-finite/malformed/recursive mappings and omit corrupt recovery rows; the journal suite passes 14, the API matrix 441 and State-of-Art 295, while live durable-runtime evidence remains blocked.
 - [x] (2026-09-10) Bound persisted SQLite/PostgreSQL audit JSON at source candidate 0cfe1cc2bf669b0d47b1993a38525804836f7a08 (tree 1b6c49a12925fbf1d355a56ec27d9d21dd12045f): audit reads cap JSON at 64 KiB, reject non-finite/malformed/recursive values and filter corrupt SQLite rows before JSON1 predicates; audit tests pass 10, the API matrix 443 and State-of-Art 295, while live external audit durability remains blocked.
+- [x] (2026-09-10) Bound SQLite/PostgreSQL knowledge metadata JSON at source candidate 134ec271097c32caa33b774be1b5f3e3974ffb08 (tree aa93b2f1bc7ebd59355dfdfcc74b28c558857fbf): metadata writes cap canonical JSON at 256 KiB and reject non-finite values, reads omit corrupt collection/document/chunk rows; knowledge tests pass 22, the API matrix 443 and State-of-Art 295, while live durable-store evidence remains blocked.
 - [ ] (2026-09-09) Execute the disposable runtime; currently blocked by Docker daemon access and unresolved external authority.
 - [ ] (2026-09-09) Complete independent runtime/design/security reviews and the human Go/No-Go.
 
@@ -201,8 +202,8 @@ made.
 ## Current candidate closure
 
 The current source implementation candidate is
-0cfe1cc2bf669b0d47b1993a38525804836f7a08 with tree
-1b6c49a12925fbf1d355a56ec27d9d21dd12045f. It contains the corrected
+134ec271097c32caa33b774be1b5f3e3974ffb08 with tree
+aa93b2f1bc7ebd59355dfdfcc74b28c558857fbf. It contains the corrected
 PostgreSQL worker gate, canonical two-process Redis/API HTTP gate, strict
 release artifact postconditions and manifest consistency checks, plus bounded
 same-run CI envelopes with redacted raw artifacts, exact workflow/run/ref/SHA
@@ -231,12 +232,14 @@ and fail-closed persisted SQLite case-row decoding, plus bounded and
 structurally validated PostgreSQL identity ACL/session JSON with fail-closed
 corrupt authorization rows, plus bounded persisted local job-journal JSON
 with fail-closed corrupt recovery rows, plus bounded persisted SQLite and
-PostgreSQL audit JSON reads with malformed-row filtering. The final
+PostgreSQL audit JSON reads with malformed-row filtering, plus bounded finite
+knowledge metadata JSON with fail-closed corrupt collection/document/chunk
+rows. The final
 documentation/control-plane follow-up is bound to the resulting clean
 checkout, while live provider/runtime evidence remains external.
-The provider, Professor, job-journal, audit, API and State-of-Art suites have
-64, 36, 14, 10, 443 and 295 passing tests respectively and the relevant static
-checks pass;
+The provider, Professor, job-journal, audit, knowledge, API and State-of-Art
+suites have 64, 36, 14, 10, 22, 443 and 295 passing tests respectively and the
+relevant static checks pass;
 the full preserved `make test` remains incomplete
 because the CVG dataset and local Playwright browser are unavailable. The
 prior integrated verifier artifact is stale after this source change and is

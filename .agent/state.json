@@ -14,7 +14,7 @@
   "active_execplan": ".agent/plans/phase-3-runtime-evidence-production-promotion.md",
   "active_task": "PH3-2-LAB-READINESS",
   "verification_state": "PARTIAL",
-  "repository_state": "Current source candidate is 0cfe1cc2bf669b0d47b1993a38525804836f7a08 (tree 1b6c49a12925fbf1d355a56ec27d9d21dd12045f); it includes a JSON-only versioned parser result envelope that never unpickles child-controlled bytes, fail-closed invalid UTF-8 rejection, bounded durable-job JSON decoding before contract parsing, bounded legacy SQLite/PostgreSQL queue payload decoding, bounded persisted SQLite vector decoding with finite-vector and canonical checksum checks, bounded persisted SQLite/PostgreSQL chat-history decoding, a shared finite/byte-bounded JSON decoder, fail-closed persisted SQLite case-row decoding, bounded and structurally validated PostgreSQL identity ACL/session JSON with fail-closed corrupt authorization rows, bounded persisted local job-journal JSON with fail-closed corrupt recovery rows, bounded persisted SQLite/PostgreSQL audit JSON with finite/byte-bounded reads and malformed-row filtering, and the prior provider, Professor, observability, API and release-boundary hardening. Clean local evidence currently passes queue-focused 14, worker 52, retrieval 37, domain 158, history 13, case 12, identity/authorization 31, ingestion 103, focused file-security/runtime 79, provider 64, Professor 36, job-journal 14, audit 10, API 443 and State-of-Art 295 tests; the next integrated packet must bind this candidate and remains expected to classify STATE_OF_ART_CANDIDATE with external blockers. No State of Art, AAA or Triple AAA promotion claim is made.",
+  "repository_state": "Current source candidate is 134ec271097c32caa33b774be1b5f3e3974ffb08 (tree aa93b2f1bc7ebd59355dfdfcc74b28c558857fbf); it includes a JSON-only versioned parser result envelope that never unpickles child-controlled bytes, fail-closed invalid UTF-8 rejection, bounded durable-job JSON decoding before contract parsing, bounded legacy SQLite/PostgreSQL queue payload decoding, bounded persisted SQLite vector decoding with finite-vector and canonical checksum checks, bounded persisted SQLite/PostgreSQL chat-history decoding, a shared finite/byte-bounded JSON decoder, fail-closed persisted SQLite case-row decoding, bounded and structurally validated PostgreSQL identity ACL/session JSON with fail-closed corrupt authorization rows, bounded persisted local job-journal JSON with fail-closed corrupt recovery rows, bounded persisted SQLite/PostgreSQL audit JSON with finite/byte-bounded reads and malformed-row filtering, bounded finite metadata JSON across the SQLite/PostgreSQL knowledge stores with fail-closed corrupt collection/document/chunk rows, and the prior provider, Professor, observability, API and release-boundary hardening. Clean local evidence currently passes queue-focused 14, worker 52, retrieval 37, domain 158, knowledge 22, history 13, case 12, identity/authorization 31, ingestion 103, focused file-security/runtime 79, provider 64, Professor 36, job-journal 14, audit 10, API 443 and State-of-Art 295 tests; the next integrated packet must bind this candidate and remains expected to classify STATE_OF_ART_CANDIDATE with external blockers. No State of Art, AAA or Triple AAA promotion claim is made.",
   "instruction_scope_refs": [
     ".agent/PLANS.md",
     "cvg-master-rag-v2/AGENTS.md",
@@ -23,8 +23,8 @@
     "docs/plans/phase-3-runtime-evidence-production-promotion.md"
   ],
   "last_gate_record": ".agent/gates/phase-3-2-lab-readiness-implementation-ready.json",
-  "last_event_id": "EVT-PH3-2-AUDIT-JSON-BOUNDARY-20260910",
-  "state_revision": 282,
+  "last_event_id": "EVT-PH3-2-KNOWLEDGE-JSON-BOUNDARY-20260910",
+  "state_revision": 283,
   "next_gate": "VERIFIED",
   "active_action_id": "PH3-2-LAB-READINESS:WAIT_RUNTIME",
   "blocked_by": [
@@ -32,5 +32,5 @@
     "Disposable runtime secrets and endpoint authority are unavailable"
   ],
   "human_approval_required": [],
-  "updated_at": "2026-09-10T15:03:38Z"
+  "updated_at": "2026-09-10T15:13:25Z"
 }

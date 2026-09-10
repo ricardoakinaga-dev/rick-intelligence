@@ -13,3 +13,11 @@ Canonical document/chunk/collection domain. No Qdrant/OpenAI/FastAPI/Redis I/O.
 
 Knowledge never decides access — authorization owns collections (see
 `authorization.md`); retrieval filters at query time and revalidates after fusion.
+
+The SQLite and PostgreSQL knowledge adapters treat persisted collection,
+document and chunk metadata as untrusted JSON. Writes use canonical finite JSON
+with a 256 KiB UTF-8 ceiling; reads reject non-finite, malformed, recursive or
+oversized values and omit the complete corrupt row rather than exposing a
+partial knowledge entity. This protects the local read model and adapter
+boundary only; PostgreSQL durability, multi-instance consistency and recovery
+remain separate runtime evidence requirements.

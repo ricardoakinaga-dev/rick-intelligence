@@ -56,8 +56,8 @@ converted to PASS by the presence of host processes.
 ### Current clean revalidation — 2026-09-10
 
 The latest source implementation candidate is
-`0cfe1cc2bf669b0d47b1993a38525804836f7a08` with tree
-`1b6c49a12925fbf1d355a56ec27d9d21dd12045f`. The ignored integrated packet
+`134ec271097c32caa33b774be1b5f3e3974ffb08` with tree
+`aa93b2f1bc7ebd59355dfdfcc74b28c558857fbf`. The ignored integrated packet
 `.runtime/phase-3/triple-aaa-verify.json` is the authority for the exact clean
 checkout, tree, artifact set, packet hash and current classification; the
 latest clean run reports `17` foundation PASS results and `24` mandatory
@@ -893,3 +893,20 @@ the State-of-Art suite **295**; compilation and `git diff --check` pass. This
 is local audit read-model evidence only. Approved external audit durability,
 multi-instance recovery, provider/corpus, independent review, sealed packet
 and human Go/No-Go remain unavailable; promotion remains disallowed.
+
+## 45. Persisted knowledge metadata JSON decoding closure — 2026-09-10
+
+Source implementation candidate `134ec271097c32caa33b774be1b5f3e3974ffb08`
+(tree `aa93b2f1bc7ebd59355dfdfcc74b28c558857fbf`) closes a concrete metadata
+read/write gap across the SQLite and PostgreSQL knowledge stores. Collection,
+document and chunk metadata is now canonical finite JSON capped at 256 KiB on
+writes; oversized, non-finite, malformed or recursive persisted values cause
+the complete collection/document/chunk row to be omitted rather than exposed
+as a partial domain object. The adversarial regression covers padded and
+`NaN` metadata plus write rejection before PostgreSQL session I/O.
+
+The knowledge suite passes **22**, the API matrix **443**, and the State-of-Art
+suite **295**; compilation and `git diff --check` pass. This is local knowledge
+read-model/adapter evidence only. Approved PostgreSQL durability, tenant and
+recovery drills, provider/corpus, independent review, sealed packet and human
+Go/No-Go remain unavailable; promotion remains disallowed.
