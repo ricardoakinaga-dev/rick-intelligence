@@ -59,6 +59,23 @@ CorrelationIdFactory = Callable[[], str]
 MessageInput = ProviderMessage | Mapping[str, object]
 
 
+def _reject_duplicate_json_keys(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    result: dict[str, object] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("duplicate JSON object key")
+        result[key] = value
+    return result
+
+
+def _loads_json(value: str | bytes) -> object:
+    return json.loads(
+        value,
+        object_pairs_hook=_reject_duplicate_json_keys,
+        parse_constant=_reject_json_constant,
+    )
+
+
 class OpenAICompatibleClient:
     """Typed async client for chat, embedding, and provider health requests.
 
@@ -432,7 +449,7 @@ class OpenAICompatibleClient:
                             saw_done = True
                             break
                         try:
-                            decoded = json.loads(data, parse_constant=_reject_json_constant)
+                            decoded = _loads_json(data)
                         except (TypeError, ValueError, RecursionError):
                             raise provider_error("invalid_json", operation, correlation, attempt) from None
                         chunk = _extract_chat_chunk(decoded, normalized_model, correlation, attempt)
@@ -545,7 +562,7 @@ class OpenAICompatibleClient:
         except UnicodeDecodeError:
             raise provider_error("invalid_json", operation, correlation_id, attempt, status=status) from None
         try:
-            return json.loads(text, parse_constant=_reject_json_constant)
+            return _loads_json(text)
         except (TypeError, ValueError, RecursionError):
             raise provider_error("invalid_json", operation, correlation_id, attempt, status=status) from None
 
@@ -568,7 +585,7 @@ class OpenAICompatibleClient:
         if not 200 <= status <= 299 or raw is None:
             return False
         try:
-            body = json.loads(raw.decode("utf-8"), parse_constant=_reject_json_constant)
+            body = _loads_json(raw.decode("utf-8"))
         except (UnicodeDecodeError, TypeError, ValueError, RecursionError):
             return False
         return _health_payload_is_valid(body, model)
@@ -813,7 +830,7 @@ def _validate_response_format_result(
     if not result.content.strip():
         raise provider_error("missing_field", operation, correlation_id, attempt)
     try:
-        decoded = json.loads(result.content, parse_constant=_reject_json_constant)
+        decoded = _loads_json(result.content)
     except (TypeError, ValueError, RecursionError):
         raise provider_error("invalid_json", operation, correlation_id, attempt) from None
     if not isinstance(decoded, dict):
@@ -1022,7 +1039,7 @@ def _extract_tool_calls(
         if not isinstance(raw_arguments, str) or not raw_arguments.strip() or len(raw_arguments) > MAX_RESPONSE_BYTES:
             raise provider_error("malformed_response", operation, correlation_id, attempt)
         try:
-            decoded_arguments = json.loads(raw_arguments, parse_constant=_reject_json_constant)
+            decoded_arguments = _loads_json(raw_arguments)
         except (TypeError, ValueError, RecursionError):
             raise provider_error("invalid_json", operation, correlation_id, attempt) from None
         if not isinstance(decoded_arguments, dict):
@@ -1185,7 +1202,7 @@ def _try_parse_json(raw_body: bytes) -> object:
     if len(raw_body) > MAX_RESPONSE_BYTES:
         return None
     try:
-        return json.loads(raw_body.decode("utf-8"), parse_constant=_reject_json_constant)
+        return _loads_json(raw_body.decode("utf-8"))
     except (UnicodeDecodeError, TypeError, ValueError, RecursionError):
         return None
 

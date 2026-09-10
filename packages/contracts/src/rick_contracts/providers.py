@@ -23,6 +23,16 @@ _PROVIDER_CONTROL = re.compile(r"[\x00-\x1f\x7f]")
 def _reject_json_constant(value: str) -> object:
     raise ValueError(value)
 
+
+def _reject_duplicate_json_keys(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    result: dict[str, object] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("duplicate JSON object key")
+        result[key] = value
+    return result
+
+
 ProviderErrorCode = Literal[
     "timeout",
     "unavailable",
@@ -114,7 +124,11 @@ class ProviderToolCallFunction(StrictContractModel):
     @classmethod
     def valid_json_arguments(cls, value: str) -> str:
         try:
-            decoded = json.loads(value, parse_constant=_reject_json_constant)
+            decoded = json.loads(
+                value,
+                object_pairs_hook=_reject_duplicate_json_keys,
+                parse_constant=_reject_json_constant,
+            )
         except (TypeError, ValueError, json.JSONDecodeError, RecursionError):
             raise ValueError("tool arguments must be valid JSON") from None
         if not isinstance(decoded, dict):

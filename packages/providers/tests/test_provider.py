@@ -214,6 +214,36 @@ async def test_streaming_contract_emits_typed_deltas_and_terminal_finish_reason(
 
 
 @pytest.mark.asyncio
+async def test_streaming_duplicate_response_keys_are_rejected_before_delta_extraction() -> None:
+    body = (
+        b'data: {"model":"chat-test-model","model":"ambiguous-model",'
+        b'"choices":[{"delta":{"content":"unsafe"},"finish_reason":null}]}\n\n'
+        b"data: [DONE]\n\n"
+    )
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            content=body,
+            headers={"content-type": "text/event-stream"},
+            request=request,
+        )
+
+    provider = OpenAICompatibleClient(_config(), transport=httpx.MockTransport(handler))
+    try:
+        with pytest.raises(ProviderError) as caught:
+            async for _chunk in provider.chat_completion_stream(
+                messages=[{"role": "user", "content": "stream"}],
+            ):
+                pass
+    finally:
+        await _close(provider)
+
+    assert caught.value.code == "invalid_json"
+    assert caught.value.attempts == 1
+
+
+@pytest.mark.asyncio
 async def test_streaming_json_content_can_be_reassembled_as_an_object() -> None:
     body = (
         b'data: {"model":"chat-test-model","choices":[{"delta":{"content":"{\\"status\\":"},"finish_reason":null}]}\n\n'
@@ -688,6 +718,27 @@ async def test_non_json_nan_is_rejected_before_embedding_validation() -> None:
     try:
         with pytest.raises(ProviderError) as caught:
             await provider.get_embedding("hello")
+    finally:
+        await _close(provider)
+    assert caught.value.code == "invalid_json"
+
+
+@pytest.mark.asyncio
+async def test_duplicate_provider_response_keys_are_rejected_before_model_validation() -> None:
+    async def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            content=(
+                b'{"model":"chat-test-model","model":"ambiguous-model",'
+                b'"choices":[{"message":{"content":"ok"}}]}'
+            ),
+            request=request,
+        )
+
+    provider = OpenAICompatibleClient(_config(), transport=httpx.MockTransport(handler))
+    try:
+        with pytest.raises(ProviderError) as caught:
+            await provider.chat_completion(messages=[{"role": "user", "content": "hello"}])
     finally:
         await _close(provider)
     assert caught.value.code == "invalid_json"

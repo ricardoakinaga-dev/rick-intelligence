@@ -78,6 +78,12 @@ def test_provider_tool_call_requires_safe_json_arguments_and_content_or_call():
             function={"name": "report_status", "arguments": "not-json"},
         )
     with pytest.raises(ValidationError):
+        ProviderToolCall(
+            id="call-1",
+            type="function",
+            function={"name": "report_status", "arguments": '{"status":"first","status":"second"}'},
+        )
+    with pytest.raises(ValidationError):
         ChatCompletionResult(model="m", content="", correlation_id="corr")
 
 
