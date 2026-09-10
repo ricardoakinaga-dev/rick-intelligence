@@ -693,3 +693,18 @@ suite **295**; compilation and `git diff --check` pass. This is local knowledge
 read-model/adapter evidence only. Approved PostgreSQL durability, tenant and
 recovery drills, provider/corpus, independent review and promotion authority
 remain unavailable; promotion remains disallowed.
+
+## 45. Cleanup-lease marker JSON closure — 2026-09-10
+
+Source candidate `5b3a652fbfae2aa4d9e839d1dfacb156dbd6dae9` (tree
+`37359cb1cec80c40776d0d40e92d1df71719b708`) closes the private cleanup-marker
+read boundary in the ingestion facade. Fallback lease markers are canonical
+finite JSON capped at 8 KiB, validate version/job/scope and bounded source
+paths, and corrupt markers do not authorize source deletion. The writer uses
+the same bounded contract before the marker becomes durable.
+
+The job-journal suite passes **15**, the API matrix **444**, and the
+State-of-Art suite **295**; compilation and `git diff --check` pass. This is
+local cleanup/recovery evidence only. Approved runtime, object-store,
+distributed recovery, provider/corpus, independent review and promotion
+authority remain unavailable; promotion remains disallowed.

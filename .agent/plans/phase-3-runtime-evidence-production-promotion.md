@@ -51,6 +51,7 @@ preserving the frozen Gauntlet bar, Phase 2 history and legacy repositories.
 - [x] (2026-09-10) Bound persisted local job-journal JSON at source candidate 12a473c6b661c04a8d565fefddc490faad91aa96 (tree a398e479e6eefa6b47fbb6fbc98e4b8526ed1e28): journal reads cap JSON at 32 KiB, reject non-finite/malformed/recursive mappings and omit corrupt recovery rows; the journal suite passes 14, the API matrix 441 and State-of-Art 295, while live durable-runtime evidence remains blocked.
 - [x] (2026-09-10) Bound persisted SQLite/PostgreSQL audit JSON at source candidate 0cfe1cc2bf669b0d47b1993a38525804836f7a08 (tree 1b6c49a12925fbf1d355a56ec27d9d21dd12045f): audit reads cap JSON at 64 KiB, reject non-finite/malformed/recursive values and filter corrupt SQLite rows before JSON1 predicates; audit tests pass 10, the API matrix 443 and State-of-Art 295, while live external audit durability remains blocked.
 - [x] (2026-09-10) Bound SQLite/PostgreSQL knowledge metadata JSON at source candidate 134ec271097c32caa33b774be1b5f3e3974ffb08 (tree aa93b2f1bc7ebd59355dfdfcc74b28c558857fbf): metadata writes cap canonical JSON at 256 KiB and reject non-finite values, reads omit corrupt collection/document/chunk rows; knowledge tests pass 22, the API matrix 443 and State-of-Art 295, while live durable-store evidence remains blocked.
+- [x] (2026-09-10) Bound cleanup-lease marker JSON at source candidate 5b3a652fbfae2aa4d9e839d1dfacb156dbd6dae9 (tree 37359cb1cec80c40776d0d40e92d1df71719b708): private fallback markers cap finite JSON at 8 KiB, validate version/job/scope and leave sources untouched for corrupt markers; the job-journal suite passes 15, the API matrix 444 and State-of-Art 295, while live runtime evidence remains blocked.
 - [ ] (2026-09-09) Execute the disposable runtime; currently blocked by Docker daemon access and unresolved external authority.
 - [ ] (2026-09-09) Complete independent runtime/design/security reviews and the human Go/No-Go.
 
@@ -202,8 +203,8 @@ made.
 ## Current candidate closure
 
 The current source implementation candidate is
-134ec271097c32caa33b774be1b5f3e3974ffb08 with tree
-aa93b2f1bc7ebd59355dfdfcc74b28c558857fbf. It contains the corrected
+5b3a652fbfae2aa4d9e839d1dfacb156dbd6dae9 with tree
+37359cb1cec80c40776d0d40e92d1df71719b708. It contains the corrected
 PostgreSQL worker gate, canonical two-process Redis/API HTTP gate, strict
 release artifact postconditions and manifest consistency checks, plus bounded
 same-run CI envelopes with redacted raw artifacts, exact workflow/run/ref/SHA
@@ -234,11 +235,12 @@ corrupt authorization rows, plus bounded persisted local job-journal JSON
 with fail-closed corrupt recovery rows, plus bounded persisted SQLite and
 PostgreSQL audit JSON reads with malformed-row filtering, plus bounded finite
 knowledge metadata JSON with fail-closed corrupt collection/document/chunk
-rows. The final
+rows, plus bounded finite cleanup-lease marker JSON with fail-closed corrupt
+private-source cleanup. The final
 documentation/control-plane follow-up is bound to the resulting clean
 checkout, while live provider/runtime evidence remains external.
 The provider, Professor, job-journal, audit, knowledge, API and State-of-Art
-suites have 64, 36, 14, 10, 22, 443 and 295 passing tests respectively and the
+suites have 64, 36, 15, 10, 22, 444 and 295 passing tests respectively and the
 relevant static checks pass;
 the full preserved `make test` remains incomplete
 because the CVG dataset and local Playwright browser are unavailable. The

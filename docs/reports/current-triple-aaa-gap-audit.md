@@ -56,8 +56,8 @@ converted to PASS by the presence of host processes.
 ### Current clean revalidation — 2026-09-10
 
 The latest source implementation candidate is
-`134ec271097c32caa33b774be1b5f3e3974ffb08` with tree
-`aa93b2f1bc7ebd59355dfdfcc74b28c558857fbf`. The ignored integrated packet
+`5b3a652fbfae2aa4d9e839d1dfacb156dbd6dae9` with tree
+`37359cb1cec80c40776d0d40e92d1df71719b708`. The ignored integrated packet
 `.runtime/phase-3/triple-aaa-verify.json` is the authority for the exact clean
 checkout, tree, artifact set, packet hash and current classification; the
 latest clean run reports `17` foundation PASS results and `24` mandatory
@@ -910,3 +910,19 @@ suite **295**; compilation and `git diff --check` pass. This is local knowledge
 read-model/adapter evidence only. Approved PostgreSQL durability, tenant and
 recovery drills, provider/corpus, independent review, sealed packet and human
 Go/No-Go remain unavailable; promotion remains disallowed.
+
+## 46. Cleanup-lease marker JSON decoding closure — 2026-09-10
+
+Source implementation candidate `5b3a652fbfae2aa4d9e839d1dfacb156dbd6dae9`
+(tree `37359cb1cec80c40776d0d40e92d1df71719b708`) closes a concrete private
+recovery-marker boundary. Cleanup-lease reads now cap marker JSON at 8 KiB,
+reject non-finite, malformed, recursive and invalid version/job values, and
+leave the private source untouched unless the complete marker is valid and
+scoped. Writes use canonical finite JSON before replacement. The adversarial
+regression covers padded and `NaN` markers.
+
+The job-journal suite passes **15**, the API matrix **444**, and the
+State-of-Art suite **295**; compilation and `git diff --check` pass. This is
+local cleanup/recovery evidence only. Approved runtime, object-store,
+distributed recovery, provider/corpus, independent review, sealed packet and
+human Go/No-Go remain unavailable; promotion remains disallowed.

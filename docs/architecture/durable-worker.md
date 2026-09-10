@@ -43,6 +43,14 @@ bounded canonical JSON contract. This protects the local recovery boundary; it
 does not turn the journal into a production durable queue or provide
 multi-instance recovery authority.
 
+When the primary journal cannot retain a private source reference, the
+ingestion facade writes a separate cleanup-lease marker under the private
+staging root. That marker is canonical finite JSON capped at 8 KiB and its
+version, job identity, scope and source path are validated before deletion;
+oversized, malformed or non-finite markers are left untouched for operator
+handling rather than authorizing a cleanup action. This is a local recovery
+fallback, not external object-storage or distributed recovery evidence.
+
 ## Canonical PostgreSQL runtime
 
 Phase 2.2 adds `apps/worker/postgres_jobs.py` as the canonical adapter for the

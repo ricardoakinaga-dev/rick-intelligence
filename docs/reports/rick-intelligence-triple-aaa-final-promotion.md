@@ -57,12 +57,13 @@ protected boundary must carry tenant/workspace scope and server-derived IDs.
 The local and PostgreSQL chat-history read models, local SQLite clinical-case
 read model, PostgreSQL identity adapter, process-local job journal and local
 SQLite/PostgreSQL audit sinks at source candidate
-`134ec271097c32caa33b774be1b5f3e3974ffb08` cap persisted JSON before
+`5b3a652fbfae2aa4d9e839d1dfacb156dbd6dae9` cap persisted JSON before
 decoding, reject non-finite/malformed/structurally invalid values and omit
 corrupt response, case, user, session, recovery-journal, audit-metadata or
-knowledge rows. This is a local read-boundary safeguard only; it does not
-prove live history/case/identity/job/audit/knowledge durability, tenant
-isolation or distributed recovery.
+knowledge rows; private cleanup-lease markers use the same fail-closed
+contract before a source deletion. This is a local read-boundary safeguard
+only; it does not prove live history/case/identity/job/audit/knowledge
+durability, tenant isolation or distributed recovery.
 
 ## 7. CI and release lanes
 
