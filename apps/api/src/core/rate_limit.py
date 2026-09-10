@@ -167,7 +167,8 @@ async def check_rate_limit_async(
 
     The async package-owned Redis limiter uses allow(limit=...) while the
     local API limiter uses check(limit_per_min=...). This adapter keeps the
-    route policy single-sourced and rejects malformed capabilities.
+    route policy single-sourced, carries the request identity across retries,
+    and rejects malformed capabilities.
     """
 
     allow = getattr(limiter, "allow", None)

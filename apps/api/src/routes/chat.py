@@ -49,26 +49,27 @@ def _chat_rate_key(session) -> str:
     return hashlib.sha256(identity.encode("utf-8")).hexdigest()
 
 
-async def _rate_allowed(providers, key: str) -> bool:
+async def _rate_allowed(providers, key: str, *, request_id: str | None = None) -> bool:
     limiter = _chat_rate_limiter(providers)
     try:
         return await check_rate_limit_async(
             limiter,
             key,
             limit_per_min=providers.settings.chat_rate_limit_per_min,
+            request_id=request_id,
         )
     except TypeError as exc:
         raise ApiError("internal_error") from exc
 
 
-async def _chat_rate_allowed(providers, session) -> bool:
-    return await _rate_allowed(providers, _chat_rate_key(session))
+async def _chat_rate_allowed(providers, session, *, request_id: str | None = None) -> bool:
+    return await _rate_allowed(providers, _chat_rate_key(session), request_id=request_id)
 
 
-async def _compat_rate_allowed(providers, api_key: str) -> bool:
+async def _compat_rate_allowed(providers, api_key: str, *, request_id: str | None = None) -> bool:
     """Apply the same bounded limiter to API-key compatibility traffic."""
     key = hashlib.sha256(f"compat:{api_key}".encode("utf-8")).hexdigest()
-    return await _rate_allowed(providers, key)
+    return await _rate_allowed(providers, key, request_id=request_id)
 
 
 def _service(request: Request) -> ChatApplicationService:
@@ -141,7 +142,11 @@ def _page_response(payload: dict, store: object, page_method: str):
 @router.post("/api/v1/chat", response_model=ChatResponse)
 async def chat(payload: ChatRequest, request: Request, session=Depends(require_authenticated)):
     providers = get_providers(request)
-    if not await _chat_rate_allowed(providers, session):
+    if not await _chat_rate_allowed(
+        providers,
+        session,
+        request_id=getattr(request.state, "request_id", None),
+    ):
         request_id = getattr(request.state, "request_id", "unknown")
         return JSONResponse(
             status_code=429,

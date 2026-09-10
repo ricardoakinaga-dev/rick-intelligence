@@ -55,4 +55,7 @@ safe templates; no stack/provider/credential leakage.
 - `GET /health/live` — process alive (public, minimal).
 - `GET /health/ready` — `ready` (200) / `degraded` (200, optional down) /
   `not_ready` (503, any required down). Never 200+ok with a mandatory dep broken.
+- Production lifespan admission runs the required readiness set before the
+  server serves traffic; a failed Redis or other mandatory check aborts
+  startup rather than relying only on the readiness endpoint.
 - `GET /api/v1/admin/health` — detailed diagnostics, requires `observability.read`.

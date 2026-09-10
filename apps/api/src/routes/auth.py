@@ -52,6 +52,7 @@ async def _recovery_rate_allowed(providers, request: Request, payload: RecoveryR
             _recovery_rate_limiter(providers),
             key,
             limit_per_min=providers.settings.recovery_rate_limit_per_min,
+            request_id=getattr(request.state, "request_id", None),
         )
     except TypeError as exc:
         raise ApiError("internal_error") from exc
@@ -123,6 +124,7 @@ async def _login_rate_allowed(providers, request: Request, payload: LoginRequest
             ensure_rate_limiter(providers),
             key,
             limit_per_min=providers.settings.login_rate_limit_per_min,
+            request_id=getattr(request.state, "request_id", None),
         )
     except TypeError as exc:
         raise ApiError("provider_unavailable") from exc

@@ -14,6 +14,29 @@ from core.rate_limit import (
 )
 
 
+def test_async_rate_limit_adapter_forwards_the_http_request_id() -> None:
+    seen = []
+
+    class Limiter:
+        async def allow(self, key, *, limit, window_seconds, request_id):
+            seen.append((key, limit, window_seconds, request_id))
+            return True
+
+    import asyncio
+
+    allowed = asyncio.run(
+        rate_limit.check_rate_limit_async(
+            Limiter(),
+            "hashed-key",
+            limit_per_min=2,
+            request_id="http-request-1",
+        )
+    )
+
+    assert allowed is True
+    assert seen == [("hashed-key", 2, 60.0, "http-request-1")]
+
+
 class _Clock:
     def __init__(self, value: float = 1_000.0) -> None:
         self.value = value

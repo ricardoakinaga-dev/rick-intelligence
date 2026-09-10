@@ -114,6 +114,72 @@ def test_bucket_bypass_is_failed_when_three_shared_requests_are_allowed() -> Non
     assert bypass.result == "FAIL"
 
 
+def test_http_results_require_all_route_policies_and_a_bounded_ttl() -> None:
+    observations = [
+        {
+            "pid": 101,
+            "replica": "api-a",
+            "http_boundary": True,
+            "tenant_namespace": "shared",
+            "bucket_pttl_ms": 59_900,
+            "production_safe": False,
+        },
+        {
+            "pid": 202,
+            "replica": "api-b",
+            "http_boundary": True,
+            "tenant_namespace": "shared",
+            "bucket_pttl_ms": 59_850,
+            "production_safe": False,
+        },
+    ]
+    cases = [
+        {
+            "name": name,
+            "unique_request_count": 4,
+            "unique_allowed": 2,
+            "unique_denied": 2,
+            "replay_consistent": True,
+            "passed": True,
+        }
+        for name in ("login", "recovery", "chat", "compatibility")
+    ]
+    results, metrics, production_safe = gate._http_results(  # noqa: SLF001
+        observations,
+        cases,
+        {
+            "http_boundary": True,
+            "all_policy_cases_passed": True,
+            "replay_consistent": True,
+            "tenant_isolation": {
+                "allowed": True,
+                "replay_consistent": True,
+                "request_ids_echoed": True,
+            },
+        },
+    )
+
+    assert all(item.result in {"PASS", "PARTIAL"} for item in results)
+    assert metrics["http_api_boundary"] is True
+    assert metrics["bucket_ttl_positive"] is True
+    assert metrics["tenant_isolation"] is True
+    assert production_safe is False
+
+
+def test_http_results_fail_when_a_policy_case_is_missing() -> None:
+    observations = [
+        {"pid": 101, "http_boundary": True, "tenant_namespace": "shared", "bucket_pttl_ms": 1000, "production_safe": False},
+        {"pid": 202, "http_boundary": True, "tenant_namespace": "shared", "bucket_pttl_ms": 1000, "production_safe": False},
+    ]
+    results, _metrics, _production_safe = gate._http_results(  # noqa: SLF001
+        observations,
+        [{"name": "login", "unique_request_count": 4, "unique_allowed": 2, "unique_denied": 2, "replay_consistent": True, "passed": True}],
+        {"all_policy_cases_passed": True, "replay_consistent": True, "tenant_isolation": {}},
+    )
+
+    assert next(item for item in results if item.name == "shared-atomic-bucket").result == "FAIL"
+
+
 def test_gate_does_not_use_the_in_memory_rate_limiter() -> None:
     source = (ROOT / "scripts/phase11/redis_multi_replica_runtime_gate.py").read_text(encoding="utf-8")
 

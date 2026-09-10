@@ -22,6 +22,71 @@ from services.identity_service import InMemoryIdentityProvider
 from services.ingestion_service import IngestionApplicationError, IngestionApplicationService
 
 
+class _HealthyProductionComponent:
+    production_safe = True
+    backend_kind = "redis"
+
+    def __init__(self, ready: bool = True) -> None:
+        self.ready = ready
+
+    def health_check(self):
+        return self.ready
+
+    def readiness_check(self):
+        return self.ready
+
+    async def allow(self, *_args, **_kwargs):
+        return self.ready
+
+
+def _production_admission_app(*, redis_ready: bool):
+    settings = make_settings(
+        environment="production",
+        identity_mode="production",
+        chat_backend_mode="legacy",
+        use_legacy_adapters=True,
+        session_cookie_secure=True,
+    )
+    component = _HealthyProductionComponent()
+    identity = SimpleNamespace(production_safe=True, health_check=lambda: True)
+    providers = Providers(
+        settings=settings,
+        identity=identity,
+        chat_backend=component,
+        provider=component,
+        health_checks={"kernel": lambda: True, "identity": lambda: True},
+        audit_sink=component,
+        chat_history=component,
+        knowledge=component,
+        vector_store=component,
+        retrieval=component,
+        ingestion=component,
+        worker=component,
+        job_journal=component,
+        queue=component,
+        object_store=component,
+        rate_limiter=_HealthyProductionComponent(redis_ready),
+        lease=component,
+    )
+    return create_app(settings, providers)
+
+
+def test_production_admission_refuses_to_start_when_redis_is_not_ready():
+    app = _production_admission_app(redis_ready=False)
+
+    with pytest.raises(RuntimeError, match="readiness gate failed"):
+        with TestClient(app):
+            pass
+
+
+def test_production_admission_starts_only_after_required_checks_are_ready():
+    app = _production_admission_app(redis_ready=True)
+
+    with TestClient(app) as client:
+        assert client.get("/health/live").json() == {"status": "live"}
+    assert app.state.admission_status == "ready"
+
+
 def test_default_factory_closes_worker_and_local_sqlite_resources(tmp_path: Path) -> None:
     settings = make_settings(
         knowledge_sqlite_path=str(tmp_path / "knowledge.sqlite"),

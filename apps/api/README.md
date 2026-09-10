@@ -66,7 +66,10 @@ the ungrounded stub.
 Production starts only with `RICK_API_COMPOSITION=module:factory`. The injected
 factory receives `ApiSettings`, returns `ExternalCompositionInputs`, and the
 entrypoint builds the canonical Postgres/S3/Qdrant/Redis/provider graph before
-calling `create_app`; missing or invalid composition fails closed.
+calling `create_app`; the Redis rate limiter and lease must be the package
+capabilities bound to the exact injected client, with one explicit global
+production namespace. Startup then performs required readiness checks before
+admitting traffic; missing or invalid composition fails closed.
 
 ## Auth model
 

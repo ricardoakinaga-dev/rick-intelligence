@@ -129,6 +129,17 @@ class RedisRateLimiter:
         self.production_safe = False
         self.backend_kind = "redis"
 
+    @property
+    def redis_client(self) -> AsyncRedisLike:
+        """Return the exact client this capability was composed with.
+
+        The identity is intentionally exposed as a binding fact for an
+        application composition root; callers must compare it by object
+        identity and must never serialize or log the client.
+        """
+
+        return self._client
+
     def _mark_production_safe(self, token: object) -> None:
         if token is _PRODUCTION_CAPABILITY_TOKEN:
             self.production_safe = True

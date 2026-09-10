@@ -293,6 +293,12 @@ class RedisLeaseStore:
         self.production_safe = False
         self.backend_kind = "redis"
 
+    @property
+    def redis_client(self) -> AsyncRedisLike:
+        """Return the exact injected client for composition identity checks."""
+
+        return self._client
+
     def _mark_production_safe(self, token: object) -> None:
         """Mark only a validated package factory product as production-safe."""
 
@@ -520,6 +526,18 @@ class RedisLeaseClient(LeaseClient):
         self.store = actual_store
         self.production_safe = actual_store.production_safe
         self.backend_kind = "redis"
+
+    @property
+    def redis_client(self) -> AsyncRedisLike:
+        """Return the exact client owned by the wrapped Redis store."""
+
+        return self.store.redis_client
+
+    @property
+    def namespace(self) -> RedisNamespace | None:
+        """Return the store namespace without exposing secret configuration."""
+
+        return self.store.namespace
 
     async def close(self) -> None:
         await self.store.close()

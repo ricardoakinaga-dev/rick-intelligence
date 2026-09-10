@@ -48,6 +48,7 @@ class ExternalCompositionInputs:
     provider_client: object | None = None
     redis_client: object | None = None
     rate_limiter: object | None = None
+    rate_limit_namespace: object | None = None
     lease: object | None = None
     event_sink: object | None = None
     password_reset_delivery: object | None = None
@@ -198,21 +199,37 @@ def build_external_providers(
         raise ExternalCompositionError("RICK_QDRANT_URL")
     if not settings.redis_url or inputs.redis_client is None:
         raise ExternalCompositionError("Redis client and RICK_REDIS_URL")
+    from rick_locking import (
+        RedisConfigurationError,
+        RedisLeaseClient,
+        RedisNamespace,
+        RedisRateLimiter,
+        validate_production_capability,
+    )
+
     rate_limiter = inputs.rate_limiter
+    rate_limit_namespace = inputs.rate_limit_namespace
     if (
-        rate_limiter is None
-        or getattr(rate_limiter, "production_safe", False) is not True
-        or getattr(rate_limiter, "backend_kind", None) != "redis"
-        or not callable(getattr(rate_limiter, "allow", None))
-        or not callable(getattr(rate_limiter, "health_check", None))
-        or not callable(getattr(rate_limiter, "readiness_check", None))
+        not isinstance(rate_limiter, RedisRateLimiter)
+        or rate_limiter.redis_client is not inputs.redis_client
+        or not isinstance(rate_limit_namespace, RedisNamespace)
+        or rate_limit_namespace.scope != "global"
+        or rate_limit_namespace.environment != "production"
+        or rate_limiter.namespace != rate_limit_namespace
     ):
-        raise ExternalCompositionError("production-safe distributed rate limiter")
+        raise ExternalCompositionError(
+            "production-safe Redis rate limiter bound to the injected client and global namespace"
+        )
+    try:
+        validate_production_capability(rate_limiter)
+    except RedisConfigurationError:
+        raise ExternalCompositionError(
+            "production-safe Redis rate limiter bound to the injected client and global namespace"
+        ) from None
 
     from rick_ingestion import IngestionService, ProcessParserRunner
     from rick_jobs import JobResult, JobScope
     from rick_knowledge import PostgresKnowledgeStore
-    from rick_locking import RedisLeaseClient
     from rick_providers import ProviderConfig, ResilientProvider, create_provider
     from rick_retrieval import QdrantBackend, QdrantHttpVectorStore
     from rick_storage import AwsCredentials, S3CompatibleObjectStore
@@ -334,16 +351,13 @@ def build_external_providers(
         raise ExternalCompositionError("production-safe Redis lease")
     if lease is None:
         lease = RedisLeaseClient(inputs.redis_client, close_client=False)
-    if settings.environment == "production" and (
-        getattr(lease, "production_safe", False) is not True
-        or getattr(lease, "backend_kind", None) != "redis"
-        or not callable(getattr(lease, "acquire_owned", None))
-        or not callable(getattr(lease, "renew_owned", None))
-        or not callable(getattr(lease, "release_owned", None))
-        or not callable(getattr(lease, "health_check", None))
-        or not callable(getattr(lease, "readiness_check", None))
-    ):
-        raise ExternalCompositionError("production-safe Redis lease")
+    if settings.environment == "production":
+        if not isinstance(lease, RedisLeaseClient) or lease.redis_client is not inputs.redis_client:
+            raise ExternalCompositionError("production-safe Redis lease bound to the injected client")
+        try:
+            validate_production_capability(lease)
+        except RedisConfigurationError:
+            raise ExternalCompositionError("production-safe Redis lease bound to the injected client") from None
     professor = ProfessorChatBackend(
         retrieval=retrieval,
         provider=provider,

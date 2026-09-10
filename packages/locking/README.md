@@ -89,17 +89,20 @@ allowed = await limiter.allow(
 
 `validate_production_capability()` rejects missing, local, unmarked, or
 malformed capabilities. `require_redis_ready()` then requires a successful
-live Redis health check. The package does not wire that gate into `apps/api`;
+live Redis health check. The package does not own the `apps/api` lifecycle;
 the application composition root must inject the Redis lease/rate-limit
-objects and call the gate before accepting production traffic.
+objects, bind them to the same client and namespace, and pass the admission
+readiness gate before accepting production traffic.
 
 The Phase 3 multi-replica gate at
 `scripts/phase11/redis_multi_replica_runtime_gate.py` starts two independent
-API-shaped processes, each with its own Redis client, against one explicitly
-owned URL. It proves that both replicas consume the same atomic tenant bucket,
-that request replay is idempotent, and that a second tenant receives a
-separate bucket. Missing configuration or the optional Redis driver returns
-`BLOCKED_EXTERNAL`; the gate never substitutes `InMemoryRateLimiter`.
+canonical `apps/api` HTTP processes, each with its own Redis client, against
+one explicitly owned URL. It proves the login, recovery, chat and
+compatibility routes consume the same atomic tenant bucket, that a request ID
+replayed through the other HTTP replica is idempotent, that a second tenant
+receives a separate bucket, and that the bucket has a bounded TTL. Missing
+configuration or the optional Redis driver returns `BLOCKED_EXTERNAL`; the
+gate never substitutes `InMemoryRateLimiter`.
 
 ## Local mode and verification
 

@@ -325,6 +325,18 @@ async def _shutdown_owned_resources(app: FastAPI) -> None:
 @asynccontextmanager
 async def _application_lifespan(app: FastAPI):
     try:
+        settings = getattr(app.state, "settings", None)
+        if getattr(settings, "environment", None) == "production":
+            # Production admission is a live, required dependency gate. A
+            # structurally complete Providers object must not start serving
+            # before Redis and the other mandatory capabilities are ready.
+            from core.lifecycle import collect_readiness_states, evaluate_readiness
+
+            states = await collect_readiness_states(app.state.providers)
+            status, _http_code = evaluate_readiness(states)
+            app.state.admission_status = status
+            if status != "ready":
+                raise RuntimeError("production readiness gate failed")
         yield
     finally:
         await _shutdown_owned_resources(app)

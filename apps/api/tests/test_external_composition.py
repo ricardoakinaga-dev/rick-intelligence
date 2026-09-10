@@ -26,6 +26,8 @@ from services.external_composition import (
     build_external_providers,
     load_external_providers,
 )
+from rick_locking import RedisLeaseClient, RedisLeaseStore, RedisNamespace, RedisRateLimiter
+from rick_locking.redis_config import _PRODUCTION_CAPABILITY_TOKEN
 
 
 class HttpTransport:
@@ -78,6 +80,16 @@ class Lease:
         return True
 
 
+def canonical_redis_capabilities(client):
+    namespace = RedisNamespace.global_scope(environment="production")
+    limiter = RedisRateLimiter(client, namespace=namespace)
+    limiter._mark_production_safe(_PRODUCTION_CAPABILITY_TOKEN)  # noqa: SLF001
+    store = RedisLeaseStore(client, namespace=namespace)
+    store._mark_production_safe(_PRODUCTION_CAPABILITY_TOKEN)  # noqa: SLF001
+    lease = RedisLeaseClient(store=store)
+    return namespace, limiter, lease
+
+
 def settings():
     return ApiSettings(
         environment="production",
@@ -101,6 +113,8 @@ def settings():
 def test_external_composition_builds_the_complete_graph_without_network_io(tmp_path):
     calls = []
     client = httpx.AsyncClient(transport=httpx.MockTransport(lambda request: httpx.Response(500)))
+    redis_client = Redis()
+    namespace, rate_limiter, lease = canonical_redis_capabilities(redis_client)
     identity = SimpleNamespace(
         production_safe=True,
         health_check=lambda: True,
@@ -113,9 +127,10 @@ def test_external_composition_builds_the_complete_graph_without_network_io(tmp_p
         created_by="bootstrap-user",
         qdrant_transport=HttpTransport(),
         provider_client=client,
-        redis_client=Redis(),
-        rate_limiter=RateLimiter(),
-        lease=Lease(),
+        redis_client=redis_client,
+        rate_limiter=rate_limiter,
+        rate_limit_namespace=namespace,
+        lease=lease,
         worker_temp_root=str(tmp_path),
         worker_scope=("tenant-a", "workspace-a", "collection-a"),
     )
@@ -190,15 +205,18 @@ def test_external_composition_requires_delivery_for_local_reset_capability(tmp_p
         production_safe=True,
         issue_password_reset=lambda **kwargs: "opaque-token",
     )
+    redis_client = Redis()
+    namespace, rate_limiter, lease = canonical_redis_capabilities(redis_client)
     inputs = ExternalCompositionInputs(
         connection_factory=lambda: None,
         object_store_transport=HttpTransport(),
         identity=identity,
         created_by="bootstrap-user",
         qdrant_transport=HttpTransport(),
-        redis_client=Redis(),
-        rate_limiter=RateLimiter(),
-        lease=Lease(),
+        redis_client=redis_client,
+        rate_limiter=rate_limiter,
+        rate_limit_namespace=namespace,
+        lease=lease,
         worker_temp_root=str(tmp_path),
     )
 
@@ -210,3 +228,23 @@ def test_external_composition_requires_delivery_for_local_reset_capability(tmp_p
         assert exc.component == "password reset delivery"
     else:
         raise AssertionError("password reset delivery must be explicit for external composition")
+
+
+def test_external_composition_rejects_structural_rate_limiter_spoof(tmp_path):
+    redis_client = Redis()
+    namespace = RedisNamespace.global_scope(environment="production")
+    inputs = ExternalCompositionInputs(
+        connection_factory=lambda: None,
+        object_store_transport=HttpTransport(),
+        identity=SimpleNamespace(production_safe=True),
+        created_by="bootstrap-user",
+        qdrant_transport=HttpTransport(),
+        redis_client=redis_client,
+        rate_limiter=RateLimiter(),
+        rate_limit_namespace=namespace,
+        lease=Lease(),
+        worker_temp_root=str(tmp_path),
+    )
+
+    with pytest.raises(ExternalCompositionError, match="bound to the injected client"):
+        build_external_providers(settings(), inputs)
