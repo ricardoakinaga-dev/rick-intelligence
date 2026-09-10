@@ -42,6 +42,7 @@ MAX_EVIDENCE_AGE_SECONDS = 24 * 60 * 60
 MAX_EVIDENCE_FUTURE_SKEW_SECONDS = 5 * 60
 RELEASE_INTEGRITY_COMMAND = ("git", "diff", "--check", "&&", "make", "validate")
 RELEASE_INTEGRITY_PROCEDURE = "run git diff --check and make validate against the exact checkout"
+CI_ENVELOPE_SCHEMA = "state-of-art-ci-evidence.v1"
 
 PASS = "PASS"
 FAIL = "FAIL"
@@ -433,6 +434,37 @@ def _validate_gate_procedure(gate: Any, failures: list[str]) -> None:
         if gate.procedure != RELEASE_INTEGRITY_PROCEDURE:
             failures.append("gate release-integrity procedure is not the approved procedure")
         return
+    if len(command) == 2 and command[0] == "ci-envelope":
+        target = command[1]
+        target_path = Path(target)
+        if target.startswith(".runtime/ci/"):
+            if (
+                target_path.is_absolute()
+                or ".." in target_path.parts
+                or target_path.suffix != ".json"
+                or target_path.name != f"{gate.gate_id}.json"
+            ):
+                failures.append(
+                    f"gate {gate.gate_id} CI-envelope target must be its exact .runtime/ci/{gate.gate_id}.json path"
+                )
+        elif gate.result == PASS:
+            failures.append(
+                f"gate {gate.gate_id} PASS requires a safe .runtime/ci CI-envelope target"
+            )
+        elif target != gate.gate_id:
+            failures.append(f"gate {gate.gate_id} non-PASS CI-envelope target is invalid")
+        evidence_paths = {item.path for item in gate.evidence_paths}
+        if target.startswith(".runtime/ci/") and target not in evidence_paths:
+            failures.append(
+                f"gate {gate.gate_id} CI-envelope target must be listed in evidence_paths"
+            )
+        if gate.result == PASS and target not in evidence_paths:
+            failures.append(
+                f"gate {gate.gate_id} PASS requires its CI envelope in evidence_paths"
+            )
+        if gate.gate_id not in gate.procedure:
+            failures.append(f"gate {gate.gate_id} procedure does not identify its gate")
+        return
     if len(command) != 2 or command[0] != "runtime-envelope" or not command[1].strip():
         failures.append(f"gate {gate.gate_id} command is not an approved runtime-envelope procedure")
         return
@@ -508,6 +540,18 @@ def _evaluate_typed_manifest(
     _validate_current_timestamp(manifest.generated_at, "manifest.generated_at", failures)
 
     manifest_relative = path.relative_to(root).as_posix() if path.is_relative_to(root) else ""
+    ci_run_ids: set[str] = set()
+    ci_run_attempts: set[str] = set()
+    expected_ci_run_id = os.environ.get("GITHUB_RUN_ID", "").strip()
+    expected_ci_run_attempt = os.environ.get("GITHUB_RUN_ATTEMPT", "").strip()
+    expected_ci_metadata = {
+        "repository": os.environ.get("GITHUB_REPOSITORY", "").strip(),
+        "workflow": os.environ.get("GITHUB_WORKFLOW", "").strip(),
+        "workflow_ref": os.environ.get("GITHUB_WORKFLOW_REF", "").strip(),
+        "event_name": os.environ.get("GITHUB_EVENT_NAME", "").strip(),
+        "ref": os.environ.get("GITHUB_REF", "").strip(),
+        "sha": os.environ.get("GITHUB_SHA", "").strip().lower(),
+    }
 
     def check_file(raw_path: str, expected_hash: str, field: str) -> None:
         if raw_path == manifest_relative:
@@ -532,7 +576,11 @@ def _evaluate_typed_manifest(
         """Validate the executable observation behind a runtime-envelope gate."""
 
         target = gate.command[1] if len(gate.command) == 2 else ""
-        if not target.startswith(".runtime/") or evidence_path != target:
+        if (
+            not target.startswith(".runtime/")
+            or target.startswith(".runtime/ci/")
+            or evidence_path != target
+        ):
             return
         safe_path, path_error = _safe_evidence_path(root, evidence_path)
         if path_error or safe_path is None or not safe_path.is_file():
@@ -595,6 +643,174 @@ def _evaluate_typed_manifest(
                 continue
             check_file(raw_path, raw_hash, f"gate {gate.gate_id}.runtime.raw_artifacts[{index}]")
 
+    def check_ci_envelope(gate: Any, evidence_path: str) -> None:
+        """Validate the same-run local CI observation behind a CI gate."""
+
+        target = gate.command[1] if len(gate.command) == 2 and gate.command[0] == "ci-envelope" else ""
+        if not evidence_path.startswith(".runtime/ci/") or (target and evidence_path != target):
+            return
+        if Path(evidence_path).name != f"{gate.gate_id}.json":
+            failures.append(f"gate {gate.gate_id} CI envelope path is not the exact gate path")
+            return
+        safe_path, path_error = _safe_evidence_path(root, evidence_path)
+        if path_error or safe_path is None or not safe_path.is_file():
+            return  # check_file already emits the authoritative path error.
+        try:
+            envelope = json.loads(safe_path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+            failures.append(f"gate {gate.gate_id} CI envelope is not readable JSON")
+            return
+        if not isinstance(envelope, Mapping) or envelope.get("schema_version") != CI_ENVELOPE_SCHEMA:
+            failures.append(f"gate {gate.gate_id} CI envelope has an unsupported schema")
+            return
+        observed_status = envelope.get("status")
+        if observed_status not in {"PASS", "FAIL", "NOT_RUN"}:
+            failures.append(f"gate {gate.gate_id} CI envelope has an invalid status")
+        is_primary_ci = bool(target)
+        if is_primary_ci and observed_status != gate.result:
+            failures.append(f"gate {gate.gate_id} CI envelope status does not match the manifest")
+        elif not is_primary_ci and observed_status != "PASS" and gate.result == "PASS":
+            failures.append(f"gate {gate.gate_id} non-PASS CI supplement cannot accompany a PASS manifest gate")
+        expected_exit = {"PASS": 0, "FAIL": 1, "NOT_RUN": None}.get(
+            gate.result if is_primary_ci else observed_status
+        )
+        if envelope.get("exit_status") != expected_exit:
+            failures.append(f"gate {gate.gate_id} CI envelope exit_status does not match the manifest")
+        gate_ids = envelope.get("gate_ids")
+        if (
+            not isinstance(gate_ids, Sequence)
+            or isinstance(gate_ids, (str, bytes, bytearray))
+            or gate.gate_id not in gate_ids
+        ):
+            failures.append(f"gate {gate.gate_id} CI envelope does not declare the gate")
+        for field, expected in (
+            ("commit_sha", binding.commit_sha),
+            ("tree_sha", binding.tree_sha),
+            ("checkout_fingerprint", binding.checkout_fingerprint),
+        ):
+            if envelope.get(field) != expected:
+                failures.append(f"gate {gate.gate_id} CI envelope {field} is not bound to the manifest")
+        if envelope.get("checkout_available") is not True:
+            failures.append(f"gate {gate.gate_id} CI envelope checkout is unavailable")
+        if envelope.get("clean_worktree") is not True:
+            failures.append(f"gate {gate.gate_id} CI envelope is not clean")
+        if envelope.get("freshness") != "CURRENT":
+            failures.append(f"gate {gate.gate_id} CI envelope is not current")
+        if envelope.get("promotion_scope") != "LOCAL_CI_ONLY":
+            failures.append(f"gate {gate.gate_id} CI envelope has an invalid promotion scope")
+        if envelope.get("production_safe") is not False:
+            failures.append(f"gate {gate.gate_id} CI envelope must not claim production safety")
+        for field in ("procedure", "environment", "observed_at"):
+            if not isinstance(envelope.get(field), str) or not envelope[field].strip():
+                failures.append(f"gate {gate.gate_id} CI envelope has no {field}")
+        if isinstance(envelope.get("observed_at"), str):
+            _validate_current_timestamp(envelope["observed_at"], f"gate {gate.gate_id}.ci.observed_at", failures)
+        sentinel = envelope.get("checkout_sentinel")
+        if not isinstance(sentinel, Mapping) or sentinel.get("unchanged") is not True:
+            failures.append(f"gate {gate.gate_id} CI envelope sentinel is not unchanged")
+
+        run = envelope.get("run")
+        if not isinstance(run, Mapping) or run.get("actions") is not True:
+            failures.append(f"gate {gate.gate_id} CI envelope has no GitHub Actions provenance")
+        else:
+            if run.get("provider") != "github-actions":
+                failures.append(f"gate {gate.gate_id} CI envelope has an invalid provider")
+            run_id = run.get("run_id")
+            if not isinstance(run_id, str) or not run_id.strip():
+                failures.append(f"gate {gate.gate_id} CI envelope has no run_id")
+            else:
+                ci_run_ids.add(run_id)
+                if expected_ci_run_id and run_id != expected_ci_run_id:
+                    failures.append(
+                        f"gate {gate.gate_id} CI envelope run_id does not match this workflow run"
+                    )
+            run_attempt = run.get("run_attempt")
+            if not isinstance(run_attempt, str) or not run_attempt.strip():
+                failures.append(f"gate {gate.gate_id} CI envelope run has no run_attempt")
+            else:
+                ci_run_attempts.add(run_attempt)
+                if expected_ci_run_attempt and run_attempt != expected_ci_run_attempt:
+                    failures.append(
+                        f"gate {gate.gate_id} CI envelope run_attempt does not match this workflow attempt"
+                    )
+            for field in (
+                "workflow",
+                "workflow_ref",
+                "job",
+                "repository",
+                "event_name",
+                "ref",
+                "sha",
+            ):
+                if not isinstance(run.get(field), str) or not run[field].strip():
+                    failures.append(f"gate {gate.gate_id} CI envelope run has no {field}")
+            for field, expected in expected_ci_metadata.items():
+                actual = run.get(field)
+                if expected and isinstance(actual, str):
+                    comparable_actual = actual.strip().lower() if field == "sha" else actual.strip()
+                    if comparable_actual != expected:
+                        failures.append(
+                            f"gate {gate.gate_id} CI envelope run {field} does not match this workflow"
+                        )
+            run_sha = run.get("sha")
+            if isinstance(run_sha, str) and run_sha.strip().lower() != binding.commit_sha:
+                failures.append(f"gate {gate.gate_id} CI envelope run SHA is not bound to the manifest")
+
+        commands = envelope.get("commands")
+        if not isinstance(commands, Sequence) or isinstance(commands, (str, bytes, bytearray)) or not commands:
+            failures.append(f"gate {gate.gate_id} CI envelope has no command observations")
+        else:
+            command_statuses: list[str] = []
+            for index, command in enumerate(commands):
+                if not isinstance(command, Mapping):
+                    failures.append(f"gate {gate.gate_id} CI command {index} is invalid")
+                    continue
+                argv = command.get("argv")
+                status = command.get("status")
+                exit_status = command.get("exit_status")
+                if not isinstance(argv, Sequence) or isinstance(argv, (str, bytes, bytearray)) or not argv:
+                    failures.append(f"gate {gate.gate_id} CI command {index} has no argv")
+                if status not in {"PASS", "FAIL", "NOT_RUN"}:
+                    failures.append(f"gate {gate.gate_id} CI command {index} has an invalid status")
+                if exit_status is not None and (type(exit_status) is not int or exit_status < 0):
+                    failures.append(f"gate {gate.gate_id} CI command {index} has an invalid exit_status")
+                command_statuses.append(str(status))
+            if gate.result == PASS and any(status != "PASS" for status in command_statuses):
+                failures.append(f"gate {gate.gate_id} PASS CI envelope contains a non-PASS command")
+            if gate.result == FAIL and not any(status != "PASS" for status in command_statuses):
+                failures.append(f"gate {gate.gate_id} FAIL CI envelope contains no failed command")
+
+        raw_artifacts = envelope.get("raw_artifacts")
+        if not isinstance(raw_artifacts, Sequence) or isinstance(raw_artifacts, (str, bytes, bytearray)) or not raw_artifacts:
+            failures.append(f"gate {gate.gate_id} CI envelope has no raw artifact")
+        else:
+            first_hash: str | None = None
+            for index, raw_ref in enumerate(raw_artifacts):
+                if not isinstance(raw_ref, Mapping):
+                    failures.append(f"gate {gate.gate_id} CI raw_artifacts[{index}] is invalid")
+                    continue
+                raw_path = raw_ref.get("path")
+                raw_hash = raw_ref.get("sha256")
+                if not isinstance(raw_path, str) or not isinstance(raw_hash, str):
+                    failures.append(f"gate {gate.gate_id} CI raw_artifacts[{index}] is incomplete")
+                    continue
+                if raw_path == evidence_path:
+                    failures.append(f"gate {gate.gate_id} CI raw artifact must not self-reference its envelope")
+                normalized_hash = raw_hash.removeprefix("sha256:").lower()
+                if not SHA256_RE.fullmatch(normalized_hash):
+                    failures.append(f"gate {gate.gate_id} CI raw_artifacts[{index}] has an invalid hash")
+                elif first_hash is None:
+                    first_hash = normalized_hash
+                check_file(raw_path, normalized_hash, f"gate {gate.gate_id}.ci.raw_artifacts[{index}]")
+            artifact_hash = envelope.get("artifact_sha256")
+            normalized_artifact_hash = (
+                artifact_hash.removeprefix("sha256:").lower()
+                if isinstance(artifact_hash, str)
+                else ""
+            )
+            if not SHA256_RE.fullmatch(normalized_artifact_hash) or normalized_artifact_hash != first_hash:
+                failures.append(f"gate {gate.gate_id} CI envelope artifact_sha256 does not match its raw artifact")
+
     for index, artifact in enumerate(manifest.artifacts):
         check_file(artifact.path, artifact.sha256, f"artifacts[{index}]")
     for gate in manifest.gates:
@@ -603,6 +819,12 @@ def _evaluate_typed_manifest(
         for index, evidence in enumerate(gate.evidence_paths):
             check_file(evidence.path, evidence.sha256, f"gate {gate.gate_id}.evidence_paths[{index}]")
             check_runtime_envelope(gate, evidence.path)
+            check_ci_envelope(gate, evidence.path)
+
+    if len(ci_run_ids) > 1:
+        failures.append("CI gate envelopes are from different GitHub workflow runs")
+    if len(ci_run_attempts) > 1:
+        failures.append("CI gate envelopes are from different GitHub workflow attempts")
 
     blocking_gates = [gate for gate in manifest.gates if gate.result != "PASS"]
     if failures:

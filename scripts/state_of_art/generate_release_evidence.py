@@ -154,11 +154,13 @@ DEFAULT_ARTIFACTS = (
     "scripts/state_of_art/release_integrity.py",
     "scripts/state_of_art/release_manifest.py",
     "scripts/state_of_art/generate_release_evidence.py",
+    "scripts/state_of_art/ci_lane_evidence.py",
     "scripts/state_of_art/phase3_evidence.py",
     "scripts/state_of_art/generate_phase3_evidence.py",
     "scripts/state_of_art/phase3_lane.py",
     "scripts/state_of_art/phase3_runtime_adapter.py",
     "scripts/state_of_art/tests/test_phase3_evidence.py",
+    "scripts/state_of_art/tests/test_ci_lane_evidence.py",
     "scripts/state_of_art/tests/test_phase3_lane.py",
     "scripts/state_of_art/tests/test_object_qdrant_runtime.py",
     "scripts/state_of_art/tests/test_provider_runtime.py",
@@ -196,6 +198,16 @@ RUNTIME_GATE_ARTIFACTS = {
     "visual": ".runtime/phase-3/frontend-supply-runtime-evidence.json",
     "supply-chain": ".runtime/phase-3/supply-chain-runtime-evidence.json",
     "provider": ".runtime/phase-3/provider-runtime-evidence.json",
+}
+CI_GATE_ARTIFACTS = {
+    # These are local CI gates only.  They never replace the named live
+    # runtime envelopes above, and their envelope explicitly carries the
+    # LOCAL_CI_ONLY promotion scope.
+    "architecture": ".runtime/ci/architecture.json",
+    "contracts": ".runtime/ci/contracts.json",
+    "security": ".runtime/ci/security.json",
+    "unit": ".runtime/ci/unit.json",
+    "supply-chain": ".runtime/ci/supply-chain.json",
 }
 
 
@@ -258,6 +270,7 @@ def _runtime_result(
     tree_sha: str,
     artifact_hash: str,
     timestamp: str,
+    supplemental_ci_relative: str | None = None,
 ) -> GateResult:
     """Aggregate an observed runtime envelope or preserve a real NOT_RUN state."""
 
@@ -298,8 +311,39 @@ def _runtime_result(
             limitations = "runtime envelope is not a JSON object"
     else:
         evidence_paths = (_evidence_ref(root, audit_path, f"current audit for missing {gate_id} evidence"),)
-        command = ("runtime-envelope", relative or gate_id)
+        command = ("runtime-envelope", relative if relative and (root / relative).is_file() else gate_id)
         procedure = f"await the approved runtime procedure for {gate_id}; no artifact is claimed"
+    if supplemental_ci_relative and relative is not None and (root / relative).is_file():
+        ci_path = root / supplemental_ci_relative
+        if ci_path.is_file():
+            evidence_paths = evidence_paths + (
+                _evidence_ref(root, supplemental_ci_relative, f"same-run CI supplement for {gate_id}"),
+            )
+            try:
+                ci_raw = json.loads(ci_path.read_text(encoding="utf-8"))
+            except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+                ci_raw = None
+            ci_result = "INVALID"
+            ci_exit_status: int | None = 1
+            if isinstance(ci_raw, dict) and ci_raw.get("schema_version") == "state-of-art-ci-evidence.v1":
+                observed_ci = str(ci_raw.get("status", "")).upper()
+                expected_ci_exit = {"PASS": 0, "FAIL": 1, "NOT_RUN": None}
+                raw_ci_exit = ci_raw.get("exit_status")
+                expected_exit = expected_ci_exit.get(observed_ci)
+                exit_shape_valid = (
+                    type(raw_ci_exit) is int and raw_ci_exit >= 0
+                    if expected_exit is not None
+                    else raw_ci_exit is None
+                )
+                if observed_ci in expected_ci_exit and exit_shape_valid and raw_ci_exit == expected_exit:
+                    ci_result = observed_ci
+                    ci_exit_status = raw_ci_exit
+            severity = {"PASS": 0, "NOT_RUN": 1, "BLOCKED_EXTERNAL": 2, "FAIL": 3, "INVALID": 4}
+            if severity[ci_result] > severity.get(result, severity["INVALID"]):
+                result = ci_result
+                exit_status = ci_exit_status
+            if ci_result != "PASS":
+                limitations = f"{limitations}; same-run CI supplement: {ci_result}"
     return GateResult(
         gate_id=gate_id,
         commit_sha=commit_sha,
@@ -312,6 +356,78 @@ def _runtime_result(
         exit_status=exit_status,
         result=result,  # type: ignore[arg-type]
         limitations=(limitations,),
+        reviewer=reviewer,
+        evidence_paths=evidence_paths,
+    )
+
+
+def _ci_result(
+    root: Path,
+    gate_id: str,
+    audit_path: str,
+    reviewer: ReviewerRef,
+    *,
+    commit_sha: str,
+    tree_sha: str,
+    artifact_hash: str,
+    timestamp: str,
+) -> GateResult:
+    """Aggregate one same-run local CI envelope without upgrading runtime."""
+
+    relative = CI_GATE_ARTIFACTS[gate_id]
+    evidence_paths: tuple[EvidenceRef, ...]
+    command: tuple[str, ...]
+    procedure: str
+    result = "NOT_RUN"
+    exit_status: int | None = None
+    limitations = "No current same-run CI envelope was supplied for this local gate."
+    path = root / relative
+    if path.is_file():
+        evidence_paths = (_evidence_ref(root, relative, f"same-run CI envelope for {gate_id}"),)
+        command = ("ci-envelope", relative)
+        procedure = f"validate the supplied same-run CI envelope for {gate_id} against this checkout"
+        try:
+            raw = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+            raw = None
+        if isinstance(raw, dict) and raw.get("schema_version") == "state-of-art-ci-evidence.v1":
+            observed = str(raw.get("status", "")).upper()
+            raw_exit = raw.get("exit_status")
+            expected_exit = {"PASS": 0, "FAIL": 1, "NOT_RUN": None}
+            if observed in expected_exit and (
+                (type(raw_exit) is int and raw_exit >= 0) or raw_exit is None
+            ) and raw_exit == expected_exit[observed]:
+                result = observed
+                exit_status = raw_exit
+                raw_limitations = raw.get("limitations")
+                if isinstance(raw_limitations, list):
+                    limitations = "; ".join(str(item) for item in raw_limitations if str(item).strip())
+                elif raw_limitations:
+                    limitations = str(raw_limitations)
+            else:
+                result = "INVALID"
+                exit_status = 1
+                limitations = "CI envelope has an unsupported status or contradictory exit_status"
+        else:
+            result = "INVALID"
+            exit_status = 1
+            limitations = "CI envelope has an unsupported schema or is not a JSON object"
+    else:
+        evidence_paths = (_evidence_ref(root, audit_path, f"current audit for missing {gate_id} CI evidence"),)
+        command = ("ci-envelope", gate_id)
+        procedure = f"await the same-run CI procedure for {gate_id}; no envelope is claimed"
+    return GateResult(
+        gate_id=gate_id,
+        commit_sha=commit_sha,
+        tree_sha=tree_sha,
+        artifact_hash=artifact_hash,
+        command=command,
+        procedure=procedure,
+        environment="same-run-ci-envelope-or-not-run",
+        timestamp=timestamp,
+        exit_status=exit_status,
+        result=result,  # type: ignore[arg-type]
+        limitations=(limitations or "CI envelope limitations were not supplied",),
         reviewer=reviewer,
         evidence_paths=evidence_paths,
     )
@@ -378,18 +494,33 @@ def generate_manifest(
     for gate_id in REQUIRED_GATES:
         if gate_id == "release-integrity":
             continue
-        gates.append(
-            _runtime_result(
-                root,
-                gate_id,
-                audit_path,
-                reviewer,
-                commit_sha=checkout["head"],
-                tree_sha=checkout["tree"],
-                artifact_hash=artifact_hash,
-                timestamp=timestamp,
+        if gate_id in CI_GATE_ARTIFACTS and gate_id != "supply-chain":
+            gates.append(
+                _ci_result(
+                    root,
+                    gate_id,
+                    audit_path,
+                    reviewer,
+                    commit_sha=checkout["head"],
+                    tree_sha=checkout["tree"],
+                    artifact_hash=artifact_hash,
+                    timestamp=timestamp,
+                )
             )
-        )
+        else:
+            gates.append(
+                _runtime_result(
+                    root,
+                    gate_id,
+                    audit_path,
+                    reviewer,
+                    commit_sha=checkout["head"],
+                    tree_sha=checkout["tree"],
+                    artifact_hash=artifact_hash,
+                    timestamp=timestamp,
+                    supplemental_ci_relative=CI_GATE_ARTIFACTS.get(gate_id),
+                )
+            )
     status = "PASS"
     if any(gate.result == "FAIL" for gate in gates):
         status = "FAIL"

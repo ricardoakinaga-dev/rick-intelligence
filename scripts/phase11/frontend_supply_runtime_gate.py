@@ -1003,7 +1003,10 @@ def audit_frontend_sources(root: Path) -> dict[str, Any]:
             "missing_scripts": sorted(required_scripts - set(scripts)),
             "configured_viewports": configured_viewports,
             "workflow_has_frontend_runtime": "frontend-runtime:" in workflow,
-            "workflow_runtime_command": "make web-e2e" in workflow,
+            "workflow_runtime_command": any(
+                command in workflow
+                for command in ("make web-e2e", "make phase3-frontend-supply-runtime")
+            ),
             "workflow_runtime_event_scope": "github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'" in workflow,
             "runtime_fixture_files_not_used": True,
         }

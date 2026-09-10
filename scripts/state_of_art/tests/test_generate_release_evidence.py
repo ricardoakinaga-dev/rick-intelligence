@@ -50,6 +50,71 @@ def test_runtime_gate_artifact_registry_points_to_named_envelopes() -> None:
     }
 
 
+def test_local_ci_gate_artifact_registry_is_explicit_and_disjoint() -> None:
+    assert generate_release_evidence.CI_GATE_ARTIFACTS == {
+        "architecture": ".runtime/ci/architecture.json",
+        "contracts": ".runtime/ci/contracts.json",
+        "security": ".runtime/ci/security.json",
+        "unit": ".runtime/ci/unit.json",
+        "supply-chain": ".runtime/ci/supply-chain.json",
+    }
+    assert not (set(generate_release_evidence.CI_GATE_ARTIFACTS) - {"supply-chain"}) & {
+        "multi-worker",
+        "multi-tenant",
+        "redis",
+        "postgresql",
+        "qdrant",
+        "object-storage",
+        "ingestion-e2e",
+        "evidence",
+        "citation",
+        "decision",
+        "observability",
+        "dr",
+        "restore",
+        "file-security",
+        "chaos",
+        "soak",
+        "performance",
+        "frontend-e2e",
+        "accessibility",
+        "visual",
+        "provider",
+    }
+
+
+def test_supply_chain_runtime_remains_primary_with_ci_as_supplement(tmp_path: Path) -> None:
+    audit = tmp_path / "audit.md"
+    audit.write_text("audit\n", encoding="utf-8")
+    runtime_path = tmp_path / generate_release_evidence.RUNTIME_GATE_ARTIFACTS["supply-chain"]
+    runtime_path.parent.mkdir(parents=True)
+    runtime_path.write_text(json.dumps({"status": "PASS", "exit_status": 0}), encoding="utf-8")
+    ci_path = tmp_path / generate_release_evidence.CI_GATE_ARTIFACTS["supply-chain"]
+    ci_path.parent.mkdir(parents=True, exist_ok=True)
+    ci_path.write_text(
+        json.dumps({"schema_version": "state-of-art-ci-evidence.v1", "status": "PASS", "exit_status": 0}),
+        encoding="utf-8",
+    )
+
+    result = generate_release_evidence._runtime_result(
+        tmp_path,
+        "supply-chain",
+        "audit.md",
+        _reviewer(),
+        commit_sha=HEAD,
+        tree_sha=TREE,
+        artifact_hash=ARTIFACT_HASH,
+        timestamp=TIMESTAMP,
+        supplemental_ci_relative=generate_release_evidence.CI_GATE_ARTIFACTS["supply-chain"],
+    )
+
+    assert result.command == ("runtime-envelope", generate_release_evidence.RUNTIME_GATE_ARTIFACTS["supply-chain"])
+    assert [item.path for item in result.evidence_paths] == [
+        generate_release_evidence.RUNTIME_GATE_ARTIFACTS["supply-chain"],
+        generate_release_evidence.CI_GATE_ARTIFACTS["supply-chain"],
+    ]
+
+
 def test_missing_runtime_artifact_is_not_run_not_fabricated_block(tmp_path: Path) -> None:
     audit = tmp_path / "audit.md"
     audit.write_text("audit\n", encoding="utf-8")
@@ -93,3 +158,93 @@ def test_runtime_artifact_status_is_aggregated(tmp_path: Path) -> None:
     assert result.result == "FAIL"
     assert result.exit_status == 1
     assert result.evidence_paths[0].path == generate_release_evidence.RUNTIME_GATE_ARTIFACTS[gate_id]
+
+
+def test_ci_artifact_status_is_aggregated(tmp_path: Path) -> None:
+    audit = tmp_path / "audit.md"
+    audit.write_text("audit\n", encoding="utf-8")
+    gate_id = "unit"
+    ci_path = tmp_path / generate_release_evidence.CI_GATE_ARTIFACTS[gate_id]
+    ci_path.parent.mkdir(parents=True)
+    ci_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "state-of-art-ci-evidence.v1",
+                "status": "PASS",
+                "exit_status": 0,
+                "limitations": ["local CI only"],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = generate_release_evidence._ci_result(
+        tmp_path,
+        gate_id,
+        "audit.md",
+        _reviewer(),
+        commit_sha=HEAD,
+        tree_sha=TREE,
+        artifact_hash=ARTIFACT_HASH,
+        timestamp=TIMESTAMP,
+    )
+
+    assert result.result == "PASS"
+    assert result.exit_status == 0
+    assert result.evidence_paths[0].path == generate_release_evidence.CI_GATE_ARTIFACTS[gate_id]
+
+
+def test_invalid_ci_artifact_status_is_not_promoted(tmp_path: Path) -> None:
+    audit = tmp_path / "audit.md"
+    audit.write_text("audit\n", encoding="utf-8")
+    gate_id = "security"
+    ci_path = tmp_path / generate_release_evidence.CI_GATE_ARTIFACTS[gate_id]
+    ci_path.parent.mkdir(parents=True)
+    ci_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "state-of-art-ci-evidence.v1",
+                "status": "PASS",
+                "exit_status": 1,
+                "limitations": ["contradictory fixture"],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = generate_release_evidence._ci_result(
+        tmp_path,
+        gate_id,
+        "audit.md",
+        _reviewer(),
+        commit_sha=HEAD,
+        tree_sha=TREE,
+        artifact_hash=ARTIFACT_HASH,
+        timestamp=TIMESTAMP,
+    )
+
+    assert result.result == "INVALID"
+    assert result.exit_status == 1
+
+
+def test_canonical_workflow_binds_ci_artifacts_to_the_same_run() -> None:
+    workflow = Path(__file__).parents[3] / ".github/workflows/quality.yml"
+    text = workflow.read_text(encoding="utf-8")
+
+    for lane, gate in (
+        ("fast", "architecture"),
+        ("unit", "unit"),
+        ("contract", "contracts"),
+        ("security", "security"),
+        ("supply-chain", "supply-chain"),
+    ):
+        assert "ci_lane_evidence.py" in text
+        assert f"--lane {lane}" in text
+        assert f"--gate {gate}" in text
+        assert f"ci-{gate}-${{{{ github.run_id }}}}" in text
+
+    assert "Download architecture CI envelope from this workflow run" in text
+    assert "Download supply-chain CI envelope from this workflow run" in text
+    assert "cvg-master-rag-v2','rick-professor','modulo-redis-locker" in text
+    assert "run: make phase3-frontend-supply-runtime" in text
+    assert ".runtime/phase-3" in text

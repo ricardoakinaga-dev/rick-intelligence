@@ -5,9 +5,11 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from hashlib import sha256
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from scripts.state_of_art import release_integrity
 from scripts.state_of_art.release_manifest import (
@@ -436,6 +438,188 @@ class ReleaseManifestTests(unittest.TestCase):
 
         self.assertEqual(result["classification"], release_integrity.FAIL)
         self.assertIn("not production-safe", result["reason"])
+
+    def test_ci_pass_requires_same_run_bound_raw_artifact(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="release-manifest-") as directory:
+            path, checkout = self._fixture(directory)
+            root = Path(directory)
+            ci_log = root / ".runtime/ci/architecture.log"
+            ci_log.parent.mkdir(parents=True)
+            ci_log.write_text("make validate: PASS\n", encoding="utf-8")
+            ci_path = root / ".runtime/ci/architecture.json"
+            ci_path.write_text(
+                json.dumps(
+                    {
+                        "schema_version": "state-of-art-ci-evidence.v1",
+                        "record_id": "CI-architecture-fixture",
+                        "lane": "fast",
+                        "gate_ids": ["architecture"],
+                        "status": "PASS",
+                        "exit_status": 0,
+                        "commit_sha": self.HEAD,
+                        "tree_sha": self.TREE,
+                        "checkout_fingerprint": self.CHECKOUT,
+                        "checkout_available": True,
+                        "clean_worktree": True,
+                        "freshness": "CURRENT",
+                        "promotion_scope": "LOCAL_CI_ONLY",
+                        "production_safe": False,
+                        "procedure": "Execute the declared shell-free commands for CI lane fast and gates architecture",
+                        "environment": "github-actions-local-ci",
+                        "observed_at": datetime.now(timezone.utc).isoformat(),
+                        "next_action": "Bind this local CI result to the complete release packet",
+                        "limitations": ["local CI only"],
+                        "run": {
+                            "actions": True,
+                            "event_name": "push",
+                            "job": "fast",
+                            "provider": "github-actions",
+                            "repository": "example/rick-intelligence",
+                            "ref": "refs/heads/main",
+                            "run_attempt": "1",
+                            "run_id": "12345",
+                            "server_url": "https://github.com",
+                            "sha": self.HEAD,
+                            "workflow": "RICK canonical quality lanes",
+                            "workflow_ref": "example/rick-intelligence/.github/workflows/quality.yml@refs/heads/main",
+                        },
+                        "commands": [
+                            {
+                                "argv": ["make", "validate"],
+                                "duration_ms": 10,
+                                "exit_status": 0,
+                                "index": 1,
+                                "output_truncated": False,
+                                "status": "PASS",
+                            }
+                        ],
+                        "raw_artifacts": [
+                            {
+                                "description": "bounded command output",
+                                "path": ".runtime/ci/architecture.log",
+                                "sha256": sha256(ci_log.read_bytes()).hexdigest(),
+                            }
+                        ],
+                        "artifact_sha256": sha256(ci_log.read_bytes()).hexdigest(),
+                        "checkout_sentinel": {
+                            "before": {
+                                "available": True,
+                                "head": self.HEAD,
+                                "tree": self.TREE,
+                                "fingerprint": self.CHECKOUT,
+                                "status": "CLEAN",
+                            },
+                            "after": {
+                                "available": True,
+                                "head": self.HEAD,
+                                "tree": self.TREE,
+                                "fingerprint": self.CHECKOUT,
+                                "status": "CLEAN",
+                            },
+                            "unchanged": True,
+                        },
+                    },
+                    sort_keys=True,
+                ),
+                encoding="utf-8",
+            )
+            ci_hash = sha256(ci_path.read_bytes()).hexdigest()
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            architecture = next(
+                gate for gate in payload["gates"]
+                if gate["gate_id"] == "architecture"
+            )
+            architecture["command"] = ["ci-envelope", ".runtime/ci/architecture.json"]
+            architecture["procedure"] = "validate the supplied same-run CI envelope for architecture against this checkout"
+            architecture["evidence_paths"] = [
+                {
+                    "description": "same-run CI envelope for architecture",
+                    "path": ".runtime/ci/architecture.json",
+                    "sha256": ci_hash,
+                }
+            ]
+            architecture["evidence_path"] = architecture["evidence_paths"]
+            path.write_text(json.dumps(payload), encoding="utf-8")
+            with patch.dict(
+                os.environ,
+                {
+                    "GITHUB_RUN_ID": "12345",
+                    "GITHUB_RUN_ATTEMPT": "1",
+                    "GITHUB_REPOSITORY": "example/rick-intelligence",
+                    "GITHUB_WORKFLOW": "RICK canonical quality lanes",
+                    "GITHUB_WORKFLOW_REF": "example/rick-intelligence/.github/workflows/quality.yml@refs/heads/main",
+                    "GITHUB_EVENT_NAME": "push",
+                    "GITHUB_REF": "refs/heads/main",
+                    "GITHUB_SHA": self.HEAD,
+                },
+            ):
+                result = release_integrity.evaluate_evidence(path, checkout, root=root)
+
+        self.assertEqual(result["classification"], release_integrity.PASS)
+
+    def test_ci_pass_rejects_production_safe_claim(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="release-manifest-") as directory:
+            path, checkout = self._fixture(directory)
+            root = Path(directory)
+            ci_log = root / ".runtime/ci/architecture.log"
+            ci_log.parent.mkdir(parents=True)
+            ci_log.write_text("pass\n", encoding="utf-8")
+            ci_path = root / ".runtime/ci/architecture.json"
+            envelope = {
+                "schema_version": "state-of-art-ci-evidence.v1",
+                "status": "PASS",
+                "exit_status": 0,
+                "gate_ids": ["architecture"],
+                "commit_sha": self.HEAD,
+                "tree_sha": self.TREE,
+                "checkout_fingerprint": self.CHECKOUT,
+                "checkout_available": True,
+                "clean_worktree": True,
+                "freshness": "CURRENT",
+                "promotion_scope": "LOCAL_CI_ONLY",
+                "production_safe": True,
+                "procedure": "validate architecture CI envelope",
+                "environment": "github-actions-local-ci",
+                "observed_at": datetime.now(timezone.utc).isoformat(),
+                "run": {
+                    "actions": True,
+                    "workflow": "workflow",
+                    "job": "architecture",
+                    "run_id": "12345",
+                    "repository": "example/rick-intelligence",
+                    "event_name": "push",
+                    "sha": self.HEAD,
+                },
+                "commands": [{"argv": ["make", "validate"], "status": "PASS", "exit_status": 0}],
+                "raw_artifacts": [
+                    {
+                        "path": ".runtime/ci/architecture.log",
+                        "sha256": sha256(ci_log.read_bytes()).hexdigest(),
+                    }
+                ],
+                "artifact_sha256": sha256(ci_log.read_bytes()).hexdigest(),
+                "limitations": ["fixture"],
+                "next_action": "review",
+                "checkout_sentinel": {"unchanged": True},
+            }
+            ci_path.write_text(json.dumps(envelope), encoding="utf-8")
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            architecture = next(gate for gate in payload["gates"] if gate["gate_id"] == "architecture")
+            architecture["command"] = ["ci-envelope", ".runtime/ci/architecture.json"]
+            architecture["procedure"] = "validate architecture CI envelope"
+            architecture["evidence_paths"] = [
+                {
+                    "description": "CI envelope",
+                    "path": ".runtime/ci/architecture.json",
+                    "sha256": sha256(ci_path.read_bytes()).hexdigest(),
+                }
+            ]
+            architecture["evidence_path"] = architecture["evidence_paths"]
+            path.write_text(json.dumps(payload), encoding="utf-8")
+            result = release_integrity.evaluate_evidence(path, checkout, root=root)
+
+        self.assertEqual(result["classification"], release_integrity.FAIL)
+        self.assertIn("must not claim production safety", result["reason"])
 
 
 if __name__ == "__main__":

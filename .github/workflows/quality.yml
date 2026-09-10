@@ -41,16 +41,26 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Install bounded test dependencies
         run: python -m pip install --disable-pip-version-check --no-cache-dir "pytest==8.0.2" "pytest-asyncio==0.23.5" "pydantic==2.6.1" "httpx==0.27.0" "fastapi==0.109.2" "python-multipart==0.0.9" "psycopg[binary]==3.2.3" "redis==5.2.1"
-      - name: Validate repository controls
-        run: make validate
-      - name: Validate migration/image static contracts
-        run: make ops-static
-      - name: Validate Compose topology without starting containers
-        run: make compose-static
-      - name: Validate whitespace and preserved child repositories
+      - name: Execute and record architecture CI gate
         run: |
-          git diff --check
-          test -z "$(git status --porcelain -- cvg-master-rag-v2 rick-professor modulo-redis-locker)"
+          python3 scripts/state_of_art/ci_lane_evidence.py \
+            --lane fast \
+            --gate architecture \
+            --output .runtime/ci/architecture.json \
+            --log-output .runtime/ci/architecture.log \
+            --command "make validate" \
+            --command "make ops-static" \
+            --command "make compose-static" \
+            --command "python3 -c \"import subprocess,sys; sys.exit(1 if subprocess.check_output(['git','status','--porcelain','--','cvg-master-rag-v2','rick-professor','modulo-redis-locker']).strip() else 0)\"" \
+            --command "git diff --check"
+      - name: Upload architecture CI envelope
+        if: always()
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: ci-architecture-${{ github.run_id }}
+          path: .runtime/ci
+          if-no-files-found: warn
+          include-hidden-files: true
 
   unit:
     name: UNIT / root packages
@@ -65,15 +75,28 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Install pinned root dependencies
         run: python -m pip install --disable-pip-version-check --no-cache-dir "pytest==8.0.2" "pytest-asyncio==0.23.5" "pydantic==2.6.1" "httpx==0.27.0" "fastapi==0.109.2" "python-multipart==0.0.9" "psycopg[binary]==3.2.3" "redis==5.2.1"
-      - name: Run root unit and contract suites
+      - name: Execute and record unit CI gate
         run: |
-          make api15-contracts
-          make api15-provider
-          make api15-lock
-          make api15-professor
-          make api16-domain
-          make api16-worker
-          python -m pytest -q -p no:cacheprovider packages/evidence/tests packages/decision/tests
+          python3 scripts/state_of_art/ci_lane_evidence.py \
+            --lane unit \
+            --gate unit \
+            --output .runtime/ci/unit.json \
+            --log-output .runtime/ci/unit.log \
+            --command "make api15-contracts" \
+            --command "make api15-provider" \
+            --command "make api15-lock" \
+            --command "make api15-professor" \
+            --command "make api16-domain" \
+            --command "make api16-worker" \
+            --command "python -m pytest -q -p no:cacheprovider packages/evidence/tests packages/decision/tests"
+      - name: Upload unit CI envelope
+        if: always()
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: ci-unit-${{ github.run_id }}
+          path: .runtime/ci
+          if-no-files-found: warn
+          include-hidden-files: true
 
   contract:
     name: CONTRACT / API and OpenAPI
@@ -88,10 +111,23 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Install API test dependencies
         run: python -m pip install --disable-pip-version-check --no-cache-dir "pytest==8.0.2" "pytest-asyncio==0.23.5" "pydantic==2.6.1" "httpx==0.27.0" "fastapi==0.109.2" "python-multipart==0.0.9"
-      - name: Run API contract and security lanes
+      - name: Execute and record contracts CI gate
         run: |
-          make api-contract
-          make api16-root
+          python3 scripts/state_of_art/ci_lane_evidence.py \
+            --lane contract \
+            --gate contracts \
+            --output .runtime/ci/contracts.json \
+            --log-output .runtime/ci/contracts.log \
+            --command "make api-contract" \
+            --command "make api16-root"
+      - name: Upload contracts CI envelope
+        if: always()
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: ci-contracts-${{ github.run_id }}
+          path: .runtime/ci
+          if-no-files-found: warn
+          include-hidden-files: true
 
   security:
     name: SECURITY / adversarial and route policy
@@ -106,10 +142,23 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Install pinned security-test dependencies
         run: python -m pip install --disable-pip-version-check --no-cache-dir "pytest==8.0.2" "pytest-asyncio==0.23.5" "pydantic==2.6.1" "httpx==0.27.0" "fastapi==0.109.2" "python-multipart==0.0.9"
-      - name: Run explicit security gates
+      - name: Execute and record security CI gate
         run: |
-          make api-security
-          make security-adversarial
+          python3 scripts/state_of_art/ci_lane_evidence.py \
+            --lane security \
+            --gate security \
+            --output .runtime/ci/security.json \
+            --log-output .runtime/ci/security.log \
+            --command "make api-security" \
+            --command "make security-adversarial"
+      - name: Upload security CI envelope
+        if: always()
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: ci-security-${{ github.run_id }}
+          path: .runtime/ci
+          if-no-files-found: warn
+          include-hidden-files: true
 
   rag-eval:
     name: RAG-EVAL / deterministic and ACL
@@ -196,19 +245,34 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Install pinned scanner
         run: python -m pip install --disable-pip-version-check --no-cache-dir "pip-audit==2.9.0"
-      - name: Audit preserved Python lock input
-        run: pip-audit -r cvg-master-rag-v2/src/requirements.txt --strict
       - uses: actions/setup-node@v4.4.0
         with:
           node-version: ${{ env.NODE_VERSION }}
-      - name: Audit preserved Node lockfiles
+      - name: Execute and record supply-chain CI gate
         run: |
-          for component in rick-professor modulo-redis-locker cvg-master-rag-v2/frontend apps/web; do
-            npm --prefix "$component" ci --ignore-scripts --no-audit --no-fund
-            npm --prefix "$component" audit --audit-level=high
-          done
-      - name: Validate immutable container release policy
-        run: python infrastructure/docker/check_release.py --mode prepared
+          python3 scripts/state_of_art/ci_lane_evidence.py \
+            --lane supply-chain \
+            --gate supply-chain \
+            --output .runtime/ci/supply-chain.json \
+            --log-output .runtime/ci/supply-chain.log \
+            --command "pip-audit -r cvg-master-rag-v2/src/requirements.txt --strict" \
+            --command "npm --prefix rick-professor ci --ignore-scripts --no-audit --no-fund" \
+            --command "npm --prefix rick-professor audit --audit-level=high" \
+            --command "npm --prefix modulo-redis-locker ci --ignore-scripts --no-audit --no-fund" \
+            --command "npm --prefix modulo-redis-locker audit --audit-level=high" \
+            --command "npm --prefix cvg-master-rag-v2/frontend ci --ignore-scripts --no-audit --no-fund" \
+            --command "npm --prefix cvg-master-rag-v2/frontend audit --audit-level=high" \
+            --command "npm --prefix apps/web ci --ignore-scripts --no-audit --no-fund" \
+            --command "npm --prefix apps/web audit --audit-level=high" \
+            --command "python infrastructure/docker/check_release.py --mode prepared"
+      - name: Upload supply-chain CI envelope
+        if: always()
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: ci-supply-chain-${{ github.run_id }}
+          path: .runtime/ci
+          if-no-files-found: warn
+          include-hidden-files: true
 
   release:
     name: RELEASE / commit-bound promotion gate
@@ -240,6 +304,36 @@ jobs:
       - uses: actions/setup-python@v5.6.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
+      - name: Download architecture CI envelope from this workflow run
+        if: needs.fast.result == 'success'
+        uses: actions/download-artifact@v4.3.0
+        with:
+          name: ci-architecture-${{ github.run_id }}
+          path: .runtime/ci
+      - name: Download unit CI envelope from this workflow run
+        if: needs.unit.result == 'success'
+        uses: actions/download-artifact@v4.3.0
+        with:
+          name: ci-unit-${{ github.run_id }}
+          path: .runtime/ci
+      - name: Download contracts CI envelope from this workflow run
+        if: needs.contract.result == 'success'
+        uses: actions/download-artifact@v4.3.0
+        with:
+          name: ci-contracts-${{ github.run_id }}
+          path: .runtime/ci
+      - name: Download security CI envelope from this workflow run
+        if: needs.security.result == 'success'
+        uses: actions/download-artifact@v4.3.0
+        with:
+          name: ci-security-${{ github.run_id }}
+          path: .runtime/ci
+      - name: Download supply-chain CI envelope from this workflow run
+        if: needs.supply-chain.result == 'success'
+        uses: actions/download-artifact@v4.3.0
+        with:
+          name: ci-supply-chain-${{ github.run_id }}
+          path: .runtime/ci
       - name: Download runtime packet from this workflow run
         if: needs.runtime.result == 'success'
         uses: actions/download-artifact@v4.3.0
@@ -330,13 +424,14 @@ jobs:
         working-directory: apps/web
         run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Execute real browser runtime matrix
-        run: make web-e2e
+        run: make phase3-frontend-supply-runtime
       - name: Upload frontend runtime envelope and diagnostics
         if: always()
         uses: actions/upload-artifact@v4.6.2
         with:
           name: phase3-frontend-runtime-${{ github.run_id }}
           path: |
+            .runtime/phase-3
             .gauntlet-state-of-art/evidence/visual-cycle5-current
             apps/web/test-results
             apps/web/playwright-report
