@@ -34,6 +34,15 @@ provide multi-instance fencing, and is rejected when `RICK_ENV=production`.
 Production still requires an external broker or reviewed database queue,
 metrics/alerts, operator dead-letter tooling, and an integration drill.
 
+The API's process-local recovery journal in
+`apps/api/src/services/job_journal.py` applies the same read-side discipline:
+persisted ACL and metadata JSON is capped at 32 KiB before and after decoding,
+rejects non-finite, malformed or recursive values, and causes a corrupt row to
+be omitted instead of being offered to restart recovery. Writes use the same
+bounded canonical JSON contract. This protects the local recovery boundary; it
+does not turn the journal into a production durable queue or provide
+multi-instance recovery authority.
+
 ## Canonical PostgreSQL runtime
 
 Phase 2.2 adds `apps/worker/postgres_jobs.py` as the canonical adapter for the

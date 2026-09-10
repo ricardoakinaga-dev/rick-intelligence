@@ -56,8 +56,8 @@ converted to PASS by the presence of host processes.
 ### Current clean revalidation — 2026-09-10
 
 The latest source implementation candidate is
-`b075d446b41a259b08a4106294c57fe99a586a8e` with tree
-`a919928f99aaf093a0f399d8a229a58b95d50bcc`. The ignored integrated packet
+`12a473c6b661c04a8d565fefddc490faad91aa96` with tree
+`a398e479e6eefa6b47fbb6fbc98e4b8526ed1e28`. The ignored integrated packet
 `.runtime/phase-3/triple-aaa-verify.json` is the authority for the exact clean
 checkout, tree, artifact set, packet hash and current classification; the
 latest clean run reports `17` foundation PASS results and `24` mandatory
@@ -66,7 +66,7 @@ latest clean run reports `17` foundation PASS results and `24` mandatory
 commit, so this audit does not hard-code a future documentation commit or
 self-reference its own bytes.
 
-The current API matrix has **440 passed** tests and the State-of-Art suite has
+The current API matrix has **441 passed** tests and the State-of-Art suite has
 **295 passed** tests. `make validate`, `make compose-static`, `make ops-static`,
 `make security-adversarial` and `make api-contract` pass. The canonical
 `make up` attempt failed closed before service startup because the required
@@ -89,7 +89,7 @@ denied independently. No runtime readiness or promotion evidence is inferred.
 ### Local checks observed
 
 The current source already has useful local controls: the State-of-Art suite
-passes (`295 passed`) and the canonical API matrix passes (`437 passed`), while
+passes (`295 passed`) and the canonical API matrix passes (`441 passed`), while
 `make validate`,
 `make ops-static`, `make compose-static`, `make security-adversarial`, Python
 compilation and `git diff --check` pass. These results prove local contracts
@@ -861,3 +861,19 @@ the State-of-Art suite **295**; compilation and `git diff --check` pass. This
 is local identity/security evidence only. Approved PostgreSQL runtime,
 tenant/recovery drills, provider/corpus, independent review, sealed packet and
 human Go/No-Go remain unavailable; promotion remains disallowed.
+
+## 43. Persisted local job-journal JSON decoding closure — 2026-09-10
+
+Source implementation candidate `12a473c6b661c04a8d565fefddc490faad91aa96`
+(tree `a398e479e6eefa6b47fbb6fbc98e4b8526ed1e28`) closes a concrete local
+recovery-journal read-boundary gap. The SQLite journal now caps persisted ACL
+and metadata JSON at 32 KiB before and after parsing, rejects non-finite,
+malformed and recursive mappings, and omits a corrupt row from `get`, `list`
+and restart recovery rather than presenting a synthetic usable snapshot.
+Bounded canonical JSON remains enforced on writes.
+
+The job-journal suite passes **14**, the API matrix **441**, and the
+State-of-Art suite **295**; compilation and `git diff --check` pass. This is
+local recovery-journal evidence only. Approved durable queue/runtime,
+multi-instance recovery, provider/corpus, independent review, sealed packet
+and human Go/No-Go remain unavailable; promotion remains disallowed.

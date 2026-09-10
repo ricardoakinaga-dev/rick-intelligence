@@ -648,3 +648,18 @@ compilation and `git diff --check` pass. This is local adapter/security
 evidence only. Live PostgreSQL, multi-tenant and recovery drills, independent
 review and promotion authority remain unavailable; promotion remains
 disallowed.
+
+## 42. Persisted local job-journal JSON closure — 2026-09-10
+
+Source candidate `12a473c6b661c04a8d565fefddc490faad91aa96` (tree
+`a398e479e6eefa6b47fbb6fbc98e4b8526ed1e28`) closes the recovery-journal
+read-boundary gap. The process-local SQLite journal caps persisted ACL and
+metadata JSON at 32 KiB before and after decoding, rejects non-finite,
+malformed and recursive mappings, and omits corrupt rows rather than handing
+them to restart recovery. Writes retain the bounded canonical JSON contract.
+
+The job-journal suite passes **14**, the API matrix **441**, and the
+State-of-Art suite **295**; compilation and `git diff --check` pass. This is
+local recovery-journal evidence only. Approved durable queue/runtime,
+multi-instance recovery, provider/corpus, independent review and promotion
+authority remain unavailable; promotion remains disallowed.
