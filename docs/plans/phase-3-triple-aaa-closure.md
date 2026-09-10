@@ -586,3 +586,19 @@ matrix **437**, and the State-of-Art suite **295**; compilation and
 approved disposable PostgreSQL runtime, distributed crash/fencing drill,
 independent review and promotion authority remain unavailable; promotion
 remains disallowed.
+
+## 38. Persisted SQLite vector decoding closure — 2026-09-10
+
+Source candidate `8035d9995d6715afa5f4571de9bf26c9ce456b4e` (tree
+`0f7010ceaa716670340f3445c9fe41c852c3c445`) closes a read-side boundedness
+gap in the hermetic vector projection. Stored vector JSON is capped before
+parsing, non-finite or dimension-invalid values fail closed, stored payload
+JSON is capped and canonicalized before the existing checksum comparison, and
+malformed/recursive data is mapped to the safe corruption error.
+
+The retrieval suite passes **37**, the combined knowledge/ingestion/retrieval
+domain suite **158**, the API matrix **437**, and the State-of-Art suite
+**295**; compilation and `git diff --check` pass. This is local read-model
+evidence only. Live Qdrant schema/ACL/rebuild/restore, approved corpus,
+independent review and promotion authority remain unavailable; promotion
+remains disallowed.

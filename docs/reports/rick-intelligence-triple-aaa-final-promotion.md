@@ -137,6 +137,13 @@ Qdrant must prove schema/index/filter behavior, alias swap, reindex, partial
 failure, deletion, rebuild and restore. The durable authority must be able to
 reconstruct the projection without accepting stale or cross-tenant content.
 
+The hermetic SQLite read-model at source candidate
+`8035d9995d6715afa5f4571de9bf26c9ce456b4e` now bounds persisted vector and
+payload JSON before decoding, rejects non-finite/dimension-invalid vectors and
+revalidates the canonical payload checksum. This is local corruption/DoS
+containment only and does not substitute for live Qdrant projection, rebuild,
+restore or tenant-isolation evidence.
+
 ## 14. Golden ingestion path
 
 `RICK_GOLDEN_RUNTIME_PATH` is the required upload → object → job → worker →

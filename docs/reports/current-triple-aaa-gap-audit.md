@@ -795,3 +795,20 @@ matrix **437**, and the State-of-Art suite **295**; compilation and
 approved disposable PostgreSQL/runtime, distributed crash/fencing drill,
 provider/corpus, independent review, sealed packet and human Go/No-Go remain
 unavailable; promotion remains disallowed.
+
+## 39. Persisted SQLite vector decoding closure — 2026-09-10
+
+Source implementation candidate `8035d9995d6715afa5f4571de9bf26c9ce456b4e`
+(tree `0f7010ceaa716670340f3445c9fe41c852c3c445`) closes a concrete local
+vector read-boundary gap. The decoder now caps vector and payload JSON before
+parsing, rejects non-finite or dimension-invalid persisted vectors, rejects
+malformed/recursive values, and re-canonicalizes bounded payloads before
+checking their checksum. An adversarial regression proves that an oversized
+payload row and a `NaN` vector do not become usable points.
+
+The retrieval suite passes **37**, the combined knowledge/ingestion/retrieval
+domain suite **158**, the API matrix **437**, and the State-of-Art suite
+**295**; compilation and `git diff --check` pass. This is local read-model
+evidence only. Approved disposable Qdrant/runtime and corpus/provider
+authority, live projection/rebuild/restore, independent review, sealed packet
+and human Go/No-Go remain unavailable; promotion remains disallowed.
