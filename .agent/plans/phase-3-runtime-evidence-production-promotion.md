@@ -28,6 +28,7 @@ preserving the frozen Gauntlet bar, Phase 2 history and legacy repositories.
 - [x] (2026-09-10) Correct scoped frontend-lane projection at source candidate fe0f06ccc4deed9a56e1a806842b71d3da8ace66 (tree 0080bb23a61486e538fbf5876c5bd38e81a23ab1): execute the shared frontend/supply adapter once, preserve source exit `2`, project browser/accessibility PASS independently from blocked image evidence, and cover missing/failed/malformed artifact negatives; 51 focused tests pass and the clean integrated packet reports `STATE_OF_ART_CANDIDATE` / exit `2`.
 - [x] (2026-09-10) Bind the scoped frontend projection to the exact verifier checkout at source candidate 96b69cf8b8dd69314f08296b850b6b1424022309 (tree 4343081d0cf004c0dc58526972362f6d9b6408dd): require matching commit/tree/fingerprint, a clean/current envelope and explicit checkout availability, and reject a cross-commit artifact fail-closed; 102 focused promotion/Phase 3 tests and `make validate` pass, while the clean integrated packet remains `STATE_OF_ART_CANDIDATE` / exit `2`.
 - [x] (2026-09-10) Make the release-test environment reproducible at source candidate 39c391b3d8ee252f88f1474df39e257a92258ec7 (tree ec80ca7ff803c216863c0a02bb4283fcff1732f9): pin the provider test dependencies, export a contiguous internal-package `PYTHONPATH` in both canonical workflows, and validate the full clean venv suite; the same-SHA remote release run reaches explicit checks and returns typed `2` for external blockers.
+- [x] (2026-09-10) Reconcile the current control plane and public pointers at checkout candidate 928bcd10cde225bedb6c237c0cc979a259919989 (tree 8da40a5b95bfa9787c2314aa89b7a0d3563c6eee): the exact packet is current and clean with 17 local foundation lanes PASS and 24 mandatory lanes `BLOCKED_EXTERNAL`; this documentation-only reconciliation does not authorize promotion.
 - [ ] (2026-09-09) Execute the disposable runtime; currently blocked by Docker daemon access and unresolved external authority.
 - [ ] (2026-09-09) Complete independent runtime/design/security reviews and the human Go/No-Go.
 
@@ -175,14 +176,16 @@ made.
 ## Current candidate closure
 
 The current source implementation candidate is
-39c391b3d8ee252f88f1474df39e257a92258ec7 with tree
-ec80ca7ff803c216863c0a02bb4283fcff1732f9. It contains the corrected
+928bcd10cde225bedb6c237c0cc979a259919989 with tree
+8da40a5b95bfa9787c2314aa89b7a0d3563c6eee. It contains the corrected
 PostgreSQL worker gate, canonical two-process Redis/API HTTP gate, strict
 release artifact postconditions and manifest consistency checks, plus bounded
 same-run CI envelopes with redacted raw artifacts, exact workflow/run/ref/SHA
 provenance, runtime-primary supply-chain binding, frontend Phase 3 transport,
 authenticated promotion packet sealing, scoped frontend-lane projection,
-checkout-bound frontend evidence and reproducible release-test dependencies.
+checkout-bound frontend evidence and reproducible release-test dependencies;
+the final documentation/control-plane reconciliation is bound to this exact
+checkout.
 The State-of-Art test suite has 295 passing tests and the relevant
 static/API checks pass; the full preserved `make test` remains incomplete
 because the CVG dataset and local Playwright browser are unavailable. The

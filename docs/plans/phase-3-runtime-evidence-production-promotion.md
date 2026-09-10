@@ -6,7 +6,7 @@
 **Prompt copy:** [`docs/prompts/phase-3-runtime-evidence-production-promotion-2026-09-09.txt`](../prompts/phase-3-runtime-evidence-production-promotion-2026-09-09.txt)
 **Current audit:** [`docs/reports/phase-3-runtime-evidence-current-audit.md`](../reports/phase-3-runtime-evidence-current-audit.md)
 **Living ExecPlan:** [`../../.agent/plans/phase-3-runtime-evidence-production-promotion.md`](../../.agent/plans/phase-3-runtime-evidence-production-promotion.md)
-**Current source implementation candidate:** `957b534d7b33a025525cb1dd667872791239ed43` (tree `65dcad96347adbd34e267537c424bef444ec48d7`)
+**Current source implementation candidate:** `928bcd10cde225bedb6c237c0cc979a259919989` (tree `8da40a5b95bfa9787c2314aa89b7a0d3563c6eee`)
 
 ## Purpose
 
@@ -221,19 +221,21 @@ rollback owner and final promotion.
 ## Current candidate closure
 
 The current source implementation candidate is
-957b534d7b33a025525cb1dd667872791239ed43 with tree
-65dcad96347adbd34e267537c424bef444ec48d7. It retains the corrected
-PostgreSQL acknowledgement wiring, canonical two-process Redis/API HTTP
-gate, strict release artifact postconditions and same-run diagnostic
-transport, and adds bounded same-run GitHub CI envelopes, exact provenance
-validation, runtime-primary supply-chain evidence and frontend Phase 3
-envelope transport. The State-of-Art suite has 256 passing tests and the
-relevant static/API checks pass; the full preserved `make test` remains
-incomplete because the CVG dataset and local Playwright browser are
-unavailable. The prior integrated verifier artifact is stale after this
-source change and is not treated as current promotion evidence; live runtime,
-distributed, operational, provider/corpus, frontend-runtime, supply-chain
-and human-approval gates remain open, so no Triple AAA claim is made.
+928bcd10cde225bedb6c237c0cc979a259919989 with tree
+8da40a5b95bfa9787c2314aa89b7a0d3563c6eee. It retains the corrected
+PostgreSQL worker gate, canonical two-process Redis/API HTTP gate, strict
+release artifact postconditions and same-run diagnostic transport, bounded
+same-run GitHub CI envelopes, exact provenance validation, runtime-primary
+supply-chain evidence, frontend Phase 3 envelope transport, authenticated
+packet sealing, scoped frontend-lane projection, checkout-bound frontend
+evidence and reproducible release-test dependencies. The State-of-Art suite
+has 295 passing tests and the relevant static/API checks pass; the full
+preserved `make test` remains incomplete because the CVG dataset and local
+Playwright browser are unavailable. The current integrated verifier packet is
+bound to this exact clean checkout and remains diagnostic
+`STATE_OF_ART_CANDIDATE` / exit `2`; live runtime, distributed, operational,
+provider/corpus and human-approval gates remain open, so no Triple AAA claim
+is made.
 
 ## Current next action
 

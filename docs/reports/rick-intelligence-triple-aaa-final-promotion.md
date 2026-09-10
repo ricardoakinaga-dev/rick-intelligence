@@ -31,9 +31,12 @@ byte identity with the attachment.
 
 ## 4. Frozen quality bar
 
-The twelve-criterion bar in `current-triple-aaa-quality-bar-v1.json` is the
-minimum acceptance contract. Its baseline statuses remain `NOT_RUN` or
-runtime-blocked until current evidence satisfies the declared method.
+The historical twelve-criterion bar in `current-triple-aaa-quality-bar-v1.json`
+remains a minimum predecessor contract. The current prompt's twenty-five
+dimensions are the explicit scorecard in section 27; neither contract may be
+averaged around a mandatory runtime or authority blocker. Their baseline
+statuses remain `NOT_RUN` or runtime-blocked until current evidence satisfies
+the declared method.
 
 ## 5. Scope and non-goals
 
