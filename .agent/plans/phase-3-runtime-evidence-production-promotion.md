@@ -37,6 +37,7 @@ preserving the frozen Gauntlet bar, Phase 2 history and legacy repositories.
 - [x] (2026-09-10) Enforce the Professor `max_tool_calls` budget at source candidate 63a195a96a588231acf5a885d11916385b438a18 (tree 1ee17a5c2b9cc1dbe26222a0498150ee4a35da1d): normal, provider-fallback and streaming paths count complete/distinct tool calls and fail with `tool_calls_budget_exceeded` before execution or result acceptance; Professor/API/State-of-Art suites pass 29/437/295, while external runtime and promotion evidence remain blocked.
 - [x] (2026-09-10) Tighten streaming Professor tool-budget enforcement at source candidate a480e6cc67ada68fc91e0c7034a37f53f23051b3 (tree 3e470607d31cc0ff45d2d2648f35ae9eaa647c14): reject a newly observed over-budget tool-call index immediately, before publishing a content delta; the focused Professor, API and State-of-Art suites pass 29/437/295, while external runtime and promotion evidence remain blocked.
 - [x] (2026-09-10) Make Professor budget configuration type-strict at source candidate eced09b7431de92fa064d9910d9ff7d489bb5dc1 (tree 6f2f162009e7bcda9327922b20e49796a79fc5d5): reject boolean/float values in integer limits and boolean timeout values; Professor/API/State-of-Art suites pass 36/437/295, while external runtime and promotion evidence remain blocked.
+- [x] (2026-09-10) Harden observability redaction at source candidate 7af6d7be4118b9ecbb237d673e39229691901cc9 (tree c2671184f2a2a20052b5aef47bd1bb0bb51d0be3): normalize JSON-escaped URL slashes before credential/query stripping; observability, API and State-of-Art suites pass 10/437/295, while external runtime and promotion evidence remain blocked.
 - [ ] (2026-09-09) Execute the disposable runtime; currently blocked by Docker daemon access and unresolved external authority.
 - [ ] (2026-09-09) Complete independent runtime/design/security reviews and the human Go/No-Go.
 
@@ -188,8 +189,8 @@ made.
 ## Current candidate closure
 
 The current source implementation candidate is
-eced09b7431de92fa064d9910d9ff7d489bb5dc1 with tree
-6f2f162009e7bcda9327922b20e49796a79fc5d5. It contains the corrected
+7af6d7be4118b9ecbb237d673e39229691901cc9 with tree
+c2671184f2a2a20052b5aef47bd1bb0bb51d0be3. It contains the corrected
 PostgreSQL worker gate, canonical two-process Redis/API HTTP gate, strict
 release artifact postconditions and manifest consistency checks, plus bounded
 same-run CI envelopes with redacted raw artifacts, exact workflow/run/ref/SHA
@@ -202,7 +203,8 @@ streaming function-tool/JSON reassembly assertions, context-budget assertion
 in the live gate, normal JSON-object response validation and Professor
 `max_tool_calls` enforcement across normal/fallback/streaming paths, including
 immediate rejection before a streamed content delta is published, and strict
-runtime types for every integer budget plus timeout booleans. The final
+runtime types for every integer budget plus timeout booleans, and escaped-URL
+credential/query redaction in observability. The final
 documentation/control-plane follow-up is bound to the resulting clean
 checkout, while live provider/runtime evidence remains external.
 The provider, Professor, API and State-of-Art suites have 64, 36, 437 and 295

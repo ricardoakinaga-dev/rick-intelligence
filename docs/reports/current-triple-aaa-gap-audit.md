@@ -679,3 +679,17 @@ suite **295**. This is local configuration-contract evidence only; the
 approved provider/corpus, distributed runtime, adversarial RAG, independent
 review, sealed packet and human Go-No-Go remain unavailable. No promotion
 claim is made.
+
+## 32. Escaped observability redaction closure — 2026-09-10
+
+Source implementation candidate `7af6d7be4118b9ecbb237d673e39229691901cc9`
+(tree `c2671184f2a2a20052b5aef47bd1bb0bb51d0be3`) closes an adversarial
+redaction gap for JSON-escaped URLs. Redaction now normalizes escaped slashes
+before stripping userinfo, query parameters and fragments, and a focused test
+proves that escaped password/token values do not survive in free-form events.
+
+The observability suite passes **10**, ingestion security/ingestion tests pass
+**63**, the API matrix **437**, and the State-of-Art suite **295**. This is
+local redaction evidence only; the approved collector/backend, distributed
+runtime, provider/corpus, independent review, sealed packet and human Go-No-Go
+remain unavailable. No promotion claim is made.

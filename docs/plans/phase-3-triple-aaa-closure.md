@@ -474,3 +474,13 @@ reasoning/request timeout limits reject booleans. The focused validation matrix
 passes **36** Professor tests; API and State-of-Art suites pass **437** and
 **295**. This closes ambiguous local configuration only and does not replace
 external runtime, provider, corpus or promotion evidence.
+
+## 31. Escaped observability redaction closure — 2026-09-10
+
+Source candidate `7af6d7be4118b9ecbb237d673e39229691901cc9` (tree
+`c2671184f2a2a20052b5aef47bd1bb0bb51d0be3`) normalizes JSON-escaped URL
+slashes before removing credentials, query parameters and fragments from
+free-form diagnostics. The focused observability suite passes **10**, while
+the API and State-of-Art suites pass **437** and **295**; ingestion security
+and ingestion tests pass **63**. This is local redaction evidence and does not
+replace live collector, runtime or promotion evidence.
