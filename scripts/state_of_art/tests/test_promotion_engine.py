@@ -277,6 +277,46 @@ def test_external_block_requires_explicit_exit_two() -> None:
     assert result["return_code"] == 2
 
 
+def test_integrated_verifier_refreshes_runtime_before_release_artifacts(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    order: list[str] = []
+
+    def fake_run(lane: triple_aaa_verify.Lane, *, timeout_seconds: int) -> dict[str, object]:
+        del timeout_seconds
+        order.append(lane.lane_id)
+        return {
+            "id": lane.lane_id,
+            "status": "PASS",
+            "required": lane.required,
+            "external": lane.external,
+            "return_code": 0,
+            "detail": "fixture observation",
+        }
+
+    monkeypatch.setattr(triple_aaa_verify, "ROOT", tmp_path)
+    monkeypatch.setattr(triple_aaa_verify, "_run", fake_run)
+    monkeypatch.setattr(
+        triple_aaa_verify,
+        "capture_checkout",
+        lambda _root: {
+            "head": "a" * 40,
+            "tree": "b" * 40,
+            "fingerprint": "c" * 64,
+            "status": "CLEAN",
+            "branch": "main",
+        },
+    )
+
+    assert triple_aaa_verify.main(["--output", ".runtime/verify-order.json", "--lane-timeout", "10"]) == 1
+
+    assert order.index("lab-readiness") < order.index("phase3-evidence")
+    assert order.index("phase3-evidence") < order.index("phase3-evidence-verify")
+    assert order.index("phase3-evidence-verify") < order.index("release-evidence-generation")
+    assert order.index("release-evidence-generation") < order.index("release-integrity")
+
+
 @pytest.mark.parametrize(
     ("lane_id", "artifact", "expected_status"),
     (

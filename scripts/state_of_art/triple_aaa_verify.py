@@ -512,6 +512,15 @@ def main(argv: list[str] | None = None) -> int:
     results: list[dict[str, object]] = []
     for lane in _local_lanes():
         results.append(_run(lane, timeout_seconds=args.lane_timeout))
+
+    # Runtime lanes produce the commit-bound envelopes consumed by both the
+    # Phase 3 matrix and the typed release manifest.  They must run first;
+    # otherwise release-integrity observes the previous run's envelopes and
+    # correctly rejects an internally inconsistent packet as stale.
+    for lane in _external_lanes():
+        if lane.lane_id != "release-integrity":
+            results.append(_run(lane, timeout_seconds=args.lane_timeout))
+
     results.append(_run(Lane("phase3-evidence", ("make", "phase3-evidence")), timeout_seconds=args.lane_timeout))
     results.append(
         _run(
@@ -527,9 +536,6 @@ def main(argv: list[str] | None = None) -> int:
     )
     results.append(_run(Lane("release-evidence-generation", ("make", "release-evidence")), timeout_seconds=args.lane_timeout))
     results.append(_run(_release_gate(), timeout_seconds=args.lane_timeout))
-    for lane in _external_lanes():
-        if lane.lane_id != "release-integrity":
-            results.append(_run(lane, timeout_seconds=args.lane_timeout))
 
     if args.seal_reference is not None and packet_seal.REFERENCE_RE.fullmatch(args.seal_reference) is None:
         parser.error("--seal-reference contains unsupported characters")
