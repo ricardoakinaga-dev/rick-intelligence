@@ -113,6 +113,9 @@ DEFAULT_ARTIFACTS = (
     "scripts/state_of_art/run_phase3_multi_worker.py",
     "scripts/state_of_art/tests/test_multi_worker_runtime.py",
     "scripts/phase11/redis_runtime_gate.py",
+    "scripts/phase11/redis_multi_replica_runtime_gate.py",
+    "scripts/state_of_art/run_phase3_redis_multi_replica.py",
+    "scripts/state_of_art/tests/test_redis_multi_replica_runtime.py",
     "scripts/state_of_art/triple_aaa_verify.py",
     "scripts/state_of_art/promotion_engine.py",
     "scripts/state_of_art/packet_seal.py",
@@ -132,7 +135,7 @@ DEFAULT_ARTIFACTS = (
 RUNTIME_GATE_ARTIFACTS = {
     "postgresql": ".runtime/phase-3/postgres-runtime-evidence.json",
     "multi-worker": ".runtime/phase-3/multi-worker-runtime-evidence.json",
-    "redis": ".runtime/phase-3/redis-runtime-evidence.json",
+    "redis": ".runtime/phase-3/redis-multi-replica-runtime-evidence.json",
     "qdrant": ".runtime/phase-3/object-qdrant-runtime-evidence.json",
     "object-storage": ".runtime/phase-3/object-qdrant-runtime-evidence.json",
 }

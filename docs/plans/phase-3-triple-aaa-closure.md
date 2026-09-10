@@ -119,5 +119,8 @@ not erase an unexplained failure; it creates a new exact run. The final report
 must contain the prompt's 28 sections, 25-dimension scorecard, all mandatory
 gate results, remaining risks and a single executable next action.
 
-The current next action is to implement Slice 3.1 after the audit artifacts
-and exact prompt copy are present, then run a fresh control/release critic.
+The current next action is to execute the newly added two-process Redis
+multi-replica gate from a clean candidate with an approved disposable Redis
+URL, then bind its result to the release matrix and a fresh Redis/security
+critic. The gate is locally tested and remains fail-closed when the runtime or
+driver is unavailable.

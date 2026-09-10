@@ -83,8 +83,12 @@ isolation proof.
 
 Required evidence covers authentication/TLS policy, timeouts, pools,
 reconnect/circuit behavior, namespace and tenant isolation, leases,
-heartbeats, rate limits and replica/failover behavior. Alternating API
-replicas must consume one shared bucket; a bypass is a rejection.
+heartbeats, rate limits and replica/failover behavior. The local
+`redis_multi_replica_runtime_gate.py` now starts two independent API-shaped
+processes against one Redis URL and checks the shared atomic bucket, replay
+idempotency and tenant separation; its real run remains external evidence.
+Alternating API replicas must consume one shared bucket; a bypass is a
+rejection.
 
 ## 12. Object storage
 

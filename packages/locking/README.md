@@ -93,6 +93,14 @@ live Redis health check. The package does not wire that gate into `apps/api`;
 the application composition root must inject the Redis lease/rate-limit
 objects and call the gate before accepting production traffic.
 
+The Phase 3 multi-replica gate at
+`scripts/phase11/redis_multi_replica_runtime_gate.py` starts two independent
+API-shaped processes, each with its own Redis client, against one explicitly
+owned URL. It proves that both replicas consume the same atomic tenant bucket,
+that request replay is idempotent, and that a second tenant receives a
+separate bucket. Missing configuration or the optional Redis driver returns
+`BLOCKED_EXTERNAL`; the gate never substitutes `InMemoryRateLimiter`.
+
 ## Local mode and verification
 
 In-memory adapters accept only `mode="test"`, `"development"`, `"dev"`, or

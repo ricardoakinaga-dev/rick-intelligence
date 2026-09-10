@@ -12,7 +12,7 @@ WEB_CURRENT_EVIDENCE_DIR := $(ROOT)/.gauntlet-state-of-art/evidence/visual-cycle
 
 .DEFAULT_GOAL := help
 
-.PHONY: help bootstrap validate quality-bar-static dev test test-fast test-integration lint typecheck build up down logs ci eval eval-retrieval eval-retrieval-pack security-adversarial storage-test ops-migration-check ops-static compose-static postgres-runtime phase3-postgres-runtime multi-worker-runtime phase3-multi-worker-runtime phase3-redis-runtime phase3-object-qdrant-runtime redis-runtime object-qdrant-runtime triple-aaa-verify ops-backup-test jobs-test release-evidence phase3-evidence phase3-evidence-verify phase3-performance phase3-chaos phase3-soak web-install web-lint web-typecheck web-build web-e2e web-validate api-dev api-test api-contract api-security api-benchmark api131-canonical api131-differential api131-full api131-benchmark api14-units api14-differential api14-acl api14-full api14-benchmark api15-contracts api15-provider api15-lock api15-professor api15-root api15-benchmark api15-verify api15-full api15-boundaries api16-domain api16-worker api16-root api16-benchmark api16-full api16-verify
+.PHONY: help bootstrap validate quality-bar-static dev test test-fast test-integration lint typecheck build up down logs ci eval eval-retrieval eval-retrieval-pack security-adversarial storage-test ops-migration-check ops-static compose-static postgres-runtime phase3-postgres-runtime multi-worker-runtime phase3-multi-worker-runtime redis-multi-replica-runtime phase3-redis-multi-replica-runtime phase3-redis-runtime phase3-object-qdrant-runtime redis-runtime object-qdrant-runtime triple-aaa-verify ops-backup-test jobs-test release-evidence phase3-evidence phase3-evidence-verify phase3-performance phase3-chaos phase3-soak web-install web-lint web-typecheck web-build web-e2e web-validate api-dev api-test api-contract api-security api-benchmark api131-canonical api131-differential api131-full api131-benchmark api14-units api14-differential api14-acl api14-full api14-benchmark api15-contracts api15-provider api15-lock api15-professor api15-root api15-benchmark api15-verify api15-full api15-boundaries api16-domain api16-worker api16-root api16-benchmark api16-full api16-verify
 
 help:
 	@printf '%s\n' 'RICK Intelligence root commands:'
@@ -39,6 +39,8 @@ help:
 	@printf '%s\n' '  make multi-worker-runtime run the real two-process worker fencing gate'
 	@printf '%s\n' '  make phase3-multi-worker-runtime emit commit-bound worker evidence'
 	@printf '%s\n' '  make redis-runtime run the real Redis lease/rate-limit gate from RICK_TEST_REDIS_URL'
+	@printf '%s\n' '  make redis-multi-replica-runtime run the real two-process Redis bucket gate'
+	@printf '%s\n' '  make phase3-redis-multi-replica-runtime emit commit-bound multi-replica Redis evidence'
 	@printf '%s\n' '  make phase3-redis-runtime emit commit-bound Redis runtime evidence'
 	@printf '%s\n' '  make object-qdrant-runtime run the real object/vector gate from explicit test URLs'
 	@printf '%s\n' '  make phase3-object-qdrant-runtime emit commit-bound object/vector runtime evidence'
@@ -139,6 +141,12 @@ multi-worker-runtime:
 
 phase3-multi-worker-runtime:
 	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)" $(PYTHON) "$(ROOT)/scripts/state_of_art/run_phase3_multi_worker.py"
+
+redis-multi-replica-runtime:
+	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)/packages/contracts/src:$(ROOT)/packages/locking/src" $(PYTHON) "$(ROOT)/scripts/phase11/redis_multi_replica_runtime_gate.py"
+
+phase3-redis-multi-replica-runtime:
+	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)" $(PYTHON) "$(ROOT)/scripts/state_of_art/run_phase3_redis_multi_replica.py"
 
 phase3-redis-runtime:
 	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT):$(ROOT)/packages/contracts/src:$(ROOT)/packages/locking/src" $(PYTHON) "$(ROOT)/scripts/state_of_art/run_phase3_redis.py"
