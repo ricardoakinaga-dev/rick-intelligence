@@ -62,8 +62,10 @@ query bodies, and response bodies. These hard ceilings can be lowered per
 instance, never raised. JSON serialization rejects non-finite numbers.
 
 Transport timeouts, transport failures, non-2xx responses, oversized bodies,
-malformed JSON, malformed result shapes, invalid input, and use after close
-map to typed `QdrantError` subclasses. Errors retain only an operation and
+malformed JSON, non-finite constants, duplicate keys, malformed result shapes,
+invalid input, and use after close map to typed `QdrantError` subclasses. The
+single response decoder applies the finite/duplicate-free contract to every
+JSON response before lifecycle, projection, query or delete validation. Errors retain only an operation and
 safe status/code metadata: URLs, API keys, request payloads, response bodies,
 and underlying exception messages are not retained or rendered.
 
@@ -74,9 +76,9 @@ supports the synchronous context-manager protocol.
 
 Focused tests in `packages/retrieval/tests/test_qdrant.py` use an in-memory
 transport. They cover server-side ACL filter construction, defense-in-depth
-filtering, empty-grant denial, timeout/status redaction, malformed and
-oversized responses, point/query/payload bounds, delete/count scoping, and
-idempotent close.
+filtering, empty-grant denial, timeout/status redaction, malformed,
+non-finite, duplicate-key and oversized responses, point/query/payload bounds,
+delete/count scoping, and idempotent close.
 
 Live integration is intentionally not wired into application settings or
 production composition in this change.

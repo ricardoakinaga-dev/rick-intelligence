@@ -66,10 +66,12 @@ a fixed 4 KiB header budget and rejects non-finite constants and duplicate
 keys before trusting persisted scope, key, size or checksum metadata. The
 Locker HTTP coordination adapter also keeps its 64 KiB streamed response
 ceiling and rejects non-finite or duplicate-key success JSON before returning
-a lease result. These are local read-boundary safeguards only; they do not
+a lease result. The Qdrant adapter applies the same finite, duplicate-free
+decoder to lifecycle, alias, point, count and search responses before
+projection data is trusted. These are local read-boundary safeguards only; they do not
 prove live history, case/identity/job/audit/knowledge/object durability,
 Redis fencing or multi-replica behavior, tenant isolation or distributed
-recovery.
+Qdrant recovery or distributed recovery.
 
 ## 7. CI and release lanes
 

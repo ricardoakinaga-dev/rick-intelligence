@@ -740,3 +740,20 @@ compilation and `git diff --check` pass. This is local coordination evidence
 only. Live Redis authentication/TLS, multi-replica rate limiting, fencing,
 reconnect, failure recovery, independent review and promotion authority remain
 unavailable; promotion remains disallowed.
+
+## 48. Qdrant HTTP response JSON closure — 2026-09-10
+
+Source implementation candidate `18f15300834b7573be91951fd1c12b8610b6d9dd`
+(tree `cc7a8b9f256d9373b54b2e828259a4cd6201cf0a`) closes the live vector
+adapter's response boundary. The single bounded Qdrant decoder now rejects
+non-finite constants, duplicate keys, recursion and malformed UTF-8/JSON
+before lifecycle acknowledgements, aliases, points, counts or search results
+are trusted. The regression covers ignored `NaN` metadata and a duplicate
+`result` field.
+
+The focused Qdrant suite passes **15**, the complete retrieval package passes
+**39**, and the combined knowledge/ingestion/retrieval domain suite passes
+**164**; compilation and `git diff --check` pass. This is local adapter
+evidence only. Live Qdrant schema/filter/alias/rebuild/restore, approved
+object storage, distributed runtime, independent review and promotion
+authority remain unavailable; promotion remains disallowed.
