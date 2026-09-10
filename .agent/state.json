@@ -14,7 +14,7 @@
   "active_execplan": ".agent/plans/phase-3-runtime-evidence-production-promotion.md",
   "active_task": "PH3-2-LAB-READINESS",
   "verification_state": "PARTIAL",
-  "repository_state": "Current source candidate is 1816748cf44dee8e48b16d718142e2ed8550ca51 (tree 2716c60e59134c8b1e8f3c1e4824b01d0a41bfa9); it includes a JSON-only versioned parser result envelope that never unpickles child-controlled bytes, fail-closed invalid UTF-8 rejection, bounded durable-job JSON decoding before contract parsing, bounded legacy SQLite/PostgreSQL queue payload decoding, bounded persisted SQLite vector decoding with finite-vector and canonical checksum checks, bounded persisted SQLite/PostgreSQL chat-history decoding, a shared finite/byte-bounded JSON decoder, fail-closed persisted SQLite case-row decoding, bounded and structurally validated PostgreSQL identity ACL/session JSON with fail-closed corrupt authorization rows, bounded persisted local job-journal JSON with fail-closed corrupt recovery rows, bounded persisted SQLite/PostgreSQL audit JSON with finite/byte-bounded reads and malformed-row filtering, bounded finite metadata JSON across the SQLite/PostgreSQL knowledge stores with fail-closed corrupt collection/document/chunk rows, bounded finite cleanup-lease marker JSON with fail-closed corrupt private-source cleanup, bounded finite local object-envelope JSON with a fixed 4 KiB header and fail-closed duplicate-key/non-finite metadata rejection, and the prior provider, Professor, observability, API and release-boundary hardening. Clean local evidence currently passes queue-focused 14, worker 52, retrieval 37, domain 158, knowledge 22, history 13, case 12, identity/authorization 31, ingestion 103, focused file-security/runtime 79, provider 64, Professor 36, job-journal 15, audit 10, storage 26, API 444 and State-of-Art 295 tests; the next integrated packet must bind this candidate and remains expected to classify STATE_OF_ART_CANDIDATE with external blockers. No State of Art, AAA or Triple AAA promotion claim is made.",
+  "repository_state": "Current source candidate is 9f0351eb2489968f4d2f2b99e5dbce584875522f (tree 85bf95feb59437d0898663331fe415cc487eaa16); it includes a JSON-only versioned parser result envelope that never unpickles child-controlled bytes, fail-closed invalid UTF-8 rejection, bounded durable-job JSON decoding before contract parsing, bounded legacy SQLite/PostgreSQL queue payload decoding, bounded persisted SQLite vector decoding with finite-vector and canonical checksum checks, bounded persisted SQLite/PostgreSQL chat-history decoding, a shared finite/byte-bounded JSON decoder, fail-closed persisted SQLite case-row decoding, bounded and structurally validated PostgreSQL identity ACL/session JSON with fail-closed corrupt authorization rows, bounded persisted local job-journal JSON with fail-closed corrupt recovery rows, bounded persisted SQLite/PostgreSQL audit JSON with finite/byte-bounded reads and malformed-row filtering, bounded finite metadata JSON across the SQLite/PostgreSQL knowledge stores with fail-closed corrupt collection/document/chunk rows, bounded finite cleanup-lease marker JSON with fail-closed corrupt private-source cleanup, bounded finite local object-envelope JSON with a fixed 4 KiB header and fail-closed duplicate-key/non-finite metadata rejection, bounded finite Locker HTTP success JSON with fail-closed duplicate-key/non-finite lease results, and the prior provider, Professor, observability, API and release-boundary hardening. Clean local evidence currently passes queue-focused 14, worker 52, retrieval 37, domain 158, knowledge 22, history 13, case 12, identity/authorization 31, ingestion 103, focused file-security/runtime 79, provider 64, Professor 36, job-journal 15, audit 10, storage 26, locking 54, API 444 and State-of-Art 295 tests; the next integrated packet must bind this candidate and remains expected to classify STATE_OF_ART_CANDIDATE with external blockers. No State of Art, AAA or Triple AAA promotion claim is made.",
   "instruction_scope_refs": [
     ".agent/PLANS.md",
     "cvg-master-rag-v2/AGENTS.md",
@@ -23,8 +23,8 @@
     "docs/plans/phase-3-runtime-evidence-production-promotion.md"
   ],
   "last_gate_record": ".agent/gates/phase-3-2-lab-readiness-implementation-ready.json",
-  "last_event_id": "EVT-PH3-2-OBJECT-ENVELOPE-JSON-BOUNDARY-20260910",
-  "state_revision": 285,
+  "last_event_id": "EVT-PH3-2-LOCKER-HTTP-JSON-BOUNDARY-20260910",
+  "state_revision": 286,
   "next_gate": "VERIFIED",
   "active_action_id": "PH3-2-LAB-READINESS:WAIT_RUNTIME",
   "blocked_by": [
@@ -32,5 +32,5 @@
     "Disposable runtime secrets and endpoint authority are unavailable"
   ],
   "human_approval_required": [],
-  "updated_at": "2026-09-10T15:28:32Z"
+  "updated_at": "2026-09-10T15:36:44Z"
 }

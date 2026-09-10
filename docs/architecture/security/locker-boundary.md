@@ -20,6 +20,10 @@ The following are facts about the current checkout:
 - Unlock and renewal compare the caller-supplied `lock_value` inside Redis
   scripts before changing the key. This is owner safety, not HTTP
   authentication or authorization.
+- The preserved async HTTP adapter streams responses through a 64 KiB byte
+  ceiling and accepts success JSON only when it is finite, syntactically valid,
+  non-recursive and free of duplicate keys; ambiguous or non-finite bodies
+  fail closed as a redacted internal error before a lease result is returned.
 - `Dockerfile` declares `EXPOSE 3000`. That is image metadata; it does not
   publish a host port. A deployment still becomes public if it adds a Compose
   `ports` mapping, host networking, an ingress, or a reverse-proxy route.
@@ -96,7 +100,7 @@ The boundary is therefore:
 | A compromised peer joins the private network | Direct lock manipulation or availability attack | Isolate the network; allow only Professor and health/orchestration paths; do not treat `lock_value` as identity | High-value residual risk until network policy/gateway is independently verified |
 | Redis is reachable from an untrusted network | Read/write of lock state and possible credential exposure | Keep Redis on the private service network; use deployment-managed Redis credentials and TLS/auth policy where supported | Deployment-specific configuration is UNKNOWN here |
 | A reverse proxy or port mapping is added during deployment | The unauthenticated service becomes internet-reachable | Static checker rejects `ports`, host/shared network modes, proxy labels, and `0.0.0.0`; required CI check | Cannot detect an out-of-band production change after deployment |
-| Malformed or oversized request body | Errors, resource pressure, or unexpected Redis commands | Zod request schemas reject missing/invalid lock fields; retain bounded body/parser policy at the gateway | Body-size/rate policy is deployment follow-up |
+| Malformed or oversized request/response body | Errors, resource pressure, or unexpected Redis commands/results | Zod request schemas reject missing/invalid lock fields; the client bounds response bytes and rejects malformed, non-finite or duplicate-key success JSON; retain bounded body/parser policy at the gateway | Body-size/rate policy is deployment follow-up |
 | Locker or Redis is unavailable | Professor work is rejected or retries/stalls | Healthcheck, bounded application behavior, TTLs, and owner-safe cleanup tests | Multi-process recovery and production SLO evidence are not run |
 
 The boundary deliberately does not claim that network reachability is

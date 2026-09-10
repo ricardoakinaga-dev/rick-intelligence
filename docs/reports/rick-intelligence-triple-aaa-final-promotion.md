@@ -63,10 +63,13 @@ corrupt response, case, user, session, recovery-journal, audit-metadata or
 knowledge rows; private cleanup-lease markers use the same fail-closed
 contract before a source deletion. The local object envelope additionally has
 a fixed 4 KiB header budget and rejects non-finite constants and duplicate
-keys before trusting persisted scope, key, size or checksum metadata. This is
-a local read-boundary safeguard only; it does not prove live history,
-case/identity/job/audit/knowledge/object durability, tenant isolation or
-distributed recovery.
+keys before trusting persisted scope, key, size or checksum metadata. The
+Locker HTTP coordination adapter also keeps its 64 KiB streamed response
+ceiling and rejects non-finite or duplicate-key success JSON before returning
+a lease result. These are local read-boundary safeguards only; they do not
+prove live history, case/identity/job/audit/knowledge/object durability,
+Redis fencing or multi-replica behavior, tenant isolation or distributed
+recovery.
 
 ## 7. CI and release lanes
 

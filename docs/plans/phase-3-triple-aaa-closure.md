@@ -724,3 +724,19 @@ This is local object-store evidence only. It does not prove the live
 S3-compatible object gate, encryption, retention, tenant runtime isolation,
 restore, distributed recovery, provider/corpus, independent review, sealed
 packet or human Go/No-Go; promotion remains disallowed.
+
+## 47. Locker HTTP response JSON closure — 2026-09-10
+
+Source implementation candidate `9f0351eb2489968f4d2f2b99e5dbce584875522f`
+(tree `85bf95feb59437d0898663331fe415cc487eaa16`) closes an HTTP coordination
+boundary. The async Locker adapter already streamed responses through a 64 KiB
+ceiling; it now also rejects non-finite constants and duplicate JSON keys, so
+an ambiguous or non-finite success body cannot return an acquired, renewed or
+deleted lease result. The regression covers ignored `NaN` metadata and a
+duplicate boolean field.
+
+The locking suite passes **54** tests and the API matrix passes **444**;
+compilation and `git diff --check` pass. This is local coordination evidence
+only. Live Redis authentication/TLS, multi-replica rate limiting, fencing,
+reconnect, failure recovery, independent review and promotion authority remain
+unavailable; promotion remains disallowed.

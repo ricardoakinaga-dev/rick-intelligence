@@ -942,3 +942,19 @@ only; the live S3-compatible gate, encryption, retention, tenant runtime
 isolation, restore, distributed recovery, provider/corpus, independent review,
 sealed packet and human Go/No-Go remain unavailable. Promotion remains
 disallowed.
+
+## 48. Locker HTTP response JSON decoding closure — 2026-09-10
+
+Source implementation candidate `9f0351eb2489968f4d2f2b99e5dbce584875522f`
+(tree `85bf95feb59437d0898663331fe415cc487eaa16`) closes a concrete HTTP
+coordination boundary. The async Locker adapter retains its 64 KiB streamed
+response ceiling and now rejects non-finite constants, duplicate keys,
+recursive and malformed JSON before returning an acquire/renew/release result.
+The adversarial regression covers ignored `NaN` metadata and a duplicate
+boolean field; the locking suite passes **54** tests and the API matrix passes
+**444**.
+
+Compilation and `git diff --check` pass. This is local coordination evidence
+only; live Redis authentication/TLS, multi-replica rate limiting, fencing,
+reconnect, failure recovery, independent review, sealed packet and human
+Go/No-Go remain unavailable. Promotion remains disallowed.
