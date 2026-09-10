@@ -346,8 +346,8 @@ Fresh local validation passes: `make validate`,
 `make triple-aaa-capability-matrix` and `make eval-retrieval-pack`. The
 pre-update release manifest and integrated verifier were bound to that clean
 candidate; its artifact-set digest was
-`0caba7cb80ce3b81e3fb9e9b1546ef82bcd588fcfa57dc36af1f8dffa8bd26e0` and the
-its checkout fingerprint was
+`0caba7cb80ce3b81e3fb9e9b1546ef82bcd588fcfa57dc36af1f8dffa8bd26e0` and its
+checkout fingerprint was
 `c5200b2a32f5393bed0602d27c86b64d4cac46dde8aca2bdbc4ab06d145e518f`.
 
 That verifier was `STATE_OF_ART_CANDIDATE`, exit **2**, with **17** local PASS
