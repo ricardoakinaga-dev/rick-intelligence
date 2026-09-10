@@ -413,3 +413,15 @@ API matrix passes **437**, the State-of-Art suite passes **295**, and the
 provider runtime fixture passes **3**. These are current local contract
 observations only; approved live provider credentials/corpus, distributed
 runtime, independent review, sealed packet and human Go/No-Go remain open.
+
+## 26. Clean integrated packet after provider contract closure — 2026-09-10
+
+Candidate `de4c9ff0f2895ebce97026f9686acc545abfe031` (tree
+`09f00954c902e2efa7db970082f8918bafe670ee`) passed `make validate` and
+produced a current diagnostic `make triple-aaa-verify` packet. The packet
+binds checkout fingerprint `dc208a52ab6730fe8e831d50415bf16917eca02d4e0694479a46c334b8c42266`, artifact set
+`5436ba6d52e27e2ee1cc242eb7dde626dde67d32193ab49ce762c293beea90b0` and
+packet SHA-256 `d003c79a737e038496a3293e52fd66e44795d897868d3388eb15b913f19c2464`.
+It returns `2`, classifies `STATE_OF_ART_CANDIDATE`, reports 17 foundation
+PASS lanes and 24 `BLOCKED_EXTERNAL` lanes, and keeps promotion disabled. Any
+subsequent documentation/control-plane commit requires a fresh packet.

@@ -592,3 +592,20 @@ Current local evidence is **59 provider tests**, **6 provider-contract tests**,
 is locally verified, but the capability remains `BLOCKED_EXTERNAL` for the
 approved provider/corpus, production budgets, distributed runtime and
 promotion evidence. No State of Art, AAA or Triple AAA claim is made.
+
+## 27. Clean integrated packet after provider contract closure — 2026-09-10
+
+The exact clean candidate `de4c9ff0f2895ebce97026f9686acc545abfe031` (tree
+`09f00954c902e2efa7db970082f8918bafe670ee`, checkout fingerprint
+`dc208a52ab6730fe8e831d50415bf16917eca02d4e0694479a46c334b8c42266`) was
+verified with `make validate` and `make triple-aaa-verify`. The packet
+(`.runtime/phase-3/triple-aaa-verify.json`, SHA-256
+`d003c79a737e038496a3293e52fd66e44795d897868d3388eb15b913f19c2464`) binds
+artifact set `5436ba6d52e27e2ee1cc242eb7dde626dde67d32193ab49ce762c293beea90b0`
+and quality-bar hash
+`60d67d97bd8924dea9a9e6f4c90e893f0edfea570bde13b40da3562d51a41f8c`.
+
+It classifies the candidate as `STATE_OF_ART_CANDIDATE`, returns `2`, keeps
+`promotion_allowed=false`, and reports 17 foundation lanes `PASS` with 24
+mandatory lanes `BLOCKED_EXTERNAL`. The clean packet is diagnostic evidence;
+the next documentation/control-plane commit requires another integrated run.
