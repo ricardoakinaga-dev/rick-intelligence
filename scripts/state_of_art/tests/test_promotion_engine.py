@@ -1,5 +1,10 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
+import pytest
+
 from scripts.state_of_art.packet_seal import seal_payload
 from scripts.state_of_art import promotion_engine
 from scripts.state_of_art import triple_aaa_verify
@@ -203,3 +208,105 @@ def test_external_block_requires_explicit_exit_two() -> None:
 
     assert result["status"] == "BLOCKED_EXTERNAL"
     assert result["return_code"] == 2
+
+
+@pytest.mark.parametrize(
+    ("lane_id", "artifact", "expected_status"),
+    (
+        (
+            "phase3-evidence",
+            {"capabilities": [{"status": "BLOCKED_EXTERNAL"}]},
+            "BLOCKED_EXTERNAL",
+        ),
+        (
+            "release-evidence-generation",
+            {"status": "BLOCKED_EXTERNAL"},
+            "BLOCKED_EXTERNAL",
+        ),
+    ),
+)
+def test_zero_exit_does_not_hide_blocked_artifact(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    lane_id: str,
+    artifact: dict[str, object],
+    expected_status: str,
+) -> None:
+    monkeypatch.setattr(triple_aaa_verify, "ROOT", tmp_path)
+    relative_path = triple_aaa_verify._ARTIFACT_LANE_PATHS[lane_id]
+    artifact_path = tmp_path / relative_path
+    artifact_path.parent.mkdir(parents=True)
+    artifact_path.write_text(json.dumps(artifact), encoding="utf-8")
+
+    result = triple_aaa_verify._run(
+        triple_aaa_verify.Lane(lane_id, ("/bin/sh", "-c", "exit 0")),
+        timeout_seconds=10,
+    )
+
+    assert result["status"] == expected_status
+    assert result["artifact_classification"] == "BLOCKED_EXTERNAL"
+    assert result["return_code"] == 0
+
+
+@pytest.mark.parametrize("artifact_contents", (None, "not-json"))
+def test_zero_exit_with_missing_or_invalid_artifact_is_non_pass(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    artifact_contents: str | None,
+) -> None:
+    monkeypatch.setattr(triple_aaa_verify, "ROOT", tmp_path)
+    artifact_path = tmp_path / triple_aaa_verify.RELEASE_EVIDENCE_ARTIFACT
+    if artifact_contents is not None:
+        artifact_path.parent.mkdir(parents=True)
+        artifact_path.write_text(artifact_contents, encoding="utf-8")
+
+    result = triple_aaa_verify._run(
+        triple_aaa_verify.Lane("release-evidence-generation", ("/bin/sh", "-c", "exit 0")),
+        timeout_seconds=10,
+    )
+
+    assert result["status"] in {"FAIL", "NOT_RUN"}
+    assert result["status"] != "PASS"
+    assert result["return_code"] == 0
+
+
+def test_zero_exit_with_promotable_matrix_is_pass(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(triple_aaa_verify, "ROOT", tmp_path)
+    artifact_path = tmp_path / triple_aaa_verify.PHASE3_EVIDENCE_ARTIFACT
+    artifact_path.parent.mkdir(parents=True)
+    artifact_path.write_text(json.dumps({"classification": "PROMOTABLE"}), encoding="utf-8")
+
+    result = triple_aaa_verify._run(
+        triple_aaa_verify.Lane("phase3-evidence", ("/bin/sh", "-c", "exit 0")),
+        timeout_seconds=10,
+    )
+
+    assert result["status"] == "PASS"
+    assert result["artifact_classification"] == "PROMOTABLE"
+    assert result["return_code"] == 0
+
+
+def test_zero_exit_with_pass_manifest_is_pass(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(triple_aaa_verify, "ROOT", tmp_path)
+    artifact_path = tmp_path / triple_aaa_verify.RELEASE_EVIDENCE_ARTIFACT
+    artifact_path.parent.mkdir(parents=True)
+    artifact_path.write_text(json.dumps({"status": "PASS"}), encoding="utf-8")
+
+    result = triple_aaa_verify._run(
+        triple_aaa_verify.Lane("release-evidence-generation", ("/bin/sh", "-c", "exit 0")),
+        timeout_seconds=10,
+    )
+
+    assert result["status"] == "PASS"
+    assert result["artifact_classification"] == "PASS"
+    assert result["return_code"] == 0
+
+
+def test_unobserved_normal_zero_exit_remains_pass() -> None:
+    result = triple_aaa_verify._run(
+        triple_aaa_verify.Lane("normal-command", ("/bin/sh", "-c", "exit 0")),
+        timeout_seconds=10,
+    )
+
+    assert result["status"] == "PASS"
+    assert result["return_code"] == 0

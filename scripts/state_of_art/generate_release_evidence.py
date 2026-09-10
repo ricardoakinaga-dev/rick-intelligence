@@ -170,14 +170,35 @@ DEFAULT_ARTIFACTS = (
     "scripts/state_of_art/tests/test_file_security_runtime.py",
 )
 RUNTIME_GATE_ARTIFACTS = {
-    "postgresql": ".runtime/phase-3/postgres-runtime-evidence.json",
     "multi-worker": ".runtime/phase-3/multi-worker-runtime-evidence.json",
+    "multi-tenant": ".runtime/phase-3/tenant-evidence-runtime-evidence.json",
+    # The mandatory release gate is the multi-replica Redis contract.  The
+    # single-node envelope remains available as a diagnostic, but must never
+    # satisfy the release gate on its own.
     "redis": ".runtime/phase-3/redis-multi-replica-runtime-evidence.json",
+    "redis-multi-replica": ".runtime/phase-3/redis-multi-replica-runtime-evidence.json",
+    "postgresql": ".runtime/phase-3/postgres-runtime-evidence.json",
     "qdrant": ".runtime/phase-3/object-qdrant-runtime-evidence.json",
     "object-storage": ".runtime/phase-3/object-qdrant-runtime-evidence.json",
+    "ingestion-e2e": ".runtime/phase-3/golden-ingestion-runtime-evidence.json",
+    "evidence": ".runtime/phase-3/tenant-evidence-runtime-evidence.json",
+    "citation": ".runtime/phase-3/golden-ingestion-runtime-evidence.json",
+    "decision": ".runtime/phase-3/golden-ingestion-runtime-evidence.json",
+    "observability": ".runtime/phase-3/observability-runtime-evidence.json",
     "restore": ".runtime/phase-3/restore-runtime-evidence.json",
+    "dr": ".runtime/phase-3/restore-runtime-evidence.json",
     "file-security": ".runtime/phase-3/file-security-runtime-evidence.json",
+    "chaos": ".runtime/phase-3/chaos-runtime-evidence.json",
+    "soak": ".runtime/phase-3/soak-runtime-evidence.json",
+    "performance": ".runtime/phase-3/performance-runtime-evidence.json",
+    "frontend-e2e": ".runtime/phase-3/frontend-supply-runtime-evidence.json",
+    "accessibility": ".runtime/phase-3/frontend-supply-runtime-evidence.json",
+    "visual": ".runtime/phase-3/frontend-supply-runtime-evidence.json",
+    "supply-chain": ".runtime/phase-3/supply-chain-runtime-evidence.json",
+    "provider": ".runtime/phase-3/provider-runtime-evidence.json",
 }
+
+
 def _run(root: Path, command: Sequence[str]) -> tuple[str, int | None, str]:
     try:
         process = subprocess.Popen(

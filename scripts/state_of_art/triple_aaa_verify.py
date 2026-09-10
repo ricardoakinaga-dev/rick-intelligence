@@ -35,6 +35,14 @@ ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_OUTPUT = ".runtime/phase-3/triple-aaa-verify.json"
 SOURCE_PROMPT = "docs/prompts/phase-3-triple-aaa-closure-2026-09-09.txt"
 QUALITY_BAR = "docs/reports/current-triple-aaa-quality-bar-v1.json"
+PHASE3_EVIDENCE_ARTIFACT = ".runtime/phase-3/capability-matrix.json"
+RELEASE_EVIDENCE_ARTIFACT = "docs/progress/release-evidence.json"
+
+
+_ARTIFACT_LANE_PATHS = {
+    "phase3-evidence": PHASE3_EVIDENCE_ARTIFACT,
+    "release-evidence-generation": RELEASE_EVIDENCE_ARTIFACT,
+}
 
 
 @dataclass(frozen=True)
@@ -67,6 +75,74 @@ def _manifest_artifact_hash() -> str | None:
     binding = payload.get("commit_binding") if isinstance(payload, dict) else None
     value = binding.get("artifact_set_sha256") if isinstance(binding, dict) else None
     return value if isinstance(value, str) and value else None
+
+
+def _phase3_matrix_classification(payload: dict[str, object]) -> str | None:
+    """Derive the matrix classification without inspecting command output."""
+
+    capabilities = payload.get("capabilities")
+    if isinstance(capabilities, list):
+        statuses: list[str] = []
+        for capability in capabilities:
+            if not isinstance(capability, dict) or not isinstance(capability.get("status"), str):
+                return "FAILED"
+            statuses.append(capability["status"].upper())
+        if not statuses:
+            return "FAILED"
+        if any(status == "FAILED" for status in statuses):
+            return "FAILED"
+        if any(status == "BLOCKED_EXTERNAL" for status in statuses):
+            return "BLOCKED_EXTERNAL"
+        if any(status == "MISSING" for status in statuses):
+            return "MISSING"
+        if any(status == "NOT_RUN" for status in statuses):
+            return "NOT_RUN"
+        if any(status in {"PARTIAL", "DONE_LOCAL_SCOPE", "LOCAL_VERIFIED"} for status in statuses):
+            return "PARTIAL"
+        if all(status == "PROMOTABLE" for status in statuses):
+            return "PROMOTABLE"
+        if all(status in {"VERIFIED_RUNTIME", "PROMOTABLE"} for status in statuses):
+            return "PARTIAL"
+        return "FAILED"
+
+    classification = payload.get("classification")
+    return classification.upper() if isinstance(classification, str) and classification.strip() else None
+
+
+def _read_lane_artifact(lane_id: str) -> tuple[str, str, str] | None:
+    """Read a known lane artifact and return (lane status, artifact class, detail)."""
+
+    relative_path = _ARTIFACT_LANE_PATHS.get(lane_id)
+    if relative_path is None:
+        return None
+
+    path = ROOT / relative_path
+    if not path.is_file():
+        return "NOT_RUN", "NOT_RUN", f"{relative_path} is absent"
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return "FAIL", "FAIL", f"{relative_path} is not readable JSON"
+    if not isinstance(payload, dict):
+        return "FAIL", "FAIL", f"{relative_path} does not contain a JSON object"
+
+    if lane_id == "phase3-evidence":
+        classification = _phase3_matrix_classification(payload)
+        promotable = "PROMOTABLE"
+    else:
+        raw_status = payload.get("status", payload.get("classification"))
+        classification = raw_status.upper() if isinstance(raw_status, str) and raw_status.strip() else None
+        promotable = "PASS"
+
+    if classification is None:
+        return "FAIL", "FAIL", f"{relative_path} has no artifact classification"
+    if classification == promotable:
+        return "PASS", classification, f"{relative_path} reports {classification}"
+    if classification == "BLOCKED_EXTERNAL":
+        return "BLOCKED_EXTERNAL", classification, f"{relative_path} reports {classification}"
+    if classification == "NOT_RUN":
+        return "NOT_RUN", classification, f"{relative_path} reports {classification}"
+    return "FAIL", classification, f"{relative_path} reports {classification}"
 
 
 def _run(lane: Lane, *, timeout_seconds: int) -> dict[str, object]:
@@ -126,7 +202,7 @@ def _run(lane: Lane, *, timeout_seconds: int) -> dict[str, object]:
     else:
         status = "FAIL"
         detail = lane.detail or "command returned non-zero"
-    return {
+    result: dict[str, object] = {
         "id": lane.lane_id,
         "status": status,
         "required": lane.required,
@@ -134,6 +210,14 @@ def _run(lane: Lane, *, timeout_seconds: int) -> dict[str, object]:
         "return_code": return_code,
         "detail": detail,
     }
+    artifact = _read_lane_artifact(lane.lane_id)
+    if artifact is not None:
+        artifact_status, artifact_classification, artifact_detail = artifact
+        result["artifact_classification"] = artifact_classification
+        if return_code == 0:
+            result["status"] = artifact_status
+            result["detail"] = artifact_detail
+    return result
 
 
 def _local_lanes() -> tuple[Lane, ...]:
