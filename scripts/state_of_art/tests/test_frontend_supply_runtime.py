@@ -289,4 +289,6 @@ def test_wrapper_emits_blocked_commit_bound_envelope(tmp_path: Path, monkeypatch
     assert (tmp_path / "evidence.json").is_file()
     supply = json.loads((tmp_path / wrapper.SUPPLY_OUTPUT).read_text(encoding="utf-8"))
     assert supply["capability_id"] == "P1-07"
+    assert supply["gate_id"] == "P1-07"
+    assert supply["lane"] == "P1-07"
     assert supply["raw_artifacts"] == envelope["raw_artifacts"]

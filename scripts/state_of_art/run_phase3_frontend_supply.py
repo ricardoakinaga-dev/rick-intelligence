@@ -60,6 +60,8 @@ def run(
     output_path.write_text(json.dumps(envelope, ensure_ascii=False, sort_keys=True, indent=2) + "\n", encoding="utf-8")
     supply_envelope = dict(envelope)
     supply_envelope["capability_id"] = "P1-07"
+    supply_envelope["gate_id"] = "P1-07"
+    supply_envelope["lane"] = "P1-07"
     supply_envelope["record_id"] = envelope["record_id"].replace("P1-06", "P1-07", 1)
     supply_envelope["reviewer"] = {
         **dict(envelope.get("reviewer", {})),
