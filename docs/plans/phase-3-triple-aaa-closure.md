@@ -4,7 +4,7 @@
 **Prompt:** [`phase-3-triple-aaa-closure-2026-09-09.txt`](../prompts/phase-3-triple-aaa-closure-2026-09-09.txt)  
 **Source attachment SHA-256:** `0d431cf3ec75e4d6455735d32f135b3270b59996866a28fd7296d73a18cabf3d`  
 **Stored copy SHA-256:** `0d431cf3ec75e4d6455735d32f135b3270b59996866a28fd7296d73a18cabf3d`
-**Candidate:** `6252f886c4b995808618ad7b67f86b6398f0ad66` / tree `71ffe90a8757fb21342de25f3d5e2d1e47cde6af`
+**Source implementation candidate:** `ea6fd613ffcc8b18fc11d55941266e28387f9b92` / tree `c8ae0fb2614bee70a4e096c6676c8e4d1a9f782e3`
 **Entry audit:** [`current-triple-aaa-gap-audit.md`](../reports/current-triple-aaa-gap-audit.md)
 
 ## 1. Outcome and constraints
@@ -373,11 +373,9 @@ cooperative cancellation before returning and adds regression coverage for
 both paths. The clean API and State-of-Art matrices pass **437** and **295**
 tests respectively.
 
-The documentation/control-plane follow-up is the current clean candidate
-`6252f886c4b995808618ad7b67f86b6398f0ad66` (tree
-`71ffe90a8757fb21342de25f3d5e2d1e47cde6af`); its integrated packet is
-`STATE_OF_ART_CANDIDATE` / JSON exit `2`, with `promotion_allowed=false` and
-17 foundation PASS results. Docker, disposable secrets, provider/corpus,
-image provenance, independent review, sealed packet and human Go/No-Go remain
-external blockers. The provider bridge correction is local reliability
-evidence and does not close live provider or budget gates.
+The ignored integrated packet is the authority for the current clean checkout;
+the latest clean run is `STATE_OF_ART_CANDIDATE` / JSON exit `2`, with
+`promotion_allowed=false` and 17 foundation PASS results. Docker, disposable
+secrets, provider/corpus, image provenance, independent review, sealed packet
+and human Go/No-Go remain external blockers. The provider bridge correction is
+local reliability evidence and does not close live provider or budget gates.

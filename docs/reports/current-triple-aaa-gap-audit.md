@@ -55,16 +55,16 @@ converted to PASS by the presence of host processes.
 
 ### Current clean revalidation — 2026-09-10
 
-The latest exact clean checkout is commit
-`6252f886c4b995808618ad7b67f86b6398f0ad66` with tree
-`71ffe90a8757fb21342de25f3d5e2d1e47cde6af`. Its integrated packet reports
-`17` foundation PASS results and `24` mandatory `BLOCKED_EXTERNAL` results,
-classification `STATE_OF_ART_CANDIDATE`, JSON exit `2`,
-`promotion_allowed=false`, artifact set
-`e49c81982cc05afd0e7de4bd12f74a69ccd4b7f6897cce10b0eb8938dc8497ec`, and
-packet SHA-256
-`1b0595a71a2c28405a06af1f8dec8acf7d78aa83ca7daaec14e4748cd14d1773`.
-The worktree is clean and `HEAD` equals `origin/main`.
+The latest source implementation candidate is
+`ea6fd613ffcc8b18fc11d55941266e28387f9b92` with tree
+`c8ae0fb2614bee70a4e096c6676c8e4d1a9f782e3`. The ignored integrated packet
+`.runtime/phase-3/triple-aaa-verify.json` is the authority for the exact clean
+checkout, tree, artifact set, packet hash and current classification; the
+latest clean run reports `17` foundation PASS results and `24` mandatory
+`BLOCKED_EXTERNAL` results, `STATE_OF_ART_CANDIDATE`, JSON exit `2` and
+`promotion_allowed=false`. The packet must be regenerated after every tracked
+commit, so this audit does not hard-code a future documentation commit or
+self-reference its own bytes.
 
 The current API matrix has **437 passed** tests and the State-of-Art suite has
 **295 passed** tests. `make validate`, `make compose-static`, `make ops-static`,
