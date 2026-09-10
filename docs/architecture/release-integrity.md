@@ -160,6 +160,20 @@ malformed, self-promoted, untrusted or mismatched packets remain
 non-promotable. The immutable artifact reference must still be retained by an
 authorized artifact system.
 
+The signed body also has a typed final-packet inventory. It must include the
+current quality-bar path and SHA-256, non-empty CI/runtime/performance/chaos/
+soak/DR/frontend/supply-chain evidence reference lists, the complete set of
+twelve fresh independent review scopes, the eighteen-item critic checklist,
+the risk register and a derived scorecard covering all twenty-six dimensions.
+Each evidence or review reference carries a SHA-256; review entries must bind a
+fresh approval artifact and explicitly record an attempted rejection. Critical
+and High risks are counted from the register and must be zero. A Medium risk
+requires owner, risk acceptance, mitigation, review date and a future
+expiration. The scorecard overall is derived from its dimensions and must meet
+the `96/100` target, while the promotion engine still requires every mandatory
+lane and the independent signed Go/No-Go. A valid signature therefore cannot
+make an underspecified packet promotable.
+
 ## Shared disposable-runtime preflight
 
 The Phase 3 runtime adapters also require one common lab attestation before a

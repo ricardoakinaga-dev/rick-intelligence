@@ -18,6 +18,7 @@ FIXTURE_CHECKOUT = {
     "tree": "b" * 40,
     "fingerprint": "c" * 64,
     "artifact_set_sha256": "d" * 64,
+    "quality_bar_sha256": "f" * 64,
     "status": "CLEAN",
 }
 FRONTEND_CHECKOUT = {
@@ -102,10 +103,41 @@ def _results(*, status: str = "PASS", external: bool = False) -> list[dict[str, 
 
 
 def _sealed_packet(results: list[dict[str, object]]) -> dict[str, object]:
+    evidence = {
+        field: [{"path": f".runtime/packet/{field}.json", "sha256": "e" * 64}]
+        for field in promotion_engine.PACKET_EVIDENCE_FIELDS
+    }
+    review_approvals = [
+        {
+            "scope": scope,
+            "reviewer_id": "independent-fixture-reviewer",
+            "independent": True,
+            "fresh": True,
+            "decision": "APPROVE",
+            "review_ref": f"reviews/{scope.lower().replace(' ', '-')}.json",
+            "review_sha256": "1" * 64,
+        }
+        for scope in promotion_engine.PACKET_REVIEW_SCOPES
+    ]
+    critic_checklist = [
+        {"check_id": check_id, "status": "PASS", "attempted_rejection": True}
+        for check_id in promotion_engine.PACKET_CRITIC_CHECKS
+    ]
+    scorecard = {
+        "overall": 100,
+        "dimensions": [
+            {"dimension": dimension, "score": 100}
+            for dimension in promotion_engine.PACKET_SCORECARD_DIMENSIONS
+        ],
+    }
     return seal_payload(
         {
             "schema_version": promotion_engine.PROMOTION_PACKET_SCHEMA,
             "sealed": True,
+            "quality_bar": {
+                "path": promotion_engine.QUALITY_BAR_PATH,
+                "sha256": "f" * 64,
+            },
             "candidate": {
                 "commit_sha": "a" * 40,
                 "tree_sha": "b" * 40,
@@ -115,13 +147,31 @@ def _sealed_packet(results: list[dict[str, object]]) -> dict[str, object]:
             },
             "results": results,
             "critical_high_findings": 0,
+            "final_classification": "TRIPLE_AAA",
             "final_decision": "GO",
             "decision_authority": {
                 "reviewer_id": "independent-fixture-reviewer",
                 "authorized": True,
                 "independent": True,
             },
+            **evidence,
+            "review_approvals": review_approvals,
+            "critic_checklist": critic_checklist,
+            "risk_register": [],
+            "scorecard": scorecard,
         },
+        immutable_reference="artifact://release/fixture",
+        signer_id="independent-fixture-reviewer",
+        key_id="fixture-release-key",
+        signing_key=FIXTURE_PRIVATE_KEY,
+    )
+
+
+def _reseal(packet: dict[str, object]) -> dict[str, object]:
+    body = dict(packet)
+    body.pop("seal", None)
+    return seal_payload(
+        body,
         immutable_reference="artifact://release/fixture",
         signer_id="independent-fixture-reviewer",
         key_id="fixture-release-key",
@@ -173,6 +223,61 @@ def test_valid_packet_without_trusted_authority_cannot_promote() -> None:
     assert result["promotion_allowed"] is False
     assert result["exit_code"] == promotion_engine.EXIT_FAILED
     assert "PACKET_NOT_SEALED_REJECTED" in result["rejection_codes"]
+
+
+def test_signed_packet_without_prompt_evidence_sections_cannot_promote() -> None:
+    observations = _results()
+    packet = _sealed_packet(observations)
+    packet.pop("performance")
+
+    result = promotion_engine.evaluate(
+        observations,
+        packet=_reseal(packet),
+        checkout=FIXTURE_CHECKOUT,
+        trusted_public_keys=FIXTURE_TRUST_STORE,
+    )
+
+    assert result["promotion_allowed"] is False
+    assert result["classification"] == "AAA"
+    assert "PACKET_CONTENT_REJECTED" in result["rejection_codes"]
+
+
+def test_medium_risk_requires_acceptance_and_expiration_fields() -> None:
+    observations = _results()
+    packet = _sealed_packet(observations)
+    packet["risk_register"] = [{"severity": "MEDIUM", "owner": "ops"}]
+
+    result = promotion_engine.evaluate(
+        observations,
+        packet=_reseal(packet),
+        checkout=FIXTURE_CHECKOUT,
+        trusted_public_keys=FIXTURE_TRUST_STORE,
+    )
+
+    assert result["promotion_allowed"] is False
+    assert "RISK_REGISTER_REJECTED" in result["rejection_codes"]
+
+
+def test_scorecard_target_is_derived_and_required_for_triple_aaa() -> None:
+    observations = _results()
+    packet = _sealed_packet(observations)
+    packet["scorecard"] = {
+        "overall": 95,
+        "dimensions": [
+            {"dimension": dimension, "score": 95}
+            for dimension in promotion_engine.PACKET_SCORECARD_DIMENSIONS
+        ],
+    }
+
+    result = promotion_engine.evaluate(
+        observations,
+        packet=_reseal(packet),
+        checkout=FIXTURE_CHECKOUT,
+        trusted_public_keys=FIXTURE_TRUST_STORE,
+    )
+
+    assert result["promotion_allowed"] is False
+    assert "SCORECARD_REJECTED" in result["rejection_codes"]
 
 
 def test_external_block_returns_candidate_and_exit_two() -> None:

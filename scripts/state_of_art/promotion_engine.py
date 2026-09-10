@@ -10,6 +10,7 @@ blocking; a score or a document cannot override it.
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from datetime import datetime, timezone
 import json
 import re
 from typing import Any
@@ -40,6 +41,84 @@ CLASSIFICATIONS = (
     "TRIPLE_AAA",
 )
 PROMOTION_PACKET_SCHEMA = "state-of-art-triple-aaa-verify.v2"
+QUALITY_BAR_PATH = "docs/reports/current-triple-aaa-quality-bar-v1.json"
+
+# A sealed packet is the final evidence index, rather than a second summary
+# of the lane statuses.  Keep its required sections explicit so a signer
+# cannot accidentally authorize a packet that only contains a classification
+# and a signature.
+PACKET_EVIDENCE_FIELDS = (
+    "ci_evidence",
+    "runtime_evidence",
+    "performance",
+    "chaos",
+    "soak",
+    "dr",
+    "frontend",
+    "supply_chain",
+)
+PACKET_REVIEW_SCOPES = (
+    "Architecture",
+    "Security",
+    "Runtime",
+    "Database",
+    "Distributed Systems",
+    "RAG",
+    "Observability",
+    "Recovery",
+    "Frontend",
+    "Accessibility",
+    "Supply Chain",
+    "Operations",
+)
+PACKET_CRITIC_CHECKS = (
+    "race_condition",
+    "lost_update",
+    "split_brain",
+    "stale_lease",
+    "duplicate_publish",
+    "unsafe_retry",
+    "deadlock",
+    "cross_tenant_leakage",
+    "timing_leak",
+    "stale_evidence",
+    "fake_promotion",
+    "secret_leak",
+    "retry_storm",
+    "orphan_object",
+    "stale_qdrant_projection",
+    "audit_gaps",
+    "unbounded_memory",
+    "unsafe_fallback",
+)
+PACKET_SCORECARD_DIMENSIONS = (
+    "Architecture",
+    "Modularity",
+    "Jobs",
+    "Worker",
+    "PostgreSQL",
+    "Redis",
+    "Qdrant",
+    "Object Storage",
+    "Ingestion",
+    "Retrieval",
+    "Evidence",
+    "Decision",
+    "Professor",
+    "Provider",
+    "Security",
+    "Multi-tenancy",
+    "Observability",
+    "Resilience",
+    "Disaster Recovery",
+    "Performance",
+    "Frontend",
+    "Accessibility",
+    "CI/CD",
+    "Supply Chain",
+    "Documentation",
+    "Production Readiness",
+)
 
 FOUNDATION_LANES = (
     "control-plane",
@@ -256,6 +335,233 @@ def _canonical(value: Any) -> bytes:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
 
 
+def _packet_sha256(value: Any) -> bool:
+    return isinstance(value, str) and _SHA256_RE.fullmatch(value.removeprefix("sha256:").lower()) is not None
+
+
+def _packet_nonempty_text(value: Any) -> bool:
+    return isinstance(value, str) and bool(value.strip())
+
+
+def _packet_date(value: Any) -> datetime | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _validate_packet_content(
+    packet: Mapping[str, Any],
+    *,
+    checkout: Mapping[str, Any] | None,
+) -> tuple[set[str], list[str]]:
+    """Validate the evidence, review, critic and scorecard sections of a seal.
+
+    The Ed25519 seal proves immutability and signer identity, but it does not
+    make an underspecified packet complete.  This structural contract keeps
+    the final packet aligned with the prompt's explicit evidence inventory and
+    prevents a signed classification from bypassing the review/risk bar.
+    """
+
+    codes: set[str] = set()
+    errors: list[str] = []
+
+    quality_bar = packet.get("quality_bar")
+    if not isinstance(quality_bar, Mapping):
+        codes.add("PACKET_CONTENT_REJECTED")
+        errors.append("sealed packet quality_bar evidence is required")
+    else:
+        if quality_bar.get("path") != QUALITY_BAR_PATH:
+            codes.add("PACKET_CONTENT_REJECTED")
+            errors.append("sealed packet quality_bar.path is not the frozen quality bar")
+        if not _packet_sha256(quality_bar.get("sha256")):
+            codes.add("PACKET_CONTENT_REJECTED")
+            errors.append("sealed packet quality_bar.sha256 is invalid")
+        expected_quality_bar = checkout.get("quality_bar_sha256") if checkout is not None else None
+        if expected_quality_bar is not None and quality_bar.get("sha256") != expected_quality_bar:
+            codes.add("PACKET_BINDING_REJECTED")
+            errors.append("sealed packet quality_bar.sha256 does not match this checkout")
+
+    for field in PACKET_EVIDENCE_FIELDS:
+        value = packet.get(field)
+        if not isinstance(value, Sequence) or isinstance(value, (str, bytes, bytearray)) or not value:
+            codes.add("PACKET_CONTENT_REJECTED")
+            errors.append(f"sealed packet {field} evidence must be a non-empty list")
+            continue
+        for index, reference in enumerate(value):
+            if not isinstance(reference, Mapping):
+                codes.add("PACKET_CONTENT_REJECTED")
+                errors.append(f"sealed packet {field}[{index}] must be an evidence object")
+                continue
+            if not _packet_nonempty_text(reference.get("path")):
+                codes.add("PACKET_CONTENT_REJECTED")
+                errors.append(f"sealed packet {field}[{index}].path is required")
+            if not _packet_sha256(reference.get("sha256")):
+                codes.add("PACKET_CONTENT_REJECTED")
+                errors.append(f"sealed packet {field}[{index}].sha256 is invalid")
+
+    review_approvals = packet.get("review_approvals")
+    seen_scopes: set[str] = set()
+    if not isinstance(review_approvals, Sequence) or isinstance(review_approvals, (str, bytes, bytearray)) or not review_approvals:
+        codes.add("INDEPENDENT_REVIEW_REJECTED")
+        errors.append("sealed packet review_approvals must be a non-empty list")
+    else:
+        expected_scopes = {scope.casefold() for scope in PACKET_REVIEW_SCOPES}
+        for index, approval in enumerate(review_approvals):
+            if not isinstance(approval, Mapping):
+                codes.add("INDEPENDENT_REVIEW_REJECTED")
+                errors.append(f"sealed packet review_approvals[{index}] must be an object")
+                continue
+            scope = approval.get("scope")
+            normalized_scope = scope.casefold() if isinstance(scope, str) else ""
+            if normalized_scope not in expected_scopes:
+                codes.add("INDEPENDENT_REVIEW_REJECTED")
+                errors.append(f"sealed packet review_approvals[{index}].scope is unsupported")
+            elif normalized_scope in seen_scopes:
+                codes.add("INDEPENDENT_REVIEW_REJECTED")
+                errors.append(f"sealed packet review scope is duplicated: {scope}")
+            else:
+                seen_scopes.add(normalized_scope)
+            if approval.get("independent") is not True or approval.get("fresh") is not True:
+                codes.add("INDEPENDENT_REVIEW_REJECTED")
+                errors.append(f"sealed packet review_approvals[{index}] is not fresh independent review")
+            if str(approval.get("decision", "")).upper() not in {"PASS", "APPROVE"}:
+                codes.add("INDEPENDENT_REVIEW_REJECTED")
+                errors.append(f"sealed packet review_approvals[{index}] is not an approval")
+            if not _packet_nonempty_text(approval.get("reviewer_id")):
+                codes.add("INDEPENDENT_REVIEW_REJECTED")
+                errors.append(f"sealed packet review_approvals[{index}].reviewer_id is required")
+            if not _packet_nonempty_text(approval.get("review_ref")) or not _packet_sha256(approval.get("review_sha256")):
+                codes.add("INDEPENDENT_REVIEW_REJECTED")
+                errors.append(f"sealed packet review_approvals[{index}] must bind a review artifact")
+        missing_scopes = sorted(expected_scopes - seen_scopes)
+        if missing_scopes:
+            codes.add("INDEPENDENT_REVIEW_REJECTED")
+            errors.append("sealed packet is missing independent review scopes: " + ", ".join(missing_scopes))
+
+    critic_checklist = packet.get("critic_checklist")
+    seen_checks: set[str] = set()
+    if not isinstance(critic_checklist, Sequence) or isinstance(critic_checklist, (str, bytes, bytearray)) or not critic_checklist:
+        codes.add("CRITIC_CHECKLIST_REJECTED")
+        errors.append("sealed packet critic_checklist must be a non-empty list")
+    else:
+        expected_checks = set(PACKET_CRITIC_CHECKS)
+        for index, check in enumerate(critic_checklist):
+            if not isinstance(check, Mapping):
+                codes.add("CRITIC_CHECKLIST_REJECTED")
+                errors.append(f"sealed packet critic_checklist[{index}] must be an object")
+                continue
+            check_id = check.get("check_id")
+            if not isinstance(check_id, str) or check_id not in expected_checks:
+                codes.add("CRITIC_CHECKLIST_REJECTED")
+                errors.append(f"sealed packet critic_checklist[{index}].check_id is unsupported")
+            elif check_id in seen_checks:
+                codes.add("CRITIC_CHECKLIST_REJECTED")
+                errors.append(f"sealed packet critic check is duplicated: {check_id}")
+            else:
+                seen_checks.add(check_id)
+            if str(check.get("status", "")).upper() not in {"PASS", "CLEAR", "NO_FINDING"}:
+                codes.add("CRITIC_CHECKLIST_REJECTED")
+                errors.append(f"sealed packet critic_checklist[{index}] did not clear the check")
+            if check.get("attempted_rejection") is not True:
+                codes.add("CRITIC_CHECKLIST_REJECTED")
+                errors.append(f"sealed packet critic_checklist[{index}] has no rejection attempt")
+        missing_checks = sorted(expected_checks - seen_checks)
+        if missing_checks:
+            codes.add("CRITIC_CHECKLIST_REJECTED")
+            errors.append("sealed packet is missing critic checks: " + ", ".join(missing_checks))
+
+    risk_register = packet.get("risk_register")
+    risk_high_count = 0
+    if not isinstance(risk_register, Sequence) or isinstance(risk_register, (str, bytes, bytearray)):
+        codes.add("RISK_REGISTER_REJECTED")
+        errors.append("sealed packet risk_register must be a list")
+    else:
+        for index, risk in enumerate(risk_register):
+            if not isinstance(risk, Mapping):
+                codes.add("RISK_REGISTER_REJECTED")
+                errors.append(f"sealed packet risk_register[{index}] must be an object")
+                continue
+            severity = str(risk.get("severity", "")).upper()
+            if severity not in {"CRITICAL", "HIGH", "MEDIUM", "LOW"}:
+                codes.add("RISK_REGISTER_REJECTED")
+                errors.append(f"sealed packet risk_register[{index}].severity is invalid")
+                continue
+            if severity in {"CRITICAL", "HIGH"}:
+                risk_high_count += 1
+            if severity == "MEDIUM":
+                missing = [
+                    field
+                    for field in ("owner", "risk_acceptance", "mitigation", "review_date", "expiration")
+                    if not _packet_nonempty_text(risk.get(field))
+                ]
+                if missing:
+                    codes.add("RISK_REGISTER_REJECTED")
+                    errors.append(
+                        f"sealed packet medium risk {index} is missing: {', '.join(missing)}"
+                    )
+                expiration = _packet_date(risk.get("expiration"))
+                if expiration is None or expiration <= datetime.now(timezone.utc):
+                    codes.add("RISK_REGISTER_REJECTED")
+                    errors.append(f"sealed packet medium risk {index} has an expired or invalid expiration")
+    findings = packet.get("critical_high_findings")
+    if risk_high_count or type(findings) is not int or findings != risk_high_count:
+        codes.add("OPEN_CRITICAL_HIGH_REJECTED")
+        errors.append("critical/high findings must equal the risk register count and be zero")
+
+    final_classification = packet.get("final_classification")
+    if final_classification != "TRIPLE_AAA":
+        codes.add("FINAL_CLASSIFICATION_REJECTED")
+        errors.append("sealed packet final_classification must be TRIPLE_AAA")
+
+    scorecard = packet.get("scorecard")
+    if not isinstance(scorecard, Mapping):
+        codes.add("SCORECARD_REJECTED")
+        errors.append("sealed packet scorecard is required")
+    else:
+        overall = scorecard.get("overall")
+        dimensions = scorecard.get("dimensions")
+        if not isinstance(overall, (int, float)) or isinstance(overall, bool) or not 0 <= overall <= 100:
+            codes.add("SCORECARD_REJECTED")
+            errors.append("sealed packet scorecard.overall must be between 0 and 100")
+        if not isinstance(dimensions, Sequence) or isinstance(dimensions, (str, bytes, bytearray)):
+            codes.add("SCORECARD_REJECTED")
+            errors.append("sealed packet scorecard.dimensions must be a list")
+        else:
+            observed_scores: dict[str, float] = {}
+            for index, dimension in enumerate(dimensions):
+                if not isinstance(dimension, Mapping):
+                    codes.add("SCORECARD_REJECTED")
+                    errors.append(f"sealed packet scorecard.dimensions[{index}] must be an object")
+                    continue
+                name = dimension.get("dimension")
+                score = dimension.get("score")
+                if not isinstance(name, str) or name not in PACKET_SCORECARD_DIMENSIONS or name in observed_scores:
+                    codes.add("SCORECARD_REJECTED")
+                    errors.append(f"sealed packet scorecard dimension {name!r} is invalid or duplicated")
+                elif not isinstance(score, (int, float)) or isinstance(score, bool) or not 0 <= score <= 100:
+                    codes.add("SCORECARD_REJECTED")
+                    errors.append(f"sealed packet scorecard dimension {name!r} has an invalid score")
+                else:
+                    observed_scores[name] = float(score)
+            if set(observed_scores) != set(PACKET_SCORECARD_DIMENSIONS):
+                codes.add("SCORECARD_REJECTED")
+                errors.append("sealed packet scorecard does not cover all required dimensions")
+            elif isinstance(overall, (int, float)) and round(sum(observed_scores.values()) / len(observed_scores), 2) != round(float(overall), 2):
+                codes.add("SCORECARD_REJECTED")
+                errors.append("sealed packet scorecard.overall is not derived from its dimensions")
+            if isinstance(overall, (int, float)) and overall < 96:
+                codes.add("SCORECARD_REJECTED")
+                errors.append("sealed packet scorecard overall is below the 96/100 target")
+
+    return codes, errors
+
+
 def _packet_rejections(
     packet: Mapping[str, Any] | None,
     results: Sequence[Mapping[str, Any]],
@@ -281,7 +587,11 @@ def _packet_rejections(
         codes.add("PACKET_SCHEMA_REJECTED")
         errors.append("sealed packet payload schema is not the current verifier schema")
 
-    valid, seal_errors = packet_seal.verify_seal(packet, trusted_public_keys=trusted_public_keys)
+    valid, seal_errors = packet_seal.verify_seal(
+        packet,
+        trusted_public_keys=trusted_public_keys,
+        expected_payload_schema=PROMOTION_PACKET_SCHEMA,
+    )
     if not valid:
         codes.add("PACKET_NOT_SEALED_REJECTED")
         errors.extend(seal_errors)
@@ -289,6 +599,10 @@ def _packet_rejections(
     if packet.get("sealed") is not True:
         codes.add("PACKET_NOT_SEALED_REJECTED")
         errors.append("packet.sealed must be true")
+
+    content_codes, content_errors = _validate_packet_content(packet, checkout=checkout)
+    codes.update(content_codes)
+    errors.extend(content_errors)
 
     packet_results = packet.get("results")
     try:
@@ -333,11 +647,6 @@ def _packet_rejections(
             if checkout.get("status") != "CLEAN":
                 codes.add("PACKET_BINDING_REJECTED")
                 errors.append("current checkout is not clean")
-
-    findings = packet.get("critical_high_findings")
-    if type(findings) is not int or findings != 0:
-        codes.add("OPEN_CRITICAL_HIGH_REJECTED")
-        errors.append("critical/high findings must be exactly zero")
 
     if packet.get("final_decision") not in {"GO", "APPROVE"}:
         codes.add("FINAL_DECISION_REJECTED")

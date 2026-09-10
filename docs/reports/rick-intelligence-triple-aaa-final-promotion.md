@@ -326,3 +326,12 @@ services, run every runtime adapter and operational gate, bind all artifacts to
 the resulting clean SHA/tree, obtain fresh independent review and record the
 authorized Go/No-Go decision. Until then the honest classification is
 `STATE_OF_ART_CANDIDATE`, below `TRIPLE_AAA` promotion.
+
+The sealed-packet contract now validates the prompt's complete final inventory
+before any future promotion: quality-bar hash; CI, runtime, performance, chaos,
+soak, DR, frontend and supply-chain evidence references; twelve fresh
+independent review scopes; the eighteen-item rejection checklist; risk-register
+severity/acceptance rules; a derived 26-dimension scorecard at or above
+`96/100`; and an explicit `final_classification: TRIPLE_AAA`. This local
+contract is fail-closed and does not supply any missing runtime or reviewer
+evidence.

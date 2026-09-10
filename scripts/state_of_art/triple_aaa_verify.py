@@ -785,6 +785,7 @@ def main(argv: list[str] | None = None) -> int:
     # sealed packet.  Keep it alongside the checkout identity so the
     # promotion engine can reject a packet from a different manifest.
     checkout["artifact_set_sha256"] = _manifest_artifact_hash()
+    checkout["quality_bar_sha256"] = _sha256_file(ROOT / QUALITY_BAR)
     _apply_packet_lanes(
         results,
         packet,

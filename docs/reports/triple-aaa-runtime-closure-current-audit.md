@@ -432,3 +432,20 @@ omits or contradicts any of those fields, including stale timestamps, a
 different gate identity or a mismatched command/artifact result. Fixture tests
 cover PASS, blocked, stale and malformed cases; this strengthens the evidence
 boundary without creating runtime evidence.
+
+## 83. Complete sealed-packet inventory — 2026-09-10
+
+The promotion engine previously authenticated the packet and checked its lane
+observations, candidate binding, critical/high count and final authority, but a
+signed body could omit the evidence inventory required by prompt §§52–57. The
+contract now requires the frozen quality-bar hash, non-empty CI/runtime,
+performance, chaos, soak, DR, frontend and supply-chain evidence references,
+all twelve independent review scopes, all eighteen critic checks, a risk
+register, a derived 26-dimension scorecard at or above `96/100` and explicit
+`final_classification: TRIPLE_AAA`. Medium risks require owner, risk
+acceptance, mitigation, review date and future expiration; Critical/High risks
+are counted from the register and reject promotion.
+
+The focused promotion/seal suite passes **45** tests. This closes a local
+underspecified-packet path; no packet is available here and no runtime or
+independent-review evidence is claimed.
