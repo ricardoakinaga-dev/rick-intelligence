@@ -37,6 +37,7 @@ import importlib
 import importlib.util
 import inspect
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -1458,6 +1459,105 @@ def _decision_action(value: object) -> str | None:
     return str(raw).strip().upper() if raw is not None else None
 
 
+_CITATION_SUPPORT_FIELDS = (
+    "citation_precision",
+    "citation_recall",
+    "citation_completeness",
+    "unsupported_claim_rate",
+)
+
+
+def _bounded_observed_signal(value: object) -> float | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    number = float(value)
+    if not math.isfinite(number) or not 0.0 <= number <= 1.0:
+        return None
+    return number
+
+
+def _citation_support_metric_value(value: object) -> float | None:
+    if isinstance(value, Mapping):
+        value = value.get("value", _MISSING)
+    return _bounded_observed_signal(value)
+
+
+def _citation_support_observation(value: object) -> tuple[dict[str, object] | None, str | None]:
+    """Extract a bound, observed claim-support result from runtime output.
+
+    A scalar ``citation_support`` value is intentionally ignored.  The gate
+    accepts either the flat response metadata contract or the evaluator's
+    nested metric shape, but always requires all four metrics, a PASS status,
+    a positive claim count and an explicit source.
+    """
+
+    payload = _mapping(value)
+    containers: list[Mapping[str, object]] = []
+    metadata = payload.get("metadata")
+    if isinstance(metadata, Mapping):
+        containers.append(metadata)
+    containers.append(payload)
+    candidates: list[Mapping[str, object]] = []
+    for container in containers:
+        for key in ("citation_support_metrics", "citation_support"):
+            nested = container.get(key, _MISSING)
+            if isinstance(nested, Mapping):
+                candidates.append(nested)
+        if any(key in container for key in _CITATION_SUPPORT_FIELDS):
+            candidates.append(container)
+
+    if not candidates:
+        return None, "citation_support_metrics_missing"
+    raw = candidates[0]
+    status = raw.get("status", raw.get("citation_support_status", _MISSING))
+    if not isinstance(status, str) or status.strip().upper() != PASS:
+        return None, "citation_support_metrics_not_pass"
+
+    normalized: dict[str, object] = {"status": PASS}
+    for field in _CITATION_SUPPORT_FIELDS:
+        observed = _citation_support_metric_value(raw.get(field, _MISSING))
+        if observed is None:
+            return None, "citation_support_metrics_incomplete"
+        child = raw.get(field)
+        if isinstance(child, Mapping):
+            child_status = child.get("status")
+            if child_status is not None and (
+                not isinstance(child_status, str) or child_status.strip().upper() != PASS
+            ):
+                return None, "citation_support_metrics_not_pass"
+        normalized[field] = observed
+
+    evaluated_claims = raw.get(
+        "evaluated_claims",
+        raw.get("citation_evaluated_claims", raw.get("claim_count", _MISSING)),
+    )
+    if (
+        isinstance(evaluated_claims, bool)
+        or not isinstance(evaluated_claims, int)
+        or not 1 <= evaluated_claims <= 10_000
+    ):
+        return None, "citation_support_claim_count_invalid"
+    source = raw.get("source", raw.get("citation_support_source", _MISSING))
+    if not isinstance(source, str) or not re.fullmatch(r"[a-z][a-z0-9_]{0,127}", source.strip()):
+        return None, "citation_support_source_missing"
+    normalized["evaluated_claims"] = evaluated_claims
+    normalized["source"] = source.strip()
+    return normalized, None
+
+
+def _observed_retrieval_quality(candidates: Sequence[object], bundle: object) -> float | None:
+    """Use a bounded score actually attached to an observed candidate."""
+
+    values: list[float] = []
+    for item in list(candidates) + list(_bundle_items(bundle)):
+        for name in ("retrieval_quality_score", "confidence_score", "reranking_score", "score"):
+            observed = _bounded_observed_signal(_read(item, name, _MISSING))
+            if observed is not None:
+                values.append(observed)
+                break
+    return max(values) if values else None
+
+
 async def _run_downstream(
     runtime: GoldenRuntime,
     fixture: SyntheticFixture,
@@ -1497,6 +1597,18 @@ async def _run_downstream(
     except Exception as exc:
         return [GateResult("professor", FAIL, _safe_error(exc))]
 
+    citation_support_metrics, citation_metrics_error = _citation_support_observation(professor_output)
+    if citation_metrics_error is not None or citation_support_metrics is None:
+        return results + [GateResult("decision.citation_support", FAIL, citation_metrics_error or "citation_support_metrics_missing")]
+    retrieval_quality = _observed_retrieval_quality(candidates, bundle)
+    if retrieval_quality is None:
+        return results + [GateResult("decision.retrieval_quality", FAIL, "retrieval_quality_missing")]
+    provider_signal = _bounded_observed_signal(
+        _read(_read(professor_output, "metadata", {}), "provider_confidence_signal", _MISSING)
+    )
+    if provider_signal is None:
+        return results + [GateResult("decision.provider_signal", FAIL, "provider_signal_missing")]
+
     decision_target = _operation(runtime.decision, ("decide", "evaluate"))
     if decision_target is None:
         return results + [GateResult("decision", FAIL, "decision_operation_missing")]
@@ -1505,10 +1617,16 @@ async def _run_downstream(
         "tenant_id": scope["tenant_id"],
         "workspace_id": scope["workspace_id"],
         "collection_id": scope["collection_id"],
-        "retrieval_quality": 1.0,
+        "retrieval_quality": retrieval_quality,
         "evidence_count": len(_bundle_items(bundle)),
-        "citation_support": 1.0,
-        "provider_confidence_signal": 1.0,
+        "citation_support": min(
+            citation_support_metrics["citation_precision"],
+            citation_support_metrics["citation_recall"],
+            citation_support_metrics["citation_completeness"],
+            1.0 - citation_support_metrics["unsupported_claim_rate"],
+        ),
+        "citation_support_metrics": citation_support_metrics,
+        "provider_confidence_signal": provider_signal,
         "retrieval_available": True,
         "integrity_ok": True,
         "policy_allows_answer": True,
@@ -1516,13 +1634,40 @@ async def _run_downstream(
     }
     try:
         try:
-            from rick_decision import DecisionInput
+            from rick_decision import (
+                DecisionInput,
+                DecisionLayer,
+                DecisionPolicy,
+                DomainRisk,
+                IntentClarity,
+                UserIntent,
+            )
         except Exception as exc:
             raise GateContractError("decision_contract_unavailable") from exc
+        decision_input["domain_risk"] = DomainRisk.LOW
+        decision_input["user_intent"] = UserIntent(
+            intent_code="golden_grounded_query",
+            clarity=IntentClarity.CLEAR,
+        )
+        decision_input["policy"] = DecisionPolicy(
+            min_retrieval_quality=0.50,
+            min_citation_support=0.80,
+            require_citation_support_metrics=True,
+            min_citation_precision=0.80,
+            min_citation_recall=0.80,
+            min_citation_completeness=0.80,
+            max_unsupported_claim_rate=0.0,
+            required_citation_support_source="approved_claim_support",
+            min_provider_confidence_signal=0.0,
+            max_retrieval_attempts=0,
+        )
         try:
             decision_input = DecisionInput(**decision_input)
         except Exception as exc:
             raise GateContractError("decision_input_invalid") from exc
+        canonical_decision = DecisionLayer().decide(decision_input)
+        if _decision_action(canonical_decision) != "ANSWER":
+            raise GateContractError("decision_policy_rejected")
         decision = await _invoke(
             decision_target,
             decision_input,

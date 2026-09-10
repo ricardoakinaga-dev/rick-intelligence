@@ -11,10 +11,19 @@ ABSTAIN
 ESCALATE
 ```
 
-Inputs include retrieval quality, evidence count, citation support, provider
-signals, domain risk and policy. The layer is deterministic for equal inputs,
-has finite limits and carries a reason code safe for logs. Controllers should
-route the decision; they should not duplicate the policy.
+Inputs include retrieval quality, evidence count, the structural citation
+registry signal, optional observed claim-level citation-support metrics,
+provider signals, domain risk and policy. The layer is deterministic for equal
+inputs, has finite limits and carries a reason code safe for logs. Controllers
+should route the decision; they should not duplicate the policy.
+
+`CitationSupportMetrics` requires a PASS observation with precision, recall,
+completeness, unsupported-claim rate, a positive evaluated-claim count and an
+explicit source. A strict runtime policy may pin that source and rejects
+missing, inconclusive or below-threshold metrics. The legacy scalar
+`citation_support` is retained only for pre-generation structural
+compatibility; a bundle existing is not proof of claim support, entailment or
+answer faithfulness.
 
 Clinical decision support is deliberately separated from general knowledge.
 Risk classes are `LOW`, `MEDIUM`, `HIGH` and `CRITICAL`; higher risk requires

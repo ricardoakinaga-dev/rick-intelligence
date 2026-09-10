@@ -31,6 +31,7 @@ INCONCLUSIVE = "INCONCLUSIVE"
 EXIT_PASS = 0
 EXIT_FAIL = 1
 EXIT_INCONCLUSIVE = 2
+_CLAIM_SUPPORT_SOURCE = "approved_claim_support"
 
 
 @dataclass(frozen=True)
@@ -934,6 +935,7 @@ def _claim_support_metrics(cases: Sequence[_Case]) -> dict[str, Any]:
         return _metric(
             NOT_RUN,
             reason="no claims were supplied in the fixture",
+            source=_CLAIM_SUPPORT_SOURCE,
             citation_precision=dict(not_run),
             citation_recall=dict(not_run),
             citation_completeness=dict(not_run),
@@ -1103,6 +1105,7 @@ def _claim_support_metrics(cases: Sequence[_Case]) -> dict[str, Any]:
     ])
     return _metric(
         status,
+        source=_CLAIM_SUPPORT_SOURCE,
         citation_precision=precision_metric,
         citation_recall=recall_metric,
         citation_completeness=completeness_metric,

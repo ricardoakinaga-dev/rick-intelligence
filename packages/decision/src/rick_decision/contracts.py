@@ -80,12 +80,57 @@ class UserIntent(_ContractModel):
         return _safe_code(value, name="intent_code")
 
 
+CitationSupportStatus = Literal["PASS", "FAIL", "INCONCLUSIVE", "NOT_RUN"]
+
+
+class CitationSupportMetrics(_ContractModel):
+    """Observed claim/citation quality supplied by an approved evaluator.
+
+    These are identity-level support observations.  They are deliberately
+    distinct from retrieval relevance, citation-registry validity and answer
+    faithfulness/entailment; none of those stronger claims can be inferred
+    from a bundle merely existing.
+    """
+
+    status: CitationSupportStatus = "NOT_RUN"
+    citation_precision: float | None = Field(default=None, ge=0.0, le=1.0)
+    citation_recall: float | None = Field(default=None, ge=0.0, le=1.0)
+    citation_completeness: float | None = Field(default=None, ge=0.0, le=1.0)
+    unsupported_claim_rate: float | None = Field(default=None, ge=0.0, le=1.0)
+    evaluated_claims: int = Field(default=0, ge=0, le=10_000)
+    source: str = Field(min_length=1, max_length=128)
+
+    @field_validator(
+        "citation_precision",
+        "citation_recall",
+        "citation_completeness",
+        "unsupported_claim_rate",
+        mode="before",
+    )
+    @classmethod
+    def validate_metric(cls, value: object, info) -> float | None:
+        if value is None:
+            return None
+        return _bounded_signal(value, name=info.field_name)
+
+    @field_validator("source", mode="before")
+    @classmethod
+    def validate_source(cls, value: object) -> str:
+        return _safe_code(value, name="source")
+
+
 class DecisionPolicy(_ContractModel):
     """Explicit thresholds and risk allowlist used by the deterministic layer."""
 
     min_evidence_count: int = Field(default=1, ge=1, le=100)
     min_retrieval_quality: float = Field(default=0.65, ge=0.0, le=1.0)
     min_citation_support: float = Field(default=0.80, ge=0.0, le=1.0)
+    require_citation_support_metrics: bool = False
+    min_citation_precision: float = Field(default=0.80, ge=0.0, le=1.0)
+    min_citation_recall: float = Field(default=0.80, ge=0.0, le=1.0)
+    min_citation_completeness: float = Field(default=0.80, ge=0.0, le=1.0)
+    max_unsupported_claim_rate: float = Field(default=0.0, ge=0.0, le=1.0)
+    required_citation_support_source: str | None = Field(default=None, max_length=128)
     min_provider_confidence_signal: float = Field(default=0.60, ge=0.0, le=1.0)
     max_retrieval_attempts: int = Field(default=1, ge=0, le=10)
     answerable_risk_levels: tuple[DomainRisk, ...] = (DomainRisk.LOW,)
@@ -93,12 +138,23 @@ class DecisionPolicy(_ContractModel):
     @field_validator(
         "min_retrieval_quality",
         "min_citation_support",
+        "min_citation_precision",
+        "min_citation_recall",
+        "min_citation_completeness",
+        "max_unsupported_claim_rate",
         "min_provider_confidence_signal",
         mode="before",
     )
     @classmethod
     def validate_threshold(cls, value: object, info) -> float:
         return _bounded_signal(value, name=info.field_name)
+
+    @field_validator("required_citation_support_source", mode="before")
+    @classmethod
+    def validate_citation_source(cls, value: object) -> str | None:
+        if value is None:
+            return None
+        return _safe_code(value, name="required_citation_support_source")
 
     @field_validator("answerable_risk_levels", mode="before")
     @classmethod
@@ -122,7 +178,11 @@ class DecisionInput(_ContractModel):
 
     retrieval_quality: float = Field(default=0.0, ge=0.0, le=1.0)
     evidence_count: int = Field(default=0, ge=0, le=100)
+    # Legacy structural signal.  Strict production/runtime gates must provide
+    # citation_support_metrics instead of treating bundle existence as claim
+    # support.
     citation_support: float = Field(default=0.0, ge=0.0, le=1.0)
+    citation_support_metrics: CitationSupportMetrics | None = None
     provider_confidence_signal: float | None = Field(default=None, ge=0.0, le=1.0)
     domain_risk: DomainRisk = DomainRisk.UNKNOWN
     user_intent: UserIntent = Field(default_factory=UserIntent)
@@ -248,5 +308,7 @@ __all__ = [
     "DomainRisk",
     "IntentClarity",
     "RiskLevel",
+    "CitationSupportMetrics",
+    "CitationSupportStatus",
     "UserIntent",
 ]

@@ -23,8 +23,14 @@ shortfalls may consume a bounded retry budget, after which the result is
 produce `ANSWER`.
 
 The package consumes a server-issued `EvidenceBundle` and can revalidate its
-scope against the request scope. It does not authorize users, retrieve data,
-generate text, classify a regulated domain, or make medical claims.
+scope against the request scope. When `require_citation_support_metrics` is
+enabled, it also requires a PASS `CitationSupportMetrics` observation with
+bounded precision, recall, completeness and unsupported-claim rate values; an
+optional policy source pin binds the observation to the approved evaluator.
+Missing or inconclusive observations cannot produce `ANSWER`. The legacy
+scalar remains for structural compatibility but is not claim-level support.
+The package does not authorize users, retrieve data, generate text, classify a
+regulated domain, or make medical claims.
 
 ## Consequences
 

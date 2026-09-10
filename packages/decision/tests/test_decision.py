@@ -15,6 +15,7 @@ for _package in ("evidence", "decision"):
         sys.path.insert(0, _source)
 
 from rick_decision import (  # noqa: E402
+    CitationSupportMetrics,
     DecisionAction,
     DecisionInput,
     DecisionLayer,
@@ -32,6 +33,9 @@ def _bundle():
         query="What does the source say?",
         scope=scope,
         candidates=[{
+            "tenant_id": "tenant-a",
+            "workspace_id": "workspace-a",
+            "collection_id": "collection-a",
             "document_id": "document-a",
             "document_version": "version-1",
             "chunk_id": "chunk-a-0001",
@@ -126,3 +130,78 @@ def test_policy_can_explicitly_allow_medium_risk_but_never_unknown_by_default() 
 
     assert medium.action is DecisionAction.ANSWER
     assert unknown.action is DecisionAction.ESCALATE
+
+
+def _citation_metrics(**overrides):
+    values = {
+        "status": "PASS",
+        "citation_precision": 1.0,
+        "citation_recall": 1.0,
+        "citation_completeness": 1.0,
+        "unsupported_claim_rate": 0.0,
+        "evaluated_claims": 1,
+        "source": "approved_claim_support",
+    }
+    values.update(overrides)
+    return CitationSupportMetrics(**values)
+
+
+def test_strict_policy_requires_observed_citation_support_metrics() -> None:
+    policy = DecisionPolicy(
+        require_citation_support_metrics=True,
+        required_citation_support_source="approved_claim_support",
+        max_retrieval_attempts=0,
+    )
+
+    decision = DecisionLayer().decide(_input(policy=policy, citation_support=1.0))
+
+    assert decision.action is DecisionAction.ABSTAIN
+    assert decision.reason_code.startswith("citation_support_metrics_missing")
+
+
+def test_strict_policy_consumes_all_citation_support_metrics() -> None:
+    policy = DecisionPolicy(
+        require_citation_support_metrics=True,
+        required_citation_support_source="approved_claim_support",
+        max_retrieval_attempts=0,
+    )
+    accepted = DecisionLayer().decide(
+        _input(policy=policy, citation_support_metrics=_citation_metrics())
+    )
+    rejected = DecisionLayer().decide(
+        _input(
+            policy=policy,
+            citation_support_metrics=_citation_metrics(
+                citation_precision=0.79,
+            ),
+        )
+    )
+
+    assert accepted.action is DecisionAction.ANSWER
+    assert rejected.action is DecisionAction.ABSTAIN
+    assert rejected.reason_code.startswith("citation_precision_below_minimum")
+
+
+def test_strict_policy_rejects_inconclusive_and_unsupported_claim_observations() -> None:
+    policy = DecisionPolicy(
+        require_citation_support_metrics=True,
+        required_citation_support_source="approved_claim_support",
+        max_retrieval_attempts=0,
+    )
+    inconclusive = DecisionLayer().decide(
+        _input(
+            policy=policy,
+            citation_support_metrics=_citation_metrics(status="INCONCLUSIVE"),
+        )
+    )
+    unsupported = DecisionLayer().decide(
+        _input(
+            policy=policy,
+            citation_support_metrics=_citation_metrics(unsupported_claim_rate=0.01),
+        )
+    )
+
+    assert inconclusive.reason_code.startswith("citation_support_metrics_not_pass")
+    assert unsupported.reason_code.startswith("unsupported_claim_rate_above_maximum")
+    assert inconclusive.action is DecisionAction.ABSTAIN
+    assert unsupported.action is DecisionAction.ABSTAIN

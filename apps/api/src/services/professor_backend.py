@@ -153,6 +153,7 @@ class EvidenceDecisionGate:
 
     def __init__(self, retrieval, *, knowledge=None) -> None:
         from rick_decision import (
+            CitationSupportMetrics,
             DecisionAction,
             DecisionInput,
             DecisionLayer,
@@ -164,6 +165,7 @@ class EvidenceDecisionGate:
         from rick_evidence import EvidenceBundle, EvidenceScope, EvidenceValidator
 
         self.retrieval = retrieval
+        self._CitationSupportMetrics = CitationSupportMetrics
         self._DecisionAction = DecisionAction
         self._DecisionInput = DecisionInput
         self._DecisionPolicy = DecisionPolicy
@@ -196,6 +198,86 @@ class EvidenceDecisionGate:
         result = target(**kwargs)
         return await result if inspect.isawaitable(result) else result
 
+    def _citation_support_metrics(
+        self,
+        payload: Mapping[str, object],
+    ) -> tuple[object | None, bool]:
+        """Parse an explicitly observed metric payload without inventing one.
+
+        The second return value distinguishes an absent observation from a
+        malformed one.  A malformed observation is deliberately converted to
+        a zero structural signal by the caller so a bad metadata value cannot
+        fall back to the legacy bundle-exists path.
+        """
+
+        raw_metadata = payload.get("metadata")
+        if not isinstance(raw_metadata, Mapping):
+            return None, False
+        metadata = dict(raw_metadata)
+        raw: Mapping[str, object] | None = None
+        nested = metadata.get("citation_support_metrics")
+        if isinstance(nested, Mapping):
+            raw = nested
+        elif "citation_support_metrics" in metadata:
+            return None, True
+        else:
+            nested_support = metadata.get("citation_support")
+            if isinstance(nested_support, Mapping):
+                raw = nested_support
+            elif "citation_support" in metadata:
+                return None, True
+            elif any(
+                key in metadata
+                for key in (
+                    "citation_precision",
+                    "citation_recall",
+                    "citation_completeness",
+                    "unsupported_claim_rate",
+                    "citation_support_status",
+                    "citation_evaluated_claims",
+                )
+            ):
+                raw = metadata
+            else:
+                return None, False
+
+        values: dict[str, object] = {}
+        for key in (
+            "status",
+            "citation_precision",
+            "citation_recall",
+            "citation_completeness",
+            "unsupported_claim_rate",
+            "evaluated_claims",
+            "source",
+        ):
+            if key in raw:
+                values[key] = raw[key]
+        aliases = {
+            "status": ("status", "citation_support_status"),
+            "evaluated_claims": ("evaluated_claims", "citation_evaluated_claims", "claim_count"),
+            "source": ("source", "citation_support_source"),
+        }
+        for target, names in aliases.items():
+            if target in values:
+                continue
+            for name in names:
+                if name in raw:
+                    values[target] = raw[name]
+                    break
+        try:
+            return self._CitationSupportMetrics.model_validate(values), True
+        except Exception:
+            return None, True
+
+    def _structural_citation_support(self, bundle: object | None) -> float:
+        """Return only the observed bundle/citation-registry validity signal."""
+
+        if bundle is None:
+            return 0.0
+        report = self.validator.validate_bundle(bundle)
+        return 1.0 if report.valid and report.evidence_count > 0 else 0.0
+
     def _decision_input(
         self,
         *,
@@ -204,10 +286,21 @@ class EvidenceDecisionGate:
         evidence_count: int,
         retrieval_quality: float,
         attempt: int,
+        citation_support_metrics: object | None = None,
+        citation_metrics_present: bool = False,
     ):
         tenant_id = context.get("tenant_id") if bundle is not None else None
         workspace_id = context.get("workspace_id") if bundle is not None else None
         collection_id = getattr(bundle, "collection_id", None) if bundle is not None else None
+        # A malformed explicitly supplied observation must not fall back to a
+        # passing structural signal. An absent observation retains the legacy
+        # pre-generation registry check for compatibility; strict runtime
+        # gates use the typed metrics field directly.
+        structural_citation_support = (
+            0.0
+            if citation_metrics_present and citation_support_metrics is None
+            else self._structural_citation_support(bundle)
+        )
         return self._DecisionInput(
             evidence_bundle=bundle,
             tenant_id=tenant_id,
@@ -215,7 +308,10 @@ class EvidenceDecisionGate:
             collection_id=collection_id,
             retrieval_quality=max(0.0, min(1.0, float(retrieval_quality))),
             evidence_count=evidence_count,
-            citation_support=1.0 if bundle is not None else 0.0,
+            # This legacy scalar means only that the server-issued citation
+            # registry validated. It is not claim-level citation support.
+            citation_support=structural_citation_support,
+            citation_support_metrics=citation_support_metrics,
             # This is an availability signal for the already composed typed
             # provider port. It is not presented as a model confidence score.
             provider_confidence_signal=1.0,
@@ -378,12 +474,15 @@ class EvidenceDecisionGate:
                 context=context,
                 candidates=candidates,
             )
+            citation_support_metrics, citation_metrics_present = self._citation_support_metrics(payload)
             decision_input = self._decision_input(
                 context=context,
                 bundle=bundle,
                 evidence_count=len(normalized),
                 retrieval_quality=quality,
                 attempt=attempt,
+                citation_support_metrics=citation_support_metrics,
+                citation_metrics_present=citation_metrics_present,
             )
             decision = self.decision_layer.decide(decision_input)
             last_payload = payload

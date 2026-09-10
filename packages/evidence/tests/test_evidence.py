@@ -34,6 +34,9 @@ def _scope() -> EvidenceScope:
 
 def _candidate(**overrides: object) -> dict[str, object]:
     value: dict[str, object] = {
+        "tenant_id": "tenant-a",
+        "workspace_id": "workspace-a",
+        "collection_id": "collection-a",
         "document_id": "document-a",
         "document_version": "version-1",
         "chunk_id": "chunk-a-0001",

@@ -14,6 +14,9 @@ unless an explicitly approved policy changes that allowlist. Ambiguous or
 unknown intent asks for clarification. Missing or weak evidence can request
 one bounded retrieval retry, then abstains. Missing or weak provider signals
 abstain. Numeric signals are bounded indicators, not calibrated probabilities.
+Strict runtime policies also require an observed `CitationSupportMetrics` PASS
+with citation precision, recall, completeness and unsupported-claim rate; the
+legacy scalar is only a structural citation-registry signal.
 
 ```python
 from rick_decision import (
@@ -43,6 +46,6 @@ When `cited_evidence_ids` is supplied, the layer resolves them against the
 server-generated `EvidenceBundle.citation_map` and abstains on an unknown or
 duplicate identifier. The integration seam is an existing retrieval or
 Professor composition point that creates the bundle with `rick-evidence`,
-feeds citation support from its validator, and invokes this package before
-committing to a response. This lane intentionally does not modify those
-callers or the API.
+supplies observed metrics when available, and invokes this package before
+committing to a response. A bundle alone is never treated as claim-level
+support by a strict gate.

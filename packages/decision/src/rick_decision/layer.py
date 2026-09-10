@@ -37,9 +37,11 @@ class DecisionLayer:
 
     Evaluation order is intentionally fixed: input/evidence integrity, human
     review and risk, intent, policy, evidence sufficiency, citation registry,
-    and provider signal.  Risk and integrity gates take precedence over all
-    answer-oriented signals.  No signal is interpreted as a calibrated
-    probability.
+    citation-support metrics, and provider signal.  Risk and integrity gates
+    take precedence over all answer-oriented signals.  No signal is
+    interpreted as a calibrated probability.  The legacy scalar
+    ``citation_support`` remains available for structural compatibility, but
+    a strict policy requires observed claim-level metrics.
     """
 
     def __init__(self, *, evidence_validator: EvidenceValidator | None = None) -> None:
@@ -76,6 +78,45 @@ class DecisionLayer:
             DecisionAction.ABSTAIN,
             f"{reason_code}_exhausted" if len(reason_code) <= 54 else "evidence_insufficient",
         )
+
+    def _citation_support_failure(self, decision_input: DecisionInput) -> str | None:
+        """Return a safe reason when observed citation support is unusable."""
+
+        policy = decision_input.policy
+        metrics = decision_input.citation_support_metrics
+        if metrics is None:
+            if policy.require_citation_support_metrics:
+                return "citation_support_metrics_missing"
+            if decision_input.citation_support < policy.min_citation_support:
+                return "citation_support_below_minimum"
+            return None
+
+        if metrics.status != "PASS":
+            return "citation_support_metrics_not_pass"
+        if metrics.evaluated_claims < 1:
+            return "citation_support_metrics_empty"
+        if (
+            policy.required_citation_support_source is not None
+            and metrics.source != policy.required_citation_support_source
+        ):
+            return "citation_support_source_invalid"
+
+        checks = (
+            (metrics.citation_precision, policy.min_citation_precision, "citation_precision_below_minimum"),
+            (metrics.citation_recall, policy.min_citation_recall, "citation_recall_below_minimum"),
+            (metrics.citation_completeness, policy.min_citation_completeness, "citation_completeness_below_minimum"),
+        )
+        for observed, minimum, reason in checks:
+            if observed is None:
+                return "citation_support_metrics_incomplete"
+            if observed < minimum:
+                return reason
+        unsupported = metrics.unsupported_claim_rate
+        if unsupported is None:
+            return "citation_support_metrics_incomplete"
+        if unsupported > policy.max_unsupported_claim_rate:
+            return "unsupported_claim_rate_above_maximum"
+        return None
 
     def decide(self, decision_input: DecisionInput) -> Decision:
         """Evaluate one validated input without I/O or nondeterministic state."""
@@ -129,8 +170,9 @@ class DecisionLayer:
             )
             if not citation_report.valid:
                 return self._make(decision_input, DecisionAction.ABSTAIN, "citation_registry_invalid", evidence_bundle_id=bundle_id)
-        if decision_input.citation_support < decision_input.policy.min_citation_support:
-            return self._retry_or_abstain(decision_input, "citation_support_below_minimum")
+        citation_failure = self._citation_support_failure(decision_input)
+        if citation_failure is not None:
+            return self._retry_or_abstain(decision_input, citation_failure)
 
         provider_signal = decision_input.provider_confidence_signal
         if provider_signal is None:

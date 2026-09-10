@@ -192,7 +192,12 @@ def _retrieval_decision_metadata(value: object) -> dict[str, str | int | float |
     metadata = payload.get("metadata")
     if not isinstance(metadata, Mapping):
         return {}
-    allowed = {"decision_action", "decision_reason", "decision_attempt", "evidence_bundle_id"}
+    allowed = {
+        "decision_action", "decision_reason", "decision_attempt", "evidence_bundle_id",
+        "citation_support_status", "citation_precision", "citation_recall",
+        "citation_completeness", "unsupported_claim_rate",
+        "citation_evaluated_claims", "citation_support_source",
+    }
     result: dict[str, str | int | float | bool | None] = {}
     for key in allowed:
         value = metadata.get(key)

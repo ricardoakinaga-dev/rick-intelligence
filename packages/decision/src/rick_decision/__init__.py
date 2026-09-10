@@ -1,6 +1,8 @@
 """Explicit deterministic decision policy for the reasoning boundary."""
 
 from rick_decision.contracts import (
+    CitationSupportMetrics,
+    CitationSupportStatus,
     DECISION_CONTRACT_VERSION,
     Decision,
     DecisionAction,
@@ -23,6 +25,8 @@ from rick_decision.layer import (
 )
 
 __all__ = [
+    "CitationSupportMetrics",
+    "CitationSupportStatus",
     "ConservativeDecisionLayer",
     "DECISION_CONTRACT_VERSION",
     "Decision",

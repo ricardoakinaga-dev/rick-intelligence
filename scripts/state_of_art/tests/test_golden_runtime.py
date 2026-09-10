@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import importlib.util
 import json
 from pathlib import Path
@@ -237,6 +238,85 @@ def test_gate_source_does_not_select_hermetic_memory_clients(gate: ModuleType) -
     assert "InMemory" not in source
     assert "DeterministicHashEmbedding" not in source
     assert gate.GATE_ID == "RICK_GOLDEN_RUNTIME_PATH"
+
+
+def test_golden_downstream_rejects_bundle_presence_as_citation_support(
+    gate: ModuleType,
+) -> None:
+    decision_calls = 0
+
+    def decision(**_kwargs):
+        nonlocal decision_calls
+        decision_calls += 1
+        return {"action": "ANSWER"}
+
+    runtime = gate.GoldenRuntime(
+        professor=lambda **_kwargs: {"answer": "grounded answer", "metadata": {"citation_support": 1.0}},
+        decision=decision,
+    )
+    results = asyncio.run(
+        gate._run_downstream(
+            runtime,
+            gate.SyntheticFixture(),
+            scope={
+                "tenant_id": "tenant-a",
+                "workspace_id": "workspace-a",
+                "collection_id": "collection-a",
+            },
+            bundle=object(),
+            candidates=[],
+            timeout=1.0,
+            run_id="golden-test",
+        )
+    )
+
+    assert results[-1].name == "decision.citation_support"
+    assert results[-1].result == gate.FAIL
+    assert results[-1].detail == "citation_support_metrics_missing"
+    assert decision_calls == 0
+
+
+def test_golden_citation_observation_requires_four_metrics_and_source(gate: ModuleType) -> None:
+    valid, error = gate._citation_support_observation(
+        {
+            "metadata": {
+                "citation_support": {
+                    "status": "PASS",
+                    "citation_precision": {"status": "PASS", "value": 1.0},
+                    "citation_recall": {"status": "PASS", "value": 0.9},
+                    "citation_completeness": {"status": "PASS", "value": 1.0},
+                    "unsupported_claim_rate": {"status": "PASS", "value": 0.0},
+                    "claim_count": 2,
+                    "source": "approved_claim_support",
+                }
+            }
+        }
+    )
+
+    assert error is None
+    assert valid == {
+        "status": "PASS",
+        "citation_precision": 1.0,
+        "citation_recall": 0.9,
+        "citation_completeness": 1.0,
+        "unsupported_claim_rate": 0.0,
+        "evaluated_claims": 2,
+        "source": "approved_claim_support",
+    }
+
+    missing, missing_error = gate._citation_support_observation(
+        {"metadata": {"citation_support": {"status": "PASS", "value": 1.0}}}
+    )
+    assert missing is None
+    assert missing_error == "citation_support_metrics_incomplete"
+
+
+def test_golden_retrieval_quality_must_be_observed(gate: ModuleType) -> None:
+    assert gate._observed_retrieval_quality([], object()) is None
+    assert gate._observed_retrieval_quality(
+        [{"retrieval_quality_score": 0.72}, {"score": 0.41}],
+        object(),
+    ) == 0.72
 
 
 def _checkout(_root: Path) -> dict[str, object]:

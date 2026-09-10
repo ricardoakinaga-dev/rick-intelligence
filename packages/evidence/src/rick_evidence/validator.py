@@ -107,6 +107,19 @@ def _candidate_value(candidate: object, *names: str, default: object = None) -> 
     return default
 
 
+def _candidate_mapping(candidate: object) -> Mapping[str, object] | None:
+    if isinstance(candidate, Mapping):
+        return candidate
+    dump = getattr(candidate, "model_dump", None)
+    if callable(dump):
+        try:
+            value = dump()
+        except Exception:
+            return None
+        return value if isinstance(value, Mapping) else None
+    return None
+
+
 def _meaningful_tokens(value: str) -> set[str]:
     return {
         token.casefold()
@@ -205,6 +218,10 @@ class EvidenceValidator:
             if _resolved_candidate is not None
             else self._resolve_authoritative(candidate, scope=expected)
         )
+        candidate_mapping = _candidate_mapping(candidate)
+        if candidate_mapping is None:
+            raise EvidenceValidationError("invalid_evidence_candidate")
+        candidate = dict(candidate_mapping)
         for name in ("tenant_id", "workspace_id", "collection_id"):
             if candidate.get(name) != getattr(expected, name):
                 raise EvidenceValidationError("authoritative_scope_mismatch")

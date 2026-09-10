@@ -46,13 +46,14 @@ def _candidate(**overrides: object) -> dict[str, object]:
 
 
 class _Retrieval:
-    def __init__(self, evidence: list[dict[str, object]]) -> None:
+    def __init__(self, evidence: list[dict[str, object]], metadata: dict[str, object] | None = None) -> None:
         self.evidence = evidence
+        self.metadata = metadata or {"backend": "test"}
         self.calls = 0
 
     async def retrieve(self, *, query: str, context: dict[str, object]) -> dict[str, object]:
         self.calls += 1
-        return {"evidence": list(self.evidence), "metadata": {"backend": "test"}}
+        return {"evidence": list(self.evidence), "metadata": dict(self.metadata)}
 
 
 class _CanonicalKnowledge:
@@ -133,3 +134,58 @@ def test_external_authority_replaces_untrusted_retrieval_text_and_checksum() -> 
     assert evidence[0]["text"] == "The canonical PostgreSQL chunk is authoritative."
     assert evidence[0]["checksum"] == "sha256:chunk"
     assert evidence[0]["document_version"] == "canonical-v2"
+
+
+def test_gate_consumes_observed_claim_support_metrics_when_present() -> None:
+    retrieval = _Retrieval(
+        [_candidate()],
+        metadata={
+            "backend": "test",
+            "citation_support_status": "PASS",
+            "citation_precision": 0.70,
+            "citation_recall": 1.0,
+            "citation_completeness": 1.0,
+            "unsupported_claim_rate": 0.0,
+            "citation_evaluated_claims": 1,
+            "citation_support_source": "approved_claim_support",
+        },
+    )
+
+    result = asyncio.run(
+        EvidenceDecisionGate(retrieval).retrieve(
+            query="What does the source support?",
+            context=_context(),
+        )
+    )
+
+    assert result["evidence"] == []
+    assert result["metadata"]["decision_action"] == "ABSTAIN"
+    assert result["metadata"]["decision_reason"].startswith("citation_precision_below_minimum")
+    assert retrieval.calls == 2
+
+
+def test_malformed_claim_support_observation_cannot_fall_back_to_bundle_presence() -> None:
+    retrieval = _Retrieval(
+        [_candidate()],
+        metadata={
+            "backend": "test",
+            "citation_support_status": "PASS",
+            "citation_precision": "not-a-number",
+            "citation_recall": 1.0,
+            "citation_completeness": 1.0,
+            "unsupported_claim_rate": 0.0,
+            "citation_evaluated_claims": 1,
+            "citation_support_source": "approved_claim_support",
+        },
+    )
+
+    result = asyncio.run(
+        EvidenceDecisionGate(retrieval).retrieve(
+            query="What does the source support?",
+            context=_context(),
+        )
+    )
+
+    assert result["evidence"] == []
+    assert result["metadata"]["decision_action"] == "ABSTAIN"
+    assert retrieval.calls == 2
