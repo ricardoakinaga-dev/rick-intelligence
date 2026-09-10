@@ -484,3 +484,19 @@ free-form diagnostics. The focused observability suite passes **10**, while
 the API and State-of-Art suites pass **437** and **295**; ingestion security
 and ingestion tests pass **63**. This is local redaction evidence and does not
 replace live collector, runtime or promotion evidence.
+
+## 32. Inline observability secret redaction closure — 2026-09-10
+
+Source candidate `e2043c05fb1b064b4618395e3358d2a22a5b2cd0` (tree
+`6774e6ab8662c0b5a085fd0d62d108c6f61ecc32`) closes the remaining free-form
+diagnostic redaction gap. Non-sensitive text fields now redact inline
+assignments, bearer headers and nested JSON/CLI-style secret values while
+preserving already-sanitized URL structure. Focused adversarial tests prove
+password, token, bearer and nested API-key values do not survive in event
+representations.
+
+The observability suite passes **10**, the API matrix **437**, and the
+State-of-Art suite **295**; compilation and `git diff --check` pass. This is
+local redaction evidence only: approved collector/backend, distributed
+runtime, provider/corpus, independent review, sealed packet and human
+Go/No-Go evidence remain unavailable, so no promotion claim is made.

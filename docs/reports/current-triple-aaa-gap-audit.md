@@ -693,3 +693,19 @@ The observability suite passes **10**, ingestion security/ingestion tests pass
 local redaction evidence only; the approved collector/backend, distributed
 runtime, provider/corpus, independent review, sealed packet and human Go-No-Go
 remain unavailable. No promotion claim is made.
+
+## 33. Inline observability secret redaction closure — 2026-09-10
+
+Source implementation candidate `e2043c05fb1b064b4618395e3358d2a22a5b2cd0`
+(tree `6774e6ab8662c0b5a085fd0d62d108c6f61ecc32`) closes the remaining
+free-form text leak identified at the observability boundary. Inline
+assignments, bearer headers and nested JSON/CLI-style values for passwords,
+tokens, API keys, credentials and related secret fields are now redacted even
+when the enclosing field is not itself sensitive. Sanitized URLs retain their
+scheme/host/path while userinfo, query and fragment material remains removed.
+
+The observability suite passes **10**, the API matrix **437**, and the
+State-of-Art suite **295**; compilation and `git diff --check` pass. This
+remains local fail-closed evidence only. Approved collector/backend,
+distributed runtime, provider/corpus, independent review, sealed packet and
+human Go/No-Go evidence remain unavailable; promotion is still disallowed.

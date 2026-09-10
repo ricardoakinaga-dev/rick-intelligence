@@ -150,8 +150,9 @@ The local source corrections at `2238b99ec797b0b2416208dd0e0b02c74897f7d9`,
 `09a467652c3c9ba85770937e3cdce8c39f545e44`,
 `6095bafcc368a4b7ee7d468bd4bac98e7b153faf`,
 `a480e6cc67ada68fc91e0c7034a37f53f23051b3`,
-`eced09b7431de92fa064d9910d9ff7d489bb5dc1` and
-`7af6d7be4118b9ecbb237d673e39229691901cc9` add a bounded authenticated
+`eced09b7431de92fa064d9910d9ff7d489bb5dc1`,
+`7af6d7be4118b9ecbb237d673e39229691901cc9` and
+`e2043c05fb1b064b4618395e3358d2a22a5b2cd0` add a bounded authenticated
 `GET /models` provider-health probe, strict model-list validation, resilient
 delegation, bounded function tools, typed complete/streaming tool calls, JSON
 argument validation, streaming tool-call reassembly and explicit live-health,
@@ -165,7 +166,9 @@ streaming tool calls without executing over-budget tools and rejects a newly
 over-budget streaming index before publishing its content delta. Integer
 budget fields and timeout booleans are also type-strict. Observability
 redaction also strips credentials and query material from
-JSON-escaped URLs before events are persisted. The normal
+JSON-escaped URLs before events are persisted, and inline assignments, bearer
+headers and nested JSON/CLI-style secret values are redacted from free-form
+diagnostic text. The normal
 JSON-object response mode is also
 validated at the client boundary and rejects invalid semantic content without
 retry, and the streaming JSON contract reassembles split deltas as an object.
