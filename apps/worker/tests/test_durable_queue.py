@@ -26,6 +26,32 @@ def _enqueue(queue: SQLiteDurableQueue, job_id: str = "job-1"):
     )
 
 
+def _stored_row(payload_json: str) -> dict[str, object]:
+    return {
+        "job_id": "job-1",
+        "idempotency_key": "idem-job-1",
+        "status": "queued",
+        "payload_json": payload_json,
+        "tenant_id": "tenant-a",
+        "workspace_id": "workspace-a",
+        "collection_id": "clinical",
+        "attempts": 0,
+        "available_at": 100.0,
+        "lease_until": None,
+        "lease_owner": None,
+        "created_at": 100.0,
+        "updated_at": 100.0,
+        "last_error": None,
+    }
+
+
+def test_stored_payload_decoder_rejects_unbounded_and_nonfinite_json() -> None:
+    oversized = '{"filename":"' + ("a" * (32 * 1024)) + '"}'
+
+    assert SQLiteDurableQueue._decode(_stored_row(oversized)).payload == {}
+    assert SQLiteDurableQueue._decode(_stored_row('{"filename":NaN}')).payload == {}
+
+
 def test_idempotency_and_payload_boundary(tmp_path: Path) -> None:
     queue = SQLiteDurableQueue(tmp_path / "queue.sqlite", mode="test")
     first = _enqueue(queue)

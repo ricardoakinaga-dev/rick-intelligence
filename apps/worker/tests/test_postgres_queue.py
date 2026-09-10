@@ -28,6 +28,13 @@ def job_row(*, status="queued", lease_owner=None, attempts=0):
     }
 
 
+def test_database_payload_decoder_rejects_unbounded_and_nonfinite_json():
+    oversized = '{"filename":"' + ("a" * (32 * 1024)) + '"}'
+
+    assert PostgresIngestionQueue._decode({**job_row(), "payload": oversized}).payload == {}
+    assert PostgresIngestionQueue._decode({**job_row(), "payload": '{"filename":NaN}'}).payload == {}
+
+
 class ScriptedCursor:
     def __init__(self, steps):
         self.steps = list(steps)

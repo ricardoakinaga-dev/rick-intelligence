@@ -144,6 +144,30 @@ def _payload(value: object) -> tuple[str, dict[str, str]]:
     return encoded, clean
 
 
+def _reject_json_constant(_value: str) -> object:
+    raise ValueError("non-finite JSON constants are not allowed")
+
+
+def _decode_payload(value: object) -> dict[str, str]:
+    """Decode a stored payload through the same bounded contract as writes."""
+
+    parsed = value
+    if isinstance(value, str):
+        try:
+            if len(value.encode("utf-8")) > MAX_JSON_BYTES:
+                return {}
+            parsed = json.loads(value, parse_constant=_reject_json_constant)
+        except (TypeError, UnicodeError, ValueError, RecursionError):
+            return {}
+    if not isinstance(parsed, Mapping):
+        return {}
+    try:
+        _encoded, clean = _payload(parsed)
+    except (TypeError, ValueError, QueueConfigurationError, RecursionError):
+        return {}
+    return clean
+
+
 def _safe_error(value: object) -> str:
     candidate = _safe_text(value, label="error", limit=64).lower()
     if not _SAFE_ERROR.fullmatch(candidate) or any(token in candidate for token in ("token", "secret", "password", "bearer")):
@@ -300,11 +324,7 @@ class SQLiteDurableQueue:
 
     @staticmethod
     def _decode(row: sqlite3.Row) -> QueueRecord:
-        try:
-            parsed = json.loads(row["payload_json"])
-            payload = dict(parsed) if isinstance(parsed, Mapping) else {}
-        except (TypeError, ValueError, json.JSONDecodeError):
-            payload = {}
+        payload = _decode_payload(row["payload_json"])
         return QueueRecord(
             job_id=row["job_id"],
             idempotency_key=row["idempotency_key"],

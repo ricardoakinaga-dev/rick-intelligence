@@ -64,6 +64,9 @@ class PostgresQueueIdempotencyError(PostgresQueueError):
         super().__init__("idempotency")
 
 
+MAX_PAYLOAD_BYTES = 32 * 1024
+
+
 def _text(value: object, *, maximum: int = 256) -> str:
     if not isinstance(value, str):
         raise PostgresQueueError("invalid_input")
@@ -99,9 +102,33 @@ def _payload(value: Mapping[str, str]) -> tuple[str, dict[str, str]]:
             raise PostgresQueueError("invalid_input")
         clean[_text(key, maximum=64)] = _text(raw, maximum=512)
     encoded = json.dumps(clean, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
-    if len(encoded.encode("utf-8")) > 32 * 1024:
+    if len(encoded.encode("utf-8")) > MAX_PAYLOAD_BYTES:
         raise PostgresQueueError("invalid_input")
     return encoded, clean
+
+
+def _reject_json_constant(_value: str) -> object:
+    raise ValueError("non-finite JSON constants are not allowed")
+
+
+def _decode_payload(value: object) -> dict[str, str]:
+    """Decode database payloads through the same bounded contract as writes."""
+
+    parsed = value
+    if isinstance(value, str):
+        try:
+            if len(value.encode("utf-8")) > MAX_PAYLOAD_BYTES:
+                return {}
+            parsed = json.loads(value, parse_constant=_reject_json_constant)
+        except (TypeError, UnicodeError, ValueError, RecursionError):
+            return {}
+    if not isinstance(parsed, Mapping):
+        return {}
+    try:
+        _encoded, clean = _payload(parsed)
+    except (TypeError, ValueError, PostgresQueueError, RecursionError):
+        return {}
+    return clean
 
 
 @dataclass(frozen=True, slots=True)
@@ -204,12 +231,7 @@ class PostgresIngestionQueue:
     @staticmethod
     def _decode(row: Mapping[str, object]) -> QueueRecord:
         raw_payload = row.get("payload") or row.get("payload_json") or {}
-        if isinstance(raw_payload, str):
-            try:
-                raw_payload = json.loads(raw_payload)
-            except (TypeError, ValueError, json.JSONDecodeError):
-                raw_payload = {}
-        payload = dict(raw_payload) if isinstance(raw_payload, Mapping) else {}
+        payload = _decode_payload(raw_payload)
         return QueueRecord(
             job_id=str(row.get("job_id") or ""),
             idempotency_key=str(row.get("idempotency_key") or ""),
