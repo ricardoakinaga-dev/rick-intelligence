@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 from pathlib import Path
 import stat
@@ -152,6 +153,44 @@ def test_malformed_committed_entry_fails_closed(tmp_path: Path, scope: ObjectSco
     with object_file.open("r+b") as handle:
         handle.seek(0)
         handle.write(b"not-an-object".ljust(4096, b"\x00"))
+
+    with pytest.raises(ObjectStoreCorruptionError):
+        store.head(scope, "valid")
+
+
+@pytest.mark.parametrize(
+    "malformed_fields",
+    (
+        '"metadata":NaN,"size":4,',
+        '"size":4,"size":4,',
+    ),
+)
+def test_ambiguous_or_nonfinite_json_header_fails_closed(
+    tmp_path: Path,
+    scope: ObjectScope,
+    malformed_fields: str,
+) -> None:
+    root = tmp_path / "objects"
+    store = LocalObjectStore(root)
+    store.put(scope, "valid", b"data")
+    object_file = next((root / "tenants").rglob("*.object"))
+    checksum = f"sha256:{hashlib.sha256(b'data').hexdigest()}"
+    payload = (
+        "{"
+        f'"checksum":{json.dumps(checksum)},'
+        '"format":1,'
+        f'"key":{json.dumps("valid")},'
+        f"{malformed_fields}"
+        f'"source_id":{json.dumps(scope.source_id)},'
+        f'"tenant_id":{json.dumps(scope.tenant_id)},'
+        f'"workspace_id":{json.dumps(scope.workspace_id)}'
+        "}"
+    ).encode("ascii")
+    header = b"RICK-LOCAL-OBJECT\x00" + payload
+    assert len(header) <= 4096
+    with object_file.open("r+b") as handle:
+        handle.seek(0)
+        handle.write(header.ljust(4096, b"\x00"))
 
     with pytest.raises(ObjectStoreCorruptionError):
         store.head(scope, "valid")

@@ -53,6 +53,19 @@ _OBJECT_SUFFIX = ".object"
 _COPY_CHUNK_BYTES = 64 * 1024
 
 
+def _reject_json_constant(_value: str) -> object:
+    raise ValueError("non-finite JSON constants are not allowed")
+
+
+def _reject_duplicate_json_keys(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    result: dict[str, object] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("duplicate JSON object key")
+        result[key] = value
+    return result
+
+
 class LocalObjectStore:
     """A private, local-only filesystem object store.
 
@@ -550,6 +563,7 @@ def _encode_header(metadata: ObjectMetadata) -> bytes:
         ensure_ascii=True,
         sort_keys=True,
         separators=(",", ":"),
+        allow_nan=False,
     ).encode("ascii")
     encoded = _MAGIC + payload
     if len(encoded) > _HEADER_BYTES:
@@ -566,8 +580,12 @@ def _decode_header(
         raise ObjectStoreCorruptionError(operation="read")
     encoded = header[len(_MAGIC) :].rstrip(b"\x00")
     try:
-        raw = json.loads(encoded.decode("ascii"))
-    except (UnicodeDecodeError, json.JSONDecodeError):
+        raw = json.loads(
+            encoded.decode("ascii"),
+            object_pairs_hook=_reject_duplicate_json_keys,
+            parse_constant=_reject_json_constant,
+        )
+    except (RecursionError, UnicodeDecodeError, ValueError):
         raise ObjectStoreCorruptionError(operation="read") from None
     if not isinstance(raw, dict) or raw.get("format") != _FORMAT_VERSION:
         raise ObjectStoreCorruptionError(operation="read")
