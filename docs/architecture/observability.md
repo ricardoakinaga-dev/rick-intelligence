@@ -90,3 +90,10 @@ não é evidência de entrega: agregação multi-instância, exportação de tra
 collector, entrega de alertas e drills live de SLO permanecem `NOT_RUN`; sua
 execução exige runtime externo autorizado. Qualquer integração futura deve
 preservar a redação, os labels bounded e a declaração explícita de `no_data`.
+
+The Phase 11 observability runtime gate applies the shared strict JSON
+boundary to HTTP backend responses and artifacts emitted by the optional
+operational harness. Duplicate keys, non-finite values, invalid UTF-8 and
+oversized artifacts fail closed before trace, metric, alert or SLO fields are
+projected. This is local gate-integrity evidence only; distributed exporter,
+collector, backend and live-drill authority remain separate requirements.

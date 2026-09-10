@@ -129,6 +129,13 @@ authorization, preflight or safety-case observations. This is local worker
 boundary hardening only; external process-isolation, corpus and promotion
 evidence remain required.
 
+At source candidate `c73eefa5e0d4ce0abc03e62c9793c649987ceffc`, the Phase 11
+observability gate applies the strict boundary to backend responses and
+operational-harness artifacts before trace, metrics, alert or SLO projection.
+This prevents ambiguous local observations from becoming gate passes; it does
+not provide distributed observability runtime, live-drill or promotion
+evidence.
+
 ## 7. CI and release lanes
 
 The canonical workflow names FAST, UNIT, CONTRACT, SECURITY, RAG_EVAL,
