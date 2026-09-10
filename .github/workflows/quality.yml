@@ -548,7 +548,8 @@ jobs:
 
   nightly:
     name: NIGHTLY / strict Phase 3 promotion boundary
-    if: github.event_name == 'schedule'
+    needs: [runtime, frontend-runtime, performance, chaos, soak]
+    if: always() && github.event_name == 'schedule'
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     permissions:
@@ -560,6 +561,19 @@ jobs:
       - uses: actions/setup-python@v5.6.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
+      - name: Require every scheduled runtime lane
+        run: |
+          for result in \
+            "${{ needs.runtime.result }}" \
+            "${{ needs.frontend-runtime.result }}" \
+            "${{ needs.performance.result }}" \
+            "${{ needs.chaos.result }}" \
+            "${{ needs.soak.result }}"; do
+            if [ "$result" != "success" ]; then
+              echo "::error::nightly runtime lane result was $result"
+              exit 1
+            fi
+          done
       - name: Generate and require a promotable Phase 3 matrix
         run: |
           make phase3-evidence

@@ -326,6 +326,19 @@ class ReleaseManifestTests(unittest.TestCase):
         self.assertEqual(result["classification"], release_integrity.FAIL)
         self.assertIn("missing mandatory gate results", result["reason"])
 
+    def test_unsupported_gate_id_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="release-manifest-") as directory:
+            path, checkout = self._fixture(directory)
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            extra = dict(payload["gates"][0])
+            extra["gate_id"] = "unreviewed-provider-alias"
+            payload["gates"].append(extra)
+            path.write_text(json.dumps(payload), encoding="utf-8")
+            result = release_integrity.evaluate_evidence(path, checkout, root=Path(directory))
+
+        self.assertEqual(result["classification"], release_integrity.FAIL)
+        self.assertIn("unsupported gate results", result["reason"])
+
     def test_conflicting_evidence_aliases_are_rejected(self) -> None:
         with tempfile.TemporaryDirectory(prefix="release-manifest-") as directory:
             path, checkout = self._fixture(directory)

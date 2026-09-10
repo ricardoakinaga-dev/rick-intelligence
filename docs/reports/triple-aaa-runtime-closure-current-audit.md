@@ -356,3 +356,21 @@ the authoritative source for the final commit/tree binding. Docker still
 cannot be accessed from this environment, so no live service, distributed
 failure/recovery, independent-review or sealed-promotion claim is made. The
 candidate remains **NO-GO**.
+
+## 78. Provider release gate and strict nightly boundary — 2026-09-10
+
+The release manifest previously carried a provider runtime artifact mapping,
+but `REQUIRED_GATES` did not require the `provider` gate. This left a schema
+gap: a typed manifest could omit the provider envelope while still satisfying
+its mandatory gate set. The manifest now requires `provider` and rejects
+unsupported gate IDs; focused release-manifest and generator tests pass (**38**
+cases). The current provider envelope remains externally blocked and is not
+promoted by this schema correction.
+
+The scheduled `nightly` workflow job now waits for the integrated runtime,
+browser, performance, chaos and soak jobs and fails closed when any dependency
+is skipped or unsuccessful before validating the Phase 3 matrix. The existing
+runtime packet remains responsible for the named PostgreSQL/worker, Redis,
+Qdrant and object-storage lanes. This makes the nightly status a truthful
+summary boundary; it does not create Docker, service, provider, chaos, soak or
+performance evidence in this environment.

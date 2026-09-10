@@ -154,7 +154,10 @@ Provider health, model validation, JSON/streaming tool handling, cancellation
 and embedding lifecycle have local contract coverage. The persistent embedding
 loop prevents cached async clients from crossing event loops. Approved live
 provider health, rate-limit, timeout, budget, cancellation and credential
-rotation evidence is not available.
+rotation evidence is not available. The release-evidence schema now makes the
+provider runtime envelope an explicit mandatory gate, so a manifest cannot be
+structurally complete while omitting provider evidence; this local control
+does not turn the unavailable provider authority into a PASS.
 
 ## 16. Retrieval
 

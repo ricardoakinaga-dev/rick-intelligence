@@ -5,7 +5,7 @@ from pathlib import Path
 import re
 
 from scripts.state_of_art import generate_release_evidence
-from scripts.state_of_art.release_manifest import ReviewerRef
+from scripts.state_of_art.release_manifest import REQUIRED_GATES, ReviewerRef
 
 
 HEAD = "a" * 40
@@ -115,6 +115,14 @@ def test_runtime_gate_artifact_registry_points_to_named_envelopes() -> None:
         "supply-chain": ".runtime/phase-3/supply-chain-runtime-evidence.json",
         "provider": ".runtime/phase-3/provider-runtime-evidence.json",
     }
+
+
+def test_provider_is_a_mandatory_release_gate() -> None:
+    assert "provider" in REQUIRED_GATES
+    assert REQUIRED_GATES.index("provider") > REQUIRED_GATES.index("decision")
+    assert generate_release_evidence.RUNTIME_GATE_ARTIFACTS["provider"] == (
+        ".runtime/phase-3/provider-runtime-evidence.json"
+    )
 
 
 def test_local_ci_gate_artifact_registry_is_explicit_and_disjoint() -> None:
@@ -350,6 +358,18 @@ def test_canonical_workflow_binds_ci_artifacts_to_the_same_run() -> None:
     assert "cvg-master-rag-v2','rick-professor','modulo-redis-locker" in text
     assert "run: make phase3-frontend-supply-runtime" in text
     assert ".runtime/phase-3" in text
+
+
+def test_nightly_boundary_waits_for_every_scheduled_runtime_lane() -> None:
+    workflow = Path(__file__).parents[3] / ".github/workflows/quality.yml"
+    text = workflow.read_text(encoding="utf-8")
+
+    nightly = text.split("  nightly:\n", 1)[1]
+    assert "needs: [runtime, frontend-runtime, performance, chaos, soak]" in nightly
+    assert "if: always() && github.event_name == 'schedule'" in nightly
+    assert "Require every scheduled runtime lane" in nightly
+    for lane in ("runtime", "frontend-runtime", "performance", "chaos", "soak"):
+        assert f'needs.{lane}.result' in nightly
 
 
 def test_final_promotion_report_matches_prompt_section_and_scorecard_contract() -> None:

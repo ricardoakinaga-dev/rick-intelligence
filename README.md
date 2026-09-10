@@ -118,6 +118,7 @@ Run `make help` for the complete list.
 | `make restore-runtime` | Runs the authorized disposable `seed → backup → destroy → restore → rebuild → verify` sequence and records RPO/RTO without accepting a local simulation. |
 | `make file-security-runtime` | Runs the ten-case hostile file corpus through an isolated external worker with bounded time, memory, CPU, output and redaction assertions. |
 | `make phase3-evidence`, `make phase3-evidence-verify` | Generate and validate the commit-bound Phase 3 capability matrix; missing, stale, blocked or non-production-safe runtime evidence is not promoted. |
+| `make triple-aaa-capability-matrix` | Validate the current runtime-closure prompt binding, allowed states and required capability columns. |
 | `make phase3-restore-runtime`, `make phase3-file-security-runtime` | Bind the restore and file-security runtime observations to the exact clean checkout. |
 | `make phase3-performance`, `make phase3-chaos`, `make phase3-soak` | Run explicitly supplied bounded operational harnesses; no harness is treated as a pass. |
 | `make triple-aaa-verify` | Executes the integrated fail-closed Phase 3 packet and writes a redacted ignored result; `0` is reserved for all mandatory lanes passing, `2` means external blocking, `1` means failure. |

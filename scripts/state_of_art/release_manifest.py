@@ -35,6 +35,7 @@ REQUIRED_GATES = (
     "evidence",
     "citation",
     "decision",
+    "provider",
     "observability",
     "dr",
     "restore",
@@ -427,6 +428,11 @@ class ReleaseEvidenceManifest:
         if not self.gates:
             errors.append("manifest must contain at least one gate result")
         present_gate_ids = {item.gate_id for item in self.gates}
+        unknown_gate_ids = sorted(present_gate_ids - set(REQUIRED_GATES))
+        if unknown_gate_ids:
+            errors.append(
+                "manifest contains unsupported gate results: " + ", ".join(unknown_gate_ids)
+            )
         missing_gate_ids = [gate_id for gate_id in REQUIRED_GATES if gate_id not in present_gate_ids]
         if missing_gate_ids:
             errors.append(
