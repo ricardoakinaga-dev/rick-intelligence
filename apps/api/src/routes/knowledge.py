@@ -14,12 +14,13 @@ from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 
 from core.errors import ApiError
-from core.middleware import is_request_too_large
+from core.middleware import RequestTooLarge, is_request_too_large
 from dependencies.identity import require_authenticated
 from dependencies.services import get_providers
 from services.audit import emit_required
 from services.authorization_service import build_retrieval_context, filter_collection_items, has_permission
 from services.ingestion_service import IngestionApplicationService, safe_job_json
+from services.json_boundary import decode_request_json
 
 router = APIRouter(tags=["Knowledge"])
 
@@ -682,7 +683,11 @@ def delete_document(document_id: str, request: Request, session=Depends(require_
 
 async def _request_json(request: Request) -> object:
     try:
-        return await request.json()
+        body = await request.body()
+        settings = get_providers(request).settings
+        if len(body) > settings.max_json_bytes:
+            raise RequestTooLarge
+        return decode_request_json(body, max_bytes=settings.max_json_bytes)
     except Exception as exc:
         if is_request_too_large(exc):
             raise ApiError("request_too_large") from None

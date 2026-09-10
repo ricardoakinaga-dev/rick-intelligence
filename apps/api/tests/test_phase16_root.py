@@ -322,6 +322,28 @@ def test_upload_rejects_unsupported_and_bounded_oversized_content() -> None:
     assert oversized.json()["error"]["code"] == "request_too_large"
 
 
+def test_json_ingestion_rejects_nonfinite_and_duplicate_request_fields() -> None:
+    client = _client()
+    _login(client, "km@example.com")
+    headers = {"Content-Type": "application/json"}
+
+    nonfinite = client.post(
+        "/api/v1/documents/upload",
+        content=b'{"filename":"strict.txt","collection_id":"rag_phase0","content":"ok","metadata":NaN}',
+        headers=headers,
+    )
+    duplicate = client.post(
+        "/api/v1/documents/upload",
+        content=b'{"filename":"strict.txt","collection_id":"rag_phase0","content":"first","content":"second"}',
+        headers=headers,
+    )
+
+    assert nonfinite.status_code == 400
+    assert nonfinite.json()["error"]["code"] == "validation_error"
+    assert duplicate.status_code == 400
+    assert duplicate.json()["error"]["code"] == "validation_error"
+
+
 def test_retry_requires_a_new_bounded_source_and_never_relabels_failed_attempt() -> None:
     client = _client()
     _login(client, "km@example.com")
