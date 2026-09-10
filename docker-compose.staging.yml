@@ -1,7 +1,5 @@
 # Production-like staging topology. Credentials, images, composition modules
 # and endpoints are mandatory inputs; no value here is a production secret.
-name: rick-intelligence-staging
-
 x-service-hardening: &service-hardening
   security_opt:
     - no-new-privileges:true
@@ -110,11 +108,13 @@ services:
     image: prom/prometheus:v2.55.1
     command:
       - --config.file=/etc/prometheus/prometheus.yml
+      - --rule.file=/etc/prometheus/alerts.yml
       - --storage.tsdb.path=/prometheus
       - --storage.tsdb.retention.time=30d
       - --web.enable-lifecycle
     volumes:
       - ./infrastructure/compose/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./infrastructure/compose/alerts.yml:/etc/prometheus/alerts.yml:ro
       - metrics-data:/prometheus
     depends_on:
       otel-collector: {condition: service_healthy}
@@ -258,11 +258,11 @@ services:
     networks: [edge, private]
 
 volumes:
-  postgres-data: {name: rick-intelligence-staging-postgres}
-  redis-data: {name: rick-intelligence-staging-redis}
-  qdrant-data: {name: rick-intelligence-staging-qdrant}
-  object-data: {name: rick-intelligence-staging-objects}
-  metrics-data: {name: rick-intelligence-staging-metrics}
+  postgres-data: {}
+  redis-data: {}
+  qdrant-data: {}
+  object-data: {}
+  metrics-data: {}
 
 networks:
   private:

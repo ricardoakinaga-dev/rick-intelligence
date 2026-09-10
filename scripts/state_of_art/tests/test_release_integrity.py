@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -214,6 +215,19 @@ class ReleaseIntegrityTests(unittest.TestCase):
         self.assertEqual(result["classification"], release_integrity.NOT_RUN)
         self.assertEqual(result["evidence"][0]["path"], "<none>")
         self.assertIn("MISSING_EVIDENCE_REJECTED", result["rejection_codes"])
+
+    def test_symlinked_evidence_path_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="release-integrity-") as directory:
+            root = Path(directory)
+            target = root / "real.md"
+            link = root / "link.md"
+            target.write_text("evidence\n", encoding="utf-8")
+            os.symlink(target, link)
+
+            path, error = release_integrity._safe_evidence_path(root, "link.md")
+
+        self.assertIsNone(path)
+        self.assertEqual(error, "evidence path must not traverse a symlink")
 
 
 if __name__ == "__main__":

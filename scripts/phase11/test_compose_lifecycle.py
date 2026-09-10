@@ -18,7 +18,7 @@ def test_compose_command_is_local_and_project_scoped() -> None:
         runner.LOCAL_DOCKER_HOST,
         "compose",
         "--project-name",
-        "rick-intelligence-dev",
+        runner._compose_project(compose),
     ]
     assert command[6:9] == ["--file", "docker-compose.dev.yml", "up"]
     assert "--detach" in command

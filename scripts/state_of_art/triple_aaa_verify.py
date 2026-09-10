@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Run the fail-closed local and runtime verification packet.
 
-This is an orchestrator, not a score generator.  A mandatory blocked, stale,
-not-run or failed lane keeps the result out of promotion.  Output is redacted
-and written below the ignored runtime directory so it cannot become a
-self-referential release artifact.
+The packet is an observation orchestrator.  The promotion engine derives the
+classification from the lane results; no score, prose field or prior result
+can promote an incomplete candidate.  Raw command output is intentionally
+discarded so the packet cannot persist secrets or document content.
 """
 
 from __future__ import annotations
@@ -12,16 +12,29 @@ from __future__ import annotations
 import argparse
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from hashlib import sha256
 import json
 import os
 from pathlib import Path
+import signal
 import shutil
 import subprocess
 import sys
 
+try:
+    from scripts.state_of_art import packet_seal
+    from scripts.state_of_art import promotion_engine
+    from scripts.state_of_art.release_integrity import capture_checkout
+except ImportError:  # pragma: no cover - direct script execution fallback.
+    import packet_seal
+    import promotion_engine
+    from release_integrity import capture_checkout
+
 
 ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_OUTPUT = ".runtime/phase-2/triple-aaa-verify.json"
+DEFAULT_OUTPUT = ".runtime/phase-3/triple-aaa-verify.json"
+SOURCE_PROMPT = "docs/prompts/phase-3-triple-aaa-closure-2026-09-09.txt"
+QUALITY_BAR = "docs/reports/current-triple-aaa-quality-bar-v1.json"
 
 
 @dataclass(frozen=True)
@@ -31,47 +44,83 @@ class Lane:
     required: bool = True
     external: bool = False
     detail: str = ""
+    blocked_return_codes: frozenset[int] = frozenset()
+    blocked_if_not_run: bool = False
+
+
+def _sha256_file(path: Path) -> str | None:
+    try:
+        digest = sha256()
+        with path.open("rb") as stream:
+            for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                digest.update(chunk)
+        return digest.hexdigest()
+    except OSError:
+        return None
+
+
+def _manifest_artifact_hash() -> str | None:
+    try:
+        payload = json.loads((ROOT / "docs/progress/release-evidence.json").read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return None
+    binding = payload.get("commit_binding") if isinstance(payload, dict) else None
+    value = binding.get("artifact_set_sha256") if isinstance(binding, dict) else None
+    return value if isinstance(value, str) and value else None
 
 
 def _run(lane: Lane, *, timeout_seconds: int) -> dict[str, object]:
     if lane.command is None:
+        status = "BLOCKED_EXTERNAL" if lane.blocked_if_not_run else "NOT_RUN"
         return {
             "id": lane.lane_id,
-            "status": "NOT_RUN",
+            "status": status,
             "required": lane.required,
             "external": lane.external,
-            "detail": lane.detail or "lane was not executed",
+            "return_code": None,
+            "detail": lane.detail or ("external dependency gate is blocked" if status == "BLOCKED_EXTERNAL" else "lane was not executed"),
         }
     try:
-        completed = subprocess.run(
+        process = subprocess.Popen(
             list(lane.command),
             cwd=ROOT,
             env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
-            check=False,
-            timeout=timeout_seconds,
+            start_new_session=True,
         )
-    except subprocess.TimeoutExpired:
-        return {
-            "id": lane.lane_id,
-            "status": "FAIL",
-            "required": lane.required,
-            "external": lane.external,
-            "detail": "lane exceeded its bounded timeout",
-        }
+        try:
+            return_code = process.wait(timeout=timeout_seconds)
+        except subprocess.TimeoutExpired:
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except OSError:
+                pass
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                pass
+            return {
+                "id": lane.lane_id,
+                "status": "FAIL",
+                "required": lane.required,
+                "external": lane.external,
+                "return_code": None,
+                "detail": "lane exceeded its bounded timeout; its process group was terminated",
+            }
     except OSError:
         return {
             "id": lane.lane_id,
             "status": "FAIL",
             "required": lane.required,
             "external": lane.external,
+            "return_code": None,
             "detail": "lane could not be started",
         }
-    if completed.returncode == 0:
+    if return_code == 0:
         status = "PASS"
         detail = lane.detail or "command returned zero"
-    elif completed.returncode == 2 and lane.external:
+    elif return_code in lane.blocked_return_codes:
         status = "BLOCKED_EXTERNAL"
         detail = lane.detail or "external dependency gate is blocked"
     else:
@@ -82,6 +131,7 @@ def _run(lane: Lane, *, timeout_seconds: int) -> dict[str, object]:
         "status": status,
         "required": lane.required,
         "external": lane.external,
+        "return_code": return_code,
         "detail": detail,
     }
 
@@ -103,6 +153,8 @@ def _local_lanes() -> tuple[Lane, ...]:
                 "no:cacheprovider",
                 "scripts/state_of_art/tests/test_release_integrity.py",
                 "scripts/state_of_art/tests/test_release_manifest.py",
+                "scripts/state_of_art/tests/test_promotion_engine.py",
+                "scripts/state_of_art/tests/test_packet_seal.py",
             ),
         ),
         Lane("locking", ("make", "api15-lock")),
@@ -123,27 +175,41 @@ def _external_lanes() -> tuple[Lane, ...]:
         shutil.which(name)
         for name in ("chromium", "chromium-browser", "google-chrome", "google-chrome-stable")
     )
+    browser_enabled = os.environ.get("RICK_FRONTEND_E2E_ENABLED") == "1"
+    frontend_command = ("make", "web-e2e") if browser_available and browser_enabled else None
     return (
-        Lane("postgresql-runtime", ("make", "postgres-runtime"), external=True),
-        Lane("redis-runtime", ("make", "redis-runtime"), external=True),
-        Lane("object-qdrant-runtime", ("make", "object-qdrant-runtime"), external=True),
+        Lane("release-integrity", None, external=True, detail="clean checkout and current mandatory evidence are required", blocked_if_not_run=True),
+        Lane("lab-readiness", None, external=True, detail="approved disposable Docker daemon is unavailable", blocked_if_not_run=True),
+        Lane("postgresql-runtime", ("make", "postgres-runtime"), external=True, blocked_return_codes=frozenset({2})),
+        Lane("multi-worker-runtime", None, external=True, detail="two isolated worker processes and crash authority are unavailable", blocked_if_not_run=True),
+        Lane("redis-runtime", ("make", "redis-runtime"), external=True, blocked_return_codes=frozenset({2})),
+        Lane("redis-multi-replica", None, external=True, detail="owned Redis replica/failover authority is unavailable", blocked_if_not_run=True),
+        Lane("object-qdrant-runtime", ("make", "object-qdrant-runtime"), external=True, blocked_return_codes=frozenset({2})),
+        Lane("ingestion-e2e", None, external=True, detail="full API→queue→worker→object→vector lifecycle requires disposable services", blocked_if_not_run=True),
+        Lane("tenant-evidence-runtime", None, external=True, detail="live tenant/evidence negative matrix requires the approved lab and corpus", blocked_if_not_run=True),
+        Lane("provider-rag-runtime", None, external=True, detail="approved provider, corpus, credentials and budget authority are unavailable", blocked_if_not_run=True),
+        Lane("observability-runtime", None, external=True, detail="collector/backend export and alert authority are unavailable", blocked_if_not_run=True),
         Lane(
             "frontend-e2e",
-            ("make", "web-e2e") if browser_available else None,
+            frontend_command,
             external=True,
-            detail="browser/runtime/API authority is unavailable" if not browser_available else "browser E2E command returned",
+            detail=(
+                "browser/runtime/API authority is unavailable; set RICK_FRONTEND_E2E_ENABLED=1 only in an approved lab"
+                if frontend_command is None
+                else "browser E2E command returned"
+            ),
+            blocked_if_not_run=frontend_command is None,
         ),
-        Lane(
-            "ingestion-e2e",
-            None,
-            external=True,
-            detail="full API→queue→worker→object→vector lifecycle requires disposable services",
-        ),
-        Lane("restore-drill", None, external=True, detail="restore authority and disposable backups are unavailable"),
-        Lane("chaos", None, external=True, detail="fault-injection authority and isolated runtime are unavailable"),
-        Lane("soak", None, external=True, detail="bounded load environment is unavailable"),
-        Lane("performance", None, external=True, detail="production-shaped workload environment is unavailable"),
-        Lane("independent-reviews", None, external=True, detail="fresh independent reviewers are not executable in this process"),
+        Lane("frontend-accessibility", None, external=True, detail="fresh browser accessibility and visual evidence is unavailable", blocked_if_not_run=True),
+        Lane("supply-chain", None, external=True, detail="current SBOM, image, provenance and signature evidence is unavailable", blocked_if_not_run=True),
+        Lane("restore-drill", None, external=True, detail="restore authority and disposable backups are unavailable", blocked_if_not_run=True),
+        Lane("performance", None, external=True, detail="production-shaped workload environment is unavailable", blocked_if_not_run=True),
+        Lane("independent-reviews", None, external=True, detail="fresh independent reviewers are not executable in this process", blocked_if_not_run=True),
+        Lane("chaos", None, external=True, detail="fault-injection authority and isolated runtime are unavailable", blocked_if_not_run=True),
+        Lane("soak", None, external=True, detail="bounded load environment is unavailable", blocked_if_not_run=True),
+        Lane("production-runtime", None, external=True, detail="production-like runtime authority is unavailable", blocked_if_not_run=True),
+        Lane("sealed-packet", None, external=True, detail="packet sealing must follow current evidence and independent review", blocked_if_not_run=True),
+        Lane("final-go-no-go", None, external=True, detail="authorized human Go/No-Go is unavailable", blocked_if_not_run=True),
     )
 
 
@@ -159,55 +225,258 @@ def _release_gate() -> Lane:
         ),
         external=True,
         detail="typed release evidence is not promotable until the checkout is clean and all mandatory gates pass",
+        blocked_return_codes=frozenset({2}),
     )
+
+
+def _safe_packet_path(raw_path: str) -> tuple[Path | None, str | None]:
+    candidate = Path(raw_path)
+    lexical = candidate if candidate.is_absolute() else ROOT / candidate
+    try:
+        relative = lexical.relative_to(ROOT)
+    except ValueError:
+        return None, "sealed packet path must remain inside the checkout"
+    cursor = ROOT
+    for component in relative.parts:
+        cursor /= component
+        if cursor.is_symlink():
+            return None, "sealed packet path must not traverse a symlink"
+    resolved = lexical.resolve()
+    try:
+        resolved.relative_to(ROOT.resolve())
+    except ValueError:
+        return None, "sealed packet path must remain inside the checkout"
+    return resolved, None
+
+
+def _load_packet(raw_path: str | None) -> tuple[dict[str, object] | None, dict[str, object]]:
+    if raw_path is None:
+        return None, {"supplied": False, "status": "NOT_SUPPLIED"}
+    path, path_error = _safe_packet_path(raw_path)
+    if path_error or path is None:
+        return None, {"supplied": True, "path": raw_path, "status": "INVALID_PATH", "error": path_error}
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        return None, {"supplied": True, "path": str(path.relative_to(ROOT)), "status": "UNREADABLE", "error": type(exc).__name__}
+    if not isinstance(value, dict):
+        return None, {"supplied": True, "path": str(path.relative_to(ROOT)), "status": "INVALID_JSON"}
+    valid, errors = packet_seal.verify_seal(value)
+    seal = value.get("seal")
+    return value, {
+        "supplied": True,
+        "path": str(path.relative_to(ROOT)),
+        "status": "VERIFIED" if valid else "INVALID",
+        "seal_verified": valid,
+        "seal_errors": list(errors),
+        "seal_digest": seal.get("digest") if isinstance(seal, dict) else None,
+        "immutable_reference": seal.get("immutable_reference") if isinstance(seal, dict) else None,
+    }
+
+
+def _canonical(value: object) -> bytes:
+    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+
+
+def _without_packet_lanes(value: object) -> list[object]:
+    if not isinstance(value, list):
+        return []
+    return [
+        item
+        for item in value
+        if not isinstance(item, dict) or item.get("id") not in {"sealed-packet", "final-go-no-go"}
+    ]
+
+
+def _packet_matches_current(
+    packet: dict[str, object] | None,
+    results: list[dict[str, object]],
+    checkout: dict[str, object],
+    requested_reference: str | None,
+) -> bool:
+    if packet is None:
+        return False
+    valid, _errors = packet_seal.verify_seal(packet)
+    if not valid or packet.get("sealed") is not True:
+        return False
+    try:
+        # These two observations are the packet's own attestation lanes.  The
+        # external packet carries them as PASS; the verifier starts with their
+        # unavailable placeholders and fills them only after this comparison.
+        if _canonical(_without_packet_lanes(packet.get("results"))) != _canonical(
+            _without_packet_lanes(results)
+        ):
+            return False
+    except (TypeError, ValueError):
+        return False
+    candidate = packet.get("candidate")
+    if not isinstance(candidate, dict):
+        return False
+    if (
+        candidate.get("commit_sha") != checkout.get("head")
+        or candidate.get("tree_sha") != checkout.get("tree")
+        or candidate.get("checkout_fingerprint") != checkout.get("fingerprint")
+        or candidate.get("clean_worktree") is not True
+        or checkout.get("status") != "CLEAN"
+    ):
+        return False
+    seal = packet.get("seal")
+    if requested_reference is not None and (
+        not isinstance(seal, dict) or seal.get("immutable_reference") != requested_reference
+    ):
+        return False
+    return True
+
+
+def _apply_packet_lanes(
+    results: list[dict[str, object]],
+    packet: dict[str, object] | None,
+    checkout: dict[str, object],
+    requested_reference: str | None,
+) -> None:
+    """Turn only independently verified packet lanes into observations."""
+
+    if not _packet_matches_current(packet, results, checkout, requested_reference):
+        return
+    assert packet is not None
+    authority = packet.get("decision_authority")
+    seal = packet.get("seal")
+    signer_id = seal.get("signer_id") if isinstance(seal, dict) else None
+    authority_valid = (
+        isinstance(authority, dict)
+        and authority.get("independent") is True
+        and authority.get("authorized") is True
+        and authority.get("reviewer_id") == signer_id
+        and packet.get("final_decision") in {"GO", "APPROVE"}
+        and type(packet.get("critical_high_findings")) is int
+        and packet.get("critical_high_findings") == 0
+    )
+    for item in results:
+        lane_id = item.get("id")
+        if lane_id == "sealed-packet":
+            item.update(
+                {
+                    "status": "PASS",
+                    "return_code": 0,
+                    "detail": "external packet seal verified against the current checkout and lane observations",
+                }
+            )
+        elif lane_id == "final-go-no-go" and authority_valid:
+            item.update(
+                {
+                    "status": "PASS",
+                    "return_code": 0,
+                    "independent": True,
+                    "detail": "authorized independent final decision verified from the sealed packet",
+                }
+            )
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", default=DEFAULT_OUTPUT)
     parser.add_argument("--lane-timeout", type=int, default=300)
+    parser.add_argument(
+        "--seal-reference",
+        help="require the supplied sealed packet to use this immutable artifact reference",
+    )
+    parser.add_argument(
+        "--sealed-packet",
+        help="path to an externally sealed packet containing this exact run's observations",
+    )
     args = parser.parse_args(sys.argv[1:] if argv is None else argv)
     if args.lane_timeout < 10 or args.lane_timeout > 3_600:
         parser.error("--lane-timeout must be between 10 and 3600 seconds")
+    if args.seal_reference is not None and args.sealed_packet is None:
+        parser.error("--seal-reference requires --sealed-packet; the verifier cannot self-seal a promotion packet")
 
     results: list[dict[str, object]] = []
     for lane in _local_lanes():
         results.append(_run(lane, timeout_seconds=args.lane_timeout))
-    # Generation is intentionally separate from validation: a truthful FAIL or
-    # BLOCKED manifest must exist before the release-integrity verifier runs.
+    results.append(_run(Lane("phase3-evidence", ("make", "phase3-evidence")), timeout_seconds=args.lane_timeout))
+    results.append(
+        _run(
+            Lane(
+                "phase3-evidence-verify",
+                (sys.executable, "scripts/state_of_art/generate_phase3_evidence.py", "--verify", "--require-promotable"),
+                external=True,
+                detail="the complete capability matrix is not promotable until every required row has current evidence",
+                blocked_return_codes=frozenset({2}),
+            ),
+            timeout_seconds=args.lane_timeout,
+        )
+    )
     results.append(_run(Lane("release-evidence-generation", ("make", "release-evidence")), timeout_seconds=args.lane_timeout))
     results.append(_run(_release_gate(), timeout_seconds=args.lane_timeout))
     for lane in _external_lanes():
-        results.append(_run(lane, timeout_seconds=args.lane_timeout))
+        if lane.lane_id != "release-integrity":
+            results.append(_run(lane, timeout_seconds=args.lane_timeout))
 
-    required = [item for item in results if item["required"] is True]
-    if any(item["status"] == "FAIL" and item["external"] is not True for item in required):
-        verdict = "FAIL"
-        exit_code = 1
-    elif any(item["status"] != "PASS" for item in required):
-        verdict = "STATE_OF_ART_CANDIDATE"
-        exit_code = 2
-    else:
-        verdict = "TRIPLE_AAA"
-        exit_code = 0
-
-    payload = {
-        "schema_version": "state-of-art-triple-aaa-verify.v1",
+    if args.seal_reference is not None and packet_seal.REFERENCE_RE.fullmatch(args.seal_reference) is None:
+        parser.error("--seal-reference contains unsupported characters")
+    packet, packet_info = _load_packet(args.sealed_packet)
+    if packet is not None and args.seal_reference is not None:
+        seal = packet.get("seal")
+        if not isinstance(seal, dict) or seal.get("immutable_reference") != args.seal_reference:
+            packet = dict(packet)
+            packet["seal_reference_mismatch"] = True
+            packet_info["status"] = "INVALID_REFERENCE"
+            packet_info["seal_verified"] = False
+    checkout = capture_checkout(ROOT)
+    _apply_packet_lanes(results, packet, checkout, args.seal_reference)
+    derived = promotion_engine.evaluate(
+        results,
+        packet=packet,
+        checkout=checkout,
+    )
+    payload: dict[str, object] = {
+        "schema_version": "state-of-art-triple-aaa-verify.v2",
         "generated_at": datetime.now(timezone.utc).isoformat(),
-        "verdict": verdict,
-        "promotion_allowed": verdict == "TRIPLE_AAA",
+        "verdict": derived["classification"],
+        "classification": derived["classification"],
+        "promotion_allowed": derived["promotion_allowed"],
+        "exit_code": derived["exit_code"],
+        "rejection_codes": derived["rejection_codes"],
+        "candidate": {
+            "commit_sha": checkout.get("head"),
+            "tree_sha": checkout.get("tree"),
+            "checkout_fingerprint": checkout.get("fingerprint"),
+            "artifact_set_sha256": _manifest_artifact_hash(),
+            "branch": checkout.get("branch"),
+            "worktree_status": checkout.get("status"),
+            "clean_worktree": checkout.get("status") == "CLEAN",
+        },
+        "source_prompt": SOURCE_PROMPT,
+        "source_prompt_sha256": _sha256_file(ROOT / SOURCE_PROMPT),
+        "quality_bar": {"path": QUALITY_BAR, "sha256": _sha256_file(ROOT / QUALITY_BAR)},
+        "stage_results": derived["stage_results"],
+        "blocking_lanes": derived["blocking_lanes"],
+        "required_lanes": derived["required_lanes"],
         "results": results,
+        "promotion_packet": packet_info,
         "limitations": [
             "This packet is only current for the exact checkout and environment that produced it.",
-            "A blocked or not-run required lane prevents promotion; no score averaging is performed.",
+            "A blocked, stale, invalid or not-run required lane prevents promotion; no score averaging is performed.",
+            "Raw command output is intentionally omitted; detailed evidence belongs in redacted, separately hashed artifacts.",
         ],
     }
+    if not packet_info.get("seal_verified"):
+        payload["seal"] = {
+            "status": "NOT_SEALED",
+            "reason": "an externally authorized sealed packet is required; the verifier never self-seals",
+        }
+    else:
+        payload["seal"] = {
+            "status": "EXTERNAL_PACKET_VERIFIED",
+            "digest": packet_info.get("seal_digest"),
+            "immutable_reference": packet_info.get("immutable_reference"),
+        }
     output = (ROOT / args.output).resolve()
     output.relative_to(ROOT.resolve())
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(payload, ensure_ascii=False, sort_keys=True, indent=2) + "\n", encoding="utf-8")
-    print(json.dumps({"output": args.output, "verdict": verdict}, sort_keys=True))
-    return exit_code
+    print(json.dumps({"output": args.output, "classification": derived["classification"], "exit_code": derived["exit_code"]}, sort_keys=True))
+    return int(derived["exit_code"])
 
 
 if __name__ == "__main__":

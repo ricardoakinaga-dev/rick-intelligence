@@ -15,6 +15,7 @@ import hashlib
 import json
 import os
 import re
+import signal
 import subprocess
 import sys
 from collections.abc import Mapping, Sequence
@@ -39,11 +40,14 @@ SHA1_RE = re.compile(r"^[0-9a-f]{40}$", re.IGNORECASE)
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$", re.IGNORECASE)
 MAX_EVIDENCE_AGE_SECONDS = 24 * 60 * 60
 MAX_EVIDENCE_FUTURE_SKEW_SECONDS = 5 * 60
+RELEASE_INTEGRITY_COMMAND = ("git", "diff", "--check", "&&", "make", "validate")
+RELEASE_INTEGRITY_PROCEDURE = "run git diff --check and make validate against the exact checkout"
 
 PASS = "PASS"
 FAIL = "FAIL"
+BLOCKED_EXTERNAL = "BLOCKED_EXTERNAL"
 NOT_RUN = "NOT_RUN"
-CLASSIFICATIONS = {PASS, FAIL, NOT_RUN}
+CLASSIFICATIONS = {PASS, FAIL, BLOCKED_EXTERNAL, NOT_RUN}
 
 def _rejection_codes(
     reason: str,
@@ -55,15 +59,23 @@ def _rejection_codes(
     lowered = reason.lower()
     codes: set[str] = set()
     if any(token in lowered for token in ("stale", "old-check")):
+        codes.add("STALE_EVIDENCE_REJECTED")
         codes.add("STALE_RELEASE_EVIDENCE_REJECTED")
     if "commit" in lowered and any(token in lowered for token in ("match", "wrong", "head")):
+        codes.add("WRONG_COMMIT_REJECTED")
         codes.add("WRONG_COMMIT_EVIDENCE_REJECTED")
+    if "tree" in lowered and any(token in lowered for token in ("match", "wrong", "bound")):
+        codes.add("WRONG_TREE_REJECTED")
     if "hash" in lowered or "fingerprint" in lowered:
         codes.add("WRONG_HASH_REJECTED")
     if any(token in lowered for token in ("absent", "not run", "no mandatory", "missing")):
+        codes.add("MISSING_GATE_REJECTED")
         codes.add("MISSING_EVIDENCE_REJECTED")
     if any(token in lowered for token in ("blocked", "external", "unavailable")):
+        codes.add("BLOCKED_GATE_REJECTED")
         codes.add("BLOCKED_RUNTIME_REJECTED")
+    if "independent" in lowered and any(token in lowered for token in ("self", "required", "review")):
+        codes.add("SELF_PROMOTED_GATE_REJECTED")
     if "not clean" in lowered or "not bound to a clean" in lowered or "dirty" in lowered:
         codes.add("DIRTY_RELEASE_EVIDENCE_REJECTED")
     if classification == NOT_RUN and not codes:
@@ -99,22 +111,31 @@ def _capture(
     """Capture a command without exposing its output in the gate artifact."""
 
     try:
-        completed = subprocess.run(
+        process = subprocess.Popen(
             list(argv),
             cwd=root,
             env=_environment(),
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            check=False,
-            timeout=timeout,
+            start_new_session=True,
         )
     except FileNotFoundError as exc:
         return None, b"", b"", f"executable unavailable: {exc.filename or argv[0]}"
-    except subprocess.TimeoutExpired:
-        return None, b"", b"", f"timed out after {timeout}s"
     except OSError as exc:
         return None, b"", b"", f"could not execute command: {exc}"
-    return completed.returncode, completed.stdout, completed.stderr, None
+    try:
+        stdout, stderr = process.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except OSError:
+            pass
+        try:
+            process.communicate(timeout=5)
+        except subprocess.TimeoutExpired:
+            pass
+        return None, b"", b"", f"timed out after {timeout}s; process group was terminated"
+    return process.returncode, stdout, stderr, None
 
 
 def _decode(value: bytes) -> str:
@@ -347,7 +368,18 @@ def classify_worktree_sentinel(
 
 def _safe_evidence_path(root: Path, raw_path: str) -> tuple[Path | None, str | None]:
     candidate = Path(raw_path)
-    resolved = (candidate if candidate.is_absolute() else root / candidate).resolve()
+    lexical = candidate if candidate.is_absolute() else root / candidate
+    try:
+        lexical_relative = lexical.relative_to(root)
+    except ValueError:
+        lexical_relative = None
+    if lexical_relative is not None:
+        cursor = root
+        for component in lexical_relative.parts:
+            cursor /= component
+            if cursor.is_symlink():
+                return None, "evidence path must not traverse a symlink"
+    resolved = lexical.resolve()
     try:
         resolved.relative_to(root.resolve())
     except ValueError:
@@ -383,6 +415,28 @@ def _validate_current_timestamp(value: str, field: str, failures: list[str]) -> 
     age_seconds = (datetime.now(timezone.utc) - timestamp.astimezone(timezone.utc)).total_seconds()
     if age_seconds > MAX_EVIDENCE_AGE_SECONDS or age_seconds < -MAX_EVIDENCE_FUTURE_SKEW_SECONDS:
         failures.append(f"{field} is outside the current evidence window")
+
+
+def _validate_gate_procedure(gate: Any, failures: list[str]) -> None:
+    """Allow only procedures whose command contract is machine-recognizable.
+
+    The integrity checker is not a shell runner for arbitrary manifest input.
+    It accepts the local gate procedure or the explicit runtime-envelope
+    procedure, then validates the referenced envelope separately.  A free-form
+    command such as ``false`` cannot be paired with a claimed PASS.
+    """
+
+    command = tuple(gate.command)
+    if gate.gate_id == "release-integrity":
+        if command != RELEASE_INTEGRITY_COMMAND:
+            failures.append("gate release-integrity command is not the approved procedure")
+        if gate.procedure != RELEASE_INTEGRITY_PROCEDURE:
+            failures.append("gate release-integrity procedure is not the approved procedure")
+        return
+    if len(command) != 2 or command[0] != "runtime-envelope" or not command[1].strip():
+        failures.append(f"gate {gate.gate_id} command is not an approved runtime-envelope procedure")
+    if gate.gate_id not in gate.procedure:
+        failures.append(f"gate {gate.gate_id} procedure does not identify its gate")
 
 
 def _evaluate_typed_manifest(
@@ -449,12 +503,70 @@ def _evaluate_typed_manifest(
         if actual_hash != expected_hash:
             failures.append(f"{field}: referenced artifact hash does not match")
 
+    def check_runtime_envelope(gate: Any, evidence_path: str) -> None:
+        """Validate the executable observation behind a runtime-envelope gate."""
+
+        target = gate.command[1] if len(gate.command) == 2 else ""
+        if not target.startswith(".runtime/") or evidence_path != target:
+            return
+        safe_path, path_error = _safe_evidence_path(root, evidence_path)
+        if path_error or safe_path is None or not safe_path.is_file():
+            return  # check_file already emits the authoritative path error.
+        try:
+            envelope = json.loads(safe_path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+            failures.append(f"gate {gate.gate_id} runtime envelope is not readable JSON")
+            return
+        if not isinstance(envelope, Mapping) or envelope.get("schema_version") != "state-of-art-runtime-evidence.v1":
+            failures.append(f"gate {gate.gate_id} runtime envelope has an unsupported schema")
+            return
+        if envelope.get("status") != gate.result:
+            failures.append(f"gate {gate.gate_id} runtime envelope status does not match the manifest")
+        expected_exit = {"PASS": 0, "BLOCKED_EXTERNAL": 2, "FAIL": 1, "NOT_RUN": None}.get(gate.result)
+        if envelope.get("exit_status") != expected_exit:
+            failures.append(f"gate {gate.gate_id} runtime envelope exit_status does not match the manifest")
+        for field, expected in (
+            ("commit_sha", binding.commit_sha),
+            ("tree_sha", binding.tree_sha),
+            ("checkout_fingerprint", binding.checkout_fingerprint),
+        ):
+            if envelope.get(field) != expected:
+                failures.append(f"gate {gate.gate_id} runtime envelope {field} is not bound to the manifest")
+        if envelope.get("clean_worktree") is not True:
+            failures.append(f"gate {gate.gate_id} runtime envelope is not clean")
+        if not isinstance(envelope.get("procedure"), str) or not envelope["procedure"].strip():
+            failures.append(f"gate {gate.gate_id} runtime envelope has no procedure")
+        observed_at = envelope.get("observed_at")
+        if isinstance(observed_at, str):
+            _validate_current_timestamp(observed_at, f"gate {gate.gate_id}.runtime.observed_at", failures)
+        else:
+            failures.append(f"gate {gate.gate_id} runtime envelope has no observed_at")
+        sentinel = envelope.get("checkout_sentinel")
+        if not isinstance(sentinel, Mapping) or sentinel.get("unchanged") is not True:
+            failures.append(f"gate {gate.gate_id} runtime envelope sentinel is not unchanged")
+        raw_artifacts = envelope.get("raw_artifacts")
+        if not isinstance(raw_artifacts, Sequence) or isinstance(raw_artifacts, (str, bytes, bytearray)) or not raw_artifacts:
+            failures.append(f"gate {gate.gate_id} runtime envelope has no raw artifact")
+            return
+        for index, raw_ref in enumerate(raw_artifacts):
+            if not isinstance(raw_ref, Mapping):
+                failures.append(f"gate {gate.gate_id} runtime raw_artifacts[{index}] is invalid")
+                continue
+            raw_path = raw_ref.get("path")
+            raw_hash = raw_ref.get("sha256")
+            if not isinstance(raw_path, str) or not isinstance(raw_hash, str):
+                failures.append(f"gate {gate.gate_id} runtime raw_artifacts[{index}] is incomplete")
+                continue
+            check_file(raw_path, raw_hash, f"gate {gate.gate_id}.runtime.raw_artifacts[{index}]")
+
     for index, artifact in enumerate(manifest.artifacts):
         check_file(artifact.path, artifact.sha256, f"artifacts[{index}]")
     for gate in manifest.gates:
+        _validate_gate_procedure(gate, failures)
         _validate_current_timestamp(gate.timestamp, f"gate {gate.gate_id}.timestamp", failures)
         for index, evidence in enumerate(gate.evidence_paths):
             check_file(evidence.path, evidence.sha256, f"gate {gate.gate_id}.evidence_paths[{index}]")
+            check_runtime_envelope(gate, evidence.path)
 
     blocking_gates = [gate for gate in manifest.gates if gate.result != "PASS"]
     if failures:
@@ -462,11 +574,15 @@ def _evaluate_typed_manifest(
         result["reason"] = "; ".join(failures)
     elif blocking_gates:
         blocking_ids = ", ".join(f"{gate.gate_id}={gate.result}" for gate in blocking_gates)
-        if any(gate.result in {"FAIL", "BLOCKED_EXTERNAL", "STALE", "INVALID"} for gate in blocking_gates):
+        if any(gate.result == "BLOCKED_EXTERNAL" for gate in blocking_gates):
+            result["classification"] = BLOCKED_EXTERNAL
+        elif any(gate.result in {"FAIL", "STALE", "INVALID"} for gate in blocking_gates):
             result["classification"] = FAIL
         else:
             result["classification"] = NOT_RUN
-        result["reason"] = f"mandatory gates are not PASS: {blocking_ids}"
+        result["reason"] = (
+            f"manifest status is {manifest.status}; mandatory gates are not PASS: {blocking_ids}"
+        )
     else:
         result["classification"] = PASS
         result["reason"] = "typed manifest, artifact hashes and mandatory gates are valid"
@@ -476,10 +592,13 @@ def _evaluate_typed_manifest(
     ))
     for gate in manifest.gates:
         if gate.result == "BLOCKED_EXTERNAL":
+            rejection_codes.add("BLOCKED_GATE_REJECTED")
             rejection_codes.add("BLOCKED_RUNTIME_REJECTED")
         elif gate.result == "NOT_RUN":
+            rejection_codes.add("MISSING_GATE_REJECTED")
             rejection_codes.add("MISSING_EVIDENCE_REJECTED")
         elif gate.result == "STALE":
+            rejection_codes.add("STALE_EVIDENCE_REJECTED")
             rejection_codes.add("STALE_RELEASE_EVIDENCE_REJECTED")
         elif gate.result == "INVALID":
             rejection_codes.add("WRONG_HASH_REJECTED")
@@ -550,6 +669,8 @@ def evaluate_evidence(
 def _overall_classification(criteria: Sequence[Mapping[str, Any]]) -> str:
     if any(item.get("classification") == FAIL for item in criteria):
         return FAIL
+    if any(item.get("required") and item.get("classification") == BLOCKED_EXTERNAL for item in criteria):
+        return BLOCKED_EXTERNAL
     if any(item.get("required") and item.get("classification") == NOT_RUN for item in criteria):
         return NOT_RUN
     return PASS
@@ -642,7 +763,7 @@ def run_gate(
     errors = [
         f"{item['id']}: {item.get('reason', item['classification'])}"
         for item in criteria
-        if item.get("classification") == FAIL
+        if item.get("classification") in {FAIL, BLOCKED_EXTERNAL}
         or (item.get("required") and item.get("classification") == NOT_RUN)
     ]
     warnings = [
@@ -750,7 +871,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         timeout=args.timeout_seconds,
     )
     print(json.dumps(artifact, ensure_ascii=False, sort_keys=True, indent=2))
-    return 0 if artifact["classification"] == PASS else 1
+    if artifact["classification"] == PASS:
+        return 0
+    if artifact["classification"] == BLOCKED_EXTERNAL:
+        return 2
+    return 1
 
 
 if __name__ == "__main__":

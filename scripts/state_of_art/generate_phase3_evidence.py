@@ -31,10 +31,12 @@ except ImportError:  # pragma: no cover - direct script execution fallback.
 
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_OUTPUT = ".runtime/phase-3/capability-matrix.json"
-PROMPT_PATH = "docs/prompts/phase-3-runtime-evidence-production-promotion-2026-09-09.txt"
-AUDIT_PATH = "docs/reports/phase-3-runtime-evidence-current-audit.md"
-PUBLIC_PLAN_PATH = "docs/plans/phase-3-runtime-evidence-production-promotion.md"
+PROMPT_PATH = "docs/prompts/phase-3-triple-aaa-closure-2026-09-09.txt"
+AUDIT_PATH = "docs/reports/current-triple-aaa-gap-audit.md"
+PUBLIC_PLAN_PATH = "docs/plans/phase-3-triple-aaa-closure.md"
 EXECP_PLAN_PATH = ".agent/plans/phase-3-runtime-evidence-production-promotion.md"
+QUALITY_BAR_PATH = "docs/reports/current-triple-aaa-quality-bar-v1.json"
+FINAL_REPORT_PATH = "docs/reports/rick-intelligence-triple-aaa-final-promotion.md"
 LOCAL_CHECK_DIR = ".runtime/phase-3/local-checks"
 
 
@@ -58,6 +60,8 @@ def _common_artifacts() -> list[tuple[str, str]]:
         (AUDIT_PATH, "current Phase 3 entry audit"),
         (PUBLIC_PLAN_PATH, "public Phase 3 execution plan"),
         (EXECP_PLAN_PATH, "living engineering ExecPlan"),
+        (QUALITY_BAR_PATH, "frozen Triple AAA quality bar"),
+        (FINAL_REPORT_PATH, "current diagnostic promotion report"),
     ]
 
 
@@ -91,7 +95,7 @@ def _capability_definitions() -> tuple[dict[str, Any], ...]:
             "status": "PARTIAL",
             "code_tests": ["scripts/state_of_art/release_integrity.py", "scripts/state_of_art/release_manifest.py", "scripts/state_of_art/tests/test_release_manifest.py"],
             "artifacts": common + [("scripts/state_of_art/release_integrity.py", "release integrity verifier"), ("scripts/state_of_art/release_manifest.py", "typed release manifest")],
-            "limitations": "The Phase 2 manifest is fail-closed but not a complete clean Phase 3 promotion packet.",
+            "limitations": "The release manifest is fail-closed but not a complete clean Triple AAA promotion packet.",
             "next_action": "Complete Phase 3 manifest binding and explicit negative rejection tests.",
         },
         {
@@ -236,8 +240,8 @@ def _capability_definitions() -> tuple[dict[str, Any], ...]:
             "title": "Independent reviews and human promotion decision",
             "priority": "P1",
             "status": "NOT_RUN",
-            "code_tests": ["docs/reports/phase-3-runtime-evidence-current-audit.md", "docs/plans/phase-3-runtime-evidence-production-promotion.md"],
-            "artifacts": common + [("docs/reports/phase-3-runtime-evidence-current-audit.md", "current audit")],
+            "code_tests": ["docs/reports/current-triple-aaa-gap-audit.md", "docs/plans/phase-3-triple-aaa-closure.md"],
+            "artifacts": common + [(AUDIT_PATH, "current audit")],
             "limitations": "Historical scoped reviews do not constitute a fresh Phase 3 packet review or human Go/No-Go.",
             "next_action": "Commission independent reviews and bind the human deployment/rollback decision.",
         },
@@ -246,7 +250,7 @@ def _capability_definitions() -> tuple[dict[str, Any], ...]:
             "title": "Advanced retrieval and calibration feature flags",
             "priority": "P2",
             "status": "NOT_RUN",
-            "code_tests": ["packages/retrieval/pyproject.toml", "scripts/state_of_art/evaluate_retrieval.py", "docs/plans/phase-3-runtime-evidence-production-promotion.md"],
+            "code_tests": ["packages/retrieval/pyproject.toml", "scripts/state_of_art/evaluate_retrieval.py", PUBLIC_PLAN_PATH],
             "artifacts": common + [("scripts/state_of_art/evaluate_retrieval.py", "retrieval evaluation")],
             "limitations": "Advanced retrieval is intentionally not promoted before baseline runtime, citation and release closure.",
             "next_action": "Enable only after all required P0/P1 runtime evidence is current.",
@@ -454,8 +458,12 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps({"classification": "FAILED", "reason": str(exc)}, ensure_ascii=False))
             return 1
     print(json.dumps({"output": str(path.relative_to(root)), **result}, ensure_ascii=False, sort_keys=True, indent=2))
+    if args.verify and result.get("classification") == "BLOCKED_EXTERNAL":
+        return 2
     if args.verify and result.get("classification") in {"FAILED", "NOT_RUN"}:
         return 1
+    if args.require_promotable and result.get("classification") == "BLOCKED_EXTERNAL":
+        return 2
     if args.require_promotable and result.get("classification") != "PROMOTABLE":
         return 1
     return 0

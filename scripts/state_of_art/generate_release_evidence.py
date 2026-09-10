@@ -15,6 +15,7 @@ from hashlib import sha256
 import json
 import os
 from pathlib import Path
+import signal
 import subprocess
 import sys
 from typing import Sequence
@@ -54,6 +55,11 @@ DEFAULT_ARTIFACTS = (
     "README.md",
     "docs/prompts/state-of-art-triple-aaa-2026-09-09.txt",
     "docs/prompts/phase-3-runtime-evidence-production-promotion-2026-09-09.txt",
+    "docs/prompts/phase-3-triple-aaa-closure-2026-09-09.txt",
+    "docs/reports/current-triple-aaa-gap-audit.md",
+    "docs/reports/current-triple-aaa-quality-bar-v1.json",
+    "docs/reports/rick-intelligence-triple-aaa-final-promotion.md",
+    "docs/plans/phase-3-triple-aaa-closure.md",
     "apps/api/pyproject.toml",
     "apps/api/src/app.py",
     "apps/api/src/services/external_composition.py",
@@ -105,6 +111,12 @@ DEFAULT_ARTIFACTS = (
     "scripts/state_of_art/tests/test_phase3_postgres_runtime.py",
     "scripts/phase11/redis_runtime_gate.py",
     "scripts/state_of_art/triple_aaa_verify.py",
+    "scripts/state_of_art/promotion_engine.py",
+    "scripts/state_of_art/packet_seal.py",
+    "scripts/state_of_art/tests/test_promotion_engine.py",
+    "scripts/state_of_art/tests/test_packet_seal.py",
+    "scripts/state_of_art/tests/test_generate_release_evidence.py",
+    "scripts/state_of_art/validate_quality_bar.py",
     "tests/security/rag_adversarial/corpus.jsonl",
     "scripts/state_of_art/release_integrity.py",
     "scripts/state_of_art/release_manifest.py",
@@ -114,46 +126,46 @@ DEFAULT_ARTIFACTS = (
     "scripts/state_of_art/phase3_lane.py",
     "scripts/state_of_art/tests/test_phase3_evidence.py",
 )
+RUNTIME_GATE_ARTIFACTS = {
+    "postgresql": ".runtime/phase-3/postgres-runtime-evidence.json",
+    "redis": ".runtime/phase-3/redis-runtime-evidence.json",
+    "qdrant": ".runtime/phase-3/object-qdrant-runtime-evidence.json",
+    "object-storage": ".runtime/phase-3/object-qdrant-runtime-evidence.json",
+}
 def _run(root: Path, command: Sequence[str]) -> tuple[str, int | None, str]:
     try:
-        completed = subprocess.run(
+        process = subprocess.Popen(
             list(command),
             cwd=root,
             env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-            check=False,
-            timeout=120,
+            start_new_session=True,
         )
-    except (OSError, subprocess.TimeoutExpired) as exc:
+    except OSError as exc:
         return "NOT_RUN", None, type(exc).__name__
-    if completed.returncode == 0:
-        return "PASS", completed.returncode, "command returned zero"
-    return "FAIL", completed.returncode, "command did not return zero"
-
-
-def _commit_timestamp(root: Path) -> str:
-    source_date_epoch = os.environ.get("SOURCE_DATE_EPOCH")
-    if source_date_epoch:
-        try:
-            return datetime.fromtimestamp(int(source_date_epoch), tz=timezone.utc).isoformat()
-        except ValueError:
-            pass
     try:
-        completed = subprocess.run(
-            ["git", "show", "-s", "--format=%cI", "HEAD"],
-            cwd=root,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            check=True,
-        )
-        value = completed.stdout.strip()
-        if value:
-            return value
-    except (OSError, subprocess.CalledProcessError):
-        pass
+        stdout, stderr = process.communicate(timeout=120)
+    except subprocess.TimeoutExpired:
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except OSError:
+            pass
+        try:
+            process.communicate(timeout=5)
+        except subprocess.TimeoutExpired:
+            pass
+        return "NOT_RUN", None, "TimeoutExpired: process group was terminated"
+    del stdout, stderr
+    if process.returncode == 0:
+        return "PASS", process.returncode, "command returned zero"
+    return "FAIL", process.returncode, "command did not return zero"
+
+
+def _execution_timestamp(_root: Path) -> str:
+    """Timestamp the observation, not the commit that happened to trigger it."""
+
     return datetime.now(timezone.utc).isoformat()
 
 
@@ -167,6 +179,75 @@ def _file_hash(root: Path, relative: str) -> str:
 
 def _evidence_ref(root: Path, relative: str, description: str) -> EvidenceRef:
     return EvidenceRef(path=relative, sha256=_file_hash(root, relative), description=description)
+
+
+def _runtime_result(
+    root: Path,
+    gate_id: str,
+    audit_path: str,
+    reviewer: ReviewerRef,
+    *,
+    commit_sha: str,
+    tree_sha: str,
+    artifact_hash: str,
+    timestamp: str,
+) -> GateResult:
+    """Aggregate an observed runtime envelope or preserve a real NOT_RUN state."""
+
+    relative = RUNTIME_GATE_ARTIFACTS.get(gate_id)
+    evidence_paths: tuple[EvidenceRef, ...]
+    command: tuple[str, ...]
+    procedure: str
+    result = "NOT_RUN"
+    exit_status: int | None = None
+    limitations = "No current runtime artifact was supplied for this mandatory gate."
+    if relative is not None and (root / relative).is_file():
+        evidence_paths = (_evidence_ref(root, relative, f"runtime envelope for {gate_id}"),)
+        command = ("runtime-envelope", relative)
+        procedure = f"validate the supplied runtime envelope for {gate_id} against this checkout"
+        try:
+            raw = json.loads((root / relative).read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+            raw = None
+        if isinstance(raw, dict):
+            observed = str(raw.get("status", "")).upper()
+            if observed in {"PASS", "BLOCKED_EXTERNAL", "FAIL", "NOT_RUN"}:
+                result = observed
+                raw_exit = raw.get("exit_status")
+                exit_status = raw_exit if type(raw_exit) is int and raw_exit >= 0 else {
+                    "PASS": 0,
+                    "BLOCKED_EXTERNAL": 2,
+                    "FAIL": 1,
+                    "NOT_RUN": None,
+                }[observed]
+                limitations = str(raw.get("limitations") or raw.get("reason") or "runtime envelope was supplied")
+            else:
+                result = "INVALID"
+                exit_status = 1
+                limitations = "runtime envelope has no supported gate status"
+        else:
+            result = "INVALID"
+            exit_status = 1
+            limitations = "runtime envelope is not a JSON object"
+    else:
+        evidence_paths = (_evidence_ref(root, audit_path, f"current audit for missing {gate_id} evidence"),)
+        command = ("runtime-envelope", relative or gate_id)
+        procedure = f"await the approved runtime procedure for {gate_id}; no artifact is claimed"
+    return GateResult(
+        gate_id=gate_id,
+        commit_sha=commit_sha,
+        tree_sha=tree_sha,
+        artifact_hash=artifact_hash,
+        command=command,
+        procedure=procedure,
+        environment="runtime-artifact-or-not-run",
+        timestamp=timestamp,
+        exit_status=exit_status,
+        result=result,  # type: ignore[arg-type]
+        limitations=(limitations,),
+        reviewer=reviewer,
+        evidence_paths=evidence_paths,
+    )
 
 
 def generate_manifest(
@@ -193,11 +274,14 @@ def generate_manifest(
         name="release-integrity-generator",
         independent=False,
     )
-    timestamp = _commit_timestamp(root)
-    audit_path = "docs/reports/phase-3-runtime-evidence-current-audit.md"
+    timestamp = _execution_timestamp(root)
+    audit_path = "docs/reports/current-triple-aaa-gap-audit.md"
     release_evidence = (
         _evidence_ref(root, "docs/architecture/release-integrity.md", "release integrity policy"),
         _evidence_ref(root, audit_path, "current candidate gap audit"),
+        _evidence_ref(root, "docs/reports/current-triple-aaa-quality-bar-v1.json", "frozen quality bar"),
+        _evidence_ref(root, "docs/plans/phase-3-triple-aaa-closure.md", "active closure plan"),
+        _evidence_ref(root, "docs/reports/rick-intelligence-triple-aaa-final-promotion.md", "current diagnostic promotion report"),
     )
     diff_result, diff_code, diff_reason = _run(root, ("git", "diff", "--check"))
     validate_result, validate_code, validate_reason = _run(root, ("make", "validate"))
@@ -211,10 +295,13 @@ def generate_manifest(
         GateResult(
             gate_id="release-integrity",
             commit_sha=checkout["head"],
+            tree_sha=checkout["tree"],
             artifact_hash=artifact_hash,
             command=("git", "diff", "--check", "&&", "make", "validate"),
+            procedure="run git diff --check and make validate against the exact checkout",
             environment=environment,
             timestamp=timestamp,
+            exit_status=0 if local_result == "PASS" else 1,
             result=local_result,  # type: ignore[arg-type]
             limitations=local_limitations,
             reviewer=reviewer,
@@ -225,19 +312,15 @@ def generate_manifest(
         if gate_id == "release-integrity":
             continue
         gates.append(
-            GateResult(
-                gate_id=gate_id,
+            _runtime_result(
+                root,
+                gate_id,
+                audit_path,
+                reviewer,
                 commit_sha=checkout["head"],
+                tree_sha=checkout["tree"],
                 artifact_hash=artifact_hash,
-                command=("gate", gate_id),
-                environment=environment,
                 timestamp=timestamp,
-                result="BLOCKED_EXTERNAL",
-                limitations=("required runtime or independent evidence was not executed in this environment",),
-                reviewer=reviewer,
-                evidence_paths=(
-                    _evidence_ref(root, audit_path, "current gap audit records the unresolved gate"),
-                ),
             )
         )
     status = "PASS"

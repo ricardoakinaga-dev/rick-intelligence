@@ -91,8 +91,25 @@ jobs:
       - name: Run API contract and security lanes
         run: |
           make api-contract
-          make api-security
           make api16-root
+
+  security:
+    name: SECURITY / adversarial and route policy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - uses: actions/setup-python@v5.6.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install pinned security-test dependencies
+        run: python -m pip install --disable-pip-version-check --no-cache-dir "pytest==8.0.2" "pytest-asyncio==0.23.5" "pydantic==2.6.1" "httpx==0.27.0" "fastapi==0.109.2" "python-multipart==0.0.9"
+      - name: Run explicit security gates
+        run: |
+          make api-security
+          make security-adversarial
 
   rag-eval:
     name: RAG-EVAL / deterministic and ACL
@@ -115,7 +132,7 @@ jobs:
           make security-adversarial
 
   frontend:
-    name: E2E / frontend build surface
+    name: FRONTEND / build surface
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     permissions:
@@ -189,24 +206,27 @@ jobs:
             npm --prefix "$component" ci --ignore-scripts --no-audit --no-fund
             npm --prefix "$component" audit --audit-level=high
           done
+      - name: Validate immutable container release policy
+        run: python infrastructure/docker/check_release.py --mode prepared
 
   release:
     name: RELEASE / commit-bound promotion gate
-    needs: [fast, unit, contract, rag-eval, frontend, supply-chain, phase3-evidence, runtime, frontend-runtime, performance, chaos, soak, nightly]
+    needs: [fast, unit, contract, security, rag-eval, frontend, supply-chain, phase3-evidence, runtime, frontend-runtime, performance, chaos, soak, nightly]
     if: >-
       always() &&
       needs.fast.result == 'success' &&
       needs.unit.result == 'success' &&
       needs.contract.result == 'success' &&
+      needs.security.result == 'success' &&
       needs.rag-eval.result == 'success' &&
       needs.frontend.result == 'success' &&
       needs.supply-chain.result == 'success' &&
       needs.phase3-evidence.result == 'success' &&
-      needs.runtime.result == 'success' &&
-      needs.frontend-runtime.result == 'success' &&
-      needs.performance.result == 'success' &&
-      needs.chaos.result == 'success' &&
-      needs.soak.result == 'success' &&
+      (needs.runtime.result == 'success' || (github.event_name != 'workflow_dispatch' && github.event_name != 'schedule')) &&
+      (needs.frontend-runtime.result == 'success' || (github.event_name != 'workflow_dispatch' && github.event_name != 'schedule')) &&
+      (needs.performance.result == 'success' || (github.event_name != 'workflow_dispatch' && github.event_name != 'schedule')) &&
+      (needs.chaos.result == 'success' || (github.event_name != 'workflow_dispatch' && github.event_name != 'schedule')) &&
+      (needs.soak.result == 'success' || (github.event_name != 'workflow_dispatch' && github.event_name != 'schedule')) &&
       (needs.nightly.result == 'success' || github.event_name != 'schedule')
     runs-on: ubuntu-24.04
     timeout-minutes: 15

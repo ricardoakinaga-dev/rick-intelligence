@@ -4,8 +4,6 @@
 # connection is explicit. Copy infrastructure/compose/.env.dev.example to an
 # ignored .env file, replace every placeholder, and render this file before
 # starting it. The stack is intentionally fail-closed when a value is absent.
-name: rick-intelligence-dev
-
 x-service-hardening: &service-hardening
   security_opt:
     - no-new-privileges:true
@@ -126,11 +124,13 @@ services:
     image: prom/prometheus:v2.55.1
     command:
       - --config.file=/etc/prometheus/prometheus.yml
+      - --rule.file=/etc/prometheus/alerts.yml
       - --storage.tsdb.path=/prometheus
       - --storage.tsdb.retention.time=7d
       - --web.enable-lifecycle
     volumes:
       - ./infrastructure/compose/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./infrastructure/compose/alerts.yml:/etc/prometheus/alerts.yml:ro
       - metrics-data:/prometheus
     ports:
       - 127.0.0.1:19090:9090
@@ -280,11 +280,11 @@ services:
     networks: [edge, private]
 
 volumes:
-  postgres-data: {name: rick-intelligence-dev-postgres}
-  redis-data: {name: rick-intelligence-dev-redis}
-  qdrant-data: {name: rick-intelligence-dev-qdrant}
-  object-data: {name: rick-intelligence-dev-objects}
-  metrics-data: {name: rick-intelligence-dev-metrics}
+  postgres-data: {}
+  redis-data: {}
+  qdrant-data: {}
+  object-data: {}
+  metrics-data: {}
 
 networks:
   private:

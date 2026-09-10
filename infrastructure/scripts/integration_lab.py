@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+from hashlib import sha256
 import os
 from pathlib import Path
 import shutil
@@ -11,7 +12,7 @@ import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parents[2]
-PROJECT = "rick-rec-local"
+PROJECT = "rick-rec-local-" + sha256(str(ROOT.resolve()).encode("utf-8")).hexdigest()[:10]
 COMPOSE = ROOT / "infrastructure/compose/compose.integration.yml"
 SECRETS = (
     "REC_POSTGRES_PASSWORD", "REC_S3_ACCESS_KEY", "REC_S3_SECRET_KEY",

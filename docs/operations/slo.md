@@ -1,8 +1,25 @@
 # Initial SLO and SLI contract
 
 These targets are policy starting points, not observed production results.
-Local fixture benchmarks, staging measurements and production SLOs must be
-reported in separate artifacts.
+Local fixture benchmarks, staging measurements and production SLOs are
+separate evidence classes and must never be merged into one availability or
+latency claim.
+
+## Environment separation
+
+| Environment | Purpose | Promotion meaning |
+| --- | --- | --- |
+| `development` | Fast feedback, hermetic tests and local diagnostics | Never an availability, durability or production-latency claim |
+| `staging` | Disposable production-shaped rehearsal with synthetic tenants | Evidence is valid only for the exact staging release and cannot become production PASS by itself |
+| `production` | Authorized live service with the declared retention, traffic and alert policy | SLO evidence is valid only with current telemetry, owner and release binding |
+
+Every SLO record must include `environment`, `release_id`, `candidate_sha`,
+`tree_sha`, `window`, `sample_count`, `scope`, `collected_at`, `status` and
+`evidence_path`. A `no_data` record remains `no_data`; it cannot be converted
+to healthy by a dashboard default or by copying a staging measurement.
+
+The same SLI name may therefore have three records, one per environment, but
+there is no cross-environment aggregation in the promotion engine.
 
 | Service level | SLI | Initial target | Window |
 | --- | --- | ---: | --- |

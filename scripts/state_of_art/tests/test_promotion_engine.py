@@ -1,0 +1,205 @@
+from __future__ import annotations
+
+from scripts.state_of_art.packet_seal import seal_payload
+from scripts.state_of_art import promotion_engine
+from scripts.state_of_art import triple_aaa_verify
+
+
+def _results(*, status: str = "PASS", external: bool = False) -> list[dict[str, object]]:
+    return [
+        {
+            "id": lane_id,
+            "status": status,
+            "required": True,
+            "external": external or lane_id in promotion_engine.EXTERNAL_LANES,
+            "detail": "fixture observation",
+            "independent": True,
+        }
+        for lane_id in promotion_engine.TRIPLE_AAA_LANES
+    ]
+
+
+def _sealed_packet(results: list[dict[str, object]]) -> dict[str, object]:
+    return seal_payload(
+        {
+            "sealed": True,
+            "candidate": {
+                "commit_sha": "a" * 40,
+                "tree_sha": "b" * 40,
+                "checkout_fingerprint": "c" * 64,
+                "clean_worktree": True,
+            },
+            "results": results,
+            "critical_high_findings": 0,
+            "final_decision": "GO",
+            "decision_authority": {
+                "reviewer_id": "independent-fixture-reviewer",
+                "authorized": True,
+                "independent": True,
+            },
+        },
+        immutable_reference="artifact://release/fixture",
+        signer_id="independent-fixture-reviewer",
+    )
+
+
+def test_all_required_lanes_and_authority_promote() -> None:
+    observations = _results()
+    result = promotion_engine.evaluate(
+        observations,
+        packet=_sealed_packet(observations),
+    )
+
+    assert result["classification"] == "TRIPLE_AAA"
+    assert result["promotion_allowed"] is True
+    assert result["exit_code"] == promotion_engine.EXIT_PASS
+    assert result["rejection_codes"] == []
+
+
+def test_external_block_returns_candidate_and_exit_two() -> None:
+    observations = _results()
+    next(item for item in observations if item["id"] == "postgresql-runtime")["status"] = "BLOCKED_EXTERNAL"
+
+    result = promotion_engine.evaluate(observations)
+
+    assert result["classification"] == "STATE_OF_ART_CANDIDATE"
+    assert result["promotion_allowed"] is False
+    assert result["exit_code"] == promotion_engine.EXIT_BLOCKED_EXTERNAL
+    assert "BLOCKED_GATE_REJECTED" in result["rejection_codes"]
+
+
+def test_local_failure_has_priority_over_external_block() -> None:
+    observations = _results()
+    observations[0]["status"] = "FAIL"
+    observations[-1]["status"] = "BLOCKED_EXTERNAL"
+
+    result = promotion_engine.evaluate(observations)
+
+    assert result["classification"] == "DEVELOPMENT"
+    assert result["exit_code"] == promotion_engine.EXIT_FAILED
+    assert "FAILED_GATE_REJECTED" in result["rejection_codes"]
+
+
+def test_missing_mandatory_lane_is_not_silently_ignored() -> None:
+    observations = _results()
+    observations = [item for item in observations if item["id"] != "restore-drill"]
+
+    result = promotion_engine.evaluate(observations)
+
+    assert result["classification"] == "STATE_OF_ART"
+    assert result["exit_code"] == promotion_engine.EXIT_FAILED
+    assert "MISSING_GATE_REJECTED" in result["rejection_codes"]
+    assert any(item["id"] == "restore-drill" for item in result["blocking_lanes"])
+
+
+def test_local_verified_is_not_runtime_pass() -> None:
+    observations = _results()
+    observations[0]["status"] = "LOCAL_VERIFIED"
+
+    result = promotion_engine.evaluate(observations)
+
+    assert result["classification"] == "DEVELOPMENT"
+    assert result["exit_code"] == promotion_engine.EXIT_FAILED
+
+
+def test_self_promoted_final_decision_is_rejected() -> None:
+    observations = _results()
+    observations[-1]["independent"] = False
+
+    result = promotion_engine.evaluate(observations)
+
+    assert result["classification"] == "AAA"
+    assert result["promotion_allowed"] is False
+    assert result["exit_code"] == promotion_engine.EXIT_FAILED
+    assert "SELF_PROMOTED_GATE_REJECTED" in result["rejection_codes"]
+
+
+def test_unsealed_packet_is_rejected_even_when_lanes_pass() -> None:
+    result = promotion_engine.evaluate(
+        _results(),
+        packet={"sealed": False, "critical_high_findings": 0, "final_decision": "GO"},
+    )
+
+    assert result["classification"] == "AAA"
+    assert result["promotion_allowed"] is False
+    assert "PACKET_NOT_SEALED_REJECTED" in result["rejection_codes"]
+
+
+def test_packet_is_required_even_when_lanes_pass() -> None:
+    result = promotion_engine.evaluate(_results())
+
+    assert result["classification"] == "AAA"
+    assert result["promotion_allowed"] is False
+    assert result["exit_code"] == promotion_engine.EXIT_FAILED
+    assert "PACKET_REQUIRED_REJECTED" in result["rejection_codes"]
+
+
+def test_promotable_is_not_an_observation_pass() -> None:
+    observations = _results(status="PROMOTABLE")
+    result = promotion_engine.evaluate(observations, packet=_sealed_packet(observations))
+
+    assert result["classification"] == "DEVELOPMENT"
+    assert result["promotion_allowed"] is False
+    assert result["exit_code"] == promotion_engine.EXIT_FAILED
+    assert "INVALID_EVIDENCE_REJECTED" in result["rejection_codes"]
+
+
+def test_sealed_packet_must_match_the_current_checkout() -> None:
+    observations = _results()
+    result = promotion_engine.evaluate(
+        observations,
+        packet=_sealed_packet(observations),
+        checkout={
+            "head": "d" * 40,
+            "tree": "b" * 40,
+            "fingerprint": "c" * 64,
+            "status": "CLEAN",
+        },
+    )
+
+    assert result["promotion_allowed"] is False
+    assert result["exit_code"] == promotion_engine.EXIT_FAILED
+    assert "PACKET_BINDING_REJECTED" in result["rejection_codes"]
+
+
+def test_external_failure_is_not_relabelled_as_external_block() -> None:
+    result = triple_aaa_verify._run(
+        triple_aaa_verify.Lane(
+            "external-failure",
+            ("/bin/sh", "-c", "exit 1"),
+            external=True,
+        ),
+        timeout_seconds=10,
+    )
+
+    assert result["status"] == "FAIL"
+    assert result["return_code"] == 1
+
+
+def test_arbitrary_external_exit_two_is_not_a_blocked_external_result() -> None:
+    result = triple_aaa_verify._run(
+        triple_aaa_verify.Lane(
+            "external-arbitrary-two",
+            ("/bin/sh", "-c", "exit 2"),
+            external=True,
+        ),
+        timeout_seconds=10,
+    )
+
+    assert result["status"] == "FAIL"
+    assert result["return_code"] == 2
+
+
+def test_external_block_requires_explicit_exit_two() -> None:
+    result = triple_aaa_verify._run(
+        triple_aaa_verify.Lane(
+            "external-block",
+            ("/bin/sh", "-c", "exit 2"),
+            external=True,
+            blocked_return_codes=frozenset({2}),
+        ),
+        timeout_seconds=10,
+    )
+
+    assert result["status"] == "BLOCKED_EXTERNAL"
+    assert result["return_code"] == 2

@@ -61,6 +61,9 @@ RAW_GATE_STATUSES = frozenset(
 )
 MAX_RUNTIME_EVIDENCE_AGE_SECONDS = 24 * 60 * 60
 MAX_RUNTIME_EVIDENCE_FUTURE_SKEW_SECONDS = 5 * 60
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+EXPECTED_SOURCE_PROMPT = "docs/prompts/phase-3-triple-aaa-closure-2026-09-09.txt"
+EXPECTED_SOURCE_PROMPT_SHA256 = "0b1703fe10e63ed6c68c543bdfdea33e92dfa1300e7422d0adb954d85ddeb987"
 
 
 class MatrixValidationError(ValueError):
@@ -114,7 +117,18 @@ def _canonical(value: Any) -> bytes:
 
 def _safe_path(root: Path, raw_path: str) -> tuple[Path | None, str | None]:
     candidate = Path(raw_path)
-    resolved = (candidate if candidate.is_absolute() else root / candidate).resolve()
+    lexical = candidate if candidate.is_absolute() else root / candidate
+    try:
+        relative = lexical.relative_to(root)
+    except ValueError:
+        relative = None
+    if relative is not None:
+        cursor = root
+        for component in relative.parts:
+            cursor /= component
+            if cursor.is_symlink():
+                return None, "path must not traverse a symlink"
+    resolved = lexical.resolve()
     try:
         resolved.relative_to(root.resolve())
     except ValueError:
@@ -443,6 +457,13 @@ def evaluate_matrix(
         if _hash_file(prompt_path) != matrix["source_prompt_sha256"]:
             failures.append("source prompt evidence hash does not match")
             rejection_codes.add("WRONG_HASH_REJECTED")
+        if root.resolve() == PROJECT_ROOT:
+            if matrix["source_prompt"] != EXPECTED_SOURCE_PROMPT:
+                failures.append("source prompt path is not the frozen acceptance prompt")
+                rejection_codes.add("WRONG_HASH_REJECTED")
+            if matrix["source_prompt_sha256"] != EXPECTED_SOURCE_PROMPT_SHA256:
+                failures.append("source prompt hash is not the frozen acceptance prompt hash")
+                rejection_codes.add("WRONG_HASH_REJECTED")
 
     for item in matrix["capabilities"]:
         capability_id = item["capability_id"]

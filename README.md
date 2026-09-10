@@ -7,8 +7,8 @@ knowledge-intelligence platform:
 - `rick-professor/` — the current TypeScript/Fastify Professor compatibility service;
 - `modulo-redis-locker/` — the current JavaScript/Express Redis lease service.
 
-The repository is now in **Phase 2 — Production Intelligence Runtime
-Closure**. `packages/knowledge`, `packages/ingestion` and `packages/retrieval`
+The repository is now in **Phase 3 — Runtime Evidence & Production Promotion**.
+`packages/knowledge`, `packages/ingestion` and `packages/retrieval`
 remain root-owned implementations with differential parity to validated legacy
 behavior; `packages/providers`, `packages/locking`, `packages/evidence`,
 `packages/decision` and `packages/professor` provide typed platform boundaries.
@@ -27,14 +27,21 @@ that is `NOT_RUN`, `BLOCKED_EXTERNAL` or failed keeps the candidate below
 promotion.
 
 The current audit is
-[`phase-2-current-gap-audit.md`](docs/reports/phase-2-current-gap-audit.md)
+[`current-triple-aaa-gap-audit.md`](docs/reports/current-triple-aaa-gap-audit.md)
 and the execution plan is
-[`phase-2-production-intelligence-runtime.md`](docs/plans/phase-2-production-intelligence-runtime.md).
+[`phase-3-triple-aaa-closure.md`](docs/plans/phase-3-triple-aaa-closure.md).
+The runtime-evidence execution plan remains
+[`phase-3-runtime-evidence-production-promotion.md`](docs/plans/phase-3-runtime-evidence-production-promotion.md).
 The final local report, scorecard and external blocker matrix are
 [`phase-2-final-report.md`](docs/progress/phase-2-final-report.md),
 [`state-of-art-triple-aaa-final-audit.md`](docs/reports/state-of-art-triple-aaa-final-audit.md)
 and [`external-evidence-blockers.md`](docs/reports/external-evidence-blockers.md).
-The original request is archived at
+The current 28-section promotion packet is
+[`rick-intelligence-triple-aaa-final-promotion.md`](docs/reports/rick-intelligence-triple-aaa-final-promotion.md)
+and remains explicitly `NO-GO` until runtime evidence is sealed.
+The current closure prompt is archived at
+[`phase-3-triple-aaa-closure-2026-09-09.txt`](docs/prompts/phase-3-triple-aaa-closure-2026-09-09.txt);
+the prior request remains preserved at
 [`state-of-art-triple-aaa-2026-09-09.txt`](docs/prompts/state-of-art-triple-aaa-2026-09-09.txt).
 
 ## Repository layout
@@ -102,7 +109,7 @@ Run `make help` for the complete list.
 | `make postgres-runtime` | Runs the real PostgreSQL migration/queue/fencing gate from an explicit `RICK_TEST_DATABASE_DSN`; returns `BLOCKED_EXTERNAL` when unavailable. |
 | `make redis-runtime` | Runs the real Redis namespace/lease/rate-limit gate from an explicit `RICK_TEST_REDIS_URL`; local semantics do not imply production-safe TLS/auth. |
 | `make object-qdrant-runtime` | Runs the real object/vector lifecycle gate from explicit test endpoints; no endpoint discovery or fake transport is used. |
-| `make triple-aaa-verify` | Executes the integrated fail-closed packet and writes a redacted ignored result; `0` is reserved for all mandatory lanes passing, `2` means external blocking, `1` means failure. |
+| `make triple-aaa-verify` | Executes the integrated fail-closed Phase 3 packet and writes a redacted ignored result; `0` is reserved for all mandatory lanes passing, `2` means external blocking, `1` means failure. |
 
 For current component-specific commands and runtime prerequisites, see
 [`docs/plans/phase-1.1-monorepo-skeleton.md`](docs/plans/phase-1.1-monorepo-skeleton.md)

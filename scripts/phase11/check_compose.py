@@ -74,6 +74,7 @@ def main() -> int:
     for required_file in (
         ROOT / "infrastructure/compose/otel-collector-config.yaml",
         ROOT / "infrastructure/compose/prometheus.yml",
+        ROOT / "infrastructure/compose/alerts.yml",
     ):
         if not required_file.is_file():
             errors.append(f"{required_file.relative_to(ROOT)}: required observability config is absent")

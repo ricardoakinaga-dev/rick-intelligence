@@ -39,6 +39,11 @@ def test_commands_never_delete_volumes_or_use_another_project():
         lab.command("down")
 
 
+def test_project_name_is_stable_for_this_checkout_but_not_global():
+    assert lab.PROJECT.startswith("rick-rec-local-")
+    assert len(lab.PROJECT.rsplit("-", 1)[-1]) == 10
+
+
 def test_missing_runtime_is_blocked(monkeypatch):
     monkeypatch.setattr(lab.shutil, "which", lambda *a, **kw: None)
     with pytest.raises(lab.LabError, match="unavailable"):

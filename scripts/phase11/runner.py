@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import os
+from hashlib import sha256
 import signal
 import shutil
 import subprocess
@@ -104,7 +105,11 @@ def run_case(
 
 def _compose_project(compose: Path) -> str:
     relative = compose.relative_to(ROOT).as_posix()
-    return COMPOSE_PROJECTS.get(relative, "rick-intelligence-local")
+    base = COMPOSE_PROJECTS.get(relative, "rick-intelligence-local")
+    # The project name is stable for this checkout path but cannot collide
+    # with another worktree/user that runs the same topology concurrently.
+    suffix = sha256(str(ROOT.resolve()).encode("utf-8")).hexdigest()[:10]
+    return f"{base}-{suffix}"
 
 
 def _compose_environment(source: dict[str, str] | None = None) -> dict[str, str]:

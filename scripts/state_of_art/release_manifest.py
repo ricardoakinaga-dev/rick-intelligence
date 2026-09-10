@@ -103,6 +103,14 @@ def _mapping(value: Any, field: str) -> Mapping[str, Any]:
     return value
 
 
+def _exit_status(value: Any, field: str) -> int | None:
+    if value is None:
+        return None
+    if type(value) is not int or value < 0:
+        raise ManifestValidationError((f"{field} must be a non-negative integer or null",))
+    return value
+
+
 def _canonical(value: Any) -> bytes:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
 
@@ -211,10 +219,13 @@ class CommitBinding:
 class GateResult:
     gate_id: str
     commit_sha: str
+    tree_sha: str
     artifact_hash: str
     command: tuple[str, ...]
+    procedure: str
     environment: str
     timestamp: str
+    exit_status: int | None
     result: GateStatus
     limitations: tuple[str, ...]
     reviewer: ReviewerRef
@@ -223,26 +234,35 @@ class GateResult:
     @classmethod
     def from_mapping(cls, value: Any, *, field: str = "gate") -> "GateResult":
         item = _mapping(value, field)
+        if "exit_status" not in item:
+            raise ManifestValidationError((f"{field}.exit_status is required",))
         command = _string_list(item.get("command"), f"{field}.command")
         limitations = _string_list(item.get("limitations", ()), f"{field}.limitations")
-        evidence = item.get("evidence_paths")
+        evidence = item.get("evidence_paths", item.get("evidence_path"))
         if not isinstance(evidence, Sequence) or isinstance(evidence, (str, bytes, bytearray)):
             raise ManifestValidationError((f"{field}.evidence_paths must be a list",))
         evidence_paths = tuple(
             EvidenceRef.from_mapping(entry, field=f"{field}.evidence_paths[{index}]")
             for index, entry in enumerate(evidence)
         )
-        result = _text(item.get("result"), f"{field}.result").upper()
+        raw_result = item.get("result", item.get("status"))
+        result = _text(raw_result, f"{field}.result").upper()
+        raw_status = item.get("status")
+        if raw_status is not None and _text(raw_status, f"{field}.status").upper() != result:
+            raise ManifestValidationError((f"{field}.status and {field}.result disagree",))
         allowed = {"PASS", "FAIL", "BLOCKED_EXTERNAL", "NOT_RUN", "STALE", "INVALID"}
         if result not in allowed:
             raise ManifestValidationError((f"{field}.result has unsupported value {result!r}",))
         return cls(
             gate_id=_text(item.get("gate_id"), f"{field}.gate_id"),
             commit_sha=_sha1(item.get("commit_sha"), f"{field}.commit_sha"),
+            tree_sha=_sha1(item.get("tree_sha"), f"{field}.tree_sha"),
             artifact_hash=_hash(item.get("artifact_hash"), f"{field}.artifact_hash"),
             command=command,
+            procedure=_text(item.get("procedure"), f"{field}.procedure"),
             environment=_text(item.get("environment"), f"{field}.environment"),
             timestamp=_text(item.get("timestamp"), f"{field}.timestamp"),
+            exit_status=_exit_status(item.get("exit_status"), f"{field}.exit_status"),
             result=result,  # type: ignore[arg-type]
             limitations=limitations,
             reviewer=ReviewerRef.from_mapping(item.get("reviewer"), field=f"{field}.reviewer"),
@@ -250,15 +270,21 @@ class GateResult:
         )
 
     def to_dict(self) -> dict[str, object]:
+        evidence = [item.to_dict() for item in self.evidence_paths]
         return {
             "artifact_hash": self.artifact_hash,
             "command": list(self.command),
             "commit_sha": self.commit_sha,
+            "tree_sha": self.tree_sha,
             "environment": self.environment,
-            "evidence_paths": [item.to_dict() for item in self.evidence_paths],
+            "evidence_path": evidence,
+            "evidence_paths": evidence,
             "gate_id": self.gate_id,
             "limitations": list(self.limitations),
+            "procedure": self.procedure,
             "result": self.result,
+            "status": self.result,
+            "exit_status": self.exit_status,
             "reviewer": self.reviewer.to_dict(),
             "timestamp": self.timestamp,
         }
@@ -407,16 +433,26 @@ class ReleaseEvidenceManifest:
         for gate in self.gates:
             if gate.commit_sha != self.commit_binding.commit_sha:
                 errors.append(f"gate {gate.gate_id} is bound to the wrong commit")
+            if gate.tree_sha != self.commit_binding.tree_sha:
+                errors.append(f"gate {gate.gate_id} is bound to the wrong tree")
             if gate.reviewer.reviewer_id not in reviewers:
                 errors.append(f"gate {gate.gate_id} references an undeclared reviewer")
+            if gate.gate_id in {"independent-reviews", "final-go-no-go"} and gate.result == "PASS" and not gate.reviewer.independent:
+                errors.append(
+                    f"gate {gate.gate_id} PASS requires an independent reviewer; self-promotion is rejected"
+                )
             if gate.artifact_hash != self.commit_binding.artifact_set_sha256:
                 errors.append(f"gate {gate.gate_id} is bound to the wrong artifact hash")
             if not gate.command:
                 errors.append(f"gate {gate.gate_id} has no command")
             if not gate.evidence_paths:
                 errors.append(f"gate {gate.gate_id} has no evidence paths")
+            if gate.result == "PASS" and gate.exit_status != 0:
+                errors.append(f"gate {gate.gate_id} is PASS but exit_status is not zero")
+            if gate.result != "PASS" and gate.exit_status == 0:
+                errors.append(f"gate {gate.gate_id} is {gate.result} but exit_status is zero")
             if gate.result != "PASS" and not gate.limitations:
                 errors.append(f"gate {gate.gate_id} must document limitations when result is {gate.result}")
-        if self.status != "PASS":
-            errors.append(f"manifest status is {self.status}, not PASS")
+        if self.status != "PASS" and all(item.result == "PASS" for item in self.gates):
+            errors.append(f"manifest status is {self.status} even though every gate is PASS")
         return errors

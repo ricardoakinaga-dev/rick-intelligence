@@ -45,6 +45,12 @@ class ReleaseManifestTests(unittest.TestCase):
             name="release-integrity-generator",
             independent=False,
         )
+        independent_reviewer = ReviewerRef(
+            reviewer_id="independent-fixture-reviewer",
+            kind="independent",
+            name="Independent fixture reviewer",
+            independent=True,
+        )
         evidence = EvidenceRef(
             path="evidence.md",
             sha256=sha256(evidence_path.read_bytes()).hexdigest(),
@@ -54,13 +60,24 @@ class ReleaseManifestTests(unittest.TestCase):
             GateResult(
                 gate_id=gate_id,
                 commit_sha=self.HEAD,
+                tree_sha=self.TREE,
                 artifact_hash=artifact_set_digest((artifact,)),
-                command=("fixture", "gate", gate_id),
+                command=(
+                    ("git", "diff", "--check", "&&", "make", "validate")
+                    if gate_id == "release-integrity"
+                    else ("runtime-envelope", gate_id)
+                ),
+                procedure=(
+                    "run git diff --check and make validate against the exact checkout"
+                    if gate_id == "release-integrity"
+                    else f"validate runtime envelope for {gate_id} against the fixture checkout"
+                ),
                 environment="test",
                 timestamp=observed_at,
+                exit_status=0 if gate_result == "PASS" else 2,
                 result=gate_result,  # type: ignore[arg-type]
                 limitations=("fixture is not a production run",) if gate_result != "PASS" else (),
-                reviewer=reviewer,
+                reviewer=independent_reviewer if gate_id == "independent-reviews" else reviewer,
                 evidence_paths=(evidence,),
             )
             for gate_id in REQUIRED_GATES
@@ -79,7 +96,7 @@ class ReleaseManifestTests(unittest.TestCase):
             ),
             artifacts=(artifact,),
             gates=gates,
-            reviewers=(reviewer,),
+            reviewers=(reviewer, independent_reviewer),
             limitations=("fixture only",),
         )
         path = root / "release-evidence.json"
@@ -187,7 +204,7 @@ class ReleaseManifestTests(unittest.TestCase):
             path, checkout = self._fixture(directory, gate_result="BLOCKED_EXTERNAL", status="BLOCKED_EXTERNAL")
             result = release_integrity.evaluate_evidence(path, checkout, root=Path(directory))
 
-        self.assertEqual(result["classification"], release_integrity.FAIL)
+        self.assertEqual(result["classification"], release_integrity.BLOCKED_EXTERNAL)
         self.assertIn("manifest status is BLOCKED_EXTERNAL", result["reason"])
         self.assertIn("BLOCKED_RUNTIME_REJECTED", result["rejection_codes"])
 
@@ -202,6 +219,47 @@ class ReleaseManifestTests(unittest.TestCase):
         self.assertEqual(result["classification"], release_integrity.FAIL)
         self.assertIn("commit binding does not match", result["reason"])
 
+    def test_wrong_gate_tree_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="release-manifest-") as directory:
+            path, checkout = self._fixture(directory)
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            payload["gates"][0]["tree_sha"] = "d" * 40
+            path.write_text(json.dumps(payload), encoding="utf-8")
+            result = release_integrity.evaluate_evidence(path, checkout, root=Path(directory))
+
+        self.assertEqual(result["classification"], release_integrity.FAIL)
+        self.assertIn("wrong tree", result["reason"])
+        self.assertIn("WRONG_TREE_REJECTED", result["rejection_codes"])
+
+    def test_missing_gate_exit_status_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="release-manifest-") as directory:
+            path, checkout = self._fixture(directory)
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            del payload["gates"][0]["exit_status"]
+            path.write_text(json.dumps(payload), encoding="utf-8")
+            result = release_integrity.evaluate_evidence(path, checkout, root=Path(directory))
+
+        self.assertEqual(result["classification"], release_integrity.FAIL)
+        self.assertIn("exit_status is required", result["reason"])
+
+    def test_independent_review_cannot_self_promote(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="release-manifest-") as directory:
+            path, checkout = self._fixture(directory)
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            for gate in payload["gates"]:
+                if gate["gate_id"] == "independent-reviews":
+                    gate["reviewer"] = {
+                        "reviewer_id": "automated-release-integrity",
+                        "kind": "automated",
+                        "name": "release-integrity-generator",
+                        "independent": False,
+                    }
+            path.write_text(json.dumps(payload), encoding="utf-8")
+            result = release_integrity.evaluate_evidence(path, checkout, root=Path(directory))
+
+        self.assertEqual(result["classification"], release_integrity.FAIL)
+        self.assertIn("SELF_PROMOTED_GATE_REJECTED", result["rejection_codes"])
+
     def test_WRONG_COMMIT_EVIDENCE_REJECTED(self) -> None:
         with tempfile.TemporaryDirectory(prefix="release-manifest-") as directory:
             path, checkout = self._fixture(directory)
@@ -213,6 +271,17 @@ class ReleaseManifestTests(unittest.TestCase):
         self.assertEqual(result["classification"], release_integrity.FAIL)
         self.assertIn("bound to the wrong commit", result["reason"])
         self.assertIn("WRONG_COMMIT_EVIDENCE_REJECTED", result["rejection_codes"])
+
+    def test_unapproved_command_procedure_cannot_claim_pass(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="release-manifest-") as directory:
+            path, checkout = self._fixture(directory)
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            payload["gates"][0]["command"] = ["false"]
+            path.write_text(json.dumps(payload), encoding="utf-8")
+            result = release_integrity.evaluate_evidence(path, checkout, root=Path(directory))
+
+        self.assertEqual(result["classification"], release_integrity.FAIL)
+        self.assertIn("not an approved", result["reason"])
 
 
 if __name__ == "__main__":

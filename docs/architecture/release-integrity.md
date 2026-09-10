@@ -66,11 +66,15 @@ The strict v2 manifest shape is:
     {
       "gate_id": "release-integrity",
       "commit_sha": "<same commit SHA>",
+      "tree_sha": "<same tree SHA>",
       "artifact_hash": "<same artifact_set_sha256>",
       "command": ["git", "diff", "--check"],
+      "procedure": "run the gate procedure against the exact checkout",
       "environment": "ci",
       "timestamp": "2026-09-09T12:00:00+00:00",
+      "exit_status": 0,
       "result": "PASS",
+      "status": "PASS",
       "limitations": [],
       "reviewer": {
         "reviewer_id": "automated-release-integrity",
@@ -78,6 +82,9 @@ The strict v2 manifest shape is:
         "name": "release-integrity-generator",
         "independent": false
       },
+      "evidence_path": [
+        {"path": "README.md", "sha256": "<same file hash>", "description": "state truth"}
+      ],
       "evidence_paths": [
         {"path": "README.md", "sha256": "<same file hash>", "description": "state truth"}
       ]
@@ -100,6 +107,8 @@ The implementation names these typed records explicitly:
 `ReviewerRef` and `CommitBinding`. Every gate is bound to the same commit and
 artifact-set hash; every referenced artifact/evidence path is rehashed from
 the checkout. The manifest itself cannot be an artifact or evidence reference.
+Referenced paths must be regular files reached without traversing symlink
+components, so a later path swap cannot change the bytes behind a reference.
 `HEAD`, tree, checkout fingerprint, artifact hash or any referenced byte
 mismatch is classified as `FAIL` (stale/wrong artifact evidence). Missing
 evidence or a mandatory `NOT_RUN` is classified as `NOT_RUN`; both are
@@ -107,9 +116,41 @@ blocking. A mandatory `FAIL`, `STALE`, `BLOCKED_EXTERNAL` or `INVALID` is also
 blocking. No status is upgraded by a reviewer label, timestamp or previous
 run.
 
-Freshness is identity-based, not wall-clock-based. A recent file from another
-checkout is stale, while an older file with a matching `HEAD`, matching
-fingerprint, and rerunnable command record is eligible for this gate.
+Freshness requires both the exact checkout identity and a current observation
+window. A recent file from another checkout is stale, while an older file with
+a matching `HEAD` can still be rejected once its `generated_at` or gate
+timestamp exceeds the 24-hour evidence window. The generator records the
+execution timestamp, not the commit timestamp, so a long-lived branch cannot
+accidentally emit already-stale release evidence.
+
+## Promotion packet sealing
+
+`make triple-aaa-verify` is an observation runner, not a signer. It never
+self-seals a candidate and never treats `--seal-reference` by itself as
+authority. A promotion attempt must provide `--sealed-packet <path>` pointing
+to an externally retained packet created with
+`scripts/state_of_art/packet_seal.py`. The packet must contain the exact lane
+observations and clean candidate `commit_sha`, `tree_sha` and checkout
+fingerprint, plus:
+
+```json
+{
+  "sealed": true,
+  "critical_high_findings": 0,
+  "final_decision": "GO",
+  "decision_authority": {
+    "reviewer_id": "independent-release-authority",
+    "authorized": true,
+    "independent": true
+  }
+}
+```
+
+The verifier recomputes the packet digest, rejects mutation, binds it to the
+current run and checkout, and requires the seal signer to match the authorized
+independent reviewer. Missing, malformed, self-promoted or mismatched packets
+remain non-promotable. A local content hash detects mutation; the immutable
+artifact reference must still be retained by an authorized artifact system.
 
 ## Checkout fingerprint
 
@@ -122,8 +163,10 @@ ignored and excluded from the untracked fingerprint so the binding is
 deterministic rather than self-referential.
 
 The top-level `classification`, `status`, `commands`, `criteria`, and
-`fingerprint` fields are stable JSON data. The process exits `0` only for
-overall `PASS`; both `FAIL` and blocking `NOT_RUN` exit non-zero.
+`fingerprint` fields are stable JSON data. `procedure` is mandatory so an
+evidence record cannot claim a result without naming what was executed. The
+process exits `0` only for overall `PASS`, `2` for `BLOCKED_EXTERNAL`, and `1`
+for a failure or missing/invalid packet.
 
 ## Production limitation
 

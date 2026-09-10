@@ -1,0 +1,21 @@
+groups:
+  - name: rick-runtime-slo
+    rules:
+      - alert: RickApiSloBreach
+        expr: rick_api_slo_status{status="breach"} == 1
+        for: 5m
+        labels:
+          severity: warning
+          service: rick-api
+        annotations:
+          summary: RICK API SLO is breaching
+          description: The bounded API SLO evaluator has reported a breach for five minutes.
+      - alert: RickApiSloNoData
+        expr: max by (environment) (rick_api_slo_status{status="no_data"}) == 1 or absent(rick_api_slo_status)
+        for: 10m
+        labels:
+          severity: critical
+          service: rick-api
+        annotations:
+          summary: RICK API SLO has no usable data
+          description: Missing telemetry is not healthy and must be investigated before promotion.
