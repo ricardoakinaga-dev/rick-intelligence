@@ -663,3 +663,18 @@ State-of-Art suite **295**; compilation and `git diff --check` pass. This is
 local recovery-journal evidence only. Approved durable queue/runtime,
 multi-instance recovery, provider/corpus, independent review and promotion
 authority remain unavailable; promotion remains disallowed.
+
+## 43. Persisted audit JSON closure — 2026-09-10
+
+Source candidate `0cfe1cc2bf669b0d47b1993a38525804836f7a08` (tree
+`1b6c49a12925fbf1d355a56ec27d9d21dd12045f`) closes the audit read boundary
+across the local SQLite and PostgreSQL sinks. Persisted event/metadata JSON is
+capped at 64 KiB, rejects non-finite, malformed and recursive values, and
+SQLite excludes invalid rows before tenant/workspace JSON1 predicates can run.
+The write-side sanitizer and canonical JSON contract remain unchanged.
+
+The SQLite/PostgreSQL audit suite passes **10**, the API matrix **443**, and
+the State-of-Art suite **295**; compilation and `git diff --check` pass. This
+is local audit read-model evidence only. Approved external audit durability,
+multi-instance recovery, provider/corpus, independent review and promotion
+authority remain unavailable; promotion remains disallowed.

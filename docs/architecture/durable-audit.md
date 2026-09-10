@@ -32,6 +32,13 @@ The file-backed adapter:
   without userinfo, query, or fragment data; the no-action path is limited to
   bounded adapter diagnostics (`sequence`, `writer`, `payload`, `second`).
 
+Reads are bounded as strictly as writes: SQLite audit rows pass through a
+finite 64 KiB decoder and malformed rows are excluded before any SQLite JSON1
+tenant/workspace predicate runs; PostgreSQL metadata returned as text or a
+driver mapping uses the same finite byte-bounded contract. Non-finite,
+recursive, oversized and malformed persisted metadata is therefore omitted
+instead of becoming an audit response value.
+
 The adapter is local durability plumbing, not a production audit architecture.
 The root factory can select it with `RICK_AUDIT_SQLITE_PATH` and the admin
 route reads through its bounded `list()` contract; `RICK_ENV=production`

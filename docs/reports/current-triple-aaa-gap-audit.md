@@ -56,8 +56,8 @@ converted to PASS by the presence of host processes.
 ### Current clean revalidation — 2026-09-10
 
 The latest source implementation candidate is
-`12a473c6b661c04a8d565fefddc490faad91aa96` with tree
-`a398e479e6eefa6b47fbb6fbc98e4b8526ed1e28`. The ignored integrated packet
+`0cfe1cc2bf669b0d47b1993a38525804836f7a08` with tree
+`1b6c49a12925fbf1d355a56ec27d9d21dd12045f`. The ignored integrated packet
 `.runtime/phase-3/triple-aaa-verify.json` is the authority for the exact clean
 checkout, tree, artifact set, packet hash and current classification; the
 latest clean run reports `17` foundation PASS results and `24` mandatory
@@ -66,7 +66,7 @@ latest clean run reports `17` foundation PASS results and `24` mandatory
 commit, so this audit does not hard-code a future documentation commit or
 self-reference its own bytes.
 
-The current API matrix has **441 passed** tests and the State-of-Art suite has
+The current API matrix has **443 passed** tests and the State-of-Art suite has
 **295 passed** tests. `make validate`, `make compose-static`, `make ops-static`,
 `make security-adversarial` and `make api-contract` pass. The canonical
 `make up` attempt failed closed before service startup because the required
@@ -89,7 +89,7 @@ denied independently. No runtime readiness or promotion evidence is inferred.
 ### Local checks observed
 
 The current source already has useful local controls: the State-of-Art suite
-passes (`295 passed`) and the canonical API matrix passes (`441 passed`), while
+passes (`295 passed`) and the canonical API matrix passes (`443 passed`), while
 `make validate`,
 `make ops-static`, `make compose-static`, `make security-adversarial`, Python
 compilation and `git diff --check` pass. These results prove local contracts
@@ -875,5 +875,21 @@ Bounded canonical JSON remains enforced on writes.
 The job-journal suite passes **14**, the API matrix **441**, and the
 State-of-Art suite **295**; compilation and `git diff --check` pass. This is
 local recovery-journal evidence only. Approved durable queue/runtime,
+multi-instance recovery, provider/corpus, independent review, sealed packet
+and human Go/No-Go remain unavailable; promotion remains disallowed.
+
+## 44. Persisted audit JSON decoding closure — 2026-09-10
+
+Source implementation candidate `0cfe1cc2bf669b0d47b1993a38525804836f7a08`
+(tree `1b6c49a12925fbf1d355a56ec27d9d21dd12045f`) closes a concrete audit
+read-boundary gap across the local SQLite and PostgreSQL sinks. Audit reads
+now cap event/metadata JSON at 64 KiB, reject non-finite, malformed and
+recursive values, and omit invalid metadata; SQLite also filters malformed
+rows before applying JSON1 tenant/workspace predicates. An adversarial
+regression covers padded and `NaN` persisted values in both adapters.
+
+The SQLite/PostgreSQL audit suite passes **10**, the API matrix **443**, and
+the State-of-Art suite **295**; compilation and `git diff --check` pass. This
+is local audit read-model evidence only. Approved external audit durability,
 multi-instance recovery, provider/corpus, independent review, sealed packet
 and human Go/No-Go remain unavailable; promotion remains disallowed.
