@@ -223,3 +223,17 @@ The combined regression is 305 tests; frontend/supply focus is 20 tests. This
 is current local evidence and a deterministic test-boundary correction, not
 production approval or an independent visual review. The next action remains
 approved disposable runtime execution and fresh independent review.
+
+## 14. Preserved-suite revalidation — 2026-09-10
+
+At the exact clean control candidate
+`14116260f727435df05e673949964a2c865ff2f5` (tree
+`67f91512f394b697ca233fb68c805d3d94494765`), `make test` was rerun after the
+local Playwright browser prerequisite was installed. The legacy frontend
+smoke passed 7/7, Professor passed 37/37 and Locker passed 2/2. The preserved
+CVG suite remained externally incomplete at 382 passed, 12 failed, 4 errors
+and 17 skipped because the approved ignored corpus and
+`src/data/default/dataset.json` are absent. The runner exit was 1 and GNU Make
+returned 2; this remains a blocking partial result, not a promotion signal.
+No fixture or corpus was fabricated or committed. Runtime, provider/corpus,
+image, independent-review and human promotion gates remain open.

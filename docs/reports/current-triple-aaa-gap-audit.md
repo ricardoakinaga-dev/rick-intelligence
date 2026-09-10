@@ -327,3 +327,23 @@ verifier bound commit `02dfbd2`/tree `aa6e3f6` and classified
 `STATE_OF_ART_CANDIDATE` with JSON exit `1`; required runtime, release,
 independent-review, sealed-packet and human Go/No-Go lanes remain blocked or
 non-promotable. No AAA or Triple AAA claim is made.
+
+## 16. Preserved-suite revalidation after browser dependency closure — 2026-09-10
+
+The exact clean control candidate `14116260f727435df05e673949964a2c865ff2f5`
+(tree `67f91512f394b697ca233fb68c805d3d94494765`) was revalidated with
+`make test` after installing the locally required Playwright Chromium revision.
+The frontend lint and legacy browser smoke completed **7/7**; Professor
+completed **37/37** and Locker **2/2**. The preserved CVG suite completed with
+**382 passed, 12 failed, 4 errors and 17 skipped**. The four setup errors and
+the dependent failures are reproducibly explained by the absent
+`cvg-master-rag-v2/src/data/default/dataset.json` and approved operational
+corpus, which are intentionally ignored/unavailable in this checkout; the
+generated test chunks do not constitute that corpus and were not promoted.
+
+The runner therefore returned `1` and GNU Make returned its recipe wrapper
+status `2`. This is partial diagnostic evidence, not a green full-suite
+claim. No corpus was fabricated, no ignored runtime data was committed, and
+the candidate remains blocked for the approved corpus, disposable runtime,
+production authority, independent review, image proof, sealed packet and
+human Go/No-Go. No Triple AAA claim is made.

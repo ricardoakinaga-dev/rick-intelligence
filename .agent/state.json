@@ -14,7 +14,7 @@
   "active_execplan": ".agent/plans/phase-3-runtime-evidence-production-promotion.md",
   "active_task": "PH3-2-LAB-READINESS",
   "verification_state": "PARTIAL",
-  "repository_state": "Current Phase 3 source implementation candidate is 02dfbd2875372643c82f861e6178602ce6530d86 (tree aa6e3f6f8e611fe1316afce1acb73d82367db7b0). It binds shared disposable-runtime preflight, canonical Compose targeting, explicit promotion exits, current-checkout/artifact-set/gate/capability/path/raw-artifact binding, hashed candidate-bound independent-review ledger records for promoted capabilities, fail-closed CI promotion, accessible canonical web targets, finite Compose resource/capability hardening and deterministic real frontend browser evidence. The latest clean integrated packet at 8216593032800ddafd2d9eb88a55f21298146ddf (tree eaf8aa2a70d81143e2ca3b8896ef704282eaffac) classified STATE_OF_ART_CANDIDATE with verifier JSON exit 1; the local browser runtime claim passed, while release evidence, immutable image proof, live runtime lanes, independent review and human promotion remain blocked, so no Triple AAA claim is made.",
+  "repository_state": "Current Phase 3 source implementation candidate is 02dfbd2875372643c82f861e6178602ce6530d86 (tree aa6e3f6f8e611fe1316afce1acb73d82367db7b0). It binds shared disposable-runtime preflight, canonical Compose targeting, explicit promotion exits, current-checkout/artifact-set/gate/capability/path/raw-artifact binding, hashed candidate-bound independent-review ledger records for promoted capabilities, fail-closed CI promotion, accessible canonical web targets, finite Compose resource/capability hardening and deterministic real frontend browser evidence. The clean control candidate 14116260f727435df05e673949964a2c865ff2f5 (tree 67f91512f394b697ca233fb68c805d3d94494765) revalidated the preserved suite: CVG 382 passed/12 failed/4 errors/17 skipped because the approved ignored corpus is absent, Professor 37/37, Locker 2/2 and legacy frontend smoke 7/7. The latest clean integrated packet at 8216593032800ddafd2d9eb88a55f21298146ddf (tree eaf8aa2a70d81143e2ca3b8896ef704282eaffac) classified STATE_OF_ART_CANDIDATE with verifier JSON exit 1; release evidence, immutable image proof, live runtime lanes, independent review and human promotion remain blocked, so no Triple AAA claim is made.",
   "instruction_scope_refs": [
     ".agent/PLANS.md",
     "cvg-master-rag-v2/AGENTS.md",
@@ -23,8 +23,8 @@
     "docs/plans/phase-3-runtime-evidence-production-promotion.md"
   ],
   "last_gate_record": ".agent/gates/phase-3-2-lab-readiness-implementation-ready.json",
-  "last_event_id": "EVT-PH3-2-FINAL-INTEGRATED-VERIFY-20260910",
-  "state_revision": 250,
+  "last_event_id": "EVT-PH3-2-PRESERVED-SUITE-REVALIDATION-20260910",
+  "state_revision": 251,
   "next_gate": "VERIFIED",
   "active_action_id": "PH3-2-LAB-READINESS:WAIT_RUNTIME",
   "blocked_by": [
@@ -32,5 +32,5 @@
     "Disposable runtime secrets and endpoint authority are unavailable"
   ],
   "human_approval_required": [],
-  "updated_at": "2026-09-10T08:43:51Z"
+  "updated_at": "2026-09-10T08:53:23Z"
 }
