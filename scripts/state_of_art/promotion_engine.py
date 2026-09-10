@@ -99,6 +99,9 @@ NON_PASS = frozenset({FAIL, BLOCKED_EXTERNAL, NOT_RUN, STALE, INVALID})
 _SHA1_RE = re.compile(r"^[0-9a-f]{40}$")
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 _EXTERNAL_ONLY_REJECTIONS = frozenset({"BLOCKED_GATE_REJECTED", "BLOCKED_RUNTIME_REJECTED"})
+_MISSING_EXTERNAL_AUTHORITY_REJECTIONS = frozenset(
+    {"PACKET_REQUIRED_REJECTED", "PACKET_NOT_SEALED_REJECTED", "FINAL_DECISION_REJECTED"}
+)
 _MISSING = object()
 
 
@@ -401,8 +404,19 @@ def evaluate(
     )
     if hard_failure:
         exit_code = EXIT_FAILED
-    elif external_block and not (set(rejection_codes) - _EXTERNAL_ONLY_REJECTIONS):
-        exit_code = EXIT_BLOCKED_EXTERNAL
+    elif external_block:
+        non_external_rejections = set(rejection_codes) - _EXTERNAL_ONLY_REJECTIONS
+        # With no packet at all, the missing seal/final authority are part of
+        # the same external dependency boundary as the unavailable runtime.
+        # A supplied but malformed/untrusted packet remains a real failure and
+        # must not be relabeled as an external block.
+        if packet is None:
+            non_external_rejections -= _MISSING_EXTERNAL_AUTHORITY_REJECTIONS
+        exit_code = (
+            EXIT_BLOCKED_EXTERNAL
+            if not non_external_rejections
+            else EXIT_FAILED
+        )
     elif blockers or rejection_codes:
         exit_code = EXIT_FAILED
     else:

@@ -102,7 +102,7 @@ def test_external_block_returns_candidate_and_exit_two() -> None:
 
     assert result["classification"] == "STATE_OF_ART_CANDIDATE"
     assert result["promotion_allowed"] is False
-    assert result["exit_code"] == promotion_engine.EXIT_FAILED
+    assert result["exit_code"] == promotion_engine.EXIT_BLOCKED_EXTERNAL
     assert "BLOCKED_GATE_REJECTED" in result["rejection_codes"]
 
 
@@ -116,7 +116,7 @@ def test_blocked_foundation_lane_remains_candidate_and_exit_two() -> None:
 
     assert result["classification"] == "STATE_OF_ART_CANDIDATE"
     assert result["promotion_allowed"] is False
-    assert result["exit_code"] == promotion_engine.EXIT_FAILED
+    assert result["exit_code"] == promotion_engine.EXIT_BLOCKED_EXTERNAL
     assert "BLOCKED_GATE_REJECTED" in result["rejection_codes"]
 
 
@@ -130,6 +130,19 @@ def test_local_failure_has_priority_over_external_block() -> None:
     assert result["classification"] == "DEVELOPMENT"
     assert result["exit_code"] == promotion_engine.EXIT_FAILED
     assert "FAILED_GATE_REJECTED" in result["rejection_codes"]
+
+
+def test_malformed_supplied_packet_keeps_external_run_as_failure() -> None:
+    observations = _results()
+    next(item for item in observations if item["id"] == "postgresql-runtime")["status"] = "BLOCKED_EXTERNAL"
+
+    result = promotion_engine.evaluate(
+        observations,
+        packet={"sealed": False, "critical_high_findings": 0, "final_decision": "GO"},
+    )
+
+    assert result["exit_code"] == promotion_engine.EXIT_FAILED
+    assert "PACKET_NOT_SEALED_REJECTED" in result["rejection_codes"]
 
 
 def test_missing_mandatory_lane_is_not_silently_ignored() -> None:
