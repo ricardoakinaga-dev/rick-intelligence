@@ -279,7 +279,7 @@ def _queue_checks(psycopg: object, dsn: str, scope: tuple[str, str, str], run_id
     if len(concurrent_ids) != 2:
         raise RuntimeError("two workers claimed the same job")
     for queue, (_job, lease) in zip((queue_a, queue_b), concurrent_claims):
-        queue.ack(
+        queue.acknowledge(
             lease,
             JobResult(output_refs={"runtime_ref": run_id}, completed_at=time.time()),
             now=time.time(),
@@ -314,7 +314,7 @@ def _queue_checks(psycopg: object, dsn: str, scope: tuple[str, str, str], run_id
         raise RuntimeError("expired lease was not reclaimed by worker B")
     job_b, lease_b = reclaimed[0]
     try:
-        queue_a.ack(
+        queue_a.acknowledge(
             lease_a,
             JobResult(output_refs={"runtime_ref": run_id}, completed_at=time.time()),
             now=time.time(),
@@ -349,7 +349,7 @@ def _queue_checks(psycopg: object, dsn: str, scope: tuple[str, str, str], run_id
     if len(replay_claim) != 1:
         raise RuntimeError("replayed job was not claimable")
     replay_job, replay_lease = replay_claim[0]
-    completed = queue_a.ack(
+    completed = queue_a.acknowledge(
         replay_lease,
         JobResult(output_refs={"runtime_ref": run_id}, completed_at=time.time()),
         now=time.time(),

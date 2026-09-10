@@ -22,6 +22,7 @@ def _load(name: str, filename: str) -> ModuleType:
 @pytest.fixture(params=(
     ("redis", "run_phase3_redis.py", "redis_runtime_gate"),
     ("object-qdrant", "run_phase3_object_qdrant.py", "object_qdrant_runtime_gate"),
+    ("multi-worker", "run_phase3_multi_worker.py", "multi_worker_runtime_gate"),
 ))
 def adapter(request: pytest.FixtureRequest) -> ModuleType:
     _label, filename, _gate_name = request.param

@@ -181,7 +181,7 @@ def _external_lanes() -> tuple[Lane, ...]:
         Lane("release-integrity", None, external=True, detail="clean checkout and current mandatory evidence are required", blocked_if_not_run=True),
         Lane("lab-readiness", None, external=True, detail="approved disposable Docker daemon is unavailable", blocked_if_not_run=True),
         Lane("postgresql-runtime", ("make", "postgres-runtime"), external=True, blocked_return_codes=frozenset({2})),
-        Lane("multi-worker-runtime", None, external=True, detail="two isolated worker processes and crash authority are unavailable", blocked_if_not_run=True),
+        Lane("multi-worker-runtime", ("make", "phase3-multi-worker-runtime"), external=True, detail="two-process worker fencing requires an approved disposable PostgreSQL runtime", blocked_return_codes=frozenset({2})),
         Lane("redis-runtime", ("make", "redis-runtime"), external=True, blocked_return_codes=frozenset({2})),
         Lane("redis-multi-replica", None, external=True, detail="owned Redis replica/failover authority is unavailable", blocked_if_not_run=True),
         Lane("object-qdrant-runtime", ("make", "object-qdrant-runtime"), external=True, blocked_return_codes=frozenset({2})),

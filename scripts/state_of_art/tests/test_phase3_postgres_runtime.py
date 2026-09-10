@@ -51,3 +51,13 @@ def test_output_path_cannot_escape_repository(tmp_path: Path) -> None:
         pass
     else:
         raise AssertionError("path traversal should be rejected")
+
+
+def test_postgres_runtime_gate_uses_canonical_acknowledge_contract() -> None:
+    source = (Path(__file__).parents[2] / "phase11" / "postgres_runtime_gate.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert "queue.ack(" not in source
+    assert "queue_a.ack(" not in source
+    assert source.count(".acknowledge(") == 3
