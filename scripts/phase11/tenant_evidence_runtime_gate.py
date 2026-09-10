@@ -321,6 +321,35 @@ def _leak_free(value: object, marker: str) -> bool:
     return True
 
 
+def _metadata_values_free(value: object, mutation: Mapping[str, object]) -> bool:
+    """Reject a response that reflects a tenant-B metadata probe value.
+
+    A runtime supplied boolean is useful as an attestation, but it cannot by
+    itself prove that the response did not enumerate an object, count, error
+    shape or identifier.  The gate therefore also checks every sensitive
+    mutation value against the bounded response projection.
+    """
+
+    forbidden = tuple(
+        item
+        for key, item in mutation.items()
+        if key not in {"probe_marker", "metadata_field"}
+        and isinstance(item, (str, int, float))
+        and not isinstance(item, bool)
+    )
+
+    def contains(candidate: object) -> bool:
+        if isinstance(candidate, str):
+            return any(str(item) in candidate for item in forbidden)
+        if isinstance(candidate, Mapping):
+            return any(contains(key) or contains(item) for key, item in candidate.items())
+        if isinstance(candidate, Sequence) and not isinstance(candidate, (str, bytes, bytearray)):
+            return any(contains(item) for item in candidate)
+        return any(candidate == item for item in forbidden)
+
+    return not contains(value)
+
+
 async def run_gate(
     runtime_path: str | None = None,
     *,
@@ -370,9 +399,17 @@ async def run_gate(
                     )
                     leak_free = _leak_free(response, marker)
                     observed["leak_free"] = leak_free
+                    metadata_values_free = (
+                        case_id not in _METADATA_CASE_IDS
+                        or _metadata_values_free(response, case["mutation"])
+                    )
+                    observed["metadata_values_free"] = metadata_values_free
                     metadata_ok = (
                         case_id not in _METADATA_CASE_IDS
-                        or observed.get("metadata_leak_free") is True
+                        or (
+                            observed.get("metadata_leak_free") is True
+                            and metadata_values_free
+                        )
                     )
                     timing_ok = (
                         case_id not in _TIMING_CASE_IDS

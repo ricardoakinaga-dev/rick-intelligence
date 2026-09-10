@@ -11,7 +11,13 @@ import pytest
 from scripts.phase11 import tenant_evidence_runtime_gate as gate
 
 
-def _runtime_module(path: Path, *, allow: bool = False, attest: bool = True) -> Path:
+def _runtime_module(
+    path: Path,
+    *,
+    allow: bool = False,
+    attest: bool = True,
+    echo_metadata: bool = False,
+) -> Path:
     path.write_text(
         """
 class Runtime:
@@ -28,11 +34,20 @@ class Runtime:
         response = {"status": "blocked", "allowed": False, "evidence_count": 0, "citation_count": 0}
         if ATTEST:
             response.update({"metadata_leak_free": True, "timing_leak_free": True})
+        if ECHO_METADATA and case["case_id"] in {
+            "tenant-id-enumeration", "document-count-enumeration",
+            "error-shape-differential", "object-existence-enumeration",
+            "job-existence-enumeration", "collection-existence-enumeration",
+            "telemetry-identifier-enumeration",
+        }:
+            response["metadata_echo"] = case["mutation"]
         return response
 
 def create_runtime():
     return Runtime()
-""".replace("ALLOW", repr(allow)).replace("ATTEST", repr(attest)),
+""".replace("ALLOW", repr(allow))
+        .replace("ATTEST", repr(attest))
+        .replace("ECHO_METADATA", repr(echo_metadata)),
         encoding="utf-8",
     )
     return path
@@ -68,6 +83,17 @@ def test_metadata_and_timing_attestations_are_mandatory(tmp_path: Path) -> None:
     assert payload["status"] == gate.FAIL
     failed = {case["case_id"] for case in payload["cases"] if case["result"] == gate.FAIL}
     assert failed == gate._METADATA_CASE_IDS | gate._TIMING_CASE_IDS
+
+
+def test_metadata_probe_values_reflected_by_runtime_fail_closed(tmp_path: Path) -> None:
+    module = _runtime_module(tmp_path / "runtime.py", echo_metadata=True)
+    payload = asyncio.run(
+        gate.run_gate(str(module), output=str(tmp_path / "tenant.json"), root=tmp_path)
+    )
+
+    assert payload["status"] == gate.FAIL
+    failed = {case["case_id"] for case in payload["cases"] if case["result"] == gate.FAIL}
+    assert failed == gate._METADATA_CASE_IDS
 
 
 def test_metadata_case_payloads_have_unique_probe_markers() -> None:
