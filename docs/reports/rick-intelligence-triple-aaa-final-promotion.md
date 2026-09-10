@@ -148,17 +148,19 @@ conservative answer/retry/clarify/abstain/escalate decisions.
 
 The local source corrections at `2238b99ec797b0b2416208dd0e0b02c74897f7d9`,
 `09a467652c3c9ba85770937e3cdce8c39f545e44` and
-`547518d26e6527ccb1803fe7eb0da37cccab3bc3` add a bounded authenticated
+`ee5a88a0728042193d80104fe183586a1b254b37` add a bounded authenticated
 `GET /models` provider-health probe, strict model-list validation, resilient
 delegation, bounded function tools, typed complete/streaming tool calls, JSON
 argument validation, streaming tool-call reassembly and explicit live-health,
 JSON, streaming and normal/streaming tool-call prerequisites in the provider
 runtime gate, including a fail-closed context-budget assertion that rejects an
-over-budget prompt before I/O. The current source candidate has 59 provider tests, 6
-provider-contract tests, 437 API tests, 295 State-of-Art tests and 3
-provider-runtime tests passing. This is local contract evidence only; the
-approved external provider, budget/cancellation behavior, corpus metrics and
-runtime promotion evidence remain open.
+over-budget prompt before I/O. The current source candidate has 63 provider
+tests, 6 provider-contract tests, 437 API tests, 295 State-of-Art tests and 3
+provider-runtime tests passing. The normal JSON-object response mode is also
+validated at the client boundary and rejects invalid semantic content without
+retry. This is local contract evidence only; the approved external provider,
+budget/cancellation behavior, corpus metrics and runtime promotion evidence
+remain open.
 
 ## 18. Observability and SLO
 

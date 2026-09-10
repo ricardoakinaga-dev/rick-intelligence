@@ -33,7 +33,7 @@ preserving the frozen Gauntlet bar, Phase 2 history and legacy repositories.
 - [x] (2026-09-10) Execute the canonical `make up` readiness attempt: Compose rejected the missing required `RICK_WORKER_IMAGE` before starting services, and the Docker daemon remains inaccessible at `/var/run/docker.sock`; no runtime readiness claim or promotion inference was made.
 - [x] (2026-09-10) Close the local provider tool/structured-response boundary at source candidate 09a467652c3c9ba85770937e3cdce8c39f545e44 (tree bdb09d2e7ff379e654eac310f3b9f7503c8685a8): bounded function tools are serialized, complete and streaming tool calls are typed, JSON arguments are validated, and the live gate requires a tool-call contract alongside health/chat/JSON/stream/embedding; provider/API/State-of-Art matrices pass 59/437/295, while approved live provider evidence remains external.
 - [x] (2026-09-10) Bind the clean integrated provider-contract packet at candidate de4c9ff0f2895ebce97026f9686acc545abfe031 (tree 09f00954c902e2efa7db970082f8918bafe670ee): `make validate` passes, the packet returns exit 2 with `STATE_OF_ART_CANDIDATE`, 17 foundation lanes PASS and 24 mandatory lanes BLOCKED_EXTERNAL; promotion remains disallowed.
-- [x] (2026-09-10) Extend the provider runtime gate at source candidate 547518d26e6527ccb1803fe7eb0da37cccab3bc3 (tree 82a0d1ab60ad978c0ffa20e91377580691a151b7): streaming function-tool deltas are reassembled and checked for strict JSON, terminal completion, fragment conflicts and extra indexes; the resilient wrapper rejects an over-budget prompt before I/O; the hermetic gate, provider and contract suites pass 3/59/6, while approved live provider evidence remains external.
+- [x] (2026-09-10) Extend the provider boundary at source candidate ee5a88a0728042193d80104fe183586a1b254b37 (tree 7ddc811003d2d0a954cf3c0a236ba93b883a1185): streaming function-tool deltas are reassembled and checked for strict JSON, terminal completion, fragment conflicts and extra indexes; the resilient wrapper rejects an over-budget prompt before I/O; normal `json_object` responses reject invalid semantic content without retry; the hermetic gate, provider and contract suites pass 3/63/6, while approved live provider evidence remains external.
 - [ ] (2026-09-09) Execute the disposable runtime; currently blocked by Docker daemon access and unresolved external authority.
 - [ ] (2026-09-09) Complete independent runtime/design/security reviews and the human Go/No-Go.
 
@@ -185,8 +185,8 @@ made.
 ## Current candidate closure
 
 The current source implementation candidate is
-547518d26e6527ccb1803fe7eb0da37cccab3bc3 with tree
-82a0d1ab60ad978c0ffa20e91377580691a151b7. It contains the corrected
+ee5a88a0728042193d80104fe183586a1b254b37 with tree
+7ddc811003d2d0a954cf3c0a236ba93b883a1185. It contains the corrected
 PostgreSQL worker gate, canonical two-process Redis/API HTTP gate, strict
 release artifact postconditions and manifest consistency checks, plus bounded
 same-run CI envelopes with redacted raw artifacts, exact workflow/run/ref/SHA
@@ -195,11 +195,11 @@ authenticated promotion packet sealing, scoped frontend-lane projection,
 checkout-bound frontend evidence, reproducible release-test dependencies and
 a bounded, cancellation-aware synchronous provider-embedding bridge, plus
 bounded provider function-tool, JSON and streaming-call contracts and a
-streaming function-tool reassembly assertion and context-budget assertion in
-the live gate. The final
+streaming function-tool reassembly assertion, context-budget assertion in the
+live gate and normal JSON-object response validation. The final
 documentation/control-plane follow-up is bound to the resulting clean
 checkout, while live provider/runtime evidence remains external.
-The provider, API and State-of-Art suites have 59, 437 and 295 passing tests
+The provider, API and State-of-Art suites have 63, 437 and 295 passing tests
 respectively and the relevant static checks pass; the full preserved `make test` remains incomplete
 because the CVG dataset and local Playwright browser are unavailable. The
 prior integrated verifier artifact is stale after this source change and is
