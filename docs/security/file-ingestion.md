@@ -12,6 +12,9 @@ Validation is fail-closed:
   containing both `[Content_Types].xml` and `word/document.xml`. Text files
   must not contain NUL bytes, an obvious binary signature, or an excessive
   control-byte stream.
+- UTF-8 is the only accepted text encoding. Invalid byte sequences are
+  rejected with a bounded `validation_error`; parsers never fall back to a
+  permissive single-byte decoding that could silently change document text.
 - A supplied MIME value is normalized by removing parameters and must belong
   to the extension allowlist. Markdown accepts `text/markdown` and
   `text/plain`; text accepts `text/plain`; PDF accepts `application/pdf`; and

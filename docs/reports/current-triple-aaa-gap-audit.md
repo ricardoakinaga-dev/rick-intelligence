@@ -727,3 +727,20 @@ State-of-Art suite **295**; compilation and `git diff --check` pass. This is
 local fail-closed evidence only. The approved disposable runtime, malicious
 corpus, distributed process-kill drill, independent review and human Go/No-Go
 remain unavailable; promotion remains disallowed.
+
+## 35. Invalid text encoding closure — 2026-09-10
+
+Source implementation candidate `bacfc9ee569e07357d3412f3588f4a7bda554c73`
+(tree `4c05c1348224f1cefe845d891d62634d9981cc9b`) closes a concrete file
+security gap: TXT parsing no longer accepts malformed UTF-8 by falling back to
+Latin-1, and Markdown parsing converts decoder failures into the same bounded
+`validation_error` contract. A focused adversarial test covers both text
+formats, while the shared bounded decoder keeps attacker-controlled exception
+details out of the public error.
+
+The ingestion security/admission/full regression passes **102**, focused
+file-security/runtime adapter tests pass **79**, the API matrix **437**, and
+the State-of-Art suite **295**; compilation and `git diff --check` pass. This
+is local file-security evidence only. The approved disposable runtime,
+malicious corpus, distributed process-kill drill, independent review, sealed
+packet and human Go/No-Go remain unavailable; promotion remains disallowed.

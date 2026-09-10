@@ -14,7 +14,7 @@
   "active_execplan": ".agent/plans/phase-3-runtime-evidence-production-promotion.md",
   "active_task": "PH3-2-LAB-READINESS",
   "verification_state": "PARTIAL",
-  "repository_state": "Current source candidate is 19ca87d987a2348a0be6346221bb1d2b61d2b831 (tree a9bc35f7809ed7529c9e8f46ce2727cfecfa96dc); the prior clean integrated packet for 28a3dae3308849da4494219811c7c7e832496dd0 is stale after this source change. It includes the corrected PostgreSQL worker gate, canonical two-process Redis/API HTTP gate, strict release artifact postconditions and manifest consistency checks, bounded same-run CI envelopes with redacted raw artifacts, exact workflow/run/ref/SHA provenance, runtime-primary supply-chain binding, frontend Phase 3 transport, authenticated promotion packet sealing, scoped frontend-lane projection, checkout-bound frontend evidence, reproducible release-test dependencies, a bounded cancellation-aware synchronous provider-embedding bridge, a bounded authenticated live provider-health probe, bounded function-tool/JSON/streaming tool-call contracts, streaming tool-call and streaming JSON reassembly, context-budget rejection before I/O, normal JSON-object response validation without retry and Professor max_tool_calls enforcement across normal/fallback/streaming paths, including immediate rejection before a streamed content delta is published, plus strict runtime types for integer budgets and timeout booleans, observability redaction of escaped URL credentials/queries plus inline assignment, bearer-header, nested-JSON and CLI-value secrets, and schema-checked parser output with bounded auxiliary metadata and a hard serialized-result ceiling before child transport. Clean provider/Professor/API/State-of-Art regressions pass 64, 36, 437 and 295 tests respectively; the next integrated packet must bind this candidate and remains expected to classify STATE_OF_ART_CANDIDATE with external blockers. No State of Art, AAA or Triple AAA promotion claim is made.",
+  "repository_state": "Current source candidate is bacfc9ee569e07357d3412f3588f4a7bda554c73 (tree 4c05c1348224f1cefe845d891d62634d9981cc9b); it includes schema-checked parser output, bounded serialized child transport, fail-closed invalid UTF-8 rejection for TXT and Markdown, and the prior provider, Professor, observability, API and release-boundary hardening. Clean local evidence currently passes ingestion 102, focused file-security/runtime 79, provider 64, Professor 36, API 437 and State-of-Art 295 tests; the next integrated packet must bind this candidate and remains expected to classify STATE_OF_ART_CANDIDATE with external blockers. No State of Art, AAA or Triple AAA promotion claim is made.",
   "instruction_scope_refs": [
     ".agent/PLANS.md",
     "cvg-master-rag-v2/AGENTS.md",
@@ -23,8 +23,8 @@
     "docs/plans/phase-3-runtime-evidence-production-promotion.md"
   ],
   "last_gate_record": ".agent/gates/phase-3-2-lab-readiness-implementation-ready.json",
-  "last_event_id": "EVT-PH3-2-INGESTION-PARSER-BOUNDARY-20260910",
-  "state_revision": 272,
+  "last_event_id": "EVT-PH3-2-INGESTION-INVALID-UNICODE-20260910",
+  "state_revision": 273,
   "next_gate": "VERIFIED",
   "active_action_id": "PH3-2-LAB-READINESS:WAIT_RUNTIME",
   "blocked_by": [
@@ -32,5 +32,5 @@
     "Disposable runtime secrets and endpoint authority are unavailable"
   ],
   "human_approval_required": [],
-  "updated_at": "2026-09-10T13:25:45Z"
+  "updated_at": "2026-09-10T13:34:04Z"
 }
