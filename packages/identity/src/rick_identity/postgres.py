@@ -32,6 +32,14 @@ class PostgresIdentityError(RuntimeError):
         super().__init__(self.code)
 
 
+MAX_IDENTITY_JSON_BYTES = 64 * 1024
+_INVALID_JSON = object()
+
+
+def _reject_json_constant(_value: str) -> object:
+    raise ValueError("non-finite JSON constants are not allowed")
+
+
 def _row_dict(cursor: object, row: object) -> dict[str, object]:
     if isinstance(row, Mapping):
         return {str(key): value for key, value in row.items()}
@@ -41,15 +49,85 @@ def _row_dict(cursor: object, row: object) -> dict[str, object]:
 
 
 def _json(value: object, default: object) -> object:
-    if isinstance(value, (dict, list)):
-        return value
+    parsed = value
     if isinstance(value, str):
         try:
-            parsed = json.loads(value)
-        except (TypeError, ValueError, json.JSONDecodeError):
+            if len(value.encode("utf-8")) > MAX_IDENTITY_JSON_BYTES:
+                return default
+            parsed = json.loads(value, parse_constant=_reject_json_constant)
+        except (TypeError, UnicodeError, ValueError, RecursionError):
             return default
-        return parsed
-    return default
+    if not isinstance(parsed, (dict, list)):
+        return default
+    try:
+        encoded = json.dumps(
+            parsed,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        )
+        if len(encoded.encode("utf-8")) > MAX_IDENTITY_JSON_BYTES:
+            return default
+    except (TypeError, UnicodeError, ValueError, OverflowError, RecursionError):
+        return default
+    return parsed
+
+
+def _json_text(value: object) -> str:
+    try:
+        encoded = json.dumps(
+            value,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        )
+    except (TypeError, ValueError, OverflowError, RecursionError):
+        raise PostgresIdentityError("invalid_input") from None
+    if len(encoded.encode("utf-8")) > MAX_IDENTITY_JSON_BYTES:
+        raise PostgresIdentityError("invalid_input")
+    return encoded
+
+
+def _bounded_text(value: object, *, maximum: int) -> bool:
+    return (
+        isinstance(value, str)
+        and bool(value.strip())
+        and len(value) <= maximum
+        and not any(ord(char) < 0x20 or ord(char) == 0x7F for char in value)
+    )
+
+
+def _bounded_text_list(value: object, *, maximum_items: int, maximum_item_length: int) -> bool:
+    return (
+        isinstance(value, list)
+        and len(value) <= maximum_items
+        and all(_bounded_text(item, maximum=maximum_item_length) for item in value)
+    )
+
+
+def _valid_authorization_snapshot(value: Mapping[str, object]) -> bool:
+    if "permissions" in value and not _bounded_text_list(
+        value["permissions"], maximum_items=256, maximum_item_length=128,
+    ):
+        return False
+    if "allowed_collection_ids" in value and not _bounded_text_list(
+        value["allowed_collection_ids"], maximum_items=128, maximum_item_length=256,
+    ):
+        return False
+    if "authorization_snapshot_version" in value:
+        version = value["authorization_snapshot_version"]
+        if isinstance(version, bool) or not isinstance(version, int) or not 1 <= version <= 16:
+            return False
+    if "authorization_state" in value and value["authorization_state"] not in {
+        "AUTHORITATIVE", "MIGRATED", "LEGACY_UNMIGRATED",
+    }:
+        return False
+    for name, maximum in (("email", 256), ("role", 64), ("canonical_role", 64)):
+        if name in value and not _bounded_text(value[name], maximum=maximum):
+            return False
+    return True
 
 
 def _epoch(value: object) -> float | None:
@@ -158,7 +236,11 @@ class PostgresUserStore(_PostgresStoreBase):
     """
 
     @staticmethod
-    def _record(row: Mapping[str, object]) -> dict[str, object]:
+    def _record(row: Mapping[str, object]) -> dict[str, object] | None:
+        permission_overrides = _json(row.get("permission_overrides"), _INVALID_JSON)
+        authorized_collection_ids = _json(row.get("authorized_collection_ids"), _INVALID_JSON)
+        if not isinstance(permission_overrides, Mapping) or not isinstance(authorized_collection_ids, list):
+            return None
         record: dict[str, object] = {
             "user_id": row.get("user_id"),
             "external_subject": row.get("external_subject"),
@@ -175,8 +257,8 @@ class PostgresUserStore(_PostgresStoreBase):
                 "workspace_id": row.get("workspace_id"),
                 "role": row.get("role"),
                 "membership_status": row.get("membership_status", "active"),
-                "permission_overrides": _json(row.get("permission_overrides"), {"add": [], "remove": []}),
-                "authorized_collection_ids": _json(row.get("authorized_collection_ids"), []),
+                "permission_overrides": permission_overrides,
+                "authorized_collection_ids": authorized_collection_ids,
             })
         return record
 
@@ -269,7 +351,7 @@ class PostgresUserStore(_PostgresStoreBase):
         result: dict[str, dict] = {}
         for row in rows:
             record = self._record(row)
-            if isinstance(record.get("user_id"), str):
+            if record is not None and isinstance(record.get("user_id"), str):
                 result.setdefault(record["user_id"], record)
         return list(result.values())
 
@@ -284,6 +366,10 @@ class PostgresUserStore(_PostgresStoreBase):
             raise PostgresIdentityError("invalid_input")
         overrides = record.get("permission_overrides", {"add": [], "remove": []})
         grants = record.get("authorized_collection_ids", [])
+        if not isinstance(overrides, Mapping) or not isinstance(grants, (list, tuple)):
+            raise PostgresIdentityError("invalid_input")
+        overrides_json = _json_text(overrides)
+        grants_json = _json_text(grants)
         password_hash = record.get("password_hash")
         if password_hash is not None and not isinstance(password_hash, str):
             raise PostgresIdentityError("invalid_input")
@@ -308,8 +394,7 @@ class PostgresUserStore(_PostgresStoreBase):
                     permission_overrides = EXCLUDED.permission_overrides,
                     authorized_collection_ids = EXCLUDED.authorized_collection_ids, updated_at = NOW()
             """, (tenant, user_id, workspace, role, "active" if status == "active" else "disabled",
-                   json.dumps(overrides, ensure_ascii=False, sort_keys=True),
-                   json.dumps(grants, ensure_ascii=False, sort_keys=True)))
+                   overrides_json, grants_json))
 
 
 class PostgresSessionStore(_PostgresStoreBase):
@@ -342,11 +427,13 @@ class PostgresSessionStore(_PostgresStoreBase):
             )
             if record.get(key) is not None
         }
-        return json.dumps(payload, ensure_ascii=False, sort_keys=True)
+        return _json_text(payload)
 
     @staticmethod
-    def _record(row: Mapping[str, object]) -> dict[str, object]:
-        snapshot = _json(row.get("authorization_snapshot"), {})
+    def _record(row: Mapping[str, object]) -> dict[str, object] | None:
+        snapshot = _json(row.get("authorization_snapshot"), _INVALID_JSON)
+        if not isinstance(snapshot, Mapping) or not _valid_authorization_snapshot(snapshot):
+            return None
         result: dict[str, object] = {
             "session_id": row.get("session_id"),
             "user_id": row.get("user_id"),
@@ -434,7 +521,12 @@ class PostgresSessionStore(_PostgresStoreBase):
         with self._session() as (_connection, cursor):
             self._execute(cursor, query, params)
             rows = self._fetchall(cursor)
-        return [self._record(row) for row in rows]
+        result: list[dict] = []
+        for row in rows:
+            record = self._record(row)
+            if record is not None:
+                result.append(record)
+        return result
 
     def revoke_user(self, user_id: str, *, tenant_id: str | None = None, reason: str = "manual_revoke") -> int:
         user_id = _required(user_id)
@@ -470,7 +562,12 @@ class PostgresSessionStore(_PostgresStoreBase):
         with self._session() as (_connection, cursor):
             self._execute(cursor, query, params)
             rows = self._fetchall(cursor)
-        return [self._record(row) for row in rows]
+        result: list[dict] = []
+        for row in rows:
+            record = self._record(row)
+            if record is not None:
+                result.append(record)
+        return result
 
     def revoke_session_by_id(self, session_id: str, *, tenant_id: str, reason: str = "manual_revoke") -> int:
         session_id = _required(session_id)

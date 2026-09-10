@@ -119,6 +119,48 @@ def session_row(**overrides):
     return row
 
 
+def test_persisted_identity_json_fails_closed_for_oversized_and_nonfinite_snapshots() -> None:
+    oversized = '{"permissions":["chat.query"]}' + (" " * (64 * 1024))
+    oversized_connection = Connection([("token_hash", [session_row(authorization_snapshot=oversized)], 1)])
+    assert PostgresSessionStore(factory_for(oversized_connection), ttl_seconds=600).get("bearer") is None
+
+    nan_connection = Connection([("token_hash", [session_row(authorization_snapshot='{"permissions":[NaN]}')], 1)])
+    assert PostgresSessionStore(factory_for(nan_connection), ttl_seconds=600).get("bearer") is None
+
+    malformed_connection = Connection([("token_hash", [session_row(authorization_snapshot='{"permissions":1}')], 1)])
+    assert PostgresSessionStore(factory_for(malformed_connection), ttl_seconds=600).get("bearer") is None
+
+
+def test_persisted_user_acl_json_fails_closed_instead_of_widening_scope() -> None:
+    corrupt = '{"add":[],"remove":[]}' + (" " * (64 * 1024))
+    connection = Connection([("WHERE u.user_id", [user_row(authorized_collection_ids=corrupt)], 1)])
+    assert PostgresUserStore(factory_for(connection)).get_by_id_for_tenant("user-a", "tenant-a") is None
+
+
+def test_identity_json_writes_reject_nonfinite_and_oversized_values_before_db() -> None:
+    def unexpected_connection():
+        raise AssertionError("invalid JSON must be rejected before opening a connection")
+
+    user_store = PostgresUserStore(unexpected_connection)
+    with pytest.raises(PostgresIdentityError):
+        user_store.save({
+            "user_id": "user-a", "email": "user-a@example.test", "tenant_id": "tenant-a",
+            "role": "VETERINARIAN", "permission_overrides": {"add": [float("nan")]},
+        })
+    with pytest.raises(PostgresIdentityError):
+        user_store.save({
+            "user_id": "user-a", "email": "user-a@example.test", "tenant_id": "tenant-a",
+            "role": "VETERINARIAN", "authorized_collection_ids": ["x" * (64 * 1024)],
+        })
+
+    session_store = PostgresSessionStore(unexpected_connection, ttl_seconds=600)
+    with pytest.raises(PostgresIdentityError):
+        session_store.create({
+            "user_id": "user-a", "tenant_id": "tenant-a", "workspace_id": "workspace-a",
+            "permissions": [float("nan")],
+        })
+
+
 def test_user_lookup_carries_tenant_scope_and_redacts_nothing_into_query() -> None:
     connection = Connection([("WHERE u.user_id", [user_row()], 1)])
     store = PostgresUserStore(factory_for(connection))
