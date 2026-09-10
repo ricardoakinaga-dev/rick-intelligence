@@ -224,6 +224,22 @@ provenance, independent-review, sealing and human-authority lanes remain
 `BLOCKED_EXTERNAL`. The packet itself is the only authority for its exact
 identity fields; no State of Art, AAA or Triple AAA promotion claim is made.
 
+## 24. Reproducible release-test environment — 2026-09-10
+
+Candidate `39c391b3d8ee252f88f1474df39e257a92258ec7` (tree
+`ec80ca7ff803c216863c0a02bb4283fcff1732f9`) closes a CI reproducibility
+defect found by comparing the remote run with a clean local venv. The release
+workflow now declares the internal package path as one contiguous `PYTHONPATH`
+and pins the provider test dependencies (`httpx` and `pydantic`) alongside
+the existing pytest/cryptography requirements. The canonical quality
+workflow received the same no-whitespace path correction.
+
+The exact clean venv State-of-Art suite passes locally, and the same-SHA
+remote [State of Art / release integrity run #62](https://github.com/ricardoakinaga-dev/rick-intelligence/actions/runs/34467118165)
+reaches the explicit root release checks; its final exit `2` is the typed
+`BLOCKED_EXTERNAL` result from unavailable runtime/release authority, not a
+test failure. This proves CI test reproducibility, not runtime promotion.
+
 ## 5. Priority and dependency order
 
 ### P0 — release truth and runtime foundation

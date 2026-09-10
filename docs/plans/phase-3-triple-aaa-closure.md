@@ -352,3 +352,13 @@ The regenerated packet remains diagnostic `STATE_OF_ART_CANDIDATE` / exit
 runtime, image provenance, independent review, sealing and human authority
 remain externally blocked. Any later documentation commit requires one more
 integrated run before the packet can be treated as current.
+
+## 22. Reproducible release-test environment — 2026-09-10
+
+Candidate `39c391b3d8ee252f88f1474df39e257a92258ec7` makes the State-of-Art
+release workflow executable in the same dependency boundary it declares:
+`httpx==0.27.0` and `pydantic==2.6.1` are pinned for provider contract tests,
+and both canonical workflows use a contiguous internal-package `PYTHONPATH`.
+The full clean venv State-of-Art suite passes; the same-SHA remote run reaches
+release checks and returns `2` only because runtime/release authority remains
+externally blocked. This is CI reproducibility evidence, not promotion.

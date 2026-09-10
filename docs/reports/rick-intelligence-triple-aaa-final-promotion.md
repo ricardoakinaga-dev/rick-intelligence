@@ -59,6 +59,12 @@ scheduled, but a skipped lane remains non-promotable. The release job must
 consume same-run, commit-bound artifacts and return `1` or `2` rather than
 silently skipping an unmet gate.
 
+The State-of-Art release test environment now pins the provider test
+dependencies and exports a contiguous internal-package `PYTHONPATH`. The
+same-SHA remote run reaches the explicit release checks; its exit `2` is the
+expected external-block classification, while the pinned test suite itself
+passes in a clean venv.
+
 ## 8. Disposable production-like lab
 
 The lab target is Postgres, Redis, Qdrant, S3-compatible object storage, API,
