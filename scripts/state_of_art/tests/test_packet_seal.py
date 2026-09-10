@@ -42,6 +42,23 @@ def test_seal_round_trip_and_mutation_detection() -> None:
     assert "seal.digest does not match packet bytes" in errors
 
 
+def test_expected_payload_schema_is_checked_when_requested() -> None:
+    sealed = _seal({"schema_version": "state-of-art-triple-aaa-verify.v2"})
+
+    assert verify_seal(
+        sealed,
+        trusted_public_keys=TRUST_STORE,
+        expected_payload_schema="state-of-art-triple-aaa-verify.v2",
+    ) == (True, ())
+    valid, errors = verify_seal(
+        sealed,
+        trusted_public_keys=TRUST_STORE,
+        expected_payload_schema="other-schema.v1",
+    )
+    assert valid is False
+    assert "payload.schema_version" in errors
+
+
 def test_seal_rejects_missing_or_untrusted_authority() -> None:
     sealed = _seal({"classification": "TRIPLE_AAA"})
 

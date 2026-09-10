@@ -104,6 +104,7 @@ def _results(*, status: str = "PASS", external: bool = False) -> list[dict[str, 
 def _sealed_packet(results: list[dict[str, object]]) -> dict[str, object]:
     return seal_payload(
         {
+            "schema_version": promotion_engine.PROMOTION_PACKET_SCHEMA,
             "sealed": True,
             "candidate": {
                 "commit_sha": "a" * 40,
@@ -126,6 +127,22 @@ def _sealed_packet(results: list[dict[str, object]]) -> dict[str, object]:
         key_id="fixture-release-key",
         signing_key=FIXTURE_PRIVATE_KEY,
     )
+
+
+def test_sealed_packet_requires_current_payload_schema() -> None:
+    observations = _results()
+    packet = _sealed_packet(observations)
+    packet.pop("schema_version")
+
+    result = promotion_engine.evaluate(
+        observations,
+        packet=packet,
+        checkout=FIXTURE_CHECKOUT,
+        trusted_public_keys=FIXTURE_TRUST_STORE,
+    )
+
+    assert result["promotion_allowed"] is False
+    assert "PACKET_SCHEMA_REJECTED" in result["rejection_codes"]
 
 
 def test_all_required_lanes_and_authority_promote() -> None:

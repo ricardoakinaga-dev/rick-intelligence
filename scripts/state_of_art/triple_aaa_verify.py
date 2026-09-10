@@ -36,6 +36,7 @@ ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_OUTPUT = ".runtime/phase-3/triple-aaa-verify.json"
 SOURCE_PROMPT = "docs/prompts/triple-aaa-runtime-closure-2026-09-10.txt"
 QUALITY_BAR = "docs/reports/current-triple-aaa-quality-bar-v1.json"
+PACKET_SCHEMA = "state-of-art-triple-aaa-verify.v2"
 PHASE3_EVIDENCE_ARTIFACT = ".runtime/phase-3/capability-matrix.json"
 RELEASE_EVIDENCE_ARTIFACT = "docs/progress/release-evidence.json"
 FRONTEND_RUNTIME_ARTIFACT = ".runtime/phase-3/frontend-supply-runtime-evidence.json"
@@ -559,7 +560,11 @@ def _load_packet(
         return None, {"supplied": True, "path": str(path.relative_to(ROOT)), "status": "UNREADABLE", "error": type(exc).__name__}
     if not isinstance(value, dict):
         return None, {"supplied": True, "path": str(path.relative_to(ROOT)), "status": "INVALID_JSON"}
-    valid, errors = packet_seal.verify_seal(value, trusted_public_keys=trusted_public_keys)
+    valid, errors = packet_seal.verify_seal(
+        value,
+        trusted_public_keys=trusted_public_keys,
+        expected_payload_schema=PACKET_SCHEMA,
+    )
     seal = value.get("seal")
     return value, {
         "supplied": True,
@@ -595,7 +600,11 @@ def _packet_matches_current(
 ) -> bool:
     if packet is None:
         return False
-    valid, _errors = packet_seal.verify_seal(packet, trusted_public_keys=trusted_public_keys)
+    valid, _errors = packet_seal.verify_seal(
+        packet,
+        trusted_public_keys=trusted_public_keys,
+        expected_payload_schema=PACKET_SCHEMA,
+    )
     if not valid or packet.get("sealed") is not True:
         return False
     try:
@@ -790,7 +799,7 @@ def main(argv: list[str] | None = None) -> int:
         trusted_public_keys=trusted_public_keys,
     )
     payload: dict[str, object] = {
-        "schema_version": "state-of-art-triple-aaa-verify.v2",
+        "schema_version": PACKET_SCHEMA,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "verdict": derived["classification"],
         "classification": derived["classification"],

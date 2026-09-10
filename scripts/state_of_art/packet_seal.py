@@ -212,6 +212,7 @@ def verify_seal(
     *,
     trusted_public_keys: Mapping[str, object] | None,
     now: datetime | None = None,
+    expected_payload_schema: str | None = None,
 ) -> tuple[bool, tuple[str, ...]]:
     """Verify packet bytes, seal metadata and an explicitly trusted signature."""
 
@@ -256,6 +257,8 @@ def verify_seal(
         errors.append("seal.immutable")
     if payload.get("sealed") is not True:
         errors.append("payload.sealed")
+    if expected_payload_schema is not None and payload.get("schema_version") != expected_payload_schema:
+        errors.append("payload.schema_version")
 
     digest = seal.get("digest")
     if not isinstance(digest, str) or _DIGEST_RE.fullmatch(digest) is None:

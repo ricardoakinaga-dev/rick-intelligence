@@ -374,3 +374,23 @@ runtime packet remains responsible for the named PostgreSQL/worker, Redis,
 Qdrant and object-storage lanes. This makes the nightly status a truthful
 summary boundary; it does not create Docker, service, provider, chaos, soak or
 performance evidence in this environment.
+
+## 79. Process isolation and current-plan reconciliation — 2026-09-10
+
+The ingestion boundary now exports `ProcessIsolatedExecutor` as the canonical
+hard parser boundary while retaining `ProcessParserRunner` as a compatibility
+name. A fresh child uses strict bounded JSON transport, hard wall-clock kill,
+best-effort POSIX resource limits and discarded native stdout/stderr, so parser
+diagnostics cannot become an unbounded worker log channel. The local default
+remains cooperative/in-process; this does not establish hostile-corpus runtime
+evidence in an approved isolated deployment.
+
+The two 2026-09-09 Phase 3 plans now state explicitly that their historical
+section and scorecard references are predecessor scope. The archived 2026-09-10
+prompt, this audit, the 11-row capability matrix and the 29-section promotion
+report are the active requirement sources.
+
+Promotion packet validation also requires the signed body to carry the current
+`state-of-art-triple-aaa-verify.v2` payload schema. A valid seal over a packet
+with an omitted or foreign body schema is rejected before promotion; no external
+packet is available in this environment.

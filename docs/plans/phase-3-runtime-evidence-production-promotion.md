@@ -8,6 +8,12 @@
 **Living ExecPlan:** [`../../.agent/plans/phase-3-runtime-evidence-production-promotion.md`](../../.agent/plans/phase-3-runtime-evidence-production-promotion.md)
 **Current source implementation candidate:** `ea6fd613ffcc8b18fc11d55941266e28387f9b92` (tree `c8ae0fb2614bee70a4e096c6676c8e4d1a9f782e`)
 
+**Scope note (2026-09-10):** This plan preserves the 2026-09-09 runtime
+evidence predecessor. Its source prompt and historical section/scorecard
+counts are not the current requirement set; use the archived
+2026-09-10 runtime-closure prompt and its current audit, matrix and promotion
+report for the active candidate.
+
 ## Purpose
 
 Raise the current local `STATE_OF_ART_CANDIDATE` to a promotion decision only
@@ -52,10 +58,10 @@ requires:
 - zero unresolved Critical/High finding at final review and a human Go/No-Go
   bound to the exact artifact and rollback owner.
 
-The final required report is
+The final required report for the predecessor prompt is
 [`docs/reports/state-of-art-triple-aaa-promotion-report.md`](../reports/state-of-art-triple-aaa-promotion-report.md).
-It will contain the 26 sections and 25-dimension scorecard named in the
-source prompt. Until that report has current evidence, the candidate is not
+It contains the predecessor prompt's 26 sections and 25-dimension scorecard.
+The current report supersedes those counts. Until the active report has current evidence, the candidate is not
 AAA or Triple AAA.
 
 ## Evidence architecture

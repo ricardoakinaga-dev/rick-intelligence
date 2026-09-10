@@ -171,8 +171,12 @@ live latency.
 
 The source includes bounded parsers, strict JSON boundaries, redaction,
 fail-closed configuration, non-root/read-only Compose intent and explicit
-credential inputs. Hostile-file runtime, live tenant negatives, image scanning,
-signature/provenance inspection and a fresh full security review remain open.
+credential inputs. `ProcessIsolatedExecutor` now provides the canonical hard
+parser boundary with bounded JSON transport, wall-clock kill, best-effort
+resource limits and discarded native stdout/stderr; the in-process runner stays
+the explicit local compatibility default. Hostile-file runtime, live tenant
+negatives, image scanning, signature/provenance inspection and a fresh full
+security review remain open.
 
 ## 18. Observability
 

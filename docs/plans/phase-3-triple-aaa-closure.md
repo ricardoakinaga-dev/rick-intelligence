@@ -7,6 +7,11 @@
 **Source implementation candidate:** `09a467652c3c9ba85770937e3cdce8c39f545e44` / tree `bdb09d2e7ff379e654eac310f3b9f7503c8685a8`
 **Entry audit:** [`current-triple-aaa-gap-audit.md`](../reports/current-triple-aaa-gap-audit.md)
 
+**Scope note (2026-09-10):** This document is the predecessor plan for the
+2026-09-09 prompt. The supplied 2026-09-10 runtime-closure prompt supersedes
+its section and scorecard counts; the canonical current audit, capability
+matrix and promotion report are the corresponding sources for this run.
+
 ## 1. Outcome and constraints
 
 Transform RICK Intelligence from `STATE_OF_ART_CANDIDATE` into a platform
@@ -34,7 +39,7 @@ evidence is current, zero Critical/High findings remain, all named independent
 reviews have attempted rejection, and a sealed packet has an authorized final
 Go/No-Go for the same candidate.
 
-The final scorecard has the prompt's 25 dimensions, with overall score at
+The predecessor prompt's final scorecard has 25 dimensions, with overall score at
 least 96 as an advisory threshold. A score cannot override a mandatory
 blocker. `TRIPLE_AAA` is not declared while any required evidence is missing,
 blocked, stale or unreviewed.
@@ -156,7 +161,7 @@ State of Art, AAA or Triple AAA promotion.
 Every interrupted slice is recovered from actual Git, process, artifact and
 service state. Previous failures stay in append-only history. A later pass does
 not erase an unexplained failure; it creates a new exact run. The final report
-must contain the prompt's 28 sections, 25-dimension scorecard, all mandatory
+must contain the predecessor prompt's 28 sections and 25-dimension scorecard, all mandatory
 gate results, remaining risks and a single executable next action.
 
 The current next action is to execute the disposable Compose/runtime gates from

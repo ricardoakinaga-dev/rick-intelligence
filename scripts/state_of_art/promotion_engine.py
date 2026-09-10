@@ -39,6 +39,7 @@ CLASSIFICATIONS = (
     "AAA",
     "TRIPLE_AAA",
 )
+PROMOTION_PACKET_SCHEMA = "state-of-art-triple-aaa-verify.v2"
 
 FOUNDATION_LANES = (
     "control-plane",
@@ -275,6 +276,10 @@ def _packet_rejections(
         return ["PACKET_REQUIRED_REJECTED", "PACKET_NOT_SEALED_REJECTED", "FINAL_DECISION_REJECTED"], [
             "packet is required for promotion"
         ]
+
+    if packet.get("schema_version") != PROMOTION_PACKET_SCHEMA:
+        codes.add("PACKET_SCHEMA_REJECTED")
+        errors.append("sealed packet payload schema is not the current verifier schema")
 
     valid, seal_errors = packet_seal.verify_seal(packet, trusted_public_keys=trusted_public_keys)
     if not valid:
