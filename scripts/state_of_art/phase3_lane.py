@@ -37,6 +37,70 @@ DEFAULT_TIMEOUT_SECONDS = {
     "soak": 3_600,
 }
 
+# These are part of the observation contract rather than suggestions for a
+# harness author.  A zero-exit command with only one happy-path measurement is
+# not enough evidence for the prompt's performance, chaos or soak gates.
+PERFORMANCE_CONCURRENCY_LEVELS = (1, 10, 50, 100)
+PERFORMANCE_WORKLOADS = (
+    "api-only",
+    "retrieval",
+    "chat",
+    "ingestion",
+    "worker-throughput",
+)
+PERFORMANCE_METRICS = (
+    "p50_ms",
+    "p95_ms",
+    "p99_ms",
+    "throughput",
+    "error_rate",
+    "cpu_percent",
+    "ram_bytes",
+    "queue_depth",
+)
+CHAOS_FAULTS = (
+    "kill-worker",
+    "kill-worker-a-only",
+    "kill-redis",
+    "restart-redis",
+    "kill-qdrant",
+    "restart-qdrant",
+    "postgres-outage",
+    "s3-outage",
+    "provider-timeout",
+    "provider-429",
+    "provider-500",
+    "network-delay",
+    "connection-reset",
+)
+CHAOS_ASSERTIONS = (
+    "no_silent_corruption",
+    "no_duplicate_publish",
+    "bounded_retries",
+    "circuit_breaker_correct",
+    "eventual_recovery",
+)
+SOAK_PROFILES = ("short", "extended")
+SOAK_METRICS = (
+    "memory_bytes",
+    "threads",
+    "processes",
+    "connections",
+    "queue_growth",
+    "latency_drift_ms",
+    "retry_storms",
+    "worker_starvation",
+    "file_descriptor_leaks",
+)
+PERFORMANCE_BASELINE_FIELDS = (
+    "hardware",
+    "container_limits",
+    "dataset",
+    "provider",
+    "model",
+    "versions",
+)
+
 
 def _checkout(root: Path) -> dict[str, object]:
     def run(*args: str) -> str:
@@ -75,6 +139,95 @@ def _safe_number(value: object) -> int | float | None:
     if not math.isfinite(float(value)):
         return None
     return value
+
+
+def _require_nonempty(value: object) -> bool:
+    if isinstance(value, str):
+        return bool(value.strip())
+    if isinstance(value, Mapping):
+        return bool(value)
+    return value is not None
+
+
+def _validate_performance_observation(
+    runtime: Mapping[str, object], measurements: Mapping[str, object]
+) -> str | None:
+    baseline = runtime.get("baseline")
+    if not isinstance(baseline, Mapping):
+        return "performance observation has no baseline metadata"
+    missing_baseline = [field for field in PERFORMANCE_BASELINE_FIELDS if not _require_nonempty(baseline.get(field))]
+    if missing_baseline:
+        return "performance baseline metadata is incomplete: " + ", ".join(missing_baseline)
+    rows = measurements.get("results")
+    if not isinstance(rows, list):
+        return "performance observation has no workload/concurrency results"
+    expected = {(workload, concurrency) for workload in PERFORMANCE_WORKLOADS for concurrency in PERFORMANCE_CONCURRENCY_LEVELS}
+    observed: set[tuple[str, int]] = set()
+    for row in rows:
+        if not isinstance(row, Mapping):
+            return "performance result is not an object"
+        workload = row.get("workload")
+        concurrency = row.get("concurrency")
+        key = (workload, concurrency)
+        if workload not in PERFORMANCE_WORKLOADS or type(concurrency) is not int or concurrency not in PERFORMANCE_CONCURRENCY_LEVELS:
+            return "performance result has an unsupported workload or concurrency"
+        if key in observed:
+            return "performance result has duplicate workload/concurrency coverage"
+        observed.add(key)
+        for metric in PERFORMANCE_METRICS:
+            if _safe_number(row.get(metric)) is None:
+                return f"performance result is missing finite {metric}"
+    missing = sorted(expected - observed, key=lambda item: (item[0], item[1]))
+    if missing:
+        return "performance result matrix is incomplete"
+    return None
+
+
+def _validate_chaos_observation(measurements: Mapping[str, object]) -> str | None:
+    rows = measurements.get("faults")
+    if not isinstance(rows, list):
+        return "chaos observation has no fault matrix"
+    observed: set[str] = set()
+    for row in rows:
+        if not isinstance(row, Mapping):
+            return "chaos fault result is not an object"
+        fault = row.get("fault")
+        if fault not in CHAOS_FAULTS:
+            return "chaos fault matrix contains an unsupported fault"
+        if fault in observed:
+            return "chaos fault matrix contains a duplicate fault"
+        observed.add(fault)
+        if any(row.get(assertion) is not True for assertion in CHAOS_ASSERTIONS):
+            return "chaos fault result does not prove every recovery assertion"
+    if observed != set(CHAOS_FAULTS):
+        return "chaos fault matrix is incomplete"
+    return None
+
+
+def _validate_soak_observation(measurements: Mapping[str, object]) -> str | None:
+    rows = measurements.get("profiles")
+    if not isinstance(rows, list):
+        return "soak observation has no short/extended profiles"
+    observed: set[str] = set()
+    for row in rows:
+        if not isinstance(row, Mapping):
+            return "soak profile is not an object"
+        profile = row.get("profile")
+        if profile not in SOAK_PROFILES:
+            return "soak profile has an unsupported name"
+        if profile in observed:
+            return "soak observation contains a duplicate profile"
+        observed.add(profile)
+        for metric in SOAK_METRICS:
+            value = row.get(metric)
+            if metric in {"retry_storms", "worker_starvation", "file_descriptor_leaks"}:
+                if value is not False:
+                    return f"soak profile does not prove absence of {metric}"
+            elif _safe_number(value) is None:
+                return f"soak profile is missing finite {metric}"
+    if observed != set(SOAK_PROFILES):
+        return "soak observation does not include both short and extended profiles"
+    return None
 
 
 def _bounded_projection(value: object, *, depth: int = 0) -> object:
@@ -122,12 +275,22 @@ def _parse_observation(raw: bytes, lane: str) -> tuple[str, dict[str, object], s
         return "FAIL", {}, "runtime observation has no explicit budgets"
     if not isinstance(measurements, dict):
         return "FAIL", {}, "runtime observation has no measurements"
-    if lane == "performance" and _safe_number(measurements.get("p95_ms")) is None:
-        return "FAIL", {}, "performance observation has no finite p95_ms measurement"
-    if lane == "chaos" and measurements.get("recovered") is not True:
-        return "FAIL", {}, "chaos observation does not prove recovery"
-    if lane == "soak" and _safe_number(measurements.get("duration_seconds")) is None:
-        return "FAIL", {}, "soak observation has no finite duration_seconds measurement"
+    # A blocked authority may emit an empty measurement object; only a PASS
+    # claim must prove the complete lane-specific matrix. This preserves the
+    # distinction between an unavailable harness and an under-specified pass.
+    if status == "PASS":
+        if lane == "performance":
+            validation_error = _validate_performance_observation(runtime, measurements)
+            if validation_error:
+                return "FAIL", {}, validation_error
+        elif lane == "chaos":
+            validation_error = _validate_chaos_observation(measurements)
+            if validation_error:
+                return "FAIL", {}, validation_error
+        elif lane == "soak":
+            validation_error = _validate_soak_observation(measurements)
+            if validation_error:
+                return "FAIL", {}, validation_error
     projected = {
         "schema_version": payload["schema_version"],
         "lane": lane,

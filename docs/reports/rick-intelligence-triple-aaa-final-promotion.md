@@ -217,18 +217,23 @@ No measured RPO/RTO or current restore packet exists.
 The operational harness defines owned faults for worker, Redis, Qdrant,
 Postgres, object storage, provider and network boundaries. No disposable fault
 run has established recovery without corruption, duplicate publication, stale
-acknowledgement or tenant leakage.
+acknowledgement or tenant leakage. The observation parser now requires all
+thirteen named faults and the five recovery assertions before accepting a
+`PASS`; an unavailable harness remains `BLOCKED_EXTERNAL`.
 
 ## 21. Soak
 
-Short and extended soak requirements are documented with bounded resource and
-queue observations. No exact-release soak window was run.
+Short and extended soak requirements are documented with bounded resource,
+queue, drift and leak observations. The parser rejects a `PASS` without both
+profiles and every requested metric. No exact-release soak window was run.
 
 ## 22. Performance
 
 Required 1/10/50/100-concurrency measurements include p50/p95/p99,
 throughput, errors, CPU, memory, threads, connections, queue depth, retries
-and starvation. Local fixture timings are not staging or production SLOs; no
+and starvation. The parser also requires baseline hardware, container limits,
+dataset, provider, model and version metadata before accepting the complete
+workload matrix. Local fixture timings are not staging or production SLOs; no
 current production-shaped performance packet exists.
 
 ## 23. Frontend

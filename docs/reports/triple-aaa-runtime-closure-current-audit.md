@@ -409,3 +409,15 @@ The provider boundary also enforces a finite tool-call budget before request
 I/O and on complete or streamed responses. The local provider suite covers
 pre-I/O rejection and oversized response rejection; live provider evidence
 remains unavailable and therefore non-promotable.
+
+## 81. Operational lane observation contract — 2026-09-10
+
+The Phase 3 performance, chaos and soak parser now rejects an under-specified
+`PASS`. Performance requires baseline metadata plus all five named workloads at
+concurrency 1/10/50/100 with p50/p95/p99, throughput, error rate, CPU, RAM and
+queue-depth measurements. Chaos requires all thirteen named faults and every
+recovery assertion; soak requires both short and extended profiles with the
+requested resource, drift and leak observations. A structured
+`BLOCKED_EXTERNAL` observation may remain blocked without fabricating runtime
+measurements. Local contract tests cover complete and incomplete matrices; no
+live operational result is claimed while the approved lab is unavailable.
