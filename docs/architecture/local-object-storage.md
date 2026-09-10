@@ -51,9 +51,12 @@ complete old or new envelope, not a partially written payload. Reopening a new
 adapter against the same root deterministically discovers the stored objects.
 
 The adapter has bounded object writes, bounded reads, and bounded list results.
-It can skip orphaned `.tmp-*` files left by an interrupted local process; an
-unexpected or malformed committed envelope fails closed with a typed corruption
-or integrity error.
+Each self-describing envelope has a fixed 4 KiB header budget; header writes
+use canonical finite JSON, and reads reject non-finite constants, duplicate
+keys, recursion/encoding failures and malformed structures before metadata is
+trusted. It can skip orphaned `.tmp-*` files left by an interrupted local
+process; an unexpected or malformed committed envelope fails closed with a
+typed corruption or integrity error.
 
 ## Production boundary
 
@@ -77,5 +80,6 @@ security, migration, recovery, and external-service evidence.
 Focused tests under `packages/storage/tests/` cover traversal rejection,
 atomic failed-write preservation, reopen, checksum/size metadata, write/read
 limits, scope isolation, deterministic listing/deletion, permissions where
-portable, corruption detection, and production-mode rejection. The package is
-also checked with Python compilation.
+portable, corruption detection, ambiguous/non-finite envelope JSON and
+production-mode rejection. The package is also checked with Python
+compilation.

@@ -33,3 +33,9 @@ signs requests with AWS Signature Version 4, keeps credentials outside the
 package, supports S3-compatible endpoints and validates response sizes and
 checksums. Credentials, endpoint reachability, encryption, retention,
 replication and restore still require an external integration gate.
+
+The local envelope has a fixed 4 KiB header budget. Its JSON is emitted as
+canonical finite data and decoded fail-closed: non-finite constants, duplicate
+keys, recursive/encoding failures and malformed metadata are corruption, not
+usable object state. This hardens the local primitive without turning it into
+evidence for the live S3/object-storage gate.

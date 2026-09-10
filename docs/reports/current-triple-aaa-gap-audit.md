@@ -926,3 +926,19 @@ State-of-Art suite **295**; compilation and `git diff --check` pass. This is
 local cleanup/recovery evidence only. Approved runtime, object-store,
 distributed recovery, provider/corpus, independent review, sealed packet and
 human Go/No-Go remain unavailable; promotion remains disallowed.
+
+## 47. Local object-envelope JSON decoding closure — 2026-09-10
+
+Source implementation candidate `1816748cf44dee8e48b16d718142e2ed8550ca51`
+(tree `2716c60e59134c8b1e8f3c1e4824b01d0a41bfa9`) closes a concrete local
+object-envelope boundary. The fixed 4 KiB header now emits canonical finite
+JSON and rejects non-finite constants, duplicate keys, recursion/encoding
+failures and malformed metadata before the object scope, key, size or checksum
+is trusted. The adversarial regression covers a `NaN` field and a duplicate
+header key; the local storage suite passes **26** tests.
+
+Compilation and `git diff --check` pass. This is local object-store evidence
+only; the live S3-compatible gate, encryption, retention, tenant runtime
+isolation, restore, distributed recovery, provider/corpus, independent review,
+sealed packet and human Go/No-Go remain unavailable. Promotion remains
+disallowed.
