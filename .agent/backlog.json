@@ -827,7 +827,10 @@
         ".agent/verification.jsonl#VER-PH3-2-FINAL-INTEGRATED-VERIFY-20260910",
         ".agent/verification.jsonl#VER-PH3-2-PRESERVED-SUITE-REVALIDATION-20260910",
         "docs/reports/current-triple-aaa-gap-audit.md",
-        "docs/plans/phase-3-triple-aaa-closure.md"
+        "docs/plans/phase-3-triple-aaa-closure.md",
+        "scripts/phase11/runner.py",
+        "scripts/phase11/test_compose_lifecycle.py",
+        ".agent/verification.jsonl#VER-PH3-2-PRESERVED-CORPUS-PREFLIGHT-20260910"
       ],
       "next_action": {
         "id": "PH3-2-LAB-READINESS:WAIT_RUNTIME",
@@ -840,7 +843,7 @@
         "Docker daemon access to /var/run/docker.sock is denied in the current session",
         "Disposable runtime secrets and endpoint authority are unavailable"
       ],
-      "reason": "The current local implementation and fail-closed API/Redis, worker, citation-support, release, same-run CI evidence, authenticated promotion-seal, shared-runtime-preflight, current-artifact promotion binding, promoted-capability independent-review binding, canonical accessibility gates, deterministic real frontend browser probe and Compose resource/capability hardening are covered by 305 State-of-Art/Phase 11 tests, 21 Compose lifecycle checks, web lint/typecheck/build, real managed API/Web browser evidence at 375/768/1440, make validate, make ops-static, make compose-static and git diff --check. The exact source implementation candidate is 02dfbd2875372643c82f861e6178602ce6530d86 with tree aa6e3f6f8e611fe1316afce1acb73d82367db7b0; the clean control candidate 14116260f727435df05e673949964a2c865ff2f5 with tree 67f91512f394b697ca233fb68c805d3d94494765 revalidated make test: CVG 382 passed, 12 failed, 4 errors and 17 skipped because the approved ignored corpus/dataset is absent, Professor 37/37, Locker 2/2 and legacy frontend smoke 7/7. The current clean integrated verifier at 8216593032800ddafd2d9eb88a55f21298146ddf classifies STATE_OF_ART_CANDIDATE with JSON exit 1 because release evidence, immutable image proof and the sealed packet are not promotable while live runtime lanes remain blocked. The preserved suite is not fully green; real Docker/Compose startup, readiness, PostgreSQL/Redis/object/vector execution, distributed service checks, production authority, fresh independent review and human Go/No-Go remain unavailable without approved external runtime access"
+      "reason": "The current local implementation and fail-closed API/Redis, worker, citation-support, release, same-run CI evidence, authenticated promotion-seal, shared-runtime-preflight, current-artifact promotion binding, promoted-capability independent-review binding, canonical accessibility gates, deterministic real frontend browser probe, Compose resource/capability hardening and preserved-CVG corpus preflight are covered by 308 State-of-Art/Phase 11 tests, 21 Compose lifecycle checks, web lint/typecheck/build, real managed API/Web browser evidence at 375/768/1440, make validate, make ops-static, make compose-static and git diff --check. The exact source implementation candidate is 6f33975452722bb365d345405220849ea86e01a0 with tree fd25a314967e51bd1613e21372a5f27ec4a3c4f5; make test classifies the absent approved dataset as BLOCKED_EXTERNAL and still runs Professor 37/37, Locker 2/2 and legacy frontend smoke 7/7, returning 2. The current clean integrated verifier at 8216593032800ddafd2d9eb88a55f21298146ddf classifies STATE_OF_ART_CANDIDATE with JSON exit 1 because release evidence, immutable image proof and the sealed packet are not promotable while live runtime lanes remain blocked. The preserved suite remains unverified until the approved corpus is supplied; real Docker/Compose startup, readiness, PostgreSQL/Redis/object/vector execution, distributed service checks, production authority, fresh independent review and human Go/No-Go remain unavailable without approved external runtime access"
     }
   ]
 }

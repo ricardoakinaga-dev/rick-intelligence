@@ -237,3 +237,15 @@ and 17 skipped because the approved ignored corpus and
 returned 2; this remains a blocking partial result, not a promotion signal.
 No fixture or corpus was fabricated or committed. Runtime, provider/corpus,
 image, independent-review and human promotion gates remain open.
+
+## 15. Preserved-corpus preflight correction — 2026-09-10
+
+Candidate `6f33975452722bb365d345405220849ea86e01a0` (tree
+`fd25a314967e51bd1613e21372a5f27ec4a3c4f5`) now checks the mandatory
+preserved-CVG dataset before invoking the full legacy suite. An unavailable
+or symlinked dataset produces an explicit `BLOCKED_EXTERNAL` lane and exit
+`2`; independent component lanes continue and remain observable. The
+correction is covered by the new runner tests and the combined **308-test**
+State-of-Art/Phase 11 regression. It is a classification/evidence-integrity
+correction only: it neither supplies the approved corpus nor closes runtime
+or promotion gates.

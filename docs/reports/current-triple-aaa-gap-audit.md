@@ -347,3 +347,22 @@ claim. No corpus was fabricated, no ignored runtime data was committed, and
 the candidate remains blocked for the approved corpus, disposable runtime,
 production authority, independent review, image proof, sealed packet and
 human Go/No-Go. No Triple AAA claim is made.
+
+## 17. Preserved-corpus preflight correction — 2026-09-10
+
+The exact clean source candidate `6f33975452722bb365d345405220849ea86e01a0`
+(tree `fd25a314967e51bd1613e21372a5f27ec4a3c4f5`) adds an explicit preflight
+to the preserved full-test runner. When the mandatory
+`cvg-master-rag-v2/src/data/default/dataset.json` is absent or symlinked, the
+CVG lane is reported as `BLOCKED_EXTERNAL` before pytest starts; no fixture is
+substituted and no failure is relabeled as a pass. Independent root-boundary,
+Professor, Locker and legacy frontend lanes still execute normally.
+
+On that clean candidate, the State-of-Art/Phase 11 regression passed **308
+tests**, `make validate` passed, and `make test` reported the CVG preflight as
+blocked while Professor completed **37/37**, Locker **2/2** and the frontend
+smoke **7/7**. The runner and GNU Make both returned `2`, preserving the
+external-block meaning. This correction removes misleading derivative red
+noise without claiming that the preserved CVG suite or the overall promotion
+gate is green. The approved corpus, disposable runtime, immutable image
+proof, independent review, sealed packet and human Go/No-Go remain open.
