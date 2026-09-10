@@ -11,3 +11,10 @@ The wrapper does not claim a distributed breaker or external telemetry. A
 production deployment must supply shared metrics/alerting and choose whether
 to wrap the live adapter at its composition root. The underlying HTTP client
 still owns timeout, retry, response-size and redaction policy.
+
+The provider HTTP, SSE and structured-tool paths decode JSON through a finite,
+duplicate-free boundary. Non-finite constants and duplicate object keys fail
+closed before chat/embedding response projection, streaming delta extraction,
+model-error classification or tool-argument validation. This is local provider
+contract evidence; a live endpoint, approved corpus and runtime budget remain
+separate promotion requirements.

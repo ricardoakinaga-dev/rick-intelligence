@@ -790,3 +790,19 @@ compilation and `git diff --check` pass. This is local queue/read-model
 evidence only. Approved PostgreSQL durability, two-process fencing and crash
 recovery, independent review, sealed packet and human Go/No-Go remain
 unavailable; promotion remains disallowed.
+
+## 52. Provider JSON duplicate-key closure — 2026-09-10
+
+Source candidate `0708ab378a7a5794aff883962327f19f4c81c70e` (tree
+`2c58c200a819f30ce7069f8e2244dfc4ee5574c5`) closes the remaining ambiguous
+JSON paths in the OpenAI-compatible provider and provider tool contract. Normal
+HTTP responses, SSE chunks, health/error bodies, JSON-mode content and complete
+tool arguments now reject duplicate object keys in addition to the existing
+finite and bounded parsing rules; invalid provider data fails before typed
+projection or tool execution.
+
+The provider suite passes **66** tests, the provider-contract slice passes **6**,
+and compilation plus `git diff --check` pass. This is local provider-contract
+evidence only. Approved live provider/corpus/budget authority, independent
+review, sealed packet and human Go/No-Go remain unavailable; promotion remains
+disallowed.

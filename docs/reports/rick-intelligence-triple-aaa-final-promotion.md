@@ -86,6 +86,13 @@ duplicate persisted JSON keys before queue payloads or job results are trusted.
 This is local corruption containment only; it does not prove PostgreSQL
 durability, multi-worker fencing, crash recovery or production promotion.
 
+The OpenAI-compatible provider and provider-tool contract at source candidate
+`0708ab378a7a5794aff883962327f19f4c81c70e` also reject duplicate JSON keys in
+normal responses, SSE chunks, health/error payloads, JSON-mode content and
+complete tool arguments before typed projection or tool execution. This is
+local provider evidence only; live endpoint, corpus and budget authority remain
+required.
+
 ## 7. CI and release lanes
 
 The canonical workflow names FAST, UNIT, CONTRACT, SECURITY, RAG_EVAL,
