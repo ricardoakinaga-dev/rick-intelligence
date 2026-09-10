@@ -48,6 +48,13 @@ import uuid
 
 
 ROOT = Path(__file__).resolve().parents[2]
+
+try:
+    from scripts.state_of_art.json_boundary import load_json, loads_json
+except ModuleNotFoundError:  # Direct execution from the scripts/phase11 directory.
+    sys.path.insert(0, str(ROOT))
+    from scripts.state_of_art.json_boundary import load_json, loads_json
+
 DEFAULT_OUTPUT = ".runtime/phase-3/observability-runtime-gate.json"
 RAW_MAX_BYTES = 512 * 1024
 PROBE_MAX_BYTES = 64 * 1024
@@ -361,7 +368,7 @@ def _http_request(
 
 def _json(response: HttpResponse, *, label: str) -> Mapping[str, object]:
     try:
-        value = json.loads(response.body.decode("utf-8"))
+        value = loads_json(response.body)
     except (UnicodeDecodeError, json.JSONDecodeError, TypeError, ValueError) as exc:
         del exc
         raise _RuntimeAssertionError(f"{label}_json_invalid") from None
@@ -1340,7 +1347,7 @@ def _phase3_lane_contracts(*, run: bool, timeout: float) -> list[GateResult]:
                     results.append(GateResult(name, FAIL, "existing operational harness exceeded its bound", required=False))
                     continue
                 try:
-                    payload = json.loads(artifact_path.read_text(encoding="utf-8"))
+                    payload = load_json(artifact_path)
                 except (OSError, UnicodeDecodeError, json.JSONDecodeError, TypeError, ValueError):
                     results.append(GateResult(name, FAIL, "existing operational harness emitted no valid observation", required=False))
                     continue

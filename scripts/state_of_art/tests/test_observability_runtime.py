@@ -190,6 +190,16 @@ def test_external_gate_is_fail_closed_without_explicit_runtime(monkeypatch: pyte
     assert any(item["name"] == "distributed-observability-runtime" and item["result"] == gate.BLOCKED_EXTERNAL for item in payload["results"])
 
 
+def test_observability_json_boundary_rejects_duplicate_fields() -> None:
+    response = gate.HttpResponse(
+        status=200,
+        headers={"content-type": "application/json"},
+        body=b'{"status":"success","status":"forged"}',
+    )
+    with pytest.raises(gate._RuntimeAssertionError, match="trace_json_invalid"):
+        gate._json(response, label="trace")
+
+
 def test_local_mode_runs_real_contracts_but_does_not_claim_runtime() -> None:
     output = _output_path()
     code = gate.main(["--local", "--output", str(output)])
