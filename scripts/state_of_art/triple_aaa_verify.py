@@ -349,7 +349,11 @@ def _safe_packet_path(raw_path: str) -> tuple[Path | None, str | None]:
     return resolved, None
 
 
-def _load_packet(raw_path: str | None) -> tuple[dict[str, object] | None, dict[str, object]]:
+def _load_packet(
+    raw_path: str | None,
+    *,
+    trusted_public_keys: dict[str, bytes] | None,
+) -> tuple[dict[str, object] | None, dict[str, object]]:
     if raw_path is None:
         return None, {"supplied": False, "status": "NOT_SUPPLIED"}
     path, path_error = _safe_packet_path(raw_path)
@@ -361,7 +365,7 @@ def _load_packet(raw_path: str | None) -> tuple[dict[str, object] | None, dict[s
         return None, {"supplied": True, "path": str(path.relative_to(ROOT)), "status": "UNREADABLE", "error": type(exc).__name__}
     if not isinstance(value, dict):
         return None, {"supplied": True, "path": str(path.relative_to(ROOT)), "status": "INVALID_JSON"}
-    valid, errors = packet_seal.verify_seal(value)
+    valid, errors = packet_seal.verify_seal(value, trusted_public_keys=trusted_public_keys)
     seal = value.get("seal")
     return value, {
         "supplied": True,
@@ -393,10 +397,11 @@ def _packet_matches_current(
     results: list[dict[str, object]],
     checkout: dict[str, object],
     requested_reference: str | None,
+    trusted_public_keys: dict[str, bytes] | None,
 ) -> bool:
     if packet is None:
         return False
-    valid, _errors = packet_seal.verify_seal(packet)
+    valid, _errors = packet_seal.verify_seal(packet, trusted_public_keys=trusted_public_keys)
     if not valid or packet.get("sealed") is not True:
         return False
     try:
@@ -433,10 +438,11 @@ def _apply_packet_lanes(
     packet: dict[str, object] | None,
     checkout: dict[str, object],
     requested_reference: str | None,
+    trusted_public_keys: dict[str, bytes] | None,
 ) -> None:
     """Turn only independently verified packet lanes into observations."""
 
-    if not _packet_matches_current(packet, results, checkout, requested_reference):
+    if not _packet_matches_current(packet, results, checkout, requested_reference, trusted_public_keys):
         return
     assert packet is not None
     authority = packet.get("decision_authority")
@@ -484,6 +490,10 @@ def main(argv: list[str] | None = None) -> int:
         "--sealed-packet",
         help="path to an externally sealed packet containing this exact run's observations",
     )
+    parser.add_argument(
+        "--trust-store",
+        help="JSON trust store mapping Ed25519 key ids to base64 public keys; may also use RICK_PROMOTION_TRUST_STORE",
+    )
     args = parser.parse_args(sys.argv[1:] if argv is None else argv)
     if args.lane_timeout < 10 or args.lane_timeout > 3_600:
         parser.error("--lane-timeout must be between 10 and 3600 seconds")
@@ -514,7 +524,25 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.seal_reference is not None and packet_seal.REFERENCE_RE.fullmatch(args.seal_reference) is None:
         parser.error("--seal-reference contains unsupported characters")
-    packet, packet_info = _load_packet(args.sealed_packet)
+    trust_store_path = args.trust_store or os.environ.get("RICK_PROMOTION_TRUST_STORE")
+    trusted_public_keys: dict[str, bytes] | None = None
+    trust_store_info: dict[str, object] = {
+        "supplied": bool(trust_store_path),
+        "status": "NOT_SUPPLIED" if not trust_store_path else "INVALID",
+        "key_count": 0,
+    }
+    if trust_store_path:
+        try:
+            trusted_public_keys = packet_seal.load_trust_store(trust_store_path)
+        except ValueError as exc:
+            trust_store_info["error"] = str(exc)
+        else:
+            trust_store_info.update({"status": "LOADED", "key_count": len(trusted_public_keys)})
+    packet, packet_info = _load_packet(
+        args.sealed_packet,
+        trusted_public_keys=trusted_public_keys,
+    )
+    packet_info["trust_store"] = trust_store_info
     if packet is not None and args.seal_reference is not None:
         seal = packet.get("seal")
         if not isinstance(seal, dict) or seal.get("immutable_reference") != args.seal_reference:
@@ -523,11 +551,18 @@ def main(argv: list[str] | None = None) -> int:
             packet_info["status"] = "INVALID_REFERENCE"
             packet_info["seal_verified"] = False
     checkout = capture_checkout(ROOT)
-    _apply_packet_lanes(results, packet, checkout, args.seal_reference)
+    _apply_packet_lanes(
+        results,
+        packet,
+        checkout,
+        args.seal_reference,
+        trusted_public_keys,
+    )
     derived = promotion_engine.evaluate(
         results,
         packet=packet,
         checkout=checkout,
+        trusted_public_keys=trusted_public_keys,
     )
     payload: dict[str, object] = {
         "schema_version": "state-of-art-triple-aaa-verify.v2",

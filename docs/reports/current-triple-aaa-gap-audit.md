@@ -3,7 +3,7 @@
 **Audit date:** 2026-09-10  
 **Prompt snapshot:** [`phase-3-triple-aaa-closure-2026-09-09.txt`](../prompts/phase-3-triple-aaa-closure-2026-09-09.txt)  
 **Source attachment SHA-256:** `0d431cf3ec75e4d6455735d32f135b3270b59996866a28fd7296d73a18cabf3d`  
-**Stored copy SHA-256:** `0b1703fe10e63ed6c68c543bdfdea33e92dfa1300e7422d0adb954d85ddeb987`  
+**Stored copy SHA-256:** `0d431cf3ec75e4d6455735d32f135b3270b59996866a28fd7296d73a18cabf3d`
 **Entry candidate commit:** `2d0b177f7745463c9457dc4da6f9dfc769b6c78d`
 **Entry candidate tree:** `6fc8b92c5a4c14147915aae787f8143fd81ec8ee`
 **Branch / remote:** `main` / `origin/main` (same SHA at snapshot)  
@@ -202,3 +202,21 @@ make the CI/release lanes and automatic promotion return codes explicit, and
 extend the capability/rejection tests without weakening runtime gates. Only
 after that slice passes its critic and regression checks may the lab/runtime
 slice be attempted.
+
+## 10. Authenticated promotion packet correction — 2026-09-10
+
+The release packet seal was independently challenged and found to be only a
+recalculable SHA-256 digest: a self-declared reviewer could satisfy the
+authority fields. The local correction replaces that v1 contract with an
+Ed25519 signature over the canonical packet body and all seal metadata,
+including the candidate, observations, decision authority, immutable
+reference, signer and key id. Verification now requires an explicit JSON trust
+store, rejects unknown keys and metadata mutation, requires a current clean
+checkout in the promotion engine, and rejects seals older than 24 hours or
+more than five minutes in the future.
+
+The correction is local evidence only: 264 State-of-Art tests, the focused
+packet/promotion suite, YAML parsing, `git diff --check` and `make validate`
+pass. It does not provide live runtime, independent production authority or a
+Triple AAA promotion decision. The runtime blocker and the requirement for a
+fresh exact-candidate review remain unchanged.

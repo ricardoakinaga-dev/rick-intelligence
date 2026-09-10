@@ -146,6 +146,7 @@ DEFAULT_ARTIFACTS = (
     "scripts/state_of_art/triple_aaa_verify.py",
     "scripts/state_of_art/promotion_engine.py",
     "scripts/state_of_art/packet_seal.py",
+    "scripts/state_of_art/requirements.txt",
     "scripts/state_of_art/tests/test_promotion_engine.py",
     "scripts/state_of_art/tests/test_packet_seal.py",
     "scripts/state_of_art/tests/test_generate_release_evidence.py",

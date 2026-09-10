@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Derive the RICK promotion level from typed lane observations.
 
-The engine is deliberately small and dependency-free.  It accepts observations
+The engine is deliberately small and dependency-light.  It accepts observations
 from a verifier, never a caller-supplied verdict, and applies a fixed ladder of
 mandatory lane sets.  Missing, stale, blocked and self-promoted evidence stays
 blocking; a score or a document cannot override it.
@@ -239,6 +239,7 @@ def _packet_rejections(
     packet: Mapping[str, Any] | None,
     results: Sequence[Mapping[str, Any]],
     checkout: Mapping[str, Any] | None = None,
+    trusted_public_keys: Mapping[str, object] | None = None,
 ) -> tuple[list[str], list[str]]:
     """Validate the independently sealed packet that authorizes promotion.
 
@@ -255,7 +256,7 @@ def _packet_rejections(
             "packet is required for promotion"
         ]
 
-    valid, seal_errors = packet_seal.verify_seal(packet)
+    valid, seal_errors = packet_seal.verify_seal(packet, trusted_public_keys=trusted_public_keys)
     if not valid:
         codes.add("PACKET_NOT_SEALED_REJECTED")
         errors.extend(seal_errors)
@@ -287,7 +288,10 @@ def _packet_rejections(
         if candidate.get("clean_worktree") is not True:
             codes.add("PACKET_BINDING_REJECTED")
             errors.append("sealed packet candidate is not clean")
-        if checkout is not None:
+        if checkout is None:
+            codes.add("PACKET_BINDING_REJECTED")
+            errors.append("current checkout is required to promote a sealed packet")
+        else:
             for field, checkout_field in (
                 ("commit_sha", "head"),
                 ("tree_sha", "tree"),
@@ -332,6 +336,7 @@ def evaluate(
     *,
     packet: Mapping[str, Any] | None = None,
     checkout: Mapping[str, Any] | None = None,
+    trusted_public_keys: Mapping[str, object] | None = None,
 ) -> dict[str, Any]:
     """Return a derived classification, rejection set and process exit code."""
 
@@ -350,7 +355,12 @@ def evaluate(
     else:
         classification = "TRIPLE_AAA"
 
-    packet_rejection_codes, packet_errors = _packet_rejections(packet, results, checkout)
+    packet_rejection_codes, packet_errors = _packet_rejections(
+        packet,
+        results,
+        checkout,
+        trusted_public_keys,
+    )
     rejection_codes.extend(packet_rejection_codes)
     rejection_codes = sorted(set(rejection_codes))
 

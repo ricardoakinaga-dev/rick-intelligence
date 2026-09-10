@@ -28,11 +28,11 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Run dependency-free gate tests
+      - name: Run pinned gate tests
         env:
           PYTHONDONTWRITEBYTECODE: "1"
         run: |
-          python3 -m pip install --disable-pip-version-check --no-cache-dir "pytest==8.0.2"
+          python3 -m pip install --disable-pip-version-check --no-cache-dir "pytest==8.0.2" -r scripts/state_of_art/requirements.txt
           python3 -m pytest -q -p no:cacheprovider scripts/state_of_art/tests
 
       - name: Generate commit-bound release evidence

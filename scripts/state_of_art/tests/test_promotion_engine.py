@@ -4,10 +4,21 @@ import json
 from pathlib import Path
 
 import pytest
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from scripts.state_of_art.packet_seal import seal_payload
 from scripts.state_of_art import promotion_engine
 from scripts.state_of_art import triple_aaa_verify
+
+
+FIXTURE_PRIVATE_KEY = Ed25519PrivateKey.from_private_bytes(bytes(range(32)))
+FIXTURE_TRUST_STORE = {"fixture-release-key": FIXTURE_PRIVATE_KEY.public_key()}
+FIXTURE_CHECKOUT = {
+    "head": "a" * 40,
+    "tree": "b" * 40,
+    "fingerprint": "c" * 64,
+    "status": "CLEAN",
+}
 
 
 def _results(*, status: str = "PASS", external: bool = False) -> list[dict[str, object]]:
@@ -45,6 +56,8 @@ def _sealed_packet(results: list[dict[str, object]]) -> dict[str, object]:
         },
         immutable_reference="artifact://release/fixture",
         signer_id="independent-fixture-reviewer",
+        key_id="fixture-release-key",
+        signing_key=FIXTURE_PRIVATE_KEY,
     )
 
 
@@ -53,12 +66,29 @@ def test_all_required_lanes_and_authority_promote() -> None:
     result = promotion_engine.evaluate(
         observations,
         packet=_sealed_packet(observations),
+        checkout=FIXTURE_CHECKOUT,
+        trusted_public_keys=FIXTURE_TRUST_STORE,
     )
 
     assert result["classification"] == "TRIPLE_AAA"
     assert result["promotion_allowed"] is True
     assert result["exit_code"] == promotion_engine.EXIT_PASS
     assert result["rejection_codes"] == []
+
+
+def test_valid_packet_without_trusted_authority_cannot_promote() -> None:
+    observations = _results()
+
+    result = promotion_engine.evaluate(
+        observations,
+        packet=_sealed_packet(observations),
+        checkout=FIXTURE_CHECKOUT,
+    )
+
+    assert result["classification"] == "AAA"
+    assert result["promotion_allowed"] is False
+    assert result["exit_code"] == promotion_engine.EXIT_FAILED
+    assert "PACKET_NOT_SEALED_REJECTED" in result["rejection_codes"]
 
 
 def test_external_block_returns_candidate_and_exit_two() -> None:
@@ -141,7 +171,12 @@ def test_packet_is_required_even_when_lanes_pass() -> None:
 
 def test_promotable_is_not_an_observation_pass() -> None:
     observations = _results(status="PROMOTABLE")
-    result = promotion_engine.evaluate(observations, packet=_sealed_packet(observations))
+    result = promotion_engine.evaluate(
+        observations,
+        packet=_sealed_packet(observations),
+        checkout=FIXTURE_CHECKOUT,
+        trusted_public_keys=FIXTURE_TRUST_STORE,
+    )
 
     assert result["classification"] == "DEVELOPMENT"
     assert result["promotion_allowed"] is False
@@ -160,6 +195,21 @@ def test_sealed_packet_must_match_the_current_checkout() -> None:
             "fingerprint": "c" * 64,
             "status": "CLEAN",
         },
+        trusted_public_keys=FIXTURE_TRUST_STORE,
+    )
+
+    assert result["promotion_allowed"] is False
+    assert result["exit_code"] == promotion_engine.EXIT_FAILED
+    assert "PACKET_BINDING_REJECTED" in result["rejection_codes"]
+
+
+def test_sealed_packet_requires_current_checkout_binding() -> None:
+    observations = _results()
+
+    result = promotion_engine.evaluate(
+        observations,
+        packet=_sealed_packet(observations),
+        trusted_public_keys=FIXTURE_TRUST_STORE,
     )
 
     assert result["promotion_allowed"] is False

@@ -8,7 +8,10 @@ from pathlib import Path
 import pytest
 
 from scripts.state_of_art import generate_phase3_evidence
+from scripts.state_of_art import phase3_evidence
 from scripts.state_of_art.phase3_evidence import (
+    EXPECTED_SOURCE_PROMPT,
+    EXPECTED_SOURCE_PROMPT_SHA256,
     MATRIX_SCHEMA,
     MatrixValidationError,
     artifact_set_digest,
@@ -20,6 +23,14 @@ from scripts.state_of_art.phase3_evidence import (
 HEAD = "a" * 40
 TREE = "c" * 40
 CHECKOUT = "b" * 64
+
+
+def test_frozen_source_prompt_copy_matches_its_recorded_digest() -> None:
+    prompt = phase3_evidence.PROJECT_ROOT / EXPECTED_SOURCE_PROMPT
+    assert prompt.is_file()
+    digest = sha256(prompt.read_bytes()).hexdigest()
+
+    assert digest == EXPECTED_SOURCE_PROMPT_SHA256
 
 
 def _ref(root: Path, path: str, description: str) -> dict[str, str]:

@@ -1375,4 +1375,3 @@ RECOVERABLE
 TRIPLE_AAA
 
 Somente declare TRIPLE_AAA quando os gates comprovarem.
-

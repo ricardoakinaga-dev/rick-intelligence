@@ -3,7 +3,7 @@
 **Status:** `ACTIVE — entry audit complete; P0 control/release closure next`  
 **Prompt:** [`phase-3-triple-aaa-closure-2026-09-09.txt`](../prompts/phase-3-triple-aaa-closure-2026-09-09.txt)  
 **Source attachment SHA-256:** `0d431cf3ec75e4d6455735d32f135b3270b59996866a28fd7296d73a18cabf3d`  
-**Stored copy SHA-256:** `0b1703fe10e63ed6c68c543bdfdea33e92dfa1300e7422d0adb954d85ddeb987`  
+**Stored copy SHA-256:** `0d431cf3ec75e4d6455735d32f135b3270b59996866a28fd7296d73a18cabf3d`
 **Candidate:** `2d0b177f7745463c9457dc4da6f9dfc769b6c78d` / tree `6fc8b92c5a4c14147915aae787f8143fd81ec8ee`  
 **Entry audit:** [`current-triple-aaa-gap-audit.md`](../reports/current-triple-aaa-gap-audit.md)
 
@@ -124,3 +124,13 @@ The current next action is to execute the newly added two-process canonical
 approved disposable Redis URL, then bind its result to the release matrix and
 a fresh Redis/security critic. The gate is locally tested and remains
 fail-closed when the runtime or driver is unavailable.
+
+## 8. Current local correction — authenticated promotion packet
+
+An independent challenge found that the former packet seal was a recalculable
+digest and allowed self-declared authority. The correction introduces a
+versioned Ed25519 seal, an explicit public-key trust store, full seal-metadata
+coverage, current-checkout binding and a 24-hour freshness window. Unknown
+keys, missing trust, stale/future timestamps, mutated metadata and absent
+checkout binding remain non-promotable. The local State-of-Art suite now has
+264 passing tests; this does not close live runtime or human promotion gates.

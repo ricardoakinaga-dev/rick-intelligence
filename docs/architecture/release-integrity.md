@@ -1,8 +1,10 @@
 # Release integrity gate
 
 `state-of-art-quality.yml` is the small offline gate for release evidence. It
-does not install packages, start Docker, call a provider, or contact a live
-service. The implementation is the stdlib-only
+does not start Docker, call a provider, or contact a live service. It installs
+only the pinned Ed25519 verifier dependency from
+[`scripts/state_of_art/requirements.txt`](../../scripts/state_of_art/requirements.txt).
+The implementation is dependency-light
 [`release_integrity.py`](../../scripts/state_of_art/release_integrity.py)
 script, the typed model in
 [`release_manifest.py`](../../scripts/state_of_art/release_manifest.py), the
@@ -129,9 +131,10 @@ accidentally emit already-stale release evidence.
 self-seals a candidate and never treats `--seal-reference` by itself as
 authority. A promotion attempt must provide `--sealed-packet <path>` pointing
 to an externally retained packet created with
-`scripts/state_of_art/packet_seal.py`. The packet must contain the exact lane
-observations and clean candidate `commit_sha`, `tree_sha` and checkout
-fingerprint, plus:
+`scripts/state_of_art/packet_seal.py`, plus `--trust-store <path>` (or
+`RICK_PROMOTION_TRUST_STORE`) containing the approved Ed25519 public keys. The
+packet must contain the exact lane observations and clean candidate
+`commit_sha`, `tree_sha` and checkout fingerprint, plus:
 
 ```json
 {
@@ -146,11 +149,16 @@ fingerprint, plus:
 }
 ```
 
-The verifier recomputes the packet digest, rejects mutation, binds it to the
-current run and checkout, and requires the seal signer to match the authorized
-independent reviewer. Missing, malformed, self-promoted or mismatched packets
-remain non-promotable. A local content hash detects mutation; the immutable
-artifact reference must still be retained by an authorized artifact system.
+An external authority creates the seal with an Ed25519 private key and a
+stable `key_id`; the trust store maps that id to the corresponding base64 raw
+public key. The digest and signature cover the packet body, candidate,
+observations, decision authority, immutable reference and all seal metadata.
+The verifier recomputes the digest, checks the signature against the explicit
+trust store, rejects mutation, binds it to the current run and checkout, and
+requires the seal signer to match the authorized independent reviewer. Missing,
+malformed, self-promoted, untrusted or mismatched packets remain
+non-promotable. The immutable artifact reference must still be retained by an
+authorized artifact system.
 
 ## Checkout fingerprint
 
