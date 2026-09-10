@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+from types import ModuleType, SimpleNamespace
+import sys
 import threading
 import time
 
@@ -14,6 +16,7 @@ from rick_observability import (
     Histogram,
     emit_safely,
     evaluate_slo,
+    inject_w3c_trace_headers,
     opaque_ref,
     safe_event,
     should_sample,
@@ -194,3 +197,27 @@ def test_sampling_correlation_and_slo_states() -> None:
     assert evaluate_slo(total=0, errors=0, latency_p95=None, max_error_rate=.01).status == "no_data"
     assert evaluate_slo(total=100, errors=3, latency_p95=20, max_error_rate=.01).status == "breach"
     assert AlertRule("chat", .05, 500).evaluate(total=100, errors=1, latency_p95=100).status == "healthy"
+
+
+def test_w3c_injection_is_bounded_and_drops_baggage(monkeypatch: pytest.MonkeyPatch) -> None:
+    fake_sdk = ModuleType("opentelemetry")
+
+    def inject(carrier: dict[str, str]) -> None:
+        carrier.update({
+            "traceparent": "00-" + "a" * 32 + "-" + "b" * 16 + "-01",
+            "tracestate": "vendor=value",
+            "baggage": "password=secret",
+        })
+
+    fake_sdk.propagate = SimpleNamespace(inject=inject)  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "opentelemetry", fake_sdk)
+
+    projected = inject_w3c_trace_headers({"X-Correlation-ID": "corr-1"})
+
+    assert projected == {
+        "X-Correlation-ID": "corr-1",
+        "traceparent": "00-" + "a" * 32 + "-" + "b" * 16 + "-01",
+        "tracestate": "vendor=value",
+    }
+    assert "baggage" not in projected
+    assert "secret" not in repr(projected)

@@ -24,6 +24,12 @@ from threading import Lock
 from typing import Any, Callable, Protocol, TypeAlias
 from urllib.parse import urlsplit
 
+try:
+    from rick_observability import inject_w3c_trace_headers
+except ImportError:  # pragma: no cover - retrieval package can run standalone.
+    def inject_w3c_trace_headers(headers: Mapping[str, str] | None = None) -> dict[str, str]:
+        return dict(headers or {})
+
 
 # These limits are deliberately finite and are part of the adapter's safety
 # boundary.  Per-instance values may be lowered for a deployment or test, but
@@ -1048,6 +1054,7 @@ class QdrantHttpVectorStore:
         }
         if self._api_key is not None:
             headers["api-key"] = self._api_key
+        headers = inject_w3c_trace_headers(headers)
         last_error: QdrantError | None = None
         for attempt in range(self._max_attempts):
             try:

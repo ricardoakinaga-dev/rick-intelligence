@@ -25,6 +25,7 @@ from rick_retrieval.qdrant import (  # noqa: E402
     QdrantTimeoutError,
     QdrantValidationError,
 )
+import rick_retrieval.qdrant as qdrant_module  # noqa: E402
 
 
 class FakeTransport:
@@ -41,6 +42,29 @@ class FakeTransport:
 
     def close(self) -> None:
         self.close_calls += 1
+
+
+def test_qdrant_http_boundary_projects_w3c_trace_identity_without_baggage(monkeypatch: pytest.MonkeyPatch) -> None:
+    def inject(headers):
+        projected = dict(headers)
+        projected["traceparent"] = "00-" + "a" * 32 + "-" + "b" * 16 + "-01"
+        return projected
+
+    monkeypatch.setattr(qdrant_module, "inject_w3c_trace_headers", inject)
+    transport = FakeTransport(lambda _method, _url, _headers, _content: HttpResponse(200, b"{}"))
+    store = QdrantHttpVectorStore(
+        "https://qdrant.example.test",
+        "documents",
+        api_key="qdrant-test-key",
+        transport=transport,
+    )
+
+    store.health()
+
+    headers = transport.requests[0][2]
+    assert headers["traceparent"].startswith("00-")
+    assert "baggage" not in headers
+    assert "secret" not in repr(headers)
 
 
 def _json_response(value: object, status: int = 200) -> HttpResponse:

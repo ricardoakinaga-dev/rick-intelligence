@@ -12,6 +12,12 @@ import threading
 from collections.abc import Mapping
 from urllib.parse import unquote, urlsplit
 
+try:
+    from rick_observability import inject_w3c_trace_headers
+except ImportError:  # pragma: no cover - the API image includes the package.
+    def inject_w3c_trace_headers(headers: Mapping[str, str] | None = None) -> dict[str, str]:
+        return dict(headers or {})
+
 
 class ObjectStoreHttpTransportError(RuntimeError):
     """Sanitized transport failure; excludes URLs, headers and response bodies."""
@@ -120,7 +126,11 @@ class StdlibS3HttpTransport:
             target = parts.path or "/"
             if parts.query:
                 target += "?" + parts.query
-            connection.request(method, target, body=body, headers=dict(headers))
+            # Trace identity is deliberately added after SigV4 signing by the
+            # caller. It is an unsigned observability header and cannot alter
+            # the canonical request or expose credentials.
+            request_headers = inject_w3c_trace_headers(headers)
+            connection.request(method, target, body=body, headers=request_headers)
             response = _Response(self, connection, connection.getresponse())
             with self._lock:
                 if self._closed:

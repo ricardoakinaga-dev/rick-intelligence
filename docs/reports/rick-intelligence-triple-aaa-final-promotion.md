@@ -159,7 +159,10 @@ when `OTEL_TRACES_EXPORTER=otlp` is configured. API stage spans cover identity,
 authorization, retrieval, evidence validation, decision policy, provider,
 object storage and queue boundaries; the worker configures its own exporter,
 attaches only flat W3C `traceparent`/`tracestate` fields and emits an ingestion
-stage span. Automatic exception payloads are disabled and error spans retain
+stage span. Provider, Qdrant and S3 HTTP boundaries project only bounded W3C
+trace identity after their request/authentication setup; `baggage` and arbitrary
+context are excluded, and the dependency-light helper degrades safely when the
+SDK is absent. Automatic exception payloads are disabled and error spans retain
 only bounded type/code identity. Compose exposes a private `/metrics` scrape
 target with Prometheus configured for the API. Collector delivery, propagation
 across a live API→queue→worker graph, alert routing, SLO windows and no-data

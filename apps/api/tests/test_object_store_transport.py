@@ -6,6 +6,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import pytest
 
 from services.object_store_transport import ObjectStoreHttpTransportError, StdlibS3HttpTransport
+import services.object_store_transport as transport_module
 
 
 @pytest.fixture
@@ -91,6 +92,24 @@ def test_wire_preserves_signed_target_body_and_ignores_proxies(wire_server, monk
     assert requests[0][1] == "/storage" + target
     assert requests[0][2]["Authorization"] == "test-signature"
     assert requests[0][3] == b"\x00payload\xff"
+    response.close()
+    transport.close()
+
+
+def test_wire_transport_projects_w3c_trace_identity_without_baggage(wire_server, monkeypatch):
+    def inject(headers):
+        projected = dict(headers)
+        projected["traceparent"] = "00-" + "a" * 32 + "-" + "b" * 16 + "-01"
+        return projected
+
+    monkeypatch.setattr(transport_module, "inject_w3c_trace_headers", inject)
+    endpoint, requests, _ = wire_server
+    transport = StdlibS3HttpTransport(endpoint, require_https=False)
+    response = transport.request("GET", endpoint + "/trace", headers={})
+
+    assert requests[0][2]["traceparent"].startswith("00-")
+    assert "baggage" not in requests[0][2]
+    assert "secret" not in repr(requests[0][2])
     response.close()
     transport.close()
 

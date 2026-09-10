@@ -6,6 +6,7 @@ import json
 import httpx
 import pytest
 
+import rick_providers.client as provider_client_module
 from rick_contracts.providers import ChatCompletionResult, EmbeddingResult
 from rick_providers import (
     DeterministicProvider,
@@ -117,6 +118,39 @@ async def test_chat_and_embedding_use_one_typed_http_boundary_and_propagate_corr
     assert all(request.headers["x-correlation-id"] == CORRELATION for request in requests)
     assert all(request.headers["authorization"] == "Bearer test-only-key" for request in requests)
     assert json.loads(requests[0].content)["messages"] == [{"role": "user", "content": "hello"}]
+
+
+@pytest.mark.asyncio
+async def test_provider_http_boundaries_project_only_w3c_trace_identity(monkeypatch: pytest.MonkeyPatch) -> None:
+    requests: list[httpx.Request] = []
+
+    def inject(headers):
+        projected = dict(headers)
+        projected["traceparent"] = "00-" + "a" * 32 + "-" + "b" * 16 + "-01"
+        return projected
+
+    monkeypatch.setattr(provider_client_module, "inject_w3c_trace_headers", inject)
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        if request.method == "GET":
+            return _response(request, 200, {"object": "list", "data": [{"id": "chat-test-model"}]})
+        if request.url.path.endswith("/embeddings"):
+            return _response(request, 200, _embedding_payload())
+        return _response(request, 200, _chat_payload())
+
+    provider = OpenAICompatibleClient(_config(), transport=httpx.MockTransport(handler))
+    try:
+        await provider.chat_completion(messages=[{"role": "user", "content": "hello"}])
+        await provider.get_embedding("hello")
+        assert await provider.health_check() is True
+    finally:
+        await _close(provider)
+
+    assert len(requests) == 3
+    assert all(request.headers["traceparent"].startswith("00-") for request in requests)
+    assert all("baggage" not in request.headers for request in requests)
+    assert all("secret" not in repr(request.headers) for request in requests)
 
 
 @pytest.mark.asyncio

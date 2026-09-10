@@ -183,3 +183,19 @@ The crash fixture remains a queue-level after-claim termination, the complete
 eight-point crash matrix is still absent, and the PostgreSQL Worker A/B run,
 stale publish result and production publication path remain unobserved. The
 candidate therefore stays **BLOCKED_EXTERNAL / NO-GO**.
+
+## 67. Downstream W3C HTTP propagation closure — 2026-09-10
+
+The source-level observability boundary now projects bounded W3C
+`traceparent`/`tracestate` identity into provider, Qdrant and S3-compatible HTTP
+requests after their request/authentication setup. The shared helper copies
+only those two fields, rejects oversized or non-ASCII values, excludes
+`baggage` and arbitrary context, and remains safe when the OpenTelemetry SDK is
+not installed. Focused local evidence passes: observability **11**, provider
+**63**, Qdrant **16**, S3 transport **15**, and the existing storage suite
+**15** tests.
+
+This closes the source and hermetic-test portion of downstream HTTP trace
+projection. It does not prove collector delivery, live trace continuity,
+runtime service readiness, independent review, or promotion; Docker remains
+unavailable to this user and the candidate remains **BLOCKED_EXTERNAL / NO-GO**.

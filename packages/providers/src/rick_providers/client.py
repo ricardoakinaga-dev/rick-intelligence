@@ -45,6 +45,12 @@ from rick_providers.errors import (
     provider_error,
 )
 
+try:
+    from rick_observability import inject_w3c_trace_headers
+except ImportError:  # pragma: no cover - provider package can run standalone.
+    def inject_w3c_trace_headers(headers: Mapping[str, str] | None = None) -> dict[str, str]:
+        return dict(headers or {})
+
 
 MAX_RESPONSE_BYTES = 1_000_000
 MAX_TOOL_COUNT = 128
@@ -427,6 +433,7 @@ class OpenAICompatibleClient:
                 }
                 if self.config.api_key:
                     headers["Authorization"] = f"Bearer {self.config.api_key}"
+                headers = inject_w3c_trace_headers(headers)
                 async with self._ensure_client().stream(
                     "POST", url, headers=headers, json=payload,
                 ) as response:
@@ -533,6 +540,7 @@ class OpenAICompatibleClient:
         }
         if self.config.api_key:
             headers["Authorization"] = f"Bearer {self.config.api_key}"
+        headers = inject_w3c_trace_headers(headers)
 
         try:
             http_client = self._ensure_client()
@@ -574,6 +582,7 @@ class OpenAICompatibleClient:
         }
         if self.config.api_key:
             headers["Authorization"] = f"Bearer {self.config.api_key}"
+        headers = inject_w3c_trace_headers(headers)
 
         async with self._ensure_client().stream(
             "GET",
