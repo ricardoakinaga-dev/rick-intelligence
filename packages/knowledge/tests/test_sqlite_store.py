@@ -7,6 +7,7 @@ import sqlite3
 import pytest
 
 from rick_knowledge import Chunk, Collection, Document, SQLiteKnowledgeStore
+from rick_knowledge.json_boundary import decode_metadata
 
 
 def _document(document_id: str, *, tenant_id: str = "tenant-a", collection_id: str = "c1") -> Document:
@@ -216,6 +217,17 @@ def test_persisted_metadata_json_fails_closed_for_all_knowledge_rows(tmp_path):
 
     with sqlite3.connect(database) as connection:
         connection.execute(
+            "UPDATE documents SET metadata_json=? WHERE document_id=?",
+            ('{"source":"test","source":"test"}', "doc-boundary"),
+        )
+        connection.commit()
+
+    reopened = SQLiteKnowledgeStore(database)
+    assert reopened.get_document("doc-boundary", tenant_id="tenant-a", workspace_id="workspace-a") is None
+    reopened.close()
+
+    with sqlite3.connect(database) as connection:
+        connection.execute(
             "UPDATE chunks SET metadata_json=? WHERE chunk_id=?",
             ('{"source":NaN}', "chunk-boundary"),
         )
@@ -224,6 +236,10 @@ def test_persisted_metadata_json_fails_closed_for_all_knowledge_rows(tmp_path):
     reopened = SQLiteKnowledgeStore(database)
     assert reopened.get_chunks("doc-boundary") == []
     reopened.close()
+
+
+def test_metadata_decoder_rejects_duplicate_object_keys() -> None:
+    assert decode_metadata('{"source":"first","source":"second"}') is None
 
 
 def test_knowledge_metadata_writes_reject_nonfinite_and_oversized_values(tmp_path):

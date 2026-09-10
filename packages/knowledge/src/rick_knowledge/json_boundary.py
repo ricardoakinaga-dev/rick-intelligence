@@ -14,6 +14,15 @@ def _reject_json_constant(_value: str) -> object:
     raise ValueError("non-finite JSON constants are not allowed")
 
 
+def _reject_duplicate_json_keys(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    decoded: dict[str, object] = {}
+    for key, value in pairs:
+        if key in decoded:
+            raise ValueError("duplicate JSON object key")
+        decoded[key] = value
+    return decoded
+
+
 def encode_metadata(value: object) -> str:
     """Return canonical metadata JSON or reject it before a durable write."""
 
@@ -41,7 +50,11 @@ def decode_metadata(value: object) -> dict[str, Any] | None:
         try:
             if len(value.encode("utf-8")) > MAX_METADATA_JSON_BYTES:
                 return None
-            decoded = json.loads(value, parse_constant=_reject_json_constant)
+            decoded = json.loads(
+                value,
+                object_pairs_hook=_reject_duplicate_json_keys,
+                parse_constant=_reject_json_constant,
+            )
         except (RecursionError, TypeError, UnicodeError, ValueError, json.JSONDecodeError):
             return None
     elif isinstance(value, Mapping):

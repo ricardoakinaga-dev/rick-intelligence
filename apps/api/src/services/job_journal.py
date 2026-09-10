@@ -170,13 +170,26 @@ def _reject_json_constant(_value: str) -> object:
     raise ValueError("non-finite JSON number")
 
 
+def _reject_duplicate_json_keys(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    decoded: dict[str, object] = {}
+    for key, value in pairs:
+        if key in decoded:
+            raise ValueError("duplicate JSON object key")
+        decoded[key] = value
+    return decoded
+
+
 def _decode_mapping(value: object) -> dict[str, Any] | object:
     if not isinstance(value, str):
         return _INVALID_JSON
     if len(value.encode("utf-8")) > MAX_JSON_BYTES:
         return _INVALID_JSON
     try:
-        decoded = json.loads(value, parse_constant=_reject_json_constant)
+        decoded = json.loads(
+            value,
+            object_pairs_hook=_reject_duplicate_json_keys,
+            parse_constant=_reject_json_constant,
+        )
         if not isinstance(decoded, Mapping):
             return _INVALID_JSON
         encoded = json.dumps(

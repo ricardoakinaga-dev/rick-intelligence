@@ -127,6 +127,11 @@ def test_persisted_identity_json_fails_closed_for_oversized_and_nonfinite_snapsh
     nan_connection = Connection([("token_hash", [session_row(authorization_snapshot='{"permissions":[NaN]}')], 1)])
     assert PostgresSessionStore(factory_for(nan_connection), ttl_seconds=600).get("bearer") is None
 
+    duplicate_connection = Connection([
+        ("token_hash", [session_row(authorization_snapshot='{"permissions":["chat.query"],"permissions":["chat.query"]}')], 1),
+    ])
+    assert PostgresSessionStore(factory_for(duplicate_connection), ttl_seconds=600).get("bearer") is None
+
     malformed_connection = Connection([("token_hash", [session_row(authorization_snapshot='{"permissions":1}')], 1)])
     assert PostgresSessionStore(factory_for(malformed_connection), ttl_seconds=600).get("bearer") is None
 

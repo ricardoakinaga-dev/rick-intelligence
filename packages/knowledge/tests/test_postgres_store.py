@@ -128,6 +128,7 @@ def test_chunk_replacement_is_transactional_and_requires_stable_order() -> None:
 def test_persisted_metadata_json_fails_closed_for_document_reads() -> None:
     for metadata in (
         '{"source":NaN}',
+        '{"source":"first","source":"second"}',
         '{"source":"test"}' + (" " * (256 * 1024)),
     ):
         connection = Connection([{

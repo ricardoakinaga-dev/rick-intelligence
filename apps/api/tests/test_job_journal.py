@@ -160,6 +160,24 @@ def test_job_journal_rejects_oversized_or_nonfinite_persisted_json(tmp_path: Pat
     reopened.close()
 
 
+def test_job_journal_rejects_duplicate_persisted_json_keys(tmp_path: Path) -> None:
+    journal_path = tmp_path / "jobs.sqlite"
+    journal = JobJournal(journal_path)
+    journal.upsert(_job("duplicate-job"))
+    journal.close()
+
+    with sqlite3.connect(journal_path) as connection:
+        connection.execute(
+            "UPDATE ingestion_jobs SET acl_json=? WHERE job_id=?",
+            ('{"allowed_collection_ids":["collection-a"],"allowed_collection_ids":["collection-a"]}', "duplicate-job"),
+        )
+        connection.commit()
+
+    reopened = JobJournal(journal_path)
+    assert reopened.get("duplicate-job") is None
+    reopened.close()
+
+
 def test_journal_hardening_failure_rolls_back_before_commit(tmp_path: Path, monkeypatch) -> None:
     journal = JobJournal(tmp_path / "jobs.sqlite")
 

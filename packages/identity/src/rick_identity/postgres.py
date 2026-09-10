@@ -40,6 +40,15 @@ def _reject_json_constant(_value: str) -> object:
     raise ValueError("non-finite JSON constants are not allowed")
 
 
+def _reject_duplicate_json_keys(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    decoded: dict[str, object] = {}
+    for key, value in pairs:
+        if key in decoded:
+            raise ValueError("duplicate JSON object key")
+        decoded[key] = value
+    return decoded
+
+
 def _row_dict(cursor: object, row: object) -> dict[str, object]:
     if isinstance(row, Mapping):
         return {str(key): value for key, value in row.items()}
@@ -54,7 +63,11 @@ def _json(value: object, default: object) -> object:
         try:
             if len(value.encode("utf-8")) > MAX_IDENTITY_JSON_BYTES:
                 return default
-            parsed = json.loads(value, parse_constant=_reject_json_constant)
+            parsed = json.loads(
+                value,
+                object_pairs_hook=_reject_duplicate_json_keys,
+                parse_constant=_reject_json_constant,
+            )
         except (TypeError, UnicodeError, ValueError, RecursionError):
             return default
     if not isinstance(parsed, (dict, list)):
