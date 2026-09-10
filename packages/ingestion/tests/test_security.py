@@ -19,6 +19,7 @@ from rick_ingestion import (  # noqa: E402
     ArchiveLimitError,
     ControlledPdfParser,
     FilenameValidationError,
+    MarkdownParser,
     MimeMismatchError,
     MAX_PARSED_TEXT_CHARS,
     ParseError,
@@ -31,6 +32,7 @@ from rick_ingestion import (  # noqa: E402
     inspect_file,
     normalize_filename,
     sanitize_display_filename,
+    TxtParser,
     validate_archive,
     validate_filename,
     validate_file,
@@ -172,6 +174,16 @@ def test_text_parser_applies_configured_character_limit(tmp_path: Path) -> None:
     with pytest.raises(ParseError) as error:
         parser.parse(path, workspace_id="workspace")
     assert error.value.code == "request_too_large"
+
+
+@pytest.mark.parametrize(("suffix", "parser_cls"), [(".txt", TxtParser), (".md", MarkdownParser)])
+def test_text_parsers_reject_invalid_utf8(tmp_path: Path, suffix: str, parser_cls: type) -> None:
+    path = _write(tmp_path / f"payload{suffix}", b"valid text\xff\xfe")
+
+    with pytest.raises(ParseError) as error:
+        parser_cls().parse(path, workspace_id="workspace")
+
+    assert error.value.code == "validation_error"
 
 
 def test_docx_archive_inspection_streams_a_valid_container(tmp_path: Path) -> None:

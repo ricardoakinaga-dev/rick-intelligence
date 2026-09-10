@@ -247,25 +247,28 @@ def read_text_file(
     )
     pieces: list[str] = []
     total_chars = 0
-    with path.open("rb") as stream:
-        while True:
-            if deadline is not None and time.monotonic() >= deadline:
-                raise ParserTimeoutError()
-            chunk = stream.read(FILE_READ_CHUNK_BYTES)
-            if not chunk:
-                break
-            if b"\x00" in chunk:
-                raise MimeMismatchError()
-            piece = decoder.decode(chunk, final=False)
+    try:
+        with path.open("rb") as stream:
+            while True:
+                if deadline is not None and time.monotonic() >= deadline:
+                    raise ParserTimeoutError()
+                chunk = stream.read(FILE_READ_CHUNK_BYTES)
+                if not chunk:
+                    break
+                if b"\x00" in chunk:
+                    raise MimeMismatchError()
+                piece = decoder.decode(chunk, final=False)
+                total_chars += len(piece)
+                if total_chars > max_chars:
+                    raise ParseError("request_too_large", "Parsed document exceeds the text limit.")
+                pieces.append(piece)
+            piece = decoder.decode(b"", final=True)
             total_chars += len(piece)
             if total_chars > max_chars:
                 raise ParseError("request_too_large", "Parsed document exceeds the text limit.")
             pieces.append(piece)
-        piece = decoder.decode(b"", final=True)
-        total_chars += len(piece)
-        if total_chars > max_chars:
-            raise ParseError("request_too_large", "Parsed document exceeds the text limit.")
-        pieces.append(piece)
+    except UnicodeDecodeError as exc:
+        raise ParseError("validation_error", "Document encoding is invalid.") from exc
     if deadline is not None and time.monotonic() >= deadline:
         raise ParserTimeoutError()
     return "".join(pieces)
@@ -1148,13 +1151,6 @@ class TxtParser(_DeadlineAwareParser):
             text = read_text_file(
                 path,
                 encoding="utf-8",
-                max_chars=self.limits.max_text_chars,
-                deadline=self._parser_deadline,
-            )
-        except UnicodeDecodeError:
-            text = read_text_file(
-                path,
-                encoding="latin-1",
                 max_chars=self.limits.max_text_chars,
                 deadline=self._parser_deadline,
             )
