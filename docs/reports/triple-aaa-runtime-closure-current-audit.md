@@ -284,11 +284,12 @@ hardening; it does not create remote same-SHA, runtime or authority evidence.
 The multi-worker gate now enumerates all eight requested crash points:
 `after_claim`, `after_heartbeat`, `during_handler`, `before_result`,
 `in_transaction`, `after_commit`, `before_publish` and `after_publish`.
-The canonical `RealWorkerRuntime` path has hermetic injection and assertions
-for the first two points, including heartbeat renewal and stale/lease
-recovery. The remaining six points are explicitly `NOT_IMPLEMENTED`; the
-gate emits `crash_matrix_complete=false` and `production_safe=false` until
-all eight pass. No live PostgreSQL Worker A/B evidence is claimed.
+The canonical `RealWorkerRuntime` and `PostgresJobQueue` paths now have
+hermetic opt-in injection and assertions for all eight points, including
+heartbeat renewal, transaction rollback/commit distinctions, stale/lease
+recovery, audit and outbox uniqueness. The gate still emits
+`production_safe=false` unless every point passes in the approved external
+deployment; no live PostgreSQL Worker A/B evidence is claimed.
 
 ## 74. Browser-run isolation hygiene — 2026-09-10
 
@@ -300,3 +301,35 @@ attempt cannot leave tracked Next metadata dirty. This improves local
 repeatability and clean-sentinel integrity; it does not prove live
 API-backed browser states, accessibility approval, image provenance or
 promotion.
+
+## 75. Tenant metadata and timing negative closure — 2026-09-10
+
+Source commits `85942fc` and `31e8cc9` expand the tenant/evidence runtime
+contract from eight to **16** negative cases. The matrix now covers tenant and
+document enumeration, differential error shape, timing-sensitive identifiers,
+object/job/collection existence and telemetry identifiers in addition to
+forged, cross-tenant, stale, checksum, unknown-chunk, prompt-injection and
+polyglot cases. Metadata cases require an explicit `metadata_leak_free` proof;
+the timing case requires `timing_leak_free`; unique probe markers and the
+mutation values themselves are checked against the bounded response projection.
+
+The focused hermetic suite passes **7** tests. This closes the local negative
+contract and rejects reflected metadata; it does not establish a live Tenant
+A/B runtime, timing distribution, provider corpus or promotion evidence.
+
+## 76. Complete hermetic worker crash seams — 2026-09-10
+
+Source candidate `780e02d` adds opt-in, fail-closed fault seams to the
+canonical `RealWorkerRuntime` and `PostgresJobQueue`. The eight requested
+points are routed distinctly: `after_claim`, `after_heartbeat`,
+`during_handler`, `before_result`, `in_transaction`, `after_commit`,
+`before_publish` and `after_publish`. Pre-commit crashes require lease expiry,
+reclaim, stale ACK/publication rejection and one final lifecycle/audit/outbox
+record; `after_commit` verifies that the committed success is retained without
+duplicate publication. The production runtime never enables these seams
+implicitly, and `production_safe` remains false until the same matrix runs
+against an approved PostgreSQL Worker A/B deployment.
+
+The focused crash/worker tests pass **14** cases and the full State-of-Art
+suite passes **336** tests. No external database or distributed runtime claim
+is made.

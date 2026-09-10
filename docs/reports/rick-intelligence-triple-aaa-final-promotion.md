@@ -77,12 +77,15 @@ cancellation and stale acknowledgement boundaries. Two worker services are
 declared and share the durable queue. The multi-worker gate's happy path now
 executes `RealWorkerRuntime.start()`, `run_once()` and `shutdown()` in each
 isolated process and requires a runtime-owned heartbeat before the result is
-acknowledged. Its crash matrix explicitly lists all eight requested points;
-only `after_claim` and `after_heartbeat` have hermetic runtime injection.
-`during_handler`, `before_result`, `in_transaction`, `after_commit`,
-`before_publish` and `after_publish` remain `NOT_IMPLEMENTED`, so the gate
-reports `production_safe=false`. No external PostgreSQL Worker A/B result is
-present and the runtime evidence is therefore blocked.
+acknowledged. The crash matrix now routes all eight requested points through
+opt-in seams in the canonical runtime and queue: `after_claim`,
+`after_heartbeat`, `during_handler`, `before_result`, `in_transaction`,
+`after_commit`, `before_publish` and `after_publish`. Pre-commit points verify
+lease expiry, reclaim, stale ACK/publication rejection and one durable
+publication; `after_commit` verifies that the committed result remains
+terminal without a duplicate. The gate still reports `production_safe=false`
+until this matrix runs against an approved PostgreSQL Worker A/B deployment.
+No external PostgreSQL result is present and the runtime evidence is blocked.
 
 ## 8. Redis
 
@@ -121,9 +124,13 @@ lineage record, idempotency result or recovery outcome.
 ## 12. Multi-Tenancy
 
 The composition requires explicit tenant/workspace/collection scope and the
-storage, queue and retrieval adapters carry scope in their contracts. A live
-Tenant A/B matrix across identity, cache, queue, object, vectors, evidence,
-decision, logs and timing metadata has not been executed.
+storage, queue and retrieval adapters carry scope in their contracts. The
+local tenant/evidence gate covers 16 negative cases, including enumeration,
+differential errors, timing-sensitive identifiers, object/job/collection
+existence and telemetry identifiers; unique probe markers and reflected
+mutation values fail closed. A live Tenant A/B matrix across identity, cache,
+queue, object, vectors, evidence, decision, logs and timing metadata has not
+been executed.
 
 ## 13. Evidence
 
@@ -244,7 +251,7 @@ review has approved promotion.
 | --- | --- | --- | --- |
 | Docker daemon/image authority unavailable | `BLOCKED_EXTERNAL` | Runtime operator | Approved daemon and immutable images |
 | PostgreSQL/Redis/Qdrant/S3 live behavior unobserved | `BLOCKED_EXTERNAL` | Runtime operators | Isolated Compose readiness and gates |
-| Multi-worker outbox/crash matrix incomplete | `BLOCKED_EXTERNAL` | Distributed systems | Independent Worker A/B crash run |
+| Multi-worker outbox/crash matrix not observed live | `BLOCKED_EXTERNAL` | Distributed systems | Independent Worker A/B crash run |
 | Provider/corpus and citation authority absent | `BLOCKED_EXTERNAL` | AI platform | Approved bounded provider/corpus packet |
 | OTLP, restore, chaos, soak and performance not measured | `NOT_RUN` | SRE | Same-release operational packet |
 | Sealed packet and human Go/No-Go absent | `NOT_RUN` | Release authority | All mandatory rows pass |
