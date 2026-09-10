@@ -369,13 +369,20 @@ async def test_stream_lease_loss_cancels_slow_provider_and_emits_safe_terminal_r
 @pytest.mark.parametrize(
     "kwargs",
     [
+        {"max_evidence_items": 1.0},
         {"max_retrieval_rounds": 0},
+        {"max_retrieval_rounds": 1.0},
         {"max_tool_calls": -1},
+        {"max_tool_calls": True},
         {"max_provider_calls": 0},
+        {"max_provider_calls": 1.0},
         {"max_tokens": 0},
+        {"max_tokens": 1.0},
         {"max_reasoning_seconds": 0},
+        {"max_reasoning_seconds": True},
         {"max_reasoning_seconds": float("inf")},
         {"max_total_request_seconds": 0},
+        {"max_total_request_seconds": True},
         {"max_total_request_seconds": float("nan")},
     ],
 )

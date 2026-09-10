@@ -64,27 +64,45 @@ class ProfessorLimits:
     max_total_request_seconds: float = 60.0
 
     def __post_init__(self) -> None:
-        if self.max_evidence_items < 1:
+        if type(self.max_evidence_items) is not int or self.max_evidence_items < 1:
             raise ValueError("max_evidence_items must be positive")
-        if self.max_evidence_chars < 1 or self.max_evidence_item_chars < 1:
+        if (
+            type(self.max_evidence_chars) is not int
+            or type(self.max_evidence_item_chars) is not int
+            or self.max_evidence_chars < 1
+            or self.max_evidence_item_chars < 1
+        ):
             raise ValueError("evidence limits must be positive")
-        if self.max_prompt_chars < 1 or self.max_answer_chars < 1:
+        if (
+            type(self.max_prompt_chars) is not int
+            or type(self.max_answer_chars) is not int
+            or self.max_prompt_chars < 1
+            or self.max_answer_chars < 1
+        ):
             raise ValueError("text limits must be positive")
-        if not 0.0 <= self.approved_confidence <= 1.0:
+        if isinstance(self.approved_confidence, bool) or not 0.0 <= self.approved_confidence <= 1.0:
             raise ValueError("approved_confidence must be between 0 and 1")
-        if self.lease_ttl_ms < 1:
+        if type(self.lease_ttl_ms) is not int or self.lease_ttl_ms < 1:
             raise ValueError("lease_ttl_ms must be positive")
-        if self.max_retrieval_rounds < 1:
+        if type(self.max_retrieval_rounds) is not int or self.max_retrieval_rounds < 1:
             raise ValueError("max_retrieval_rounds must be positive")
-        if self.max_tool_calls < 0:
+        if type(self.max_tool_calls) is not int or self.max_tool_calls < 0:
             raise ValueError("max_tool_calls must not be negative")
-        if self.max_provider_calls < 1:
+        if type(self.max_provider_calls) is not int or self.max_provider_calls < 1:
             raise ValueError("max_provider_calls must be positive")
-        if self.max_tokens < 1:
+        if type(self.max_tokens) is not int or self.max_tokens < 1:
             raise ValueError("max_tokens must be positive")
-        if not math.isfinite(self.max_reasoning_seconds) or self.max_reasoning_seconds <= 0:
+        if (
+            isinstance(self.max_reasoning_seconds, bool)
+            or not math.isfinite(self.max_reasoning_seconds)
+            or self.max_reasoning_seconds <= 0
+        ):
             raise ValueError("max_reasoning_seconds must be finite and positive")
-        if not math.isfinite(self.max_total_request_seconds) or self.max_total_request_seconds <= 0:
+        if (
+            isinstance(self.max_total_request_seconds, bool)
+            or not math.isfinite(self.max_total_request_seconds)
+            or self.max_total_request_seconds <= 0
+        ):
             raise ValueError("max_total_request_seconds must be finite and positive")
 
 
