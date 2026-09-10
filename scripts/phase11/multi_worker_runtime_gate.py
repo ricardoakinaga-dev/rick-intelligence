@@ -30,6 +30,11 @@ DEFAULT_OUTPUT = ".runtime/phase-3/multi-worker-runtime-gate.json"
 LEASE_SECONDS = 0.75
 WORKER_WAIT_SECONDS = 30
 PROCESS_JOIN_SECONDS = 10
+CRASH_POINTS = (
+    "after_claim", "after_heartbeat", "during_handler", "before_result",
+    "in_transaction", "after_commit", "before_publish", "after_publish",
+)
+SUPPORTED_CRASH_POINTS = ("after_claim", "after_heartbeat")
 
 
 @dataclass(frozen=True)
@@ -177,14 +182,77 @@ def _claim_and_ack_worker(
             pass
 
 
+class _ObservedHeartbeatQueue:
+    """Observe the real renewed lease without replacing any queue operation."""
+
+    def __init__(self, queue: Any) -> None:
+        self.queue = queue
+        self.renewed_lease: Any = None
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self.queue, name)
+
+    def heartbeat(self, *args: Any, **kwargs: Any) -> Any:
+        renewed = self.queue.heartbeat(*args, **kwargs)
+        self.renewed_lease = renewed
+        return renewed
+
+
+def _run_crash_cycle(queue: Any, scope: Any, worker_id: str, channel: Any, crash_point: str) -> None:
+    """Terminate inside a real worker handler at one explicitly supported point."""
+
+    from runtime import RealWorkerRuntime
+
+    if crash_point not in SUPPORTED_CRASH_POINTS:
+        raise ValueError("unsupported crash point")
+    observed = _ObservedHeartbeatQueue(queue)
+
+    def handler(job: Any, lease: Any, *, cancelled: Any) -> Any:
+        if crash_point == "after_heartbeat":
+            deadline = time.monotonic() + WORKER_WAIT_SECONDS / 2
+            while runtime.metrics().heartbeats < 1:
+                cancelled.checkpoint()
+                if time.monotonic() >= deadline:
+                    raise RuntimeError("runtime heartbeat was not observed")
+                time.sleep(0.01)
+            lease = observed.renewed_lease
+        # Lease credentials cross only the private parent pipe for the stale
+        # mutation negative. They are never included in the evidence artifact.
+        channel.send({
+            "kind": "claimed", "pid": os.getpid(), "worker_id": worker_id,
+            "job_id": str(job.job_id), "version": job.version,
+            "token": str(lease.token), "acquired_at": lease.acquired_at,
+            "expires_at": lease.expires_at, "heartbeat_at": lease.heartbeat_at,
+            "runtime": "RealWorkerRuntime", "crash_point": crash_point,
+        })
+        channel.close()
+        os._exit(0)
+
+    runtime = RealWorkerRuntime(
+        observed, worker_id=worker_id, scope=scope,
+        handlers={"runtime_multi_worker": handler}, max_concurrency=1,
+        heartbeat_interval_seconds=LEASE_SECONDS / 3,
+        poll_interval_seconds=0.01, handler_timeout_seconds=WORKER_WAIT_SECONDS / 2,
+        shutdown_timeout_seconds=2.0,
+    )
+    try:
+        runtime.start()
+        runtime.run_once(wait=True)
+        raise RuntimeError("crash worker did not terminate at the requested point")
+    finally:
+        # Reached only when setup fails or a hermetic test replaces os._exit.
+        runtime.shutdown(timeout=2.0)
+
+
 def _crash_after_claim_worker(
     dsn: str,
     scope_values: tuple[str, str, str],
     worker_id: str,
     ready: Any,
     channel: Any,
+    crash_point: str = "after_claim",
 ) -> None:
-    """Claim and terminate before ACK to model a worker crash."""
+    """Launch a real runtime and terminate before ACK at the requested point."""
 
     try:
         dependencies = _runtime_dependencies()
@@ -197,34 +265,7 @@ def _crash_after_claim_worker(
             os._exit(1)
         queue = _queue_for(dsn, dependencies)
         scope = scope_type(*scope_values)
-        claimed = queue.claim(
-            worker_id=worker_type(worker_id),
-            scope=scope,
-            expected_versions={},
-            limit=1,
-            now=time.time(),
-        )
-        if not claimed:
-            _send(channel, {"kind": "error", "error": "crash_worker_claimed_no_job"})
-            os._exit(1)
-        job, lease = claimed[0]
-        # This token travels only over a private pipe so the parent can issue
-        # the stale mutation negative; it is never persisted in evidence.
-        channel.send(
-            {
-                "kind": "claimed",
-                "pid": os.getpid(),
-                "worker_id": worker_id,
-                "job_id": str(job.job_id),
-                "version": job.version,
-                "token": str(lease.token),
-                "acquired_at": lease.acquired_at,
-                "expires_at": lease.expires_at,
-                "heartbeat_at": lease.heartbeat_at,
-            }
-        )
-        channel.close()
-        os._exit(0)
+        _run_crash_cycle(queue, scope, worker_id, channel, crash_point)
     except Exception as exc:  # pragma: no cover - exercised by a live dependency.
         _send(channel, {"kind": "error", "error": type(exc).__name__})
         os._exit(1)
@@ -332,16 +373,17 @@ def _run_crash_recovery(
     dependencies: tuple[Any, ...],
     scope: tuple[str, str, str],
     run_id: str,
+    crash_point: str = "after_claim",
 ) -> list[GateResult]:
     queue = _queue_for(dsn, dependencies)
-    job_id = f"runtime-crash-{run_id}"
+    job_id = f"runtime-crash-{crash_point}-{run_id}"
     queue.enqueue(_new_job(dependencies, scope, job_id, run_id), expected_version=0)
     context = multiprocessing_module.get_context("spawn")
     ready = context.Event()
     parent, child = context.Pipe(duplex=False)
     crashed = context.Process(
         target=_crash_after_claim_worker,
-        args=(dsn, scope, "worker-crash", ready, child),
+        args=(dsn, scope, "worker-crash", ready, child, crash_point),
         name="rick-runtime-worker-crash",
     )
     crashed.start()
@@ -352,6 +394,10 @@ def _run_crash_recovery(
     _finish_process(crashed)
     if claim.get("kind") != "claimed" or crashed.exitcode != 0:
         raise RuntimeError("crash worker did not claim and terminate cleanly")
+    if claim.get("runtime") != "RealWorkerRuntime" or claim.get("crash_point") != crash_point:
+        raise RuntimeError("crash observation did not come from the requested runtime point")
+    if crash_point == "after_heartbeat" and float(claim["heartbeat_at"]) <= float(claim["acquired_at"]):
+        raise RuntimeError("crash worker did not observe a renewed lease")
 
     expires_at = float(claim["expires_at"])
     time.sleep(max(0.0, expires_at - time.time() + 0.25))
@@ -422,6 +468,7 @@ def _run_crash_recovery(
     if not outbox_row or int(outbox_row[0]) != 1:
         raise RuntimeError("crash recovery produced an unexpected durable publication count")
     return [
+        GateResult(f"CRASH_{crash_point.upper()}", "PASS", "real worker process terminated and its durable job recovered"),
         GateResult("LEASE_RECLAIM_AFTER_EXPIRY", "PASS", "a second process reclaimed the expired durable lease"),
         GateResult("STALE_WORKER_ACK_REJECTED", "PASS", "the crashed worker's stale lease could not acknowledge after reclaim"),
         GateResult("STALE_WORKER_PUBLISH_REJECTED", "PASS", "the stale worker attempt left the durable outbox publication count unchanged"),
@@ -449,7 +496,12 @@ def run_gate(dsn: str, *, allow_nonlocal: bool = False) -> tuple[str, list[GateR
         connection = psycopg.connect(dsn)
         scope = postgres_runtime_gate._seed_scope(connection, run_id)
         results.extend(_run_concurrent_claim(dsn, dependencies, scope, run_id))
-        results.extend(_run_crash_recovery(dsn, dependencies, scope, run_id))
+        for crash_point in SUPPORTED_CRASH_POINTS:
+            case_results = _run_crash_recovery(dsn, dependencies, scope, run_id, crash_point)
+            # Keep common case names once, while preserving separate point
+            # evidence; every invocation must succeed before either is accepted.
+            existing = {result.name for result in results}
+            results.extend(result for result in case_results if result.name not in existing)
         with connection.cursor() as cursor:
             cursor.execute("SELECT 1")
             if cursor.fetchone() != (1,):
@@ -484,12 +536,19 @@ def main(argv: list[str] | None = None) -> int:
         except ValueError as exc:
             status = "FAIL"
             results = [GateResult("configuration", status, str(exc))]
+    crash_matrix = {
+        point: "PASS" if any(result.name == f"CRASH_{point.upper()}" and result.result == "PASS" for result in results)
+        else "NOT_RUN" if point in SUPPORTED_CRASH_POINTS else "NOT_IMPLEMENTED"
+        for point in CRASH_POINTS
+    }
     payload = {
         "schema_version": "phase3-multi-worker-runtime-gate.v1",
         "status": status,
         "results": [item.to_dict() for item in results],
         "runtime_claim": status == "PASS",
-        "production_safe": status == "PASS",
+        "production_safe": status == "PASS" and all(value == "PASS" for value in crash_matrix.values()),
+        "crash_matrix": crash_matrix,
+        "crash_matrix_complete": all(value == "PASS" for value in crash_matrix.values()),
     }
     output = (ROOT / args.output).resolve()
     output.relative_to(ROOT.resolve())

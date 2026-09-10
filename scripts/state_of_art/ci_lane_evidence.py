@@ -303,7 +303,10 @@ def run_lane(
     if timeout_seconds < 1 or timeout_seconds > MAX_TIMEOUT_SECONDS:
         raise ValueError(f"timeout must be between 1 and {MAX_TIMEOUT_SECONDS} seconds")
 
-    observed_at = _now()
+    # Keep explicit lifecycle timestamps in the envelope.  ``observed_at`` is
+    # retained as the historical completion marker, while the start/end pair
+    # makes the section 9 contract machine-readable and auditable.
+    started_at = _now()
     checkout_before = capture_checkout(root)
     metadata = _metadata(env)
     command_results, commands_passed, limitations = _run_commands(
@@ -343,6 +346,8 @@ def run_lane(
                 "sha256": _sha256(log_path),
             }
         )
+    finished_at = _now()
+    observed_at = finished_at
 
     envelope: dict[str, Any] = {
         "artifact_sha256": raw_artifacts[0]["sha256"] if raw_artifacts else None,
@@ -357,6 +362,7 @@ def run_lane(
         "commands": command_results,
         "commit_sha": checkout_after.get("head"),
         "environment": "github-actions-local-ci",
+        "exit_code": exit_status,
         "gate_ids": list(normalized_gates),
         "lane": lane,
         "limitations": limitations
@@ -374,9 +380,11 @@ def run_lane(
         "record_id": f"CI-{lane}-{observed_at.replace('-', '').replace(':', '').replace('.', '')}",
         "run": metadata,
         "schema_version": SCHEMA_VERSION,
+        "started_at": started_at,
         "status": status,
         "tree_sha": checkout_after.get("tree"),
         "exit_status": exit_status,
+        "finished_at": finished_at,
         "freshness": "CURRENT" if checkout_unchanged else "INVALID_CHECKOUT",
     }
     output.parent.mkdir(parents=True, exist_ok=True)

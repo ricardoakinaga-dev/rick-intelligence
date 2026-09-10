@@ -35,6 +35,9 @@ and runs the 375/768/1440 matrix with a single-worker lab profile. This
 keeps the LCP/CLS sample representative of the built artifact. Direct
 `npm run test:e2e` remains the faster development-server workflow; set
 `RICK_WEB_E2E_PRODUCTION=1` when reproducing the production profile manually.
+The Phase 3 API-backed browser gate supplies a per-run `NEXT_DIST_DIR`, so a
+managed development server cannot rewrite the production E2E routes manifest
+when both lanes run on the same checkout.
 
 By default the browser calls its own origin and Next forwards `/api/*` and
 `/health/*` to `RICK_API_INTERNAL_URL` (locally

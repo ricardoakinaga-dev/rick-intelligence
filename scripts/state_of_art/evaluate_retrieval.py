@@ -319,6 +319,31 @@ def _claim_list(value: Any, *, path: str, errors: list[str]) -> list[dict[str, A
         elif "supported" not in claim:
             claim["supported"] = None
 
+        # Faithfulness is an authority-owned annotation.  A boolean is useful
+        # for reviewed yes/no labels; a bounded numeric value supports graded
+        # review.  The evaluator never derives it from lexical overlap or
+        # citation identity, because neither establishes entailment.
+        faithfulness_key = next(
+            (alias for alias in ("faithfulness", "faithful") if alias in claim),
+            None,
+        )
+        if faithfulness_key is None:
+            claim["faithfulness"] = None
+        else:
+            raw_faithfulness = claim[faithfulness_key]
+            if isinstance(raw_faithfulness, bool):
+                claim["faithfulness"] = 1.0 if raw_faithfulness else 0.0
+            elif isinstance(raw_faithfulness, (int, float)) and not isinstance(raw_faithfulness, bool):
+                faithfulness = float(raw_faithfulness)
+                if not math.isfinite(faithfulness) or not 0.0 <= faithfulness <= 1.0:
+                    errors.append(f"{claim_path}.{faithfulness_key} must be a finite number between zero and one")
+                    claim["faithfulness"] = None
+                else:
+                    claim["faithfulness"] = faithfulness
+            else:
+                errors.append(f"{claim_path}.{faithfulness_key} must be a boolean or bounded number")
+                claim["faithfulness"] = None
+
         claim["claim_id"] = claim_id
         claim["text"] = text or ""
         claims.append(claim)
@@ -918,12 +943,12 @@ def _citation_source_metrics(cases: Sequence[_Case]) -> dict[str, Any]:
 
 
 def _claim_support_metrics(cases: Sequence[_Case]) -> dict[str, Any]:
-    """Evaluate claim-to-citation observations without claiming entailment.
+    """Evaluate claim-to-citation observations and reviewed faithfulness.
 
     ``reference_citation_ids`` are reviewed, versioned support annotations from
     the approved evaluation pack.  ``citation_ids`` are the answer's emitted
-    citations.  The evaluator measures identity-level support and completeness
-    only; domain review or an entailment model remains a separate authority.
+    citations.  Faithfulness is accepted only as an explicit reviewed
+    annotation on each claim; it is never inferred by this offline harness.
     """
 
     claims = [
@@ -941,6 +966,7 @@ def _claim_support_metrics(cases: Sequence[_Case]) -> dict[str, Any]:
             citation_recall=dict(not_run),
             citation_completeness=dict(not_run),
             unsupported_claim_rate=dict(not_run),
+            faithfulness=dict(not_run),
             claim_count=0,
             per_claim=[],
         )
@@ -951,6 +977,8 @@ def _claim_support_metrics(cases: Sequence[_Case]) -> dict[str, Any]:
     invalid_citation_count = 0
     supported_count = 0
     unsupported_count = 0
+    faithfulness_values: list[float] = []
+    missing_faithfulness_annotations: list[str] = []
 
     for case, claim in claims:
         predicted_raw = claim.get("citation_ids")
@@ -996,6 +1024,12 @@ def _claim_support_metrics(cases: Sequence[_Case]) -> dict[str, Any]:
         elif supported is False:
             unsupported_count += 1
 
+        faithfulness = claim.get("faithfulness")
+        if isinstance(faithfulness, (int, float)) and not isinstance(faithfulness, bool):
+            faithfulness_values.append(float(faithfulness))
+        else:
+            missing_faithfulness_annotations.append(f"{case.case_id}:{claim['claim_id']}")
+
         per_claim.append({
             "case_id": case.case_id,
             "claim_id": claim["claim_id"],
@@ -1006,6 +1040,8 @@ def _claim_support_metrics(cases: Sequence[_Case]) -> dict[str, Any]:
             "true_positive_citation_ids": sorted(true_positive),
             "supported": supported,
             "support_source": support_source,
+            "faithfulness": faithfulness,
+            "faithfulness_source": "reviewed_annotation" if faithfulness is not None else "unobservable",
         })
 
     precision_numerator = sum(len(row["true_positive"]) for row in precision_claims)
@@ -1098,11 +1134,32 @@ def _claim_support_metrics(cases: Sequence[_Case]) -> dict[str, Any]:
             aggregation="micro_over_claims",
         )
 
+    if missing_faithfulness_annotations:
+        faithfulness_metric = _metric(
+            INCONCLUSIVE,
+            reason="each claim needs an explicit reviewed faithfulness annotation",
+            value=None,
+            numerator=None,
+            denominator=len(claims),
+            missing_claims=missing_faithfulness_annotations,
+            source="reviewed_annotation",
+        )
+    else:
+        faithfulness_metric = _metric(
+            PASS,
+            value=_round_ratio(sum(faithfulness_values) / len(faithfulness_values)),
+            numerator=_round_ratio(sum(faithfulness_values)),
+            denominator=len(faithfulness_values),
+            aggregation="mean_over_reviewed_claims",
+            source="reviewed_annotation",
+        )
+
     status = _status_join([
         precision_metric["status"],
         recall_metric["status"],
         completeness_metric["status"],
         unsupported_metric["status"],
+        faithfulness_metric["status"],
     ])
     return _metric(
         status,
@@ -1111,13 +1168,14 @@ def _claim_support_metrics(cases: Sequence[_Case]) -> dict[str, Any]:
         citation_recall=recall_metric,
         citation_completeness=completeness_metric,
         unsupported_claim_rate=unsupported_metric,
+        faithfulness=faithfulness_metric,
         claim_count=len(claims),
         supported_claims=supported_count,
         unsupported_claims=unsupported_count,
         invalid_citation_count=invalid_citation_count,
         per_claim=per_claim,
         limitations=[
-            "Citation support is identity-level evaluation against approved reference IDs; it is not entailment or answer faithfulness.",
+            "Citation support is identity-level evaluation against approved reference IDs; faithfulness is reported only from explicit reviewed annotations.",
             "Low metric values remain observable so pack-owned thresholds, rather than this evaluator, decide quality acceptance.",
         ],
     )

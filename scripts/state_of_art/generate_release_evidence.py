@@ -15,6 +15,7 @@ from hashlib import sha256
 import json
 import os
 from pathlib import Path
+import re
 import signal
 import subprocess
 import sys
@@ -49,6 +50,9 @@ except ImportError:  # pragma: no cover - direct script execution fallback.
 
 
 ROOT = Path(__file__).resolve().parents[2]
+SHA1_RE = re.compile(r"^[0-9a-f]{40}$", re.IGNORECASE)
+SHA256_RE = re.compile(r"^[0-9a-f]{64}$", re.IGNORECASE)
+CI_ENVELOPE_SCHEMA = "state-of-art-ci-evidence.v1"
 DEFAULT_OUTPUT = "docs/progress/release-evidence.json"
 DEFAULT_ARTIFACTS = (
     ".github/workflows/state-of-art-quality.yml",
@@ -308,6 +312,109 @@ def _evidence_ref(root: Path, relative: str, description: str) -> EvidenceRef:
     return EvidenceRef(path=relative, sha256=_file_hash(root, relative), description=description)
 
 
+def _validate_ci_envelope(
+    raw: object,
+    *,
+    gate_id: str,
+    commit_sha: str,
+    tree_sha: str,
+    checkout_fingerprint: str,
+) -> tuple[str, int | None, str]:
+    """Validate the minimum section 9 contract before aggregating CI status.
+
+    ``release_integrity`` performs the full byte/path/provenance validation at
+    the final gate.  The generator must still remain truthful on its own: a
+    copied or hand-written PASS envelope must not look like current CI merely
+    because its status and exit code agree.
+    """
+
+    if not isinstance(raw, dict) or raw.get("schema_version") != CI_ENVELOPE_SCHEMA:
+        return "INVALID", 1, "CI envelope has an unsupported schema or is not a JSON object"
+    observed = str(raw.get("status", "")).upper()
+    expected_exit = {"PASS": 0, "FAIL": 1, "NOT_RUN": None}.get(observed)
+    raw_exit = raw.get("exit_status")
+    exit_shape_valid = (
+        raw_exit is None
+        if expected_exit is None
+        else type(raw_exit) is int and raw_exit == expected_exit
+    )
+    if observed not in {"PASS", "FAIL", "NOT_RUN"} or not exit_shape_valid:
+        return "INVALID", 1, "CI envelope has an unsupported status or contradictory exit_status"
+    if type(raw.get("exit_code")) is not type(raw_exit) or raw.get("exit_code") != raw_exit:
+        return "INVALID", 1, "CI envelope exit_code and exit_status disagree"
+    identity = (
+        ("commit_sha", commit_sha, SHA1_RE),
+        ("tree_sha", tree_sha, SHA1_RE),
+        ("checkout_fingerprint", checkout_fingerprint, SHA256_RE),
+    )
+    for field, expected, pattern in identity:
+        actual = raw.get(field)
+        if (
+            not isinstance(expected, str)
+            or not pattern.fullmatch(expected)
+            or not isinstance(actual, str)
+            or not pattern.fullmatch(actual)
+            or actual.lower() != expected.lower()
+        ):
+            return "INVALID", 1, f"CI envelope {field} is not bound to the current checkout"
+    for field in ("lane", "environment", "procedure", "started_at", "finished_at", "observed_at"):
+        if not isinstance(raw.get(field), str) or not raw[field].strip():
+            return "INVALID", 1, f"CI envelope has no {field}"
+    gate_ids = raw.get("gate_ids")
+    if (
+        not isinstance(gate_ids, list)
+        or not gate_ids
+        or any(not isinstance(item, str) or not item.strip() for item in gate_ids)
+        or gate_id not in gate_ids
+    ):
+        return "INVALID", 1, "CI envelope does not declare its manifest gate"
+    if raw.get("checkout_available") is not True or raw.get("clean_worktree") is not True:
+        return "INVALID", 1, "CI envelope checkout is unavailable or dirty"
+    if raw.get("freshness") != "CURRENT":
+        return "INVALID", 1, "CI envelope is not current"
+    if raw.get("promotion_scope") != "LOCAL_CI_ONLY" or raw.get("production_safe") is not False:
+        return "INVALID", 1, "CI envelope has an unsafe promotion scope"
+    sentinel = raw.get("checkout_sentinel")
+    if not isinstance(sentinel, dict) or sentinel.get("unchanged") is not True:
+        return "INVALID", 1, "CI envelope checkout sentinel is not unchanged"
+    commands = raw.get("commands")
+    if not isinstance(commands, list) or not commands:
+        return "INVALID", 1, "CI envelope has no command observations"
+    statuses: list[str] = []
+    for command in commands:
+        if not isinstance(command, dict) or not isinstance(command.get("status"), str):
+            return "INVALID", 1, "CI envelope contains a malformed command observation"
+        command_status = command["status"].upper()
+        if command_status not in {"PASS", "FAIL", "NOT_RUN"}:
+            return "INVALID", 1, "CI envelope contains an unsupported command status"
+        command_exit = command.get("exit_status")
+        if command_status == "PASS" and (type(command_exit) is not int or command_exit != 0):
+            return "INVALID", 1, "PASS CI command has a contradictory exit_status"
+        if command_status == "NOT_RUN" and command_exit is not None:
+            return "INVALID", 1, "NOT_RUN CI command has a contradictory exit_status"
+        if command_status == "FAIL" and (not isinstance(command_exit, int) or isinstance(command_exit, bool) or command_exit < 0):
+            return "INVALID", 1, "FAIL CI command has an invalid exit_status"
+        statuses.append(command_status)
+    if observed == "PASS" and any(status != "PASS" for status in statuses):
+        return "INVALID", 1, "PASS CI envelope contains a non-PASS command"
+    if observed == "FAIL" and all(status == "PASS" for status in statuses):
+        return "INVALID", 1, "FAIL CI envelope contains no failed command"
+    raw_artifacts = raw.get("raw_artifacts")
+    artifact_hash = raw.get("artifact_sha256")
+    if (
+        not isinstance(raw_artifacts, list)
+        or not raw_artifacts
+        or not isinstance(raw_artifacts[0], dict)
+        or not isinstance(raw_artifacts[0].get("sha256"), str)
+        or not SHA256_RE.fullmatch(raw_artifacts[0]["sha256"].removeprefix("sha256:"))
+        or not isinstance(artifact_hash, str)
+        or artifact_hash.removeprefix("sha256:").lower()
+        != raw_artifacts[0]["sha256"].removeprefix("sha256:").lower()
+    ):
+        return "INVALID", 1, "CI envelope raw artifact hash is missing or inconsistent"
+    return observed, raw_exit, "CI envelope is current and bound to the exact checkout"
+
+
 def _runtime_result(
     root: Path,
     gate_id: str,
@@ -316,6 +423,7 @@ def _runtime_result(
     *,
     commit_sha: str,
     tree_sha: str,
+    checkout_fingerprint: str,
     artifact_hash: str,
     timestamp: str,
     supplemental_ci_relative: str | None = None,
@@ -371,27 +479,19 @@ def _runtime_result(
                 ci_raw = load_json(ci_path)
             except (OSError, UnicodeDecodeError, json.JSONDecodeError):
                 ci_raw = None
-            ci_result = "INVALID"
-            ci_exit_status: int | None = 1
-            if isinstance(ci_raw, dict) and ci_raw.get("schema_version") == "state-of-art-ci-evidence.v1":
-                observed_ci = str(ci_raw.get("status", "")).upper()
-                expected_ci_exit = {"PASS": 0, "FAIL": 1, "NOT_RUN": None}
-                raw_ci_exit = ci_raw.get("exit_status")
-                expected_exit = expected_ci_exit.get(observed_ci)
-                exit_shape_valid = (
-                    type(raw_ci_exit) is int and raw_ci_exit >= 0
-                    if expected_exit is not None
-                    else raw_ci_exit is None
-                )
-                if observed_ci in expected_ci_exit and exit_shape_valid and raw_ci_exit == expected_exit:
-                    ci_result = observed_ci
-                    ci_exit_status = raw_ci_exit
+            ci_result, ci_exit_status, ci_reason = _validate_ci_envelope(
+                ci_raw,
+                gate_id=gate_id,
+                commit_sha=commit_sha,
+                tree_sha=tree_sha,
+                checkout_fingerprint=checkout_fingerprint,
+            )
             severity = {"PASS": 0, "NOT_RUN": 1, "BLOCKED_EXTERNAL": 2, "FAIL": 3, "INVALID": 4}
             if severity[ci_result] > severity.get(result, severity["INVALID"]):
                 result = ci_result
                 exit_status = ci_exit_status
             if ci_result != "PASS":
-                limitations = f"{limitations}; same-run CI supplement: {ci_result}"
+                limitations = f"{limitations}; same-run CI supplement: {ci_result} ({ci_reason})"
     return GateResult(
         gate_id=gate_id,
         commit_sha=commit_sha,
@@ -417,6 +517,7 @@ def _ci_result(
     *,
     commit_sha: str,
     tree_sha: str,
+    checkout_fingerprint: str,
     artifact_hash: str,
     timestamp: str,
 ) -> GateResult:
@@ -438,28 +539,23 @@ def _ci_result(
             raw = load_json(path)
         except (OSError, UnicodeDecodeError, json.JSONDecodeError):
             raw = None
-        if isinstance(raw, dict) and raw.get("schema_version") == "state-of-art-ci-evidence.v1":
-            observed = str(raw.get("status", "")).upper()
-            raw_exit = raw.get("exit_status")
-            expected_exit = {"PASS": 0, "FAIL": 1, "NOT_RUN": None}
-            if observed in expected_exit and (
-                (type(raw_exit) is int and raw_exit >= 0) or raw_exit is None
-            ) and raw_exit == expected_exit[observed]:
-                result = observed
-                exit_status = raw_exit
-                raw_limitations = raw.get("limitations")
-                if isinstance(raw_limitations, list):
-                    limitations = "; ".join(str(item) for item in raw_limitations if str(item).strip())
-                elif raw_limitations:
-                    limitations = str(raw_limitations)
+        result, exit_status, validation_reason = _validate_ci_envelope(
+            raw,
+            gate_id=gate_id,
+            commit_sha=commit_sha,
+            tree_sha=tree_sha,
+            checkout_fingerprint=checkout_fingerprint,
+        )
+        if result != "INVALID":
+            raw_limitations = raw.get("limitations") if isinstance(raw, dict) else None
+            if isinstance(raw_limitations, list):
+                limitations = "; ".join(str(item) for item in raw_limitations if str(item).strip())
+            elif raw_limitations:
+                limitations = str(raw_limitations)
             else:
-                result = "INVALID"
-                exit_status = 1
-                limitations = "CI envelope has an unsupported status or contradictory exit_status"
+                limitations = validation_reason
         else:
-            result = "INVALID"
-            exit_status = 1
-            limitations = "CI envelope has an unsupported schema or is not a JSON object"
+            limitations = validation_reason
     else:
         evidence_paths = (_evidence_ref(root, audit_path, f"current audit for missing {gate_id} CI evidence"),)
         command = ("ci-envelope", gate_id)
@@ -551,6 +647,7 @@ def generate_manifest(
                     reviewer,
                     commit_sha=checkout["head"],
                     tree_sha=checkout["tree"],
+                    checkout_fingerprint=checkout["fingerprint"],
                     artifact_hash=artifact_hash,
                     timestamp=timestamp,
                 )
@@ -564,6 +661,7 @@ def generate_manifest(
                     reviewer,
                     commit_sha=checkout["head"],
                     tree_sha=checkout["tree"],
+                    checkout_fingerprint=checkout["fingerprint"],
                     artifact_hash=artifact_hash,
                     timestamp=timestamp,
                     supplemental_ci_relative=CI_SUPPLEMENTAL_ARTIFACTS.get(

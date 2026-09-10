@@ -37,6 +37,7 @@ def test_fixture_proves_ranking_acl_and_provenance_metrics() -> None:
     assert support["citation_recall"]["value"] == 1.0
     assert support["citation_completeness"]["value"] == 1.0
     assert support["unsupported_claim_rate"]["value"] == 0.0
+    assert support["faithfulness"]["value"] == 1.0
 
 
 def test_known_bad_acl_and_citation_cases_are_not_accepted() -> None:
@@ -102,6 +103,7 @@ def test_claim_support_rejects_forged_and_missing_supporting_citations() -> None
     assert support["citation_recall"]["value"] == 0.0
     assert support["citation_completeness"]["value"] == 0.0
     assert support["unsupported_claim_rate"]["value"] == 1.0
+    assert support["faithfulness"]["status"] == INCONCLUSIVE
 
 
 def test_missing_annotations_are_inconclusive_instead_of_a_pass() -> None:
@@ -170,6 +172,38 @@ def test_claim_support_is_inconclusive_without_approved_annotations() -> None:
     assert support["status"] == INCONCLUSIVE
     assert support["citation_completeness"]["status"] == INCONCLUSIVE
     assert support["unsupported_claim_rate"]["status"] == INCONCLUSIVE
+    assert support["faithfulness"]["status"] == INCONCLUSIVE
+
+
+def test_reviewed_faithfulness_is_bounded_and_cannot_be_inferred() -> None:
+    result = evaluate_fixture(
+        {
+            "cases": [{
+                "query": "q",
+                "citations": [{"chunk_id": "chunk-1", "source": "approved.txt"}],
+                "claims": [{
+                    "claim_id": "claim-1",
+                    "text": "A reviewed claim.",
+                    "citation_ids": ["chunk-1"],
+                    "reference_citation_ids": ["chunk-1"],
+                    "faithfulness": 0.75,
+                }],
+            }],
+        }
+    )
+    support = result["metrics"]["citation_support"]
+    assert support["faithfulness"]["status"] == PASS
+    assert support["faithfulness"]["value"] == 0.75
+
+    missing = evaluate_fixture(
+        {
+            "cases": [{
+                "query": "q",
+                "claims": [{"claim_id": "claim-1", "text": "No review annotation."}],
+            }],
+        }
+    )
+    assert missing["metrics"]["citation_support"]["faithfulness"]["status"] == INCONCLUSIVE
 
 
 def test_missing_fixture_is_not_run_and_live_mode_never_calls_a_provider(capsys, tmp_path: Path) -> None:

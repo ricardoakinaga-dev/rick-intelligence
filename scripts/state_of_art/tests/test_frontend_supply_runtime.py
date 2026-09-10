@@ -111,6 +111,30 @@ def test_source_audit_records_fixture_tests_without_using_them_as_evidence() -> 
     assert observations["fixture_test_files_excluded_from_runtime"]
     assert observations["configured_viewports"] == {"375": "375x812", "768": "768x1024", "1440": "1440x1000"}
     assert observations["workflow_runtime_event_scope"] is True
+    assert observations["managed_runtime_isolated_dist"] is True
+
+
+def test_managed_runtime_uses_an_ephemeral_next_dist_directory(tmp_path: Path) -> None:
+    runtime = gate._ManagedRuntime(tmp_path, timeout=1.0)  # noqa: SLF001
+    assert runtime.web_dist_dir.parent == tmp_path / "apps/web"
+    assert runtime.web_dist_dir.name.startswith(".next-phase3-")
+
+
+def test_managed_runtime_restores_next_generated_metadata(tmp_path: Path) -> None:
+    web = tmp_path / "apps/web"
+    web.mkdir(parents=True)
+    next_env = web / "next-env.d.ts"
+    tsconfig = web / "tsconfig.json"
+    next_env.write_text("original-env\n", encoding="utf-8")
+    tsconfig.write_text('{"include": ["original"]}\n', encoding="utf-8")
+
+    runtime = gate._ManagedRuntime(tmp_path, timeout=1.0)  # noqa: SLF001
+    next_env.write_text("generated-env\n", encoding="utf-8")
+    tsconfig.write_text('{"include": [".next-phase3"]}\n', encoding="utf-8")
+    runtime._restore_generated_web_files()  # noqa: SLF001
+
+    assert next_env.read_text(encoding="utf-8") == "original-env\n"
+    assert tsconfig.read_text(encoding="utf-8") == '{"include": ["original"]}\n'
 
 
 def test_failed_browser_report_preserves_observed_dimension_results() -> None:

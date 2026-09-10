@@ -244,6 +244,7 @@ class EvidenceDecisionGate:
                     "citation_recall",
                     "citation_completeness",
                     "unsupported_claim_rate",
+                    "faithfulness",
                     "citation_support_status",
                     "citation_evaluated_claims",
                 )
@@ -259,6 +260,7 @@ class EvidenceDecisionGate:
             "citation_recall",
             "citation_completeness",
             "unsupported_claim_rate",
+            "faithfulness",
             "evaluated_claims",
             "source",
         ):

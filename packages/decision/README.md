@@ -15,8 +15,9 @@ unknown intent asks for clarification. Missing or weak evidence can request
 one bounded retrieval retry, then abstains. Missing or weak provider signals
 abstain. Numeric signals are bounded indicators, not calibrated probabilities.
 Strict runtime policies also require an observed `CitationSupportMetrics` PASS
-with citation precision, recall, completeness and unsupported-claim rate; the
-legacy scalar is only a structural citation-registry signal.
+with citation precision, recall, completeness, unsupported-claim rate and,
+when `require_faithfulness` is enabled, an explicit reviewed faithfulness
+signal; the legacy scalar is only a structural citation-registry signal.
 
 ```python
 from rick_decision import (

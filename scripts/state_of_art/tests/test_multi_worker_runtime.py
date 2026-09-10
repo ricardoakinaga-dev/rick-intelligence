@@ -132,3 +132,87 @@ def test_runtime_heartbeat_failure_cannot_report_publication(local_runtime_contr
 
     assert queue.heartbeat_calls >= 1
     assert queue.acknowledged == []
+
+
+@pytest.mark.parametrize("crash_point", ["after_claim", "after_heartbeat"])
+def test_crash_injection_runs_inside_real_handler(local_runtime_contract, monkeypatch, crash_point):
+    """Observe injection locally; os._exit is replaced, so this is not a crash proof."""
+    contract = local_runtime_contract
+    job = contract.job(operation="runtime_multi_worker", now=time.time())
+    queue = contract.FakeQueue([job])
+    messages = []
+    exit_codes = []
+
+    class Channel:
+        closed = False
+
+        def send(self, value):
+            messages.append(value)
+
+        def close(self):
+            self.closed = True
+
+    def terminate(code):
+        exit_codes.append(code)
+        raise SystemExit(code)
+
+    channel = Channel()
+    monkeypatch.setattr(gate.os, "_exit", terminate)
+
+    with pytest.raises(RuntimeError, match="did not terminate at the requested point"):
+        gate._run_crash_cycle(queue, contract.SCOPE, "worker-crash-test", channel, crash_point)
+
+    assert exit_codes == [0]
+    assert channel.closed is True
+    assert len(messages) == 1
+    assert messages[0]["runtime"] == "RealWorkerRuntime"
+    assert messages[0]["crash_point"] == crash_point
+    assert messages[0]["job_id"] == str(job.job_id)
+    if crash_point == "after_heartbeat":
+        assert queue.heartbeat_calls >= 1
+        assert messages[0]["heartbeat_at"] > messages[0]["acquired_at"]
+        assert messages[0]["expires_at"] == queue._leases[str(job.job_id)].expires_at
+    else:
+        assert queue.heartbeat_calls == 0
+    assert queue.acknowledged == []
+
+
+def test_partial_crash_coverage_does_not_claim_complete_production_safety(tmp_path, monkeypatch):
+    monkeypatch.setattr(gate, "ROOT", tmp_path)
+    monkeypatch.setattr(gate, "run_gate", lambda *_args, **_kwargs: (
+        "PASS", [gate.GateResult(f"CRASH_{point.upper()}", "PASS") for point in gate.SUPPORTED_CRASH_POINTS]
+    ))
+
+    assert gate.main(["--database-url", "postgresql://localhost/test", "--output", "gate.json"]) == 0
+
+    payload = json.loads((tmp_path / "gate.json").read_text())
+    assert payload["runtime_claim"] is True
+    assert payload["production_safe"] is False
+    assert payload["crash_matrix_complete"] is False
+    assert payload["crash_matrix"]["after_heartbeat"] == "PASS"
+    assert payload["crash_matrix"]["in_transaction"] == "NOT_IMPLEMENTED"
+    assert len(payload["crash_matrix"]) == 8
+
+
+def test_failed_heartbeat_cannot_report_reaching_after_heartbeat_crash(local_runtime_contract, monkeypatch):
+    contract = local_runtime_contract
+    queue = contract.FakeQueue(
+        [contract.job(operation="runtime_multi_worker", now=time.time())], heartbeat_error=True,
+    )
+    observations = []
+
+    class Channel:
+        def send(self, value):
+            observations.append(value)
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(gate.os, "_exit", lambda code: observations.append(code))
+
+    with pytest.raises(RuntimeError, match="did not terminate at the requested point"):
+        gate._run_crash_cycle(queue, contract.SCOPE, "worker-crash-failure", Channel(), "after_heartbeat")
+
+    assert queue.heartbeat_calls >= 1
+    assert observations == []
+    assert queue.acknowledged == []

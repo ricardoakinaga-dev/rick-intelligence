@@ -292,6 +292,19 @@ class _ManagedRuntime:
         self.production = production
         self.api_port = _free_port()
         self.web_port = _free_port()
+        # Next writes routes-manifest.json while a dev server is running. A
+        # shared .next directory would let this managed probe race a
+        # production E2E lane and bind its build to the probe's ephemeral API
+        # port. Keep each managed runtime in its own directory and remove it
+        # during teardown.
+        self.web_dist_dir = self.root / "apps/web" / f".next-phase3-{self.web_port}"
+        self._generated_web_files = {
+            path: (path.read_bytes() if path.is_file() else None)
+            for path in (
+                self.root / "apps/web" / "next-env.d.ts",
+                self.root / "apps/web" / "tsconfig.json",
+            )
+        }
         self.api: subprocess.Popen[str] | None = None
         self.web: subprocess.Popen[str] | None = None
         self._tmp = tempfile.TemporaryDirectory(prefix="rick-phase3-frontend-")
@@ -391,6 +404,7 @@ class _ManagedRuntime:
                     "RICK_API_INTERNAL_URL": self.api_url,
                     "NEXT_TELEMETRY_DISABLED": "1",
                     "NODE_ENV": "production" if self.production else "development",
+                    "NEXT_DIST_DIR": self.web_dist_dir.name,
                 }
             )
             npm = _tool("npm")
@@ -425,12 +439,31 @@ class _ManagedRuntime:
         except BaseException:
             _terminate_process(self.web)
             _terminate_process(self.api)
+            shutil.rmtree(self.web_dist_dir, ignore_errors=True)
+            self._restore_generated_web_files()
             self._tmp.cleanup()
             raise
+
+    def _restore_generated_web_files(self) -> None:
+        """Restore tracked Next metadata changed by a managed dev/build run."""
+
+        for path, content in self._generated_web_files.items():
+            try:
+                if content is None:
+                    if path.is_file():
+                        path.unlink()
+                else:
+                    path.write_bytes(content)
+            except OSError:
+                # The runtime result remains the authoritative failure; a
+                # later clean-worktree gate will reject an un-restored file.
+                pass
 
     def __exit__(self, _type: object, _value: object, _traceback: object) -> None:
         _terminate_process(self.web)
         _terminate_process(self.api)
+        shutil.rmtree(self.web_dist_dir, ignore_errors=True)
+        self._restore_generated_web_files()
         self._tmp.cleanup()
 
 
@@ -979,8 +1012,9 @@ def _run_browser_probe(
 def audit_frontend_sources(root: Path) -> dict[str, Any]:
     package_path = root / "apps/web/package.json"
     config_path = root / "apps/web/playwright.config.ts"
+    next_config_path = root / "apps/web/next.config.mjs"
     workflow_path = root / ".github/workflows/quality.yml"
-    missing = [str(path.relative_to(root)) for path in (package_path, config_path, workflow_path) if not path.is_file()]
+    missing = [str(path.relative_to(root)) for path in (package_path, config_path, next_config_path, workflow_path) if not path.is_file()]
     fixture_files: list[str] = []
     for path in sorted((root / "apps/web/tests").glob("*.spec.ts")) if (root / "apps/web/tests").is_dir() else []:
         try:
@@ -996,6 +1030,8 @@ def audit_frontend_sources(root: Path) -> dict[str, Any]:
         package = load_json(package_path)
         scripts = package.get("scripts", {}) if isinstance(package, dict) else {}
         config = config_path.read_text(encoding="utf-8")
+        next_config = next_config_path.read_text(encoding="utf-8")
+        gate_source = Path(__file__).read_text(encoding="utf-8")
         workflow = workflow_path.read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         return _check("frontend-source-audit", "FAIL", f"frontend source audit could not parse inputs ({type(exc).__name__})", evidence=[], observations=values)
@@ -1010,6 +1046,11 @@ def audit_frontend_sources(root: Path) -> dict[str, Any]:
             "required_scripts": sorted(required_scripts),
             "missing_scripts": sorted(required_scripts - set(scripts)),
             "configured_viewports": configured_viewports,
+            "managed_runtime_isolated_dist": (
+                "NEXT_DIST_DIR" in next_config
+                and "NEXT_DIST_DIR" in gate_source
+                and ".next-phase3-" in gate_source
+            ),
             "workflow_has_frontend_runtime": "frontend-runtime:" in workflow,
             "workflow_runtime_command": any(
                 command in workflow
@@ -1019,12 +1060,12 @@ def audit_frontend_sources(root: Path) -> dict[str, Any]:
             "runtime_fixture_files_not_used": True,
         }
     )
-    if values["missing_scripts"] or len(values["configured_viewports"]) != 3 or not values["workflow_has_frontend_runtime"]:
-        return _check("frontend-source-audit", "FAIL", "frontend source contract is incomplete", evidence=[_relative(root, package_path), _relative(root, config_path), _relative(root, workflow_path)], observations=values)
+    if values["missing_scripts"] or len(values["configured_viewports"]) != 3 or not values["workflow_has_frontend_runtime"] or not values["managed_runtime_isolated_dist"]:
+        return _check("frontend-source-audit", "FAIL", "frontend source contract is incomplete", evidence=[_relative(root, package_path), _relative(root, config_path), _relative(root, next_config_path), _relative(root, workflow_path)], observations=values)
     detail = "canonical frontend config and workflow were audited; fixture-intercepting visual tests are explicitly excluded from runtime evidence"
     if values["workflow_runtime_event_scope"]:
         detail += "; existing workflow runs the browser job only on manual/scheduled events"
-    return _check("frontend-source-audit", "PASS", detail, evidence=[_relative(root, package_path), _relative(root, config_path), _relative(root, workflow_path)], observations=values)
+    return _check("frontend-source-audit", "PASS", detail, evidence=[_relative(root, package_path), _relative(root, config_path), _relative(root, next_config_path), _relative(root, workflow_path)], observations=values)
 
 
 def _node_components(root: Path) -> list[tuple[str, Path, Path, dict[str, Any]]]:

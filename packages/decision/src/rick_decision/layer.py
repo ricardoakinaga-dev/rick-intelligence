@@ -116,6 +116,11 @@ class DecisionLayer:
             return "citation_support_metrics_incomplete"
         if unsupported > policy.max_unsupported_claim_rate:
             return "unsupported_claim_rate_above_maximum"
+        faithfulness = metrics.faithfulness
+        if policy.require_faithfulness and faithfulness is None:
+            return "citation_support_metrics_incomplete"
+        if faithfulness is not None and faithfulness < policy.min_faithfulness:
+            return "faithfulness_below_minimum"
         return None
 
     def decide(self, decision_input: DecisionInput) -> Decision:

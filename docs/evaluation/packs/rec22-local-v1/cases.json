@@ -36,13 +36,15 @@
           "claim_id": "alpha-claim-1",
           "text": "The alpha record is present in the approved corpus.",
           "citation_ids": ["alpha-1"],
-          "reference_citation_ids": ["alpha-1"]
+          "reference_citation_ids": ["alpha-1"],
+          "faithfulness": true
         },
         {
           "claim_id": "alpha-claim-2",
           "text": "The second alpha record is also present.",
           "citation_ids": ["alpha-2"],
-          "reference_citation_ids": ["alpha-2"]
+          "reference_citation_ids": ["alpha-2"],
+          "faithfulness": true
         }
       ],
       "latency_samples_ms": [8, 9, 11]
@@ -77,7 +79,8 @@
           "claim_id": "beta-claim-1",
           "text": "The beta record is present in the approved corpus.",
           "citation_ids": ["beta-1"],
-          "reference_citation_ids": ["beta-1"]
+          "reference_citation_ids": ["beta-1"],
+          "faithfulness": true
         }
       ],
       "latency_samples_ms": [7, 10, 15]

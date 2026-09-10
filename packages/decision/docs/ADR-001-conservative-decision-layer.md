@@ -25,8 +25,11 @@ produce `ANSWER`.
 The package consumes a server-issued `EvidenceBundle` and can revalidate its
 scope against the request scope. When `require_citation_support_metrics` is
 enabled, it also requires a PASS `CitationSupportMetrics` observation with
-bounded precision, recall, completeness and unsupported-claim rate values; an
-optional policy source pin binds the observation to the approved evaluator.
+bounded precision, recall, completeness and unsupported-claim rate values. An
+approved evaluator may also provide a bounded reviewed faithfulness value;
+`require_faithfulness` makes that fifth signal mandatory and
+`min_faithfulness` applies its threshold. An optional policy source pin binds
+the observation to the approved evaluator.
 Missing or inconclusive observations cannot produce `ANSWER`. The legacy
 scalar remains for structural compatibility but is not claim-level support.
 The package does not authorize users, retrieve data, generate text, classify a

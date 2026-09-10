@@ -86,10 +86,9 @@ CitationSupportStatus = Literal["PASS", "FAIL", "INCONCLUSIVE", "NOT_RUN"]
 class CitationSupportMetrics(_ContractModel):
     """Observed claim/citation quality supplied by an approved evaluator.
 
-    These are identity-level support observations.  They are deliberately
-    distinct from retrieval relevance, citation-registry validity and answer
-    faithfulness/entailment; none of those stronger claims can be inferred
-    from a bundle merely existing.
+    Citation identity metrics and faithfulness are separate observations.
+    Faithfulness is accepted only when supplied by an approved reviewer; the
+    decision layer never derives it from a bundle merely existing.
     """
 
     status: CitationSupportStatus = "NOT_RUN"
@@ -97,6 +96,7 @@ class CitationSupportMetrics(_ContractModel):
     citation_recall: float | None = Field(default=None, ge=0.0, le=1.0)
     citation_completeness: float | None = Field(default=None, ge=0.0, le=1.0)
     unsupported_claim_rate: float | None = Field(default=None, ge=0.0, le=1.0)
+    faithfulness: float | None = Field(default=None, ge=0.0, le=1.0)
     evaluated_claims: int = Field(default=0, ge=0, le=10_000)
     source: str = Field(min_length=1, max_length=128)
 
@@ -105,6 +105,7 @@ class CitationSupportMetrics(_ContractModel):
         "citation_recall",
         "citation_completeness",
         "unsupported_claim_rate",
+        "faithfulness",
         mode="before",
     )
     @classmethod
@@ -130,6 +131,8 @@ class DecisionPolicy(_ContractModel):
     min_citation_recall: float = Field(default=0.80, ge=0.0, le=1.0)
     min_citation_completeness: float = Field(default=0.80, ge=0.0, le=1.0)
     max_unsupported_claim_rate: float = Field(default=0.0, ge=0.0, le=1.0)
+    min_faithfulness: float = Field(default=0.80, ge=0.0, le=1.0)
+    require_faithfulness: bool = False
     required_citation_support_source: str | None = Field(default=None, max_length=128)
     min_provider_confidence_signal: float = Field(default=0.60, ge=0.0, le=1.0)
     max_retrieval_attempts: int = Field(default=1, ge=0, le=10)
@@ -142,6 +145,7 @@ class DecisionPolicy(_ContractModel):
         "min_citation_recall",
         "min_citation_completeness",
         "max_unsupported_claim_rate",
+        "min_faithfulness",
         "min_provider_confidence_signal",
         mode="before",
     )

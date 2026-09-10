@@ -276,7 +276,7 @@ def test_golden_downstream_rejects_bundle_presence_as_citation_support(
     assert decision_calls == 0
 
 
-def test_golden_citation_observation_requires_four_metrics_and_source(gate: ModuleType) -> None:
+def test_golden_citation_observation_requires_five_metrics_and_source(gate: ModuleType) -> None:
     valid, error = gate._citation_support_observation(
         {
             "metadata": {
@@ -286,6 +286,7 @@ def test_golden_citation_observation_requires_four_metrics_and_source(gate: Modu
                     "citation_recall": {"status": "PASS", "value": 0.9},
                     "citation_completeness": {"status": "PASS", "value": 1.0},
                     "unsupported_claim_rate": {"status": "PASS", "value": 0.0},
+                    "faithfulness": {"status": "PASS", "value": 1.0},
                     "claim_count": 2,
                     "source": "approved_claim_support",
                 }
@@ -300,6 +301,7 @@ def test_golden_citation_observation_requires_four_metrics_and_source(gate: Modu
         "citation_recall": 0.9,
         "citation_completeness": 1.0,
         "unsupported_claim_rate": 0.0,
+        "faithfulness": 1.0,
         "evaluated_claims": 2,
         "source": "approved_claim_support",
     }

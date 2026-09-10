@@ -60,6 +60,35 @@ def _reviewer() -> ReviewerRef:
     )
 
 
+def _ci_payload(gate_id: str, *, status: str = "PASS", exit_status: int | None = 0) -> dict[str, object]:
+    return {
+        "schema_version": "state-of-art-ci-evidence.v1",
+        "lane": gate_id,
+        "gate_ids": [gate_id],
+        "status": status,
+        "exit_status": exit_status,
+        "exit_code": exit_status,
+        "commit_sha": HEAD,
+        "tree_sha": TREE,
+        "checkout_fingerprint": ARTIFACT_HASH,
+        "checkout_available": True,
+        "clean_worktree": True,
+        "freshness": "CURRENT",
+        "promotion_scope": "LOCAL_CI_ONLY",
+        "production_safe": False,
+        "environment": "github-actions-local-ci",
+        "procedure": f"Execute CI lane {gate_id}",
+        "started_at": TIMESTAMP,
+        "finished_at": TIMESTAMP,
+        "observed_at": TIMESTAMP,
+        "checkout_sentinel": {"unchanged": True},
+        "commands": [{"argv": ["make", gate_id], "status": "PASS", "exit_status": 0}],
+        "raw_artifacts": [{"path": f".runtime/ci/{gate_id}.log", "sha256": ARTIFACT_HASH}],
+        "artifact_sha256": ARTIFACT_HASH,
+        "limitations": ["local CI only"],
+    }
+
+
 def test_runtime_gate_artifact_registry_points_to_named_envelopes() -> None:
     assert generate_release_evidence.RUNTIME_GATE_ARTIFACTS == {
         "multi-worker": ".runtime/phase-3/multi-worker-runtime-evidence.json",
@@ -136,7 +165,7 @@ def test_supply_chain_runtime_remains_primary_with_ci_as_supplement(tmp_path: Pa
     ci_path = tmp_path / generate_release_evidence.CI_GATE_ARTIFACTS["supply-chain"]
     ci_path.parent.mkdir(parents=True, exist_ok=True)
     ci_path.write_text(
-        json.dumps({"schema_version": "state-of-art-ci-evidence.v1", "status": "PASS", "exit_status": 0}),
+        json.dumps(_ci_payload("supply-chain")),
         encoding="utf-8",
     )
 
@@ -147,6 +176,7 @@ def test_supply_chain_runtime_remains_primary_with_ci_as_supplement(tmp_path: Pa
         _reviewer(),
         commit_sha=HEAD,
         tree_sha=TREE,
+        checkout_fingerprint=ARTIFACT_HASH,
         artifact_hash=ARTIFACT_HASH,
         timestamp=TIMESTAMP,
         supplemental_ci_relative=generate_release_evidence.CI_GATE_ARTIFACTS["supply-chain"],
@@ -170,6 +200,7 @@ def test_missing_runtime_artifact_is_not_run_not_fabricated_block(tmp_path: Path
         _reviewer(),
         commit_sha=HEAD,
         tree_sha=TREE,
+        checkout_fingerprint=ARTIFACT_HASH,
         artifact_hash=ARTIFACT_HASH,
         timestamp=TIMESTAMP,
     )
@@ -195,6 +226,7 @@ def test_runtime_artifact_status_is_aggregated(tmp_path: Path) -> None:
         _reviewer(),
         commit_sha=HEAD,
         tree_sha=TREE,
+        checkout_fingerprint=ARTIFACT_HASH,
         artifact_hash=ARTIFACT_HASH,
         timestamp=TIMESTAMP,
     )
@@ -211,14 +243,7 @@ def test_ci_artifact_status_is_aggregated(tmp_path: Path) -> None:
     ci_path = tmp_path / generate_release_evidence.CI_GATE_ARTIFACTS[gate_id]
     ci_path.parent.mkdir(parents=True)
     ci_path.write_text(
-        json.dumps(
-            {
-                "schema_version": "state-of-art-ci-evidence.v1",
-                "status": "PASS",
-                "exit_status": 0,
-                "limitations": ["local CI only"],
-            }
-        ),
+        json.dumps(_ci_payload(gate_id)),
         encoding="utf-8",
     )
 
@@ -229,6 +254,7 @@ def test_ci_artifact_status_is_aggregated(tmp_path: Path) -> None:
         _reviewer(),
         commit_sha=HEAD,
         tree_sha=TREE,
+        checkout_fingerprint=ARTIFACT_HASH,
         artifact_hash=ARTIFACT_HASH,
         timestamp=TIMESTAMP,
     )
@@ -263,12 +289,40 @@ def test_invalid_ci_artifact_status_is_not_promoted(tmp_path: Path) -> None:
         _reviewer(),
         commit_sha=HEAD,
         tree_sha=TREE,
+        checkout_fingerprint=ARTIFACT_HASH,
         artifact_hash=ARTIFACT_HASH,
         timestamp=TIMESTAMP,
     )
 
     assert result.result == "INVALID"
     assert result.exit_status == 1
+
+
+def test_ci_artifact_from_wrong_checkout_is_not_promoted(tmp_path: Path) -> None:
+    audit = tmp_path / "audit.md"
+    audit.write_text("audit\n", encoding="utf-8")
+    gate_id = "security"
+    ci_path = tmp_path / generate_release_evidence.CI_GATE_ARTIFACTS[gate_id]
+    ci_path.parent.mkdir(parents=True)
+    payload = _ci_payload(gate_id)
+    payload["commit_sha"] = "d" * 40
+    ci_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = generate_release_evidence._ci_result(
+        tmp_path,
+        gate_id,
+        "audit.md",
+        _reviewer(),
+        commit_sha=HEAD,
+        tree_sha=TREE,
+        checkout_fingerprint=ARTIFACT_HASH,
+        artifact_hash=ARTIFACT_HASH,
+        timestamp=TIMESTAMP,
+    )
+
+    assert result.result == "INVALID"
+    assert result.exit_status == 1
+    assert "commit_sha" in result.limitations[0]
 
 
 def test_canonical_workflow_binds_ci_artifacts_to_the_same_run() -> None:

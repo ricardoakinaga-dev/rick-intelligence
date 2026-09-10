@@ -1464,6 +1464,7 @@ _CITATION_SUPPORT_FIELDS = (
     "citation_recall",
     "citation_completeness",
     "unsupported_claim_rate",
+    "faithfulness",
 )
 
 
@@ -1487,7 +1488,7 @@ def _citation_support_observation(value: object) -> tuple[dict[str, object] | No
 
     A scalar ``citation_support`` value is intentionally ignored.  The gate
     accepts either the flat response metadata contract or the evaluator's
-    nested metric shape, but always requires all four metrics, a PASS status,
+    nested metric shape, but always requires all five metrics, a PASS status,
     a positive claim count and an explicit source.
     """
 
@@ -1657,6 +1658,8 @@ async def _run_downstream(
             min_citation_recall=0.80,
             min_citation_completeness=0.80,
             max_unsupported_claim_rate=0.0,
+            min_faithfulness=0.80,
+            require_faithfulness=True,
             required_citation_support_source="approved_claim_support",
             min_provider_confidence_signal=0.0,
             max_retrieval_attempts=0,

@@ -61,6 +61,12 @@
       "value": 0.0
     },
     {
+      "id": "faithfulness",
+      "metric_path": "metrics.citation_support.faithfulness.value",
+      "operator": ">=",
+      "value": 1.0
+    },
+    {
       "id": "fixture-p95-latency",
       "metric_path": "metrics.latency.p95",
       "operator": "<=",

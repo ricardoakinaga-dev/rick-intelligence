@@ -64,6 +64,10 @@ def test_pass_writes_bound_redacted_raw_artifact(tmp_path: Path) -> None:
 
     assert envelope["status"] == "PASS"
     assert envelope["exit_status"] == 0
+    assert envelope["exit_code"] == 0
+    assert envelope["started_at"]
+    assert envelope["finished_at"]
+    assert envelope["finished_at"] >= envelope["started_at"]
     assert envelope["commit_sha"] == HEAD
     assert envelope["tree_sha"] == TREE
     assert envelope["run"]["run_id"] == "12345"
@@ -93,6 +97,9 @@ def test_failed_command_keeps_a_non_passing_envelope(tmp_path: Path) -> None:
 
     assert envelope["status"] == "FAIL"
     assert envelope["exit_status"] == 1
+    assert envelope["exit_code"] == 1
+    assert envelope["started_at"]
+    assert envelope["finished_at"]
     assert envelope["commands"][0]["status"] == "FAIL"
     assert envelope["commands"][0]["exit_status"] == 3
     assert envelope["raw_artifacts"]
@@ -117,6 +124,7 @@ def test_missing_github_provenance_is_not_run(tmp_path: Path) -> None:
 
     assert envelope["status"] == "NOT_RUN"
     assert envelope["exit_status"] is None
+    assert envelope["exit_code"] is None
     assert any("provenance" in item for item in envelope["limitations"])
 
 

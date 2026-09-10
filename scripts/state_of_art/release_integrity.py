@@ -856,8 +856,16 @@ def _evaluate_typed_manifest(
         expected_exit = {"PASS": 0, "FAIL": 1, "NOT_RUN": None}.get(
             gate.result if is_primary_ci else observed_status
         )
-        if envelope.get("exit_status") != expected_exit:
+        raw_exit_status = envelope.get("exit_status")
+        exit_shape_valid = (
+            raw_exit_status is None
+            if expected_exit is None
+            else type(raw_exit_status) is int and raw_exit_status == expected_exit
+        )
+        if not exit_shape_valid:
             failures.append(f"gate {gate.gate_id} CI envelope exit_status does not match the manifest")
+        if type(envelope.get("exit_code")) is not type(raw_exit_status) or envelope.get("exit_code") != raw_exit_status:
+            failures.append(f"gate {gate.gate_id} CI envelope exit_code does not match exit_status")
         gate_ids = envelope.get("gate_ids")
         if (
             not isinstance(gate_ids, Sequence)
@@ -882,11 +890,21 @@ def _evaluate_typed_manifest(
             failures.append(f"gate {gate.gate_id} CI envelope has an invalid promotion scope")
         if envelope.get("production_safe") is not False:
             failures.append(f"gate {gate.gate_id} CI envelope must not claim production safety")
-        for field in ("procedure", "environment", "observed_at"):
+        for field in ("lane", "procedure", "environment", "started_at", "finished_at", "observed_at"):
             if not isinstance(envelope.get(field), str) or not envelope[field].strip():
                 failures.append(f"gate {gate.gate_id} CI envelope has no {field}")
-        if isinstance(envelope.get("observed_at"), str):
-            _validate_current_timestamp(envelope["observed_at"], f"gate {gate.gate_id}.ci.observed_at", failures)
+        for field in ("started_at", "finished_at", "observed_at"):
+            if isinstance(envelope.get(field), str):
+                _validate_current_timestamp(envelope[field], f"gate {gate.gate_id}.ci.{field}", failures)
+        if all(isinstance(envelope.get(field), str) for field in ("started_at", "finished_at")):
+            try:
+                started = datetime.fromisoformat(envelope["started_at"].replace("Z", "+00:00"))
+                finished = datetime.fromisoformat(envelope["finished_at"].replace("Z", "+00:00"))
+            except ValueError:
+                pass  # Individual timestamp validation above reports the shape error.
+            else:
+                if started.tzinfo is not None and finished.tzinfo is not None and finished < started:
+                    failures.append(f"gate {gate.gate_id} CI envelope finished_at precedes started_at")
         sentinel = envelope.get("checkout_sentinel")
         if not isinstance(sentinel, Mapping) or sentinel.get("unchanged") is not True:
             failures.append(f"gate {gate.gate_id} CI envelope sentinel is not unchanged")

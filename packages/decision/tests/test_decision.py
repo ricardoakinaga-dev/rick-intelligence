@@ -139,6 +139,7 @@ def _citation_metrics(**overrides):
         "citation_recall": 1.0,
         "citation_completeness": 1.0,
         "unsupported_claim_rate": 0.0,
+        "faithfulness": 1.0,
         "evaluated_claims": 1,
         "source": "approved_claim_support",
     }
@@ -205,3 +206,25 @@ def test_strict_policy_rejects_inconclusive_and_unsupported_claim_observations()
     assert unsupported.reason_code.startswith("unsupported_claim_rate_above_maximum")
     assert inconclusive.action is DecisionAction.ABSTAIN
     assert unsupported.action is DecisionAction.ABSTAIN
+
+
+def test_faithfulness_is_consumed_when_observed_or_required() -> None:
+    policy = DecisionPolicy(
+        require_citation_support_metrics=True,
+        require_faithfulness=True,
+        required_citation_support_source="approved_claim_support",
+        max_retrieval_attempts=0,
+    )
+    missing = DecisionLayer().decide(
+        _input(policy=policy, citation_support_metrics=_citation_metrics(faithfulness=None))
+    )
+    weak = DecisionLayer().decide(
+        _input(policy=policy, citation_support_metrics=_citation_metrics(faithfulness=0.79))
+    )
+    accepted = DecisionLayer().decide(
+        _input(policy=policy, citation_support_metrics=_citation_metrics(faithfulness=0.80))
+    )
+
+    assert missing.reason_code.startswith("citation_support_metrics_incomplete")
+    assert weak.reason_code.startswith("faithfulness_below_minimum")
+    assert accepted.action is DecisionAction.ANSWER
