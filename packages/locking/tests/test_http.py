@@ -123,6 +123,26 @@ async def test_http_malformed_success_is_internal_error(content: bytes) -> None:
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "content",
+    [
+        b'{"ok":true,"acquired":true,"metadata":NaN}',
+        b'{"ok":true,"acquired":false,"acquired":true}',
+    ],
+)
+async def test_http_ambiguous_or_nonfinite_success_is_internal_error(content: bytes) -> None:
+    async def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, content=content)
+
+    async with HttpLockerStore(
+        "http://locker.test", transport=httpx.MockTransport(handler)
+    ) as store:
+        with pytest.raises(LeaseError) as caught:
+            await store.acquire("k", "owner", 100)
+    assert caught.value.code.value == "internal_error"
+
+
+@pytest.mark.asyncio
 async def test_http_response_is_bounded_and_timeout_is_typed() -> None:
     async def oversized(request: httpx.Request) -> httpx.Response:
         return httpx.Response(200, content=b"x" * 100)

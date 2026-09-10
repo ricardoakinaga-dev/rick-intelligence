@@ -22,6 +22,19 @@ from rick_locking.validation import (
 )
 
 
+def _reject_json_constant(_value: str) -> object:
+    raise ValueError("non-finite JSON constants are not allowed")
+
+
+def _reject_duplicate_json_keys(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    result: dict[str, object] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("duplicate JSON object key")
+        result[key] = value
+    return result
+
+
 class HttpLockerStore:
     """Low-level HTTP backend mapping to ``/lock``, ``/renew``, and ``/unlock``.
 
@@ -156,7 +169,11 @@ class HttpLockerStore:
         parse_failure = False
         body: Any = None
         try:
-            body = json.loads(content)
+            body = json.loads(
+                content,
+                object_pairs_hook=_reject_duplicate_json_keys,
+                parse_constant=_reject_json_constant,
+            )
         except (TypeError, ValueError, RecursionError):
             parse_failure = True
         if parse_failure:
