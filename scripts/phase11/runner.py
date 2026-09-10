@@ -25,6 +25,11 @@ LOCKER = ROOT / "modulo-redis-locker"
 PYTHON = str((ROOT / ".runtime/venvs/cvg/bin/python") if (ROOT / ".runtime/venvs/cvg/bin/python").is_file() else Path(sys.executable))
 NPM = os.environ.get("NPM", "npm")
 NODE = os.environ.get("NODE", "node")
+try:
+    from scripts.state_of_art.phase3_runtime_adapter import redact_runtime_value
+except ModuleNotFoundError:  # Direct execution from the scripts/phase11 directory.
+    sys.path.insert(0, str(ROOT))
+    from scripts.state_of_art.phase3_runtime_adapter import redact_runtime_value
 GENERATED_COMPONENT_ARTIFACTS = (
     PROFESSOR / "test/artifacts/phase-0.6-provider-contract.json",
     FRONTEND / "next-env.d.ts",
@@ -235,9 +240,10 @@ def _redact_diagnostic_output(value: str) -> str:
         "RICK_OBJECT_STORE_SECRET_ACCESS_KEY",
     ):
         secret = os.environ.get(name, "")
-        if len(secret) >= 8:
+        if secret:
             redacted = redacted.replace(secret, "[REDACTED]")
-    return redacted
+    sanitized = redact_runtime_value(redacted)
+    return sanitized if isinstance(sanitized, str) else str(sanitized)
 
 
 def _collect_compose_diagnostics(compose: Path) -> Path | None:

@@ -71,6 +71,20 @@ def test_diagnostics_redact_both_object_store_secret_names(
     assert output == "credential=[REDACTED]"
 
 
+def test_diagnostics_redact_unexported_nested_secrets_and_urls() -> None:
+    output = runner._redact_diagnostic_output(
+        r'{"password":"unexported-password", "nested":{"token":"nested-token"}, '
+        r'"dsn":"postgresql://user:dsn-secret@example.invalid/db", '
+        r'"client_secret":"safe \" escaped-secret"}'
+    )
+
+    assert "unexported-password" not in output
+    assert "nested-token" not in output
+    assert "dsn-secret" not in output
+    assert "escaped-secret" not in output
+    assert "[REDACTED]" in output
+
+
 @pytest.mark.parametrize("raw", ["0", "-1", "1801", "not-a-number"])
 def test_invalid_compose_wait_timeout_is_rejected(monkeypatch: pytest.MonkeyPatch, raw: str) -> None:
     monkeypatch.setenv("RICK_COMPOSE_WAIT_TIMEOUT", raw)
