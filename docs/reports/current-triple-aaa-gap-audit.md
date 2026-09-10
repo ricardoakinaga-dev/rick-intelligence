@@ -990,3 +990,19 @@ passes **445**; compilation and `git diff --check` pass. This is local request
 boundary evidence only. Live tenant/runtime isolation, distributed
 coordination, provider/corpus, independent review, sealed packet and human
 Go/No-Go remain unavailable; promotion remains disallowed.
+## 51. Durable job JSON duplicate-key closure — 2026-09-10
+
+Source implementation candidate `e62afddd2124ae71ef9b05f6ff50f6db226aec6b`
+(tree `847aa5a8a93243971cd787961d7c4014f8b7e329`) closes the remaining
+ambiguity in the local SQLite queue, legacy PostgreSQL queue and canonical
+PostgreSQL job adapter. Their persisted JSON decoders now reject duplicate
+object keys alongside the existing byte, finite-value, recursive and
+malformed-input controls; duplicate queue fields fail closed rather than
+silently selecting the last value.
+
+The focused durable-adapter slice passes **25** tests, the complete worker
+suite passes **52**, and the broader `api16-worker` target passes **71**;
+compilation and `git diff --check` pass. This is local queue/read-model
+evidence only. Approved PostgreSQL durability, two-process fencing and crash
+recovery, independent review, sealed packet and human Go/No-Go remain
+unavailable; promotion remains disallowed.

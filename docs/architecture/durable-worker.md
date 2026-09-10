@@ -20,12 +20,13 @@ bounded exponential backoff or moved to the dead-letter state. Payloads reject
 arbitrary fields and raw content.
 
 Reads apply the same payload contract as writes: persisted JSON is capped at
-32 KiB before parsing, non-finite constants and malformed/recursive values are
-rejected, and only bounded string fields from the whitelist are returned. The
-legacy SQLite and PostgreSQL queue adapters therefore do not turn corrupted
-rows into arbitrary mappings; invalid stored payloads become an empty bounded
-payload at the adapter boundary and remain subject to downstream required-field
-validation.
+32 KiB before parsing, non-finite constants, duplicate object keys and
+malformed/recursive values are rejected, and only bounded string fields from
+the whitelist are returned. The legacy SQLite and PostgreSQL queue adapters
+and the canonical PostgreSQL job adapter therefore do not turn corrupted rows
+into arbitrary mappings or ambiguous job results; invalid stored payloads
+become an empty bounded payload or a bounded corruption error at the adapter
+boundary and remain subject to downstream required-field validation.
 
 The local file is WAL-backed and private (`0700` parent, `0600` database). A
 reopened queue can recover a leased job after its lease expires. This proves a

@@ -80,6 +80,12 @@ This closes local `NaN` and duplicate-field ambiguity at the public request
 boundary; it does not replace live tenant, provider, distributed-runtime or
 production evidence.
 
+The SQLite/legacy PostgreSQL queue readers and canonical PostgreSQL job adapter
+at source candidate `e62afddd2124ae71ef9b05f6ff50f6db226aec6b` likewise reject
+duplicate persisted JSON keys before queue payloads or job results are trusted.
+This is local corruption containment only; it does not prove PostgreSQL
+durability, multi-worker fencing, crash recovery or production promotion.
+
 ## 7. CI and release lanes
 
 The canonical workflow names FAST, UNIT, CONTRACT, SECURITY, RAG_EVAL,
