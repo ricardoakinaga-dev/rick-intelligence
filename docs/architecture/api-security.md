@@ -34,6 +34,11 @@ structural test fails on missing policy. Public: `/health/live`, `/health/ready`
   a neutral 429 envelope. A distributed limiter remains required for multi-replica
   production (the injected interface is ready; local fallback is not a production
   security boundary).
+- Request bodies: the streaming middleware enforces the configured byte ceiling for
+  both declared and chunked bodies. The JSON upload, reindex and retry routes use a
+  finite UTF-8 decoder that rejects non-finite constants, duplicate object keys,
+  recursive/malformed bodies and non-object/array roots before Pydantic validation;
+  invalid input returns the canonical `validation_error` envelope.
 
 ## Permissions (canonical)
 

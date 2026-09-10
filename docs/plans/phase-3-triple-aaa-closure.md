@@ -757,3 +757,20 @@ The focused Qdrant suite passes **15**, the complete retrieval package passes
 evidence only. Live Qdrant schema/filter/alias/rebuild/restore, approved
 object storage, distributed runtime, independent review and promotion
 authority remain unavailable; promotion remains disallowed.
+
+## 50. API request JSON decoding closure — 2026-09-10
+
+Source candidate `1ddd3c5b1c9af913bc3da427c284a91f8f454f99` (tree
+`cec335bf412fa4077db1c61566ce07cbc10b5de6`) closes a concrete public API
+input boundary. The JSON upload, reindex and retry routes no longer delegate
+to permissive `Request.json()` parsing: they enforce the configured byte
+budget, strict UTF-8 decoding, finite JSON constants and unique object keys
+before Pydantic model validation. A `NaN` field and a duplicate `content`
+field both reproduce as rejected `validation_error` responses at the HTTP
+boundary.
+
+The focused ingestion/security slice passes **53** tests and the complete API
+matrix passes **445**; compilation and `git diff --check` pass. This is local
+API-boundary evidence only. Live authenticated tenant runtime, multi-replica
+coordination, external provider/corpus, independent review, sealed packet and
+human Go/No-Go remain unavailable; promotion remains disallowed.

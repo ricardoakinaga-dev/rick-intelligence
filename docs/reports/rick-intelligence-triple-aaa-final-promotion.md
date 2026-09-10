@@ -73,6 +73,13 @@ prove live history, case/identity/job/audit/knowledge/object durability,
 Redis fencing or multi-replica behavior, tenant isolation or distributed
 Qdrant recovery or distributed recovery.
 
+The API upload, reindex and retry routes at source candidate
+`1ddd3c5b1c9af913bc3da427c284a91f8f454f99` also apply the configured request
+byte budget and a finite, duplicate-free UTF-8 decoder before model validation.
+This closes local `NaN` and duplicate-field ambiguity at the public request
+boundary; it does not replace live tenant, provider, distributed-runtime or
+production evidence.
+
 ## 7. CI and release lanes
 
 The canonical workflow names FAST, UNIT, CONTRACT, SECURITY, RAG_EVAL,

@@ -37,6 +37,12 @@ stream-cleanup contract is documented in
 [HTTP transport observation](http-transport-observation.md). Provider isolation
 does not introduce another middleware layer or change that composition.
 
+JSON ingestion routes read through the same bounded body stream and then apply a
+finite, duplicate-free UTF-8 decoder before model validation. This prevents
+`NaN`/`Infinity` constants and duplicate object keys from becoming accepted
+upload, reindex or retry semantics; the configured `max_json_bytes` remains the
+authoritative request budget.
+
 ## Request context
 
 `RequestContext{request_id, correlation_id, user_id, session_id, workspace_id,

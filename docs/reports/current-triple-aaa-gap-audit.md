@@ -974,3 +974,19 @@ Compilation and `git diff --check` pass. This is local adapter evidence only;
 live Qdrant schema/filter/alias/rebuild/restore, approved object storage,
 distributed runtime, independent review, sealed packet and human Go/No-Go
 remain unavailable. Promotion remains disallowed.
+
+## 50. API request JSON decoding closure — 2026-09-10
+
+Source implementation candidate `1ddd3c5b1c9af913bc3da427c284a91f8f454f99`
+(tree `cec335bf412fa4077db1c61566ce07cbc10b5de6`) closes a concrete public
+API input-boundary gap. The JSON upload, reindex and retry routes now read the
+bounded request body and use strict UTF-8/finite/duplicate-free decoding before
+Pydantic validation. The baseline accepted an ignored `NaN` field and used the
+last value of a duplicate `content` field; the public upload boundary now
+rejects both as `validation_error` before ingestion.
+
+The focused API boundary slice passes **53** tests and the complete API matrix
+passes **445**; compilation and `git diff --check` pass. This is local request
+boundary evidence only. Live tenant/runtime isolation, distributed
+coordination, provider/corpus, independent review, sealed packet and human
+Go/No-Go remain unavailable; promotion remains disallowed.
