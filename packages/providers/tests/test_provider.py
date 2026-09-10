@@ -177,6 +177,76 @@ async def test_health_check_has_an_explicit_timeout_for_an_unresponsive_transpor
 
 
 @pytest.mark.asyncio
+async def test_streaming_contract_emits_typed_deltas_and_terminal_finish_reason() -> None:
+    requests: list[httpx.Request] = []
+    body = (
+        b'data: {"model":"chat-test-model","choices":[{"delta":{"content":"stream "},"finish_reason":null}]}\n\n'
+        b'data: {"model":"chat-test-model","choices":[{"delta":{"content":"ok"},"finish_reason":null}]}\n\n'
+        b'data: {"model":"chat-test-model","choices":[{"delta":{},"finish_reason":"stop"}]}\n\n'
+        b"data: [DONE]\n\n"
+    )
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(
+            200,
+            content=body,
+            headers={"content-type": "text/event-stream"},
+            request=request,
+        )
+
+    provider = OpenAICompatibleClient(_config(), transport=httpx.MockTransport(handler))
+    try:
+        chunks = [
+            chunk
+            async for chunk in provider.chat_completion_stream(
+                messages=[{"role": "user", "content": "stream"}],
+                correlation_id=CORRELATION,
+            )
+        ]
+    finally:
+        await _close(provider)
+
+    assert [chunk.delta for chunk in chunks] == ["stream ", "ok", ""]
+    assert chunks[-1].finish_reason == "stop"
+    assert requests[0].method == "POST"
+    assert json.loads(requests[0].content)["stream"] is True
+
+
+@pytest.mark.asyncio
+async def test_streaming_cancellation_propagates_without_retry_or_conversion() -> None:
+    started = asyncio.Event()
+    calls = 0
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        started.set()
+        await asyncio.Event().wait()
+        return httpx.Response(200, content=b"", request=request)
+
+    provider = OpenAICompatibleClient(_config(max_attempts=3), transport=httpx.MockTransport(handler))
+
+    async def consume() -> None:
+        async for _chunk in provider.chat_completion_stream(
+            messages=[{"role": "user", "content": "cancel"}],
+            correlation_id=CORRELATION,
+        ):
+            pass
+
+    task = asyncio.create_task(consume())
+    try:
+        await asyncio.wait_for(started.wait(), timeout=1)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+    finally:
+        await _close(provider)
+
+    assert calls == 1
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("exception", "expected_code"),
     [

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run a bounded live OpenAI-compatible chat and embedding gate.
+"""Run a bounded live OpenAI-compatible health/chat/stream/embedding gate.
 
 The gate requires an explicitly configured provider URL and uses the canonical
 HTTP client.  It never installs a fake transport, never falls back to the
@@ -172,6 +172,8 @@ async def _run_checks(
     provider_health_ok = False
     chat_ok = False
     embedding_ok = False
+    streaming_ok = False
+    json_ok = False
     try:
         try:
             provider_health_ok = await client.health_check()
@@ -212,6 +214,63 @@ async def _run_checks(
             assertions.append(_Assertion("chat-completion-contract", FAIL, "live chat assertion failed"))
 
         try:
+            structured = await client.chat_completion(
+                messages=[
+                    ProviderMessage(
+                        role="user",
+                        content="Return a JSON object with status=ok.",
+                    )
+                ],
+                temperature=0,
+                response_format={"type": "json_object"},
+                correlation_id=f"phase11-provider-json-{uuid.uuid4().hex[:12]}",
+            )
+            decoded = json.loads(structured.content)
+            json_ok = bool(structured.model == config.chat_model and isinstance(decoded, dict))
+            assertions.append(
+                _Assertion(
+                    "json-response-contract",
+                    PASS if json_ok else FAIL,
+                    "typed JSON response parsed as an object"
+                    if json_ok
+                    else "typed JSON response did not satisfy the object contract",
+                )
+            )
+        except Exception:
+            assertions.append(_Assertion("json-response-contract", FAIL, "live JSON assertion failed"))
+
+        try:
+            deltas: list[str] = []
+            finish_reason: str | None = None
+            stream = client.chat_completion_stream(
+                messages=[
+                    ProviderMessage(
+                        role="user",
+                        content="Reply with a short streaming health acknowledgement.",
+                    )
+                ],
+                temperature=0,
+                correlation_id=f"phase11-provider-stream-{uuid.uuid4().hex[:12]}",
+            )
+            async for chunk in stream:
+                if chunk.delta:
+                    deltas.append(chunk.delta)
+                if chunk.finish_reason:
+                    finish_reason = chunk.finish_reason
+            streaming_ok = bool("".join(deltas).strip() and finish_reason in {"stop", "length", "content_filter", "unknown"})
+            assertions.append(
+                _Assertion(
+                    "streaming-contract",
+                    PASS if streaming_ok else FAIL,
+                    "typed stream emitted deltas and a terminal finish reason"
+                    if streaming_ok
+                    else "typed stream did not satisfy the terminal contract",
+                )
+            )
+        except Exception:
+            assertions.append(_Assertion("streaming-contract", FAIL, "live streaming assertion failed"))
+
+        try:
             embedding = await client.get_embedding(
                 "provider runtime health probe",
                 correlation_id=f"phase11-provider-embedding-{uuid.uuid4().hex[:12]}",
@@ -240,7 +299,7 @@ async def _run_checks(
                 "canonical OpenAI-compatible client is configured",
             )
         )
-        status = PASS if provider_health_ok and chat_ok and embedding_ok else FAIL
+        status = PASS if provider_health_ok and chat_ok and json_ok and streaming_ok and embedding_ok else FAIL
         production_safe = bool(
             status == PASS
             and config.is_production

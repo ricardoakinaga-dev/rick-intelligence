@@ -40,12 +40,31 @@ class _ProviderHandler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:  # noqa: N802
         length = int(self.headers.get("Content-Length", "0"))
         body = json.loads(self.rfile.read(length))
+        if self.path.endswith("/chat/completions") and body.get("stream") is True:
+            encoded = (
+                f'data: {json.dumps({"model": body["model"], "choices": [{"delta": {"content": "stream "}, "finish_reason": None}]})}\n\n'
+                f'data: {json.dumps({"model": body["model"], "choices": [{"delta": {"content": "acknowledged"}, "finish_reason": None}]})}\n\n'
+                f'data: {json.dumps({"model": body["model"], "choices": [{"delta": {}, "finish_reason": "stop"}]})}\n\n'
+                "data: [DONE]\n\n"
+            ).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.send_header("Content-Length", str(len(encoded)))
+            self.send_header("Connection", "close")
+            self.end_headers()
+            self.wfile.write(encoded)
+            return
         if self.path.endswith("/chat/completions"):
+            content = (
+                json.dumps({"status": "ok"})
+                if body.get("response_format") == {"type": "json_object"}
+                else "health acknowledged"
+            )
             payload = {
                 "model": body["model"],
                 "choices": [
                     {
-                        "message": {"role": "assistant", "content": "health acknowledged"},
+                        "message": {"role": "assistant", "content": content},
                         "finish_reason": "stop",
                     }
                 ],
@@ -116,6 +135,8 @@ def test_real_openai_compatible_endpoint_passes_semantic_checks(provider_url: st
     assert {item.name for item in assertions} >= {
         "provider-health-probe",
         "chat-completion-contract",
+        "json-response-contract",
+        "streaming-contract",
         "embedding-contract",
     }
     assert production_safe is False
