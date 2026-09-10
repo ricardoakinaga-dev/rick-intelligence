@@ -18,7 +18,9 @@ The worker owns the polling loop, scoped lease, heartbeat, bounded handler
 execution, cancellation, retry/dead-letter mapping and shutdown report. The
 external composition injects the canonical `ProcessParserRunner`: each parser
 gets a fresh `spawn` child, a wall-clock deadline, advisory CPU/memory limits
-and process-group termination on timeout. The local compatibility path keeps
+and process-group termination on timeout. The parser response crosses the
+child boundary through a bounded versioned JSON envelope; child-controlled
+bytes are never unpickled in the worker process. The local compatibility path keeps
 the cooperative runner and is never used as proof of external runtime health.
 
 ## Failure policy

@@ -78,10 +78,11 @@ Current live readiness is `BLOCKED_EXTERNAL` when the approved daemon is not
 available.
 
 The local ingestion boundary also validates parser output shape and
-provenance, bounds auxiliary sections/metadata, caps the serialized
-process-runner result before child transport, and rejects invalid UTF-8 with a
-bounded `validation_error` instead of a permissive fallback at source
-candidate `bacfc9ee569e07357d3412f3588f4a7bda554c73`. This strengthens local
+provenance, bounds auxiliary sections/metadata, transports the result through
+a bounded JSON-only envelope without unpickling child-controlled bytes, and
+rejects invalid UTF-8 with a bounded `validation_error` instead of a
+permissive fallback at source candidate
+`714355e346adf900960725bb863b99cbfda52900`. This strengthens local
 hostile-file handling; it is not live malicious-corpus, container or runtime
 evidence.
 

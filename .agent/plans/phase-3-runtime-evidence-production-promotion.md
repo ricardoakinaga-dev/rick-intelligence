@@ -41,6 +41,7 @@ preserving the frozen Gauntlet bar, Phase 2 history and legacy repositories.
 - [x] (2026-09-10) Close free-form observability secret redaction at source candidate e2043c05fb1b064b4618395e3358d2a22a5b2cd0 (tree 6774e6ab8662c0b5a085fd0d62d108c6f61ecc32): redact inline assignments, bearer headers and nested JSON/CLI secret values in non-sensitive text fields; observability/API/State-of-Art suites pass 10/437/295, while external runtime and promotion evidence remain blocked.
 - [x] (2026-09-10) Bound parser result transport at source candidate 19ca87d987a2348a0be6346221bb1d2b61d2b831 (tree a9bc35f7809ed7529c9e8f46ce2727cfecfa96dc): validate parser text/pages/sections/metadata and cap the serialized child response before transport; ingestion security/admission/full tests pass 100, while API/State-of-Art suites remain green at 437/295 and external runtime evidence remains blocked.
 - [x] (2026-09-10) Reject invalid UTF-8 at source candidate bacfc9ee569e07357d3412f3588f4a7bda554c73 (tree 4c05c1348224f1cefe845d891d62634d9981cc9b): remove the permissive TXT Latin-1 fallback and convert decoder failures into a bounded `validation_error` for both TXT and Markdown; ingestion security/admission/full tests pass 102, focused file-security/runtime adapter tests 79, and API/State-of-Art suites remain green at 437/295 while external runtime evidence remains blocked.
+- [x] (2026-09-10) Remove Pickle from the parser result wire at source candidate 714355e346adf900960725bb863b99cbfda52900 (tree b3456248f0774ed7a4bb99b1d81753bb03457673): return values now cross the child pipe as a bounded versioned JSON envelope, and the parent rejects legacy or malicious Pickle payloads; ingestion security/admission/full tests pass 103, focused file-security/runtime adapter tests 79, and API/State-of-Art suites remain green at 437/295 while external runtime evidence remains blocked.
 - [ ] (2026-09-09) Execute the disposable runtime; currently blocked by Docker daemon access and unresolved external authority.
 - [ ] (2026-09-09) Complete independent runtime/design/security reviews and the human Go/No-Go.
 
@@ -192,8 +193,8 @@ made.
 ## Current candidate closure
 
 The current source implementation candidate is
-bacfc9ee569e07357d3412f3588f4a7bda554c73 with tree
-4c05c1348224f1cefe845d891d62634d9981cc9b. It contains the corrected
+714355e346adf900960725bb863b99cbfda52900 with tree
+b3456248f0774ed7a4bb99b1d81753bb03457673. It contains the corrected
 PostgreSQL worker gate, canonical two-process Redis/API HTTP gate, strict
 release artifact postconditions and manifest consistency checks, plus bounded
 same-run CI envelopes with redacted raw artifacts, exact workflow/run/ref/SHA
@@ -210,8 +211,9 @@ runtime types for every integer budget plus timeout booleans, escaped-URL
 credential/query redaction and inline assignment, bearer-header, nested-JSON
 and CLI-value secret redaction in observability, plus schema-checked parser
 output with bounded auxiliary metadata and a hard serialized-result ceiling
-before child transport, and rejects invalid UTF-8 with a bounded parser error
-instead of silently decoding text with a permissive fallback. The final
+before child transport through a versioned JSON-only envelope, never
+unpickles child-controlled bytes, and rejects invalid UTF-8 with a bounded
+parser error instead of silently decoding text with a permissive fallback. The final
 documentation/control-plane follow-up is bound to the resulting clean
 checkout, while live provider/runtime evidence remains external.
 The provider, Professor, API and State-of-Art suites have 64, 36, 437 and 295

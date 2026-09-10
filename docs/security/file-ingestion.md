@@ -45,6 +45,9 @@ Built-in parser loops use a cooperative 30-second deadline, bounded reads, and
 page or section checkpoints. `ProcessParserRunner` is the production runner:
 it starts a fresh `spawn` child, applies advisory CPU/memory limits, enforces a
 parent wall-clock deadline and terminates the child process group on timeout.
+The child response uses a versioned JSON-only envelope; the parent never
+unpickles parser-controlled bytes, and the serialized response remains capped
+at 32 MiB.
 The external composition rejects a custom runner that does not advertise both
 `production_safe` and `process_isolated`. The default
 `InProcessParserRunner` remains available for local compatibility and converts

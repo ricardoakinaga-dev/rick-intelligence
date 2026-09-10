@@ -863,7 +863,8 @@
     ".agent/verification.jsonl#VER-PH3-2-OBSERVABILITY-ESCAPED-URL-20260910",
     ".agent/verification.jsonl#VER-PH3-2-OBSERVABILITY-INLINE-SECRETS-20260910",
     ".agent/verification.jsonl#VER-PH3-2-INGESTION-PARSER-BOUNDARY-20260910",
-    ".agent/verification.jsonl#VER-PH3-2-INGESTION-INVALID-UNICODE-20260910"
+    ".agent/verification.jsonl#VER-PH3-2-INGESTION-INVALID-UNICODE-20260910",
+    ".agent/verification.jsonl#VER-PH3-2-INGESTION-PARSER-WIRE-JSON-20260910"
       ],
       "next_action": {
         "id": "PH3-2-LAB-READINESS:WAIT_RUNTIME",

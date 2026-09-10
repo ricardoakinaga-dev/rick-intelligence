@@ -17,7 +17,7 @@
       "type": "REPO",
       "location": "docs/reports/current-triple-aaa-gap-audit.md",
     "version": "39c391b3d8ee252f88f1474df39e257a92258ec7",
-      "snapshot_sha256": "4ca51a125319a6d0476f7220d356ed505cc284ffa2205dc82faef20586a340a9",
+      "snapshot_sha256": "811f7c2e60016e84951a379948eb7f7a9faedbf29287bcbf515bec3a21236ea0",
       "license_notes": "Current repository audit and evidence boundary."
     }
   ],

@@ -14,7 +14,7 @@
   "active_execplan": ".agent/plans/phase-3-runtime-evidence-production-promotion.md",
   "active_task": "PH3-2-LAB-READINESS",
   "verification_state": "PARTIAL",
-  "repository_state": "Current source candidate is bacfc9ee569e07357d3412f3588f4a7bda554c73 (tree 4c05c1348224f1cefe845d891d62634d9981cc9b); it includes schema-checked parser output, bounded serialized child transport, fail-closed invalid UTF-8 rejection for TXT and Markdown, and the prior provider, Professor, observability, API and release-boundary hardening. Clean local evidence currently passes ingestion 102, focused file-security/runtime 79, provider 64, Professor 36, API 437 and State-of-Art 295 tests; the next integrated packet must bind this candidate and remains expected to classify STATE_OF_ART_CANDIDATE with external blockers. No State of Art, AAA or Triple AAA promotion claim is made.",
+  "repository_state": "Current source candidate is 714355e346adf900960725bb863b99cbfda52900 (tree b3456248f0774ed7a4bb99b1d81753bb03457673); it includes schema-checked parser output, bounded serialized child transport, a versioned JSON-only parser result envelope that never unpickles child-controlled bytes, fail-closed invalid UTF-8 rejection for TXT and Markdown, and the prior provider, Professor, observability, API and release-boundary hardening. Clean local evidence currently passes ingestion 103, focused file-security/runtime 79, provider 64, Professor 36, API 437 and State-of-Art 295 tests; the next integrated packet must bind this candidate and remains expected to classify STATE_OF_ART_CANDIDATE with external blockers. No State of Art, AAA or Triple AAA promotion claim is made.",
   "instruction_scope_refs": [
     ".agent/PLANS.md",
     "cvg-master-rag-v2/AGENTS.md",
@@ -23,8 +23,8 @@
     "docs/plans/phase-3-runtime-evidence-production-promotion.md"
   ],
   "last_gate_record": ".agent/gates/phase-3-2-lab-readiness-implementation-ready.json",
-  "last_event_id": "EVT-PH3-2-INGESTION-INVALID-UNICODE-20260910",
-  "state_revision": 273,
+  "last_event_id": "EVT-PH3-2-INGESTION-PARSER-WIRE-JSON-20260910",
+  "state_revision": 274,
   "next_gate": "VERIFIED",
   "active_action_id": "PH3-2-LAB-READINESS:WAIT_RUNTIME",
   "blocked_by": [
@@ -32,5 +32,5 @@
     "Disposable runtime secrets and endpoint authority are unavailable"
   ],
   "human_approval_required": [],
-  "updated_at": "2026-09-10T13:34:04Z"
+  "updated_at": "2026-09-10T13:45:04Z"
 }

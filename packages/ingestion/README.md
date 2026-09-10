@@ -8,6 +8,7 @@ The local compatibility path uses `InProcessParserRunner`. The external worker
 composition uses `ProcessParserRunner`, which runs each parser in a fresh
 `spawn` child with a wall-clock deadline, advisory resource limits and
 process-group termination. Parser results are schema-checked and bounded
-before they cross the child pipe, including a hard serialized-result ceiling;
-oversized or malformed custom-runner output fails closed. PDF and DOCX support is packaged in the API and
+before they cross the child pipe, including a JSON-only versioned wire schema
+and a hard serialized-result ceiling; the parent never unpickles child data.
+Oversized or malformed custom-runner output fails closed. PDF and DOCX support is packaged in the API and
 worker images with pinned `pdfplumber` and `python-docx` dependencies.

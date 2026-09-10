@@ -534,3 +534,21 @@ the State-of-Art suite **295**; compilation and `git diff --check` pass. This
 is local file-security evidence only. The approved disposable runtime,
 malicious corpus, distributed file-security drill, independent review and
 promotion authority remain unavailable; promotion remains disallowed.
+
+## 35. Parser wire deserialization closure — 2026-09-10
+
+Source candidate `714355e346adf900960725bb863b99cbfda52900` (tree
+`b3456248f0774ed7a4bb99b1d81753bb03457673`) closes a process-isolation gap in
+the parser result transport. The child now returns a bounded, versioned
+JSON-only envelope for either a validated `ParsedDocument` or a safe error;
+the parent no longer performs `pickle.loads` on child-controlled bytes, and
+legacy/malicious Pickle payloads are rejected before interpretation. Pickle is
+retained only for the parent-to-child parser object handoff required by the
+spawn runtime.
+
+The ingestion security/admission/full regression passes **103**, the focused
+file-security/runtime adapter tests pass **79**, the API matrix **437**, and
+the State-of-Art suite **295**; compilation and `git diff --check` pass. This
+is local process-isolation evidence only. The approved disposable runtime,
+malicious corpus, distributed file-security drill, independent review and
+promotion authority remain unavailable; promotion remains disallowed.
