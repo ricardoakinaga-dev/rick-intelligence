@@ -56,6 +56,74 @@ class ReleaseManifestTests(unittest.TestCase):
             sha256=sha256(evidence_path.read_bytes()).hexdigest(),
             description="fixture evidence",
         )
+        runtime_refs: dict[str, EvidenceRef] = {}
+        runtime_dir = root / ".runtime"
+        runtime_dir.mkdir(parents=True, exist_ok=True)
+        checkout_snapshot = {
+            "available": True,
+            "head": self.HEAD,
+            "tree": self.TREE,
+            "fingerprint": self.CHECKOUT,
+            "status": "CLEAN",
+        }
+        for runtime_gate_id in REQUIRED_GATES:
+            if runtime_gate_id == "release-integrity":
+                continue
+            runtime_relative = f".runtime/{runtime_gate_id}.json"
+            runtime_target = root / runtime_relative
+            runtime_target.write_text(
+                json.dumps(
+                    {
+                        "schema_version": "state-of-art-runtime-evidence.v1",
+                        "record_id": f"fixture-{runtime_gate_id}",
+                        "capability_id": runtime_gate_id,
+                        "status": gate_result,
+                        "exit_status": (
+                            0
+                            if gate_result == "PASS"
+                            else 1
+                            if gate_result in {"FAIL", "STALE", "INVALID"}
+                            else 2
+                            if gate_result == "BLOCKED_EXTERNAL"
+                            else None
+                        ),
+                        "commit_sha": self.HEAD,
+                        "tree_sha": self.TREE,
+                        "checkout_fingerprint": self.CHECKOUT,
+                        "checkout_available": True,
+                        "checkout_sentinel": {
+                            "before": checkout_snapshot,
+                            "after": checkout_snapshot,
+                            "unchanged": True,
+                        },
+                        "clean_worktree": True,
+                        "production_safe": gate_result == "PASS",
+                        "procedure": f"fixture runtime procedure for {runtime_gate_id}",
+                        "environment": "fixture",
+                        "limitations": ["fixture is not a production run"],
+                        "next_action": "replace fixture with an approved runtime observation",
+                        "observed_at": observed_at,
+                        "freshness": "CURRENT",
+                        "artifact_sha256": evidence.sha256,
+                        "raw_artifacts": [evidence.to_dict()],
+                    },
+                    sort_keys=True,
+                ),
+                encoding="utf-8",
+            )
+            runtime_refs[runtime_gate_id] = EvidenceRef(
+                path=runtime_relative,
+                sha256=sha256(runtime_target.read_bytes()).hexdigest(),
+                description=f"fixture runtime envelope for {runtime_gate_id}",
+            )
+        gate_exit_status = {
+            "PASS": 0,
+            "BLOCKED_EXTERNAL": 2,
+            "FAIL": 1,
+            "STALE": 1,
+            "INVALID": 1,
+            "NOT_RUN": None,
+        }[gate_result]
         gates = tuple(
             GateResult(
                 gate_id=gate_id,
@@ -65,7 +133,7 @@ class ReleaseManifestTests(unittest.TestCase):
                 command=(
                     ("git", "diff", "--check", "&&", "make", "validate")
                     if gate_id == "release-integrity"
-                    else ("runtime-envelope", gate_id)
+                    else ("runtime-envelope", f".runtime/{gate_id}.json")
                 ),
                 procedure=(
                     "run git diff --check and make validate against the exact checkout"
@@ -74,11 +142,11 @@ class ReleaseManifestTests(unittest.TestCase):
                 ),
                 environment="test",
                 timestamp=observed_at,
-                exit_status=0 if gate_result == "PASS" else 2,
+                exit_status=gate_exit_status,
                 result=gate_result,  # type: ignore[arg-type]
                 limitations=("fixture is not a production run",) if gate_result != "PASS" else (),
                 reviewer=independent_reviewer if gate_id == "independent-reviews" else reviewer,
-                evidence_paths=(evidence,),
+                evidence_paths=(evidence,) if gate_id == "release-integrity" else (runtime_refs[gate_id],),
             )
             for gate_id in REQUIRED_GATES
         )
@@ -282,6 +350,49 @@ class ReleaseManifestTests(unittest.TestCase):
 
         self.assertEqual(result["classification"], release_integrity.FAIL)
         self.assertIn("not an approved", result["reason"])
+
+    def test_runtime_pass_requires_a_bound_envelope(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="release-manifest-") as directory:
+            path, checkout = self._fixture(directory)
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            architecture = next(
+                gate for gate in payload["gates"] if gate["gate_id"] == "architecture"
+            )
+            architecture["command"] = ["runtime-envelope", "architecture"]
+            architecture["evidence_paths"] = [
+                {
+                    "path": "evidence.md",
+                    "sha256": sha256((Path(directory) / "evidence.md").read_bytes()).hexdigest(),
+                    "description": "unbound plain-text evidence",
+                }
+            ]
+            architecture["evidence_path"] = architecture["evidence_paths"]
+            path.write_text(json.dumps(payload), encoding="utf-8")
+            result = release_integrity.evaluate_evidence(path, checkout, root=Path(directory))
+
+        self.assertEqual(result["classification"], release_integrity.FAIL)
+        self.assertIn("PASS requires a safe .runtime", result["reason"])
+
+    def test_runtime_pass_requires_production_safe_envelope(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="release-manifest-") as directory:
+            path, checkout = self._fixture(directory)
+            runtime_path = Path(directory) / ".runtime/architecture.json"
+            runtime = json.loads(runtime_path.read_text(encoding="utf-8"))
+            runtime["production_safe"] = False
+            runtime_path.write_text(json.dumps(runtime), encoding="utf-8")
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            architecture = next(
+                gate for gate in payload["gates"] if gate["gate_id"] == "architecture"
+            )
+            architecture["evidence_paths"][0]["sha256"] = sha256(
+                runtime_path.read_bytes()
+            ).hexdigest()
+            architecture["evidence_path"] = architecture["evidence_paths"]
+            path.write_text(json.dumps(payload), encoding="utf-8")
+            result = release_integrity.evaluate_evidence(path, checkout, root=Path(directory))
+
+        self.assertEqual(result["classification"], release_integrity.FAIL)
+        self.assertIn("not production-safe", result["reason"])
 
 
 if __name__ == "__main__":

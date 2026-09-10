@@ -40,7 +40,14 @@ _GENERATION_FAILED_ANSWER = "I could not generate a grounded response right now.
 
 @dataclass(frozen=True, slots=True)
 class ProfessorLimits:
-    """Hard limits applied before provider invocation and response emission."""
+    """Hard limits applied before provider invocation and response emission.
+
+    The orchestration seam currently has one retrieval round, no tool
+    execution, and at most one provider call per request.  Those ceilings are
+    explicit here so a future loop cannot silently turn into an unbounded
+    agent.  Time and token limits remain enforced even when an injected
+    dependency is slow or omits usage counters.
+    """
 
     max_evidence_items: int = 8
     max_evidence_chars: int = 12_000
@@ -49,6 +56,12 @@ class ProfessorLimits:
     max_answer_chars: int = 8_000
     approved_confidence: float = 0.50
     lease_ttl_ms: int = 120_000
+    max_retrieval_rounds: int = 1
+    max_tool_calls: int = 0
+    max_provider_calls: int = 1
+    max_tokens: int = 8_192
+    max_reasoning_seconds: float = 30.0
+    max_total_request_seconds: float = 60.0
 
     def __post_init__(self) -> None:
         if self.max_evidence_items < 1:
@@ -61,6 +74,35 @@ class ProfessorLimits:
             raise ValueError("approved_confidence must be between 0 and 1")
         if self.lease_ttl_ms < 1:
             raise ValueError("lease_ttl_ms must be positive")
+        if self.max_retrieval_rounds < 1:
+            raise ValueError("max_retrieval_rounds must be positive")
+        if self.max_tool_calls < 0:
+            raise ValueError("max_tool_calls must not be negative")
+        if self.max_provider_calls < 1:
+            raise ValueError("max_provider_calls must be positive")
+        if self.max_tokens < 1:
+            raise ValueError("max_tokens must be positive")
+        if not math.isfinite(self.max_reasoning_seconds) or self.max_reasoning_seconds <= 0:
+            raise ValueError("max_reasoning_seconds must be finite and positive")
+        if not math.isfinite(self.max_total_request_seconds) or self.max_total_request_seconds <= 0:
+            raise ValueError("max_total_request_seconds must be finite and positive")
+
+
+@dataclass(slots=True)
+class _RequestBudget:
+    """Counters shared by every operation belonging to one request."""
+
+    retrieval_rounds: int = 0
+    tool_calls: int = 0
+    provider_calls: int = 0
+
+
+class _BudgetExceeded(Exception):
+    """Internal control flow for an exhausted request budget."""
+
+    def __init__(self, budget_name: str) -> None:
+        super().__init__(budget_name)
+        self.budget_name = budget_name
 
 
 @dataclass(frozen=True, slots=True)
@@ -330,6 +372,23 @@ async def _call_maybe_async(target: Callable[..., object], **kwargs: object) -> 
     return await result if inspect.isawaitable(result) else result
 
 
+def _estimated_tokens(text: str) -> int:
+    """Conservative, provider-independent token estimate for unmetered seams."""
+    return max(1, (len(text) + 3) // 4)
+
+
+def _completion_within_token_budget(
+    completion: ChatCompletionResult,
+    messages: Sequence[ProviderMessage],
+    max_tokens: int,
+) -> bool:
+    """Enforce a hard total-token ceiling even when provider usage is absent."""
+    estimated = sum(_estimated_tokens(message.content) for message in messages)
+    estimated += _estimated_tokens(completion.content)
+    reported = completion.usage.total_tokens if completion.usage is not None else 0
+    return max(estimated, reported) <= max_tokens
+
+
 def _provider_target(provider: object) -> Callable[..., object]:
     target = getattr(provider, "complete", None)
     if callable(target):
@@ -396,11 +455,21 @@ class ProfessorOrchestrator:
 
     async def run(self, request: ProfessorRequest) -> ProfessorResponse:
         self._validate_request(request)
+        try:
+            return await asyncio.wait_for(
+                self._run_request(request),
+                timeout=self.limits.max_total_request_seconds,
+            )
+        except asyncio.TimeoutError:
+            return self._failed(request, "total_request_timeout")
+
+    async def _run_request(self, request: ProfessorRequest) -> ProfessorResponse:
         lease_key = self._lease_key(request)
         lease_owner = uuid.uuid4().hex
         lease_acquired = False
         lease_handle: object | None = None
         lease_low_level = True
+        budget = _RequestBudget()
         try:
             if self.lease_manager is not None:
                 try:
@@ -432,15 +501,25 @@ class ProfessorOrchestrator:
                     return self._failed(request, "lease_unavailable")
                 lease_acquired = True
 
-            if lease_acquired:
-                return await self._run_with_lease_heartbeat(
-                    request,
-                    lease_key=lease_key,
-                    lease_owner=lease_owner,
-                    lease_handle=lease_handle,
-                    lease_low_level=lease_low_level,
+            try:
+                if lease_acquired:
+                    return await asyncio.wait_for(
+                        self._run_with_lease_heartbeat(
+                            request,
+                            budget=budget,
+                            lease_key=lease_key,
+                            lease_owner=lease_owner,
+                            lease_handle=lease_handle,
+                            lease_low_level=lease_low_level,
+                        ),
+                        timeout=self.limits.max_reasoning_seconds,
+                    )
+                return await asyncio.wait_for(
+                    self._run_generation(request, budget=budget),
+                    timeout=self.limits.max_reasoning_seconds,
                 )
-            return await self._run_generation(request)
+            except asyncio.TimeoutError:
+                return self._failed(request, "reasoning_timeout")
         finally:
             if lease_acquired and self.lease_manager is not None:
                 try:
@@ -464,9 +543,16 @@ class ProfessorOrchestrator:
                     # completed answer into a provider error.
                     pass
 
-    async def _run_generation(self, request: ProfessorRequest) -> ProfessorResponse:
+    async def _run_generation(
+        self,
+        request: ProfessorRequest,
+        *,
+        budget: _RequestBudget,
+    ) -> ProfessorResponse:
         try:
-            retrieval_result = await self._retrieve(request)
+            retrieval_result = await self._retrieve(request, budget=budget)
+        except _BudgetExceeded as error:
+            return self._failed(request, f"{error.budget_name}_budget_exceeded")
         except asyncio.CancelledError:
             raise
         except Exception:
@@ -481,16 +567,32 @@ class ProfessorOrchestrator:
 
         messages = _build_messages(request, evidence, self.limits)
         try:
+            self._consume_provider_call(budget)
             raw_completion = await _call_maybe_async(
                 _provider_target(self.chat_provider),
                 messages=messages,
                 conversation_id=request.conversation_id,
             )
             completion = raw_completion if isinstance(raw_completion, ChatCompletionResult) else ChatCompletionResult.model_validate(raw_completion)
+        except _BudgetExceeded as error:
+            return self._failed(
+                request,
+                f"{error.budget_name}_budget_exceeded",
+                evidence,
+                metadata=decision_metadata,
+            )
         except asyncio.CancelledError:
             raise
         except Exception:
             return self._failed(request, "provider_failed", evidence, metadata=decision_metadata)
+
+        if not _completion_within_token_budget(completion, messages, self.limits.max_tokens):
+            return self._failed(
+                request,
+                "token_budget_exceeded",
+                evidence,
+                metadata=decision_metadata,
+            )
 
         answer, citations, invalid = self._citations(completion.content, evidence)
         if invalid:
@@ -513,6 +615,7 @@ class ProfessorOrchestrator:
         self,
         request: ProfessorRequest,
         *,
+        budget: _RequestBudget,
         lease_key: str,
         lease_owner: str,
         lease_handle: object | None,
@@ -521,10 +624,10 @@ class ProfessorOrchestrator:
         """Run generation while renewing an acquired lease when supported."""
 
         if self.lease_manager is None or not callable(getattr(self.lease_manager, "renew", None)):
-            return await self._run_generation(request)
+            return await self._run_generation(request, budget=budget)
 
         work_task: asyncio.Task[object] = asyncio.create_task(
-            self._run_generation(request), name="root-professor-generation"
+            self._run_generation(request, budget=budget), name="root-professor-generation"
         )
         heartbeat_task: asyncio.Task[object] = asyncio.create_task(
             self._lease_heartbeat(
@@ -604,6 +707,16 @@ class ProfessorOrchestrator:
         return await self.run(request)
 
     async def stream(self, request: ProfessorRequest):
+        """Yield a bounded stream and a safe terminal response."""
+        self._validate_request(request)
+        try:
+            async with asyncio.timeout(self.limits.max_total_request_seconds):
+                async for event in self._stream_request(request):
+                    yield event
+        except TimeoutError:
+            yield {"kind": "final", "response": self._failed(request, "total_request_timeout")}
+
+    async def _stream_request(self, request: ProfessorRequest):
         """Yield provider deltas and one validated final response.
 
         The generator owns the lease for its whole lifetime. A caller that
@@ -617,6 +730,7 @@ class ProfessorOrchestrator:
         lease_acquired = False
         lease_handle: object | None = None
         lease_low_level = True
+        budget = _RequestBudget()
         try:
             if self.lease_manager is not None:
                 try:
@@ -645,17 +759,18 @@ class ProfessorOrchestrator:
                     return
                 lease_acquired = True
             if lease_acquired:
-                async for event in self._stream_with_lease_heartbeat(
+                source = self._stream_with_lease_heartbeat(
                     request,
+                    budget=budget,
                     lease_key=lease_key,
                     lease_owner=lease_owner,
                     lease_handle=lease_handle,
                     lease_low_level=lease_low_level,
-                ):
-                    yield event
+                )
             else:
-                async for event in self._stream_generation(request):
-                    yield event
+                source = self._stream_generation(request, budget=budget)
+            async for event in self._stream_with_reasoning_budget(request, source):
+                yield event
         finally:
             if lease_acquired and self.lease_manager is not None:
                 try:
@@ -675,6 +790,7 @@ class ProfessorOrchestrator:
         self,
         request: ProfessorRequest,
         *,
+        budget: _RequestBudget,
         lease_key: str,
         lease_owner: str,
         lease_handle: object | None,
@@ -688,7 +804,7 @@ class ProfessorOrchestrator:
         """
 
         if self.lease_manager is None or not callable(getattr(self.lease_manager, "renew", None)):
-            async for event in self._stream_generation(request):
+            async for event in self._stream_generation(request, budget=budget):
                 yield event
             return
 
@@ -696,7 +812,7 @@ class ProfessorOrchestrator:
 
         async def produce() -> None:
             try:
-                async for event in self._stream_generation(request):
+                async for event in self._stream_generation(request, budget=budget):
                     await events.put(("event", event))
                 await events.put(("done", None))
             except asyncio.CancelledError:
@@ -755,9 +871,20 @@ class ProfessorOrchestrator:
             await _drain_task(work_task)
             await _drain_task(heartbeat_task)
 
-    async def _stream_generation(self, request: ProfessorRequest):
+    async def _stream_with_reasoning_budget(self, request: ProfessorRequest, source: object):
         try:
-            retrieval_result = await self._retrieve(request)
+            async with asyncio.timeout(self.limits.max_reasoning_seconds):
+                async for event in source:  # type: ignore[union-attr]
+                    yield event
+        except TimeoutError:
+            yield {"kind": "final", "response": self._failed(request, "reasoning_timeout")}
+
+    async def _stream_generation(self, request: ProfessorRequest, *, budget: _RequestBudget):
+        try:
+            retrieval_result = await self._retrieve(request, budget=budget)
+        except _BudgetExceeded as error:
+            yield {"kind": "final", "response": self._failed(request, f"{error.budget_name}_budget_exceeded")}
+            return
         except asyncio.CancelledError:
             raise
         except Exception:
@@ -777,11 +904,15 @@ class ProfessorOrchestrator:
         stream_target = getattr(self.chat_provider, "stream", None)
         if not callable(stream_target):
             try:
+                self._consume_provider_call(budget)
                 raw_completion = await _call_maybe_async(
                     _provider_target(self.chat_provider),
                     messages=messages, conversation_id=request.conversation_id,
                 )
                 completion = raw_completion if isinstance(raw_completion, ChatCompletionResult) else ChatCompletionResult.model_validate(raw_completion)
+                if not _completion_within_token_budget(completion, messages, self.limits.max_tokens):
+                    yield {"kind": "final", "response": self._failed(request, "token_budget_exceeded", evidence, metadata=decision_metadata)}
+                    return
                 yield {"kind": "delta", "delta": completion.content}
                 answer, citations, invalid = self._citations(completion.content, evidence)
                 if invalid:
@@ -793,6 +924,8 @@ class ProfessorOrchestrator:
                     evidence=[item.response_dict() for item in evidence],
                     metadata={**decision_metadata, "evidence_count": len(evidence), "provider_model": completion.model[:128], "finish_reason": completion.finish_reason},
                 )}
+            except _BudgetExceeded as error:
+                yield {"kind": "final", "response": self._failed(request, f"{error.budget_name}_budget_exceeded", evidence, metadata=decision_metadata)}
             except asyncio.CancelledError:
                 raise
             except Exception:
@@ -803,7 +936,9 @@ class ProfessorOrchestrator:
         model = ""
         finish_reason = "unknown"
         correlation_id = f"chat-{request.conversation_id}"[:128]
+        usage = None
         try:
+            self._consume_provider_call(budget)
             stream = await _call_maybe_async(
                 stream_target, messages=messages, conversation_id=request.conversation_id,
             )
@@ -811,6 +946,8 @@ class ProfessorOrchestrator:
                 chunk = raw_chunk if isinstance(raw_chunk, ChatCompletionChunk) else ChatCompletionChunk.model_validate(raw_chunk)
                 model = chunk.model
                 correlation_id = chunk.correlation_id
+                if chunk.usage is not None:
+                    usage = chunk.usage
                 if chunk.delta:
                     content_parts.append(chunk.delta)
                     yield {"kind": "delta", "delta": chunk.delta}
@@ -829,9 +966,15 @@ class ProfessorOrchestrator:
         try:
             completion = ChatCompletionResult(
                 model=model, content=content, finish_reason=finish_reason,
-                correlation_id=correlation_id,
+                correlation_id=correlation_id, usage=usage,
             )
+            if not _completion_within_token_budget(completion, messages, self.limits.max_tokens):
+                yield {"kind": "final", "response": self._failed(request, "token_budget_exceeded", evidence, metadata=decision_metadata)}
+                return
             answer, citations, invalid = self._citations(completion.content, evidence)
+        except _BudgetExceeded as error:
+            yield {"kind": "final", "response": self._failed(request, f"{error.budget_name}_budget_exceeded", evidence, metadata=decision_metadata)}
+            return
         except Exception:
             yield {"kind": "final", "response": self._failed(request, "provider_failed", evidence, metadata=decision_metadata)}
             return
@@ -845,7 +988,18 @@ class ProfessorOrchestrator:
             metadata={**decision_metadata, "evidence_count": len(evidence), "provider_model": completion.model[:128], "finish_reason": completion.finish_reason},
         )}
 
-    async def _retrieve(self, request: ProfessorRequest) -> object:
+    def _consume_retrieval_round(self, budget: _RequestBudget) -> None:
+        budget.retrieval_rounds += 1
+        if budget.retrieval_rounds > self.limits.max_retrieval_rounds:
+            raise _BudgetExceeded("retrieval_rounds")
+
+    def _consume_provider_call(self, budget: _RequestBudget) -> None:
+        budget.provider_calls += 1
+        if budget.provider_calls > self.limits.max_provider_calls:
+            raise _BudgetExceeded("provider_calls")
+
+    async def _retrieve(self, request: ProfessorRequest, *, budget: _RequestBudget) -> object:
+        self._consume_retrieval_round(budget)
         target = getattr(self.retrieval, "retrieve", None)
         if not callable(target):
             if not callable(self.retrieval):

@@ -435,6 +435,31 @@ def _validate_gate_procedure(gate: Any, failures: list[str]) -> None:
         return
     if len(command) != 2 or command[0] != "runtime-envelope" or not command[1].strip():
         failures.append(f"gate {gate.gate_id} command is not an approved runtime-envelope procedure")
+        return
+    target = command[1]
+    target_path = Path(target)
+    if target.startswith(".runtime/"):
+        if target_path.is_absolute() or ".." in target_path.parts:
+            failures.append(
+                f"gate {gate.gate_id} runtime-envelope target must be a safe .runtime path"
+            )
+    elif gate.result == PASS:
+        failures.append(
+            f"gate {gate.gate_id} PASS requires a safe .runtime runtime-envelope target"
+        )
+    elif target != gate.gate_id:
+        failures.append(
+            f"gate {gate.gate_id} non-PASS runtime-envelope target is invalid"
+        )
+    evidence_paths = {item.path for item in gate.evidence_paths}
+    if target.startswith(".runtime/") and target not in evidence_paths:
+        failures.append(
+            f"gate {gate.gate_id} runtime-envelope target must be listed in evidence_paths"
+        )
+    if gate.result == PASS and target not in evidence_paths:
+        failures.append(
+            f"gate {gate.gate_id} PASS requires its runtime envelope in evidence_paths"
+        )
     if gate.gate_id not in gate.procedure:
         failures.append(f"gate {gate.gate_id} procedure does not identify its gate")
 
@@ -522,7 +547,14 @@ def _evaluate_typed_manifest(
             return
         if envelope.get("status") != gate.result:
             failures.append(f"gate {gate.gate_id} runtime envelope status does not match the manifest")
-        expected_exit = {"PASS": 0, "BLOCKED_EXTERNAL": 2, "FAIL": 1, "NOT_RUN": None}.get(gate.result)
+        expected_exit = {
+            "PASS": 0,
+            "BLOCKED_EXTERNAL": 2,
+            "FAIL": 1,
+            "STALE": 1,
+            "INVALID": 1,
+            "NOT_RUN": None,
+        }.get(gate.result)
         if envelope.get("exit_status") != expected_exit:
             failures.append(f"gate {gate.gate_id} runtime envelope exit_status does not match the manifest")
         for field, expected in (
@@ -534,6 +566,10 @@ def _evaluate_typed_manifest(
                 failures.append(f"gate {gate.gate_id} runtime envelope {field} is not bound to the manifest")
         if envelope.get("clean_worktree") is not True:
             failures.append(f"gate {gate.gate_id} runtime envelope is not clean")
+        if gate.result == PASS and envelope.get("production_safe") is not True:
+            failures.append(
+                f"gate {gate.gate_id} PASS runtime envelope is not production-safe"
+            )
         if not isinstance(envelope.get("procedure"), str) or not envelope["procedure"].strip():
             failures.append(f"gate {gate.gate_id} runtime envelope has no procedure")
         observed_at = envelope.get("observed_at")

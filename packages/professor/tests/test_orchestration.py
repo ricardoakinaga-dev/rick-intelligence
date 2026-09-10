@@ -15,7 +15,7 @@ for _package in ("contracts", "professor"):
         sys.path.insert(0, _source)
 
 from rick_contracts.professor import ProfessorRequest
-from rick_contracts.providers import ChatCompletionChunk, ChatCompletionResult
+from rick_contracts.providers import ChatCompletionChunk, ChatCompletionResult, ProviderUsage
 from rick_contracts.security import RetrievalContext
 from rick_professor import ProfessorLimits, ProfessorOrchestrator
 
@@ -364,3 +364,99 @@ async def test_stream_lease_loss_cancels_slow_provider_and_emits_safe_terminal_r
     assert lease.releases == 1
     assert events[-1]["kind"] == "final"
     assert events[-1]["response"].metadata["failure_stage"] == "lease_lost"
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"max_retrieval_rounds": 0},
+        {"max_tool_calls": -1},
+        {"max_provider_calls": 0},
+        {"max_tokens": 0},
+        {"max_reasoning_seconds": 0},
+        {"max_reasoning_seconds": float("inf")},
+        {"max_total_request_seconds": 0},
+        {"max_total_request_seconds": float("nan")},
+    ],
+)
+def test_request_budgets_reject_unusable_limits(kwargs: dict) -> None:
+    with pytest.raises(ValueError):
+        ProfessorLimits(**kwargs)
+
+
+@pytest.mark.asyncio
+async def test_reasoning_timeout_is_translated_to_a_safe_response() -> None:
+    class SlowRetrieval:
+        async def retrieve(self, *, query: str, context: dict) -> dict:
+            await asyncio.sleep(1)
+            return {"evidence": []}
+
+    response = await ProfessorOrchestrator(
+        retrieval=SlowRetrieval(),
+        chat_provider=ProviderDouble(),
+        limits=ProfessorLimits(max_reasoning_seconds=0.01, max_total_request_seconds=1),
+    ).run(_request())
+
+    assert response.evidence_status == "GENERATION_FAILED"
+    assert response.metadata["failure_stage"] == "reasoning_timeout"
+
+
+@pytest.mark.asyncio
+async def test_total_request_timeout_covers_lease_acquisition() -> None:
+    class SlowLease:
+        async def acquire(self, *, key: str, owner: str, ttl_ms: int) -> dict:
+            await asyncio.sleep(1)
+            return {"acquired": True}
+
+    response = await ProfessorOrchestrator(
+        retrieval=RetrievalDouble([]),
+        chat_provider=ProviderDouble(),
+        lease_manager=SlowLease(),
+        limits=ProfessorLimits(max_reasoning_seconds=1, max_total_request_seconds=0.01),
+    ).run(_request())
+
+    assert response.evidence_status == "GENERATION_FAILED"
+    assert response.metadata["failure_stage"] == "total_request_timeout"
+
+
+@pytest.mark.asyncio
+async def test_provider_token_budget_is_enforced_from_reported_usage() -> None:
+    class MeteredProvider(ProviderDouble):
+        async def complete(self, *, messages, conversation_id: str) -> ChatCompletionResult:
+            return ChatCompletionResult(
+                model="metered",
+                content="Grounded answer [cite:ev-1]",
+                correlation_id="corr-metered",
+                usage=ProviderUsage(prompt_tokens=10, completion_tokens=90, total_tokens=100),
+            )
+
+    response = await ProfessorOrchestrator(
+        retrieval=RetrievalDouble([_evidence()]),
+        chat_provider=MeteredProvider(),
+        limits=ProfessorLimits(max_tokens=99),
+    ).run(_request())
+
+    assert response.evidence_status == "GENERATION_FAILED"
+    assert response.metadata["failure_stage"] == "token_budget_exceeded"
+
+
+@pytest.mark.asyncio
+async def test_stream_reasoning_timeout_emits_safe_terminal_response() -> None:
+    class SlowStreamingProvider(ProviderDouble):
+        async def stream(self, *, messages, conversation_id: str):
+            await asyncio.sleep(1)
+            yield ChatCompletionChunk(
+                model="slow", delta="late", finish_reason="stop", correlation_id="corr-slow"
+            )
+
+    events = [
+        event
+        async for event in ProfessorOrchestrator(
+            retrieval=RetrievalDouble([_evidence()]),
+            chat_provider=SlowStreamingProvider(),
+            limits=ProfessorLimits(max_reasoning_seconds=0.01, max_total_request_seconds=1),
+        ).stream(_request())
+    ]
+
+    assert events[-1]["kind"] == "final"
+    assert events[-1]["response"].metadata["failure_stage"] == "reasoning_timeout"
