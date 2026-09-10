@@ -280,6 +280,23 @@ def test_scorecard_target_is_derived_and_required_for_triple_aaa() -> None:
     assert "SCORECARD_REJECTED" in result["rejection_codes"]
 
 
+def test_packet_requires_current_checkout_quality_bar_binding() -> None:
+    observations = _results()
+    checkout = dict(FIXTURE_CHECKOUT)
+    checkout.pop("quality_bar_sha256")
+
+    result = promotion_engine.evaluate(
+        observations,
+        packet=_sealed_packet(observations),
+        checkout=checkout,
+        trusted_public_keys=FIXTURE_TRUST_STORE,
+    )
+
+    assert result["promotion_allowed"] is False
+    assert result["exit_code"] == promotion_engine.EXIT_FAILED
+    assert "PACKET_BINDING_REJECTED" in result["rejection_codes"]
+
+
 def test_external_block_returns_candidate_and_exit_two() -> None:
     observations = _results()
     next(item for item in observations if item["id"] == "postgresql-runtime")["status"] = "BLOCKED_EXTERNAL"

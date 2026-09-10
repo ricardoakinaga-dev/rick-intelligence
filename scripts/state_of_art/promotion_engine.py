@@ -383,7 +383,10 @@ def _validate_packet_content(
             codes.add("PACKET_CONTENT_REJECTED")
             errors.append("sealed packet quality_bar.sha256 is invalid")
         expected_quality_bar = checkout.get("quality_bar_sha256") if checkout is not None else None
-        if expected_quality_bar is not None and quality_bar.get("sha256") != expected_quality_bar:
+        if not _packet_sha256(expected_quality_bar):
+            codes.add("PACKET_BINDING_REJECTED")
+            errors.append("current checkout quality_bar_sha256 is required to promote a sealed packet")
+        elif quality_bar.get("sha256") != expected_quality_bar:
             codes.add("PACKET_BINDING_REJECTED")
             errors.append("sealed packet quality_bar.sha256 does not match this checkout")
 
