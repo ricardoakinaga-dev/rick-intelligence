@@ -6,6 +6,7 @@
 **Prompt copy:** [`docs/prompts/phase-3-runtime-evidence-production-promotion-2026-09-09.txt`](../prompts/phase-3-runtime-evidence-production-promotion-2026-09-09.txt)
 **Current audit:** [`docs/reports/phase-3-runtime-evidence-current-audit.md`](../reports/phase-3-runtime-evidence-current-audit.md)
 **Living ExecPlan:** [`../../.agent/plans/phase-3-runtime-evidence-production-promotion.md`](../../.agent/plans/phase-3-runtime-evidence-production-promotion.md)
+**Current source implementation candidate:** `3fae7e6c7d993d03e71cdf79f43393fcffb1ca0c` (tree `f092dedf17683ecc2468fa6263df004a205af815`)
 
 ## Purpose
 
@@ -219,11 +220,13 @@ rollback owner and final promotion.
 
 ## Current candidate closure
 
-The reviewed source implementation candidate was
-7ea1f287f452ac14d6126060f5811d2fc00920a7. Its local evidence boundary has
-90 passing State-of-Art tests and a fresh independent I1 review with no
-material bypass found. The subsequent documentation/control-plane
-reconciliation is metadata-only; live runtime, distributed, operational,
+The current source implementation candidate is
+3fae7e6c7d993d03e71cdf79f43393fcffb1ca0c with tree
+f092dedf17683ecc2468fa6263df004a205af815. It has 153 passing local
+State-of-Art tests, corrected PostgreSQL acknowledgement wiring and a real
+two-process claim/heartbeat/crash-reclaim/stale-ACK gate that fails closed
+without an approved disposable runtime. The 7ea1f287f452ac14d6126060f5811d2fc00920a7
+review remains historical; live runtime, distributed, operational,
 provider/corpus, frontend-runtime, supply-chain and human-approval gates
 remain open, so no Triple AAA claim is made.
 

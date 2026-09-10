@@ -748,7 +748,7 @@
         "PH3-1-CI-RELEASE-CLOSURE"
       ],
       "owner": "Codex lead",
-      "acceptance_summary": "Canonical dev/staging Compose renders the required 11-service topology, make up validates inventory and waits for health/readiness, failure diagnostics are bounded/redacted, and make down is project-scoped and volume-preserving; live startup remains external evidence",
+      "acceptance_summary": "Canonical dev/staging Compose renders the required 11-service topology, make up validates inventory and waits for health/readiness, failure diagnostics are bounded/redacted, make down is project-scoped and volume-preserving, and the local P0 worker implementation includes a real two-process PostgreSQL fencing/crash-reclaim/stale-ACK gate; live startup and runtime execution remain external evidence",
       "evidence_refs": [
         "docs/prompts/phase-3-runtime-evidence-production-promotion-2026-09-09.txt",
         "docs/reports/phase-3-runtime-evidence-current-audit.md",
@@ -758,9 +758,15 @@
         "scripts/phase11/runner.py",
         "scripts/phase11/test_compose_lifecycle.py",
         "scripts/phase11/check_compose.py",
+        "scripts/phase11/postgres_runtime_gate.py",
+        "scripts/phase11/multi_worker_runtime_gate.py",
+        "scripts/state_of_art/run_phase3_multi_worker.py",
+        "scripts/state_of_art/tests/test_phase3_postgres_runtime.py",
+        "scripts/state_of_art/tests/test_multi_worker_runtime.py",
         "docker-compose.dev.yml",
         "docker-compose.staging.yml",
-        "infrastructure/compose/README.md"
+        "infrastructure/compose/README.md",
+        ".agent/verification.jsonl#VER-PH3-2-CURRENT-SOURCE-LOCAL-20260910"
       ],
       "next_action": {
         "id": "PH3-2-LAB-READINESS:WAIT_RUNTIME",
@@ -773,7 +779,7 @@
         "Docker daemon access to /var/run/docker.sock is denied in the current session",
         "Disposable runtime secrets and endpoint authority are unavailable"
       ],
-      "reason": "The local Compose implementation is independently reviewed, but live startup, readiness probes and teardown cannot be executed without approved external runtime access"
+      "reason": "The current local implementation and fail-closed two-process worker gate are covered by 153 local tests and static checks, but live startup, readiness probes, real PostgreSQL execution, distributed service checks and teardown cannot be executed without approved external runtime access"
     }
   ]
 }

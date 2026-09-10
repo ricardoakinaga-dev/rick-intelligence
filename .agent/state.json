@@ -14,7 +14,7 @@
   "active_execplan": ".agent/plans/phase-3-runtime-evidence-production-promotion.md",
   "active_task": "PH3-2-LAB-READINESS",
   "verification_state": "PARTIAL",
-  "repository_state": "Phase 3.1 source implementation was locally verified and freshly independently reviewed at source candidate 7ea1f287f452ac14d6126060f5811d2fc00920a7; its 90 local tests and fail-closed negative probes pass. Documentation/control-plane reconciliation is metadata-only. Phase 3.2 Compose readiness is blocked on approved Docker daemon and disposable runtime configuration; PostgreSQL, Redis, object/vector, multi-worker and live supervisor gates remain BLOCKED_EXTERNAL",
+  "repository_state": "Current Phase 3 source implementation candidate is 3fae7e6c7d993d03e71cdf79f43393fcffb1ca0c (tree f092dedf17683ecc2468fa6263df004a205af815). Its 153 local tests and fail-closed static checks pass; it includes the real PostgreSQL multi-worker claim/heartbeat/crash-reclaim/stale-ACK gate, which correctly returns BLOCKED_EXTERNAL without an approved disposable DSN/runtime. The earlier 7ea1f287f452ac14d6126060f5811d2fc00920a7 review remains historical. Phase 3.2 live Compose, PostgreSQL, Redis, object/vector, multi-worker and live supervisor gates remain BLOCKED_EXTERNAL",
   "instruction_scope_refs": [
     ".agent/PLANS.md",
     "cvg-master-rag-v2/AGENTS.md",
@@ -23,8 +23,8 @@
     "docs/plans/phase-3-runtime-evidence-production-promotion.md"
   ],
   "last_gate_record": ".agent/gates/phase-3-2-lab-readiness-implementation-ready.json",
-  "last_event_id": "EVT-PH3-2-METADATA-RECONCILIATION-20260909",
-  "state_revision": 237,
+  "last_event_id": "EVT-PH3-2-CURRENT-SOURCE-RECONCILIATION-20260910",
+  "state_revision": 238,
   "next_gate": "VERIFIED",
   "active_action_id": "PH3-2-LAB-READINESS:WAIT_RUNTIME",
   "blocked_by": [
@@ -32,5 +32,5 @@
     "Disposable runtime secrets and endpoint authority are unavailable"
   ],
   "human_approval_required": [],
-  "updated_at": "2026-09-09T23:42:56Z"
+  "updated_at": "2026-09-10T03:33:56Z"
 }
