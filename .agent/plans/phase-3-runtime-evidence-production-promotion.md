@@ -29,6 +29,7 @@ preserving the frozen Gauntlet bar, Phase 2 history and legacy repositories.
 - [x] (2026-09-10) Bind the scoped frontend projection to the exact verifier checkout at source candidate 96b69cf8b8dd69314f08296b850b6b1424022309 (tree 4343081d0cf004c0dc58526972362f6d9b6408dd): require matching commit/tree/fingerprint, a clean/current envelope and explicit checkout availability, and reject a cross-commit artifact fail-closed; 102 focused promotion/Phase 3 tests and `make validate` pass, while the clean integrated packet remains `STATE_OF_ART_CANDIDATE` / exit `2`.
 - [x] (2026-09-10) Make the release-test environment reproducible at source candidate 39c391b3d8ee252f88f1474df39e257a92258ec7 (tree ec80ca7ff803c216863c0a02bb4283fcff1732f9): pin the provider test dependencies, export a contiguous internal-package `PYTHONPATH` in both canonical workflows, and validate the full clean venv suite; the same-SHA remote release run reaches explicit checks and returns typed `2` for external blockers.
 - [x] (2026-09-10) Reconcile the current control plane and public pointers at checkout candidate 928bcd10cde225bedb6c237c0cc979a259919989 (tree 8da40a5b95bfa9787c2314aa89b7a0d3563c6eee): the exact packet is current and clean with 17 local foundation lanes PASS and 24 mandatory lanes `BLOCKED_EXTERNAL`; this documentation-only reconciliation does not authorize promotion.
+- [x] (2026-09-10) Bound synchronous provider embeddings at source candidate ea6fd613ffcc8b18fc11d55941266e28387f9b92 (tree c8ae0fb2614bee70a4e096c6676c8e4d1a9f782e): provider timeout is validated and enforced both outside and inside an active event loop, cancellation is requested before return, and clean API/State-of-Art matrices pass 437/295 tests; live provider/runtime evidence remains external.
 - [ ] (2026-09-09) Execute the disposable runtime; currently blocked by Docker daemon access and unresolved external authority.
 - [ ] (2026-09-09) Complete independent runtime/design/security reviews and the human Go/No-Go.
 
@@ -64,6 +65,7 @@ access, so no live claim can be made.
 - 2026-09-10: Keep the combined frontend adapter as one current observation while deriving independent `frontend-e2e`, `frontend-accessibility` and `supply-chain` lane statuses. A real browser/API PASS must remain visible even when image digest/SBOM evidence is externally blocked; production safety and promotion remain false.
 - 2026-09-10: Require the integrated verifier to bind the frontend envelope to the checkout captured before lane execution. Cross-commit, dirty, unavailable or non-current identity now fails closed; the browser/accessibility projection remains diagnostic only and never authorizes promotion.
 - 2026-09-10: Treat CI dependency/path reproducibility as a release prerequisite. A clean venv must import the real provider boundary; missing `httpx`/`pydantic` or whitespace-corrupted package paths are CI defects, while the remote release gate may still return `2` for genuine external runtime blockers.
+- 2026-09-10: Treat the synchronous embedding bridge as a bounded reliability boundary. A provider awaitable that exceeds the configured timeout must cancel cooperatively and raise a typed timeout instead of blocking API/ingestion indefinitely; this local correction does not replace live provider and budget evidence.
 
 ## Outcomes & Retrospective
 
@@ -176,16 +178,17 @@ made.
 ## Current candidate closure
 
 The current source implementation candidate is
-928bcd10cde225bedb6c237c0cc979a259919989 with tree
-8da40a5b95bfa9787c2314aa89b7a0d3563c6eee. It contains the corrected
+ea6fd613ffcc8b18fc11d55941266e28387f9b92 with tree
+c8ae0fb2614bee70a4e096c6676c8e4d1a9f782e. It contains the corrected
 PostgreSQL worker gate, canonical two-process Redis/API HTTP gate, strict
 release artifact postconditions and manifest consistency checks, plus bounded
 same-run CI envelopes with redacted raw artifacts, exact workflow/run/ref/SHA
 provenance, runtime-primary supply-chain binding, frontend Phase 3 transport,
 authenticated promotion packet sealing, scoped frontend-lane projection,
-checkout-bound frontend evidence and reproducible release-test dependencies;
-the final documentation/control-plane reconciliation is bound to this exact
-checkout.
+checkout-bound frontend evidence, reproducible release-test dependencies and
+a bounded, cancellation-aware synchronous provider-embedding bridge. The final
+documentation/control-plane follow-up is bound to the resulting clean
+checkout, while live provider/runtime evidence remains external.
 The State-of-Art test suite has 295 passing tests and the relevant
 static/API checks pass; the full preserved `make test` remains incomplete
 because the CVG dataset and local Playwright browser are unavailable. The

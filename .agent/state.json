@@ -14,7 +14,7 @@
   "active_execplan": ".agent/plans/phase-3-runtime-evidence-production-promotion.md",
   "active_task": "PH3-2-LAB-READINESS",
   "verification_state": "PARTIAL",
-  "repository_state": "Current Phase 3 checkout candidate is 928bcd10cde225bedb6c237c0cc979a259919989 (tree 8da40a5b95bfa9787c2314aa89b7a0d3563c6eee). It includes the corrected PostgreSQL worker gate, canonical two-process Redis/API HTTP gate, strict release artifact postconditions and manifest consistency checks, bounded same-run CI envelopes with redacted raw artifacts, exact workflow/run/ref/SHA provenance, runtime-primary supply-chain binding, frontend Phase 3 transport, authenticated promotion packet sealing, scoped frontend-lane projection, checkout-bound frontend evidence and reproducible release-test dependencies. The current integrated packet at 928bcd10cde225bedb6c237c0cc979a259919989 (tree 8da40a5b95bfa9787c2314aa89b7a0d3563c6eee, checkout fingerprint 51df03e54c2aa3eb77aad68f0850437beea6f185f3e3c596a0660c2ff0eb1764, artifact set 8cd58342573f7a98e4ebb2b23a0f7cd995c50b445f2800c41d9c440b3e51081e, packet SHA-256 e6eb51260f3fc2a7eb312fc88c0a988f1ad265a1246a6b5e09133b1b7c8373f1) classified STATE_OF_ART_CANDIDATE with verifier JSON and GNU Make exit 2; 17 foundation lanes passed, every non-pass mandatory lane is BLOCKED_EXTERNAL, and no invalid/failing gate remains. The external runtime, provider/corpus, image proof, independent review, sealing and human promotion boundaries remain unavailable, so no State of Art, AAA or Triple AAA claim is made.",
+  "repository_state": "Current Phase 3 source implementation candidate is ea6fd613ffcc8b18fc11d55941266e28387f9b92 (tree c8ae0fb2614bee70a4e096c6676c8e4d1a9f782e). It includes the corrected PostgreSQL worker gate, canonical two-process Redis/API HTTP gate, strict release artifact postconditions and manifest consistency checks, bounded same-run CI envelopes with redacted raw artifacts, exact workflow/run/ref/SHA provenance, runtime-primary supply-chain binding, frontend Phase 3 transport, authenticated promotion packet sealing, scoped frontend-lane projection, checkout-bound frontend evidence, reproducible release-test dependencies and a bounded, cancellation-aware synchronous provider-embedding bridge. Clean API and State-of-Art regressions pass 437 and 295 tests respectively; the integrated packet remains diagnostic and current for the final documentation follow-up, with external runtime, provider/corpus, image proof, independent review, sealing and human promotion boundaries unavailable. No State of Art, AAA or Triple AAA promotion claim is made.",
   "instruction_scope_refs": [
     ".agent/PLANS.md",
     "cvg-master-rag-v2/AGENTS.md",
@@ -23,8 +23,8 @@
     "docs/plans/phase-3-runtime-evidence-production-promotion.md"
   ],
   "last_gate_record": ".agent/gates/phase-3-2-lab-readiness-implementation-ready.json",
-  "last_event_id": "EVT-PH3-2-CURRENT-HEAD-DOCS-RECONCILIATION-20260910",
-  "state_revision": 257,
+  "last_event_id": "EVT-PH3-2-PROVIDER-EMBEDDING-TIMEOUT-20260910",
+  "state_revision": 258,
   "next_gate": "VERIFIED",
   "active_action_id": "PH3-2-LAB-READINESS:WAIT_RUNTIME",
   "blocked_by": [
@@ -32,5 +32,5 @@
     "Disposable runtime secrets and endpoint authority are unavailable"
   ],
   "human_approval_required": [],
-  "updated_at": "2026-09-10T10:49:31Z"
+  "updated_at": "2026-09-10T11:03:39Z"
 }

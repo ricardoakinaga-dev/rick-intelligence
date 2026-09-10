@@ -6,7 +6,7 @@
 **Prompt copy:** [`docs/prompts/phase-3-runtime-evidence-production-promotion-2026-09-09.txt`](../prompts/phase-3-runtime-evidence-production-promotion-2026-09-09.txt)
 **Current audit:** [`docs/reports/phase-3-runtime-evidence-current-audit.md`](../reports/phase-3-runtime-evidence-current-audit.md)
 **Living ExecPlan:** [`../../.agent/plans/phase-3-runtime-evidence-production-promotion.md`](../../.agent/plans/phase-3-runtime-evidence-production-promotion.md)
-**Current source implementation candidate:** `928bcd10cde225bedb6c237c0cc979a259919989` (tree `8da40a5b95bfa9787c2314aa89b7a0d3563c6eee`)
+**Current source implementation candidate:** `ea6fd613ffcc8b18fc11d55941266e28387f9b92` (tree `c8ae0fb2614bee70a4e096c6676c8e4d1a9f782e`)
 
 ## Purpose
 
@@ -221,15 +221,17 @@ rollback owner and final promotion.
 ## Current candidate closure
 
 The current source implementation candidate is
-928bcd10cde225bedb6c237c0cc979a259919989 with tree
-8da40a5b95bfa9787c2314aa89b7a0d3563c6eee. It retains the corrected
+ea6fd613ffcc8b18fc11d55941266e28387f9b92 with tree
+c8ae0fb2614bee70a4e096c6676c8e4d1a9f782e. It retains the corrected
 PostgreSQL worker gate, canonical two-process Redis/API HTTP gate, strict
 release artifact postconditions and same-run diagnostic transport, bounded
 same-run GitHub CI envelopes, exact provenance validation, runtime-primary
 supply-chain evidence, frontend Phase 3 envelope transport, authenticated
 packet sealing, scoped frontend-lane projection, checkout-bound frontend
-evidence and reproducible release-test dependencies. The State-of-Art suite
-has 295 passing tests and the relevant static/API checks pass; the full
+evidence, reproducible release-test dependencies and a bounded,
+cancellation-aware synchronous provider-embedding bridge. The State-of-Art
+suite has 295 passing tests, the canonical API matrix has 437 passing tests,
+and the relevant static checks pass; the full
 preserved `make test` remains incomplete because the CVG dataset and local
 Playwright browser are unavailable. The current integrated verifier packet is
 bound to this exact clean checkout and remains diagnostic
