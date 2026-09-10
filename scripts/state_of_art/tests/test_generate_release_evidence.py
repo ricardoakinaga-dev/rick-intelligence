@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import re
 
 from scripts.state_of_art import generate_release_evidence
 from scripts.state_of_art.release_manifest import ReviewerRef
@@ -11,6 +12,34 @@ HEAD = "a" * 40
 TREE = "b" * 40
 ARTIFACT_HASH = "c" * 64
 TIMESTAMP = "2026-09-10T00:00:00+00:00"
+
+PROMPT_SCORECARD_DIMENSIONS = (
+    "Architecture",
+    "Modularity",
+    "Jobs",
+    "Worker",
+    "PostgreSQL",
+    "Redis",
+    "Qdrant",
+    "Object Storage",
+    "Ingestion",
+    "Retrieval",
+    "Evidence",
+    "Decision",
+    "Professor",
+    "Security",
+    "Multi-tenancy",
+    "Observability",
+    "Resilience",
+    "Disaster Recovery",
+    "Performance",
+    "Frontend",
+    "Accessibility",
+    "CI/CD",
+    "Supply Chain",
+    "Documentation",
+    "Production Readiness",
+)
 
 
 def _reviewer() -> ReviewerRef:
@@ -248,3 +277,16 @@ def test_canonical_workflow_binds_ci_artifacts_to_the_same_run() -> None:
     assert "cvg-master-rag-v2','rick-professor','modulo-redis-locker" in text
     assert "run: make phase3-frontend-supply-runtime" in text
     assert ".runtime/phase-3" in text
+
+
+def test_final_promotion_report_matches_prompt_section_and_scorecard_contract() -> None:
+    report = Path(__file__).parents[3] / "docs/reports/rick-intelligence-triple-aaa-final-promotion.md"
+    text = report.read_text(encoding="utf-8")
+
+    sections = re.findall(r"^## (\d+)\.", text, flags=re.MULTILINE)
+    assert sections == [str(number) for number in range(1, 29)]
+
+    rows = re.findall(r"^\| (\d+) \| ([^|]+) \| `[^`]+` \|", text, flags=re.MULTILINE)
+    assert [int(number) for number, _dimension in rows] == list(range(1, 26))
+    assert [dimension.strip() for _number, dimension in rows] == list(PROMPT_SCORECARD_DIMENSIONS)
+    assert "**Decision:** `NO-GO / NOT PROMOTED`." in text
