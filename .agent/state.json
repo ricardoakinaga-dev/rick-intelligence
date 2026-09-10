@@ -14,7 +14,7 @@
   "active_execplan": ".agent/plans/phase-3-runtime-evidence-production-promotion.md",
   "active_task": "PH3-2-LAB-READINESS",
   "verification_state": "PARTIAL",
-  "repository_state": "Current Phase 3 source implementation candidate is 57b243ca3250e97b49c2af761e7940f5cd85db5b (tree d4bbf0368af50a2e034f8ef847d95db333ea04de). It binds shared disposable-runtime preflight, canonical Compose targeting, explicit promotion exits, current-checkout/artifact-set/gate/capability/path/raw-artifact binding, hashed candidate-bound independent-review ledger records for promoted capabilities, fail-closed CI promotion, accessible canonical web targets and finite Compose resource/capability hardening. The latest clean published HEAD 8b488ae59ec85403ae7f9eda162a0a5d9d67fe57 produced a current STATE_OF_ART_CANDIDATE packet with verifier JSON exit 1; release evidence, the sealed packet, live runtime lanes, production authority and human promotion remain blocked, so no Triple AAA claim is made.",
+  "repository_state": "Current Phase 3 source implementation candidate is 02dfbd2875372643c82f861e6178602ce6530d86 (tree aa6e3f6f8e611fe1316afce1acb73d82367db7b0). It binds shared disposable-runtime preflight, canonical Compose targeting, explicit promotion exits, current-checkout/artifact-set/gate/capability/path/raw-artifact binding, hashed candidate-bound independent-review ledger records for promoted capabilities, fail-closed CI promotion, accessible canonical web targets, finite Compose resource/capability hardening and deterministic real frontend browser evidence. The latest clean integrated packet at 8216593032800ddafd2d9eb88a55f21298146ddf (tree eaf8aa2a70d81143e2ca3b8896ef704282eaffac) classified STATE_OF_ART_CANDIDATE with verifier JSON exit 1; the local browser runtime claim passed, while release evidence, immutable image proof, live runtime lanes, independent review and human promotion remain blocked, so no Triple AAA claim is made.",
   "instruction_scope_refs": [
     ".agent/PLANS.md",
     "cvg-master-rag-v2/AGENTS.md",
@@ -23,8 +23,8 @@
     "docs/plans/phase-3-runtime-evidence-production-promotion.md"
   ],
   "last_gate_record": ".agent/gates/phase-3-2-lab-readiness-implementation-ready.json",
-  "last_event_id": "EVT-PH3-2-COMPOSE-HARDENING-INTEGRATED-VERIFY-20260910",
-  "state_revision": 248,
+  "last_event_id": "EVT-PH3-2-FINAL-INTEGRATED-VERIFY-20260910",
+  "state_revision": 250,
   "next_gate": "VERIFIED",
   "active_action_id": "PH3-2-LAB-READINESS:WAIT_RUNTIME",
   "blocked_by": [
@@ -32,5 +32,5 @@
     "Disposable runtime secrets and endpoint authority are unavailable"
   ],
   "human_approval_required": [],
-  "updated_at": "2026-09-10T08:25:25Z"
+  "updated_at": "2026-09-10T08:43:51Z"
 }
