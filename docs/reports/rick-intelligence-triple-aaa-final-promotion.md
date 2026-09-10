@@ -107,6 +107,14 @@ before evidence status or candidate fields are projected. This protects local
 promotion integrity only; it does not turn blocked runtime or review lanes into
 promotion evidence.
 
+At source candidate `e84227c9a90ab3d12b78885b7fa7228607efcac7`, the Phase 11
+object/Qdrant runtime gate applies that strict boundary to request-filter
+observations and bounded Qdrant responses. Duplicate fields, non-finite values,
+invalid UTF-8 and oversized bodies cannot alter status, points, counts, aliases
+or recorded scope observations. This closes a local gate-integrity ambiguity;
+it does not provide the authorized live Qdrant/object runtime or promote the
+candidate.
+
 ## 7. CI and release lanes
 
 The canonical workflow names FAST, UNIT, CONTRACT, SECURITY, RAG_EVAL,

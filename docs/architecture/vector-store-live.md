@@ -94,3 +94,10 @@ tenant/workspace fixtures, and a cleanup/recovery procedure. It must then
 prove health, upsert, query/search ACL isolation, delete/count scope, timeout
 behavior, and close/connection cleanup against that endpoint before any
 production settings are changed.
+
+The Phase 11 live Qdrant runtime gate uses the same bounded strict JSON
+boundary for request-filter observations and response projection. Duplicate
+object keys, non-finite values, invalid UTF-8 and oversized bodies fail closed
+before a status, point, count, alias or scope observation is trusted. This is
+local gate-integrity protection; it does not replace an authorized live
+Qdrant/object-store run or promotion evidence.
