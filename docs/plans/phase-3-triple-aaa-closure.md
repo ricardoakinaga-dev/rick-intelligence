@@ -617,3 +617,18 @@ the State-of-Art suite **295**; compilation and `git diff --check` pass. This
 is local history read-model evidence only. Live PostgreSQL durability,
 tenant-isolation/recovery drills, provider/corpus, independent review and
 promotion authority remain unavailable; promotion remains disallowed.
+
+## 40. Persisted SQLite case JSON decoding closure — 2026-09-10
+
+Source candidate `49784e50c16baa92eac41280a7d14d84ae1a8515` (tree
+`e20480c92212957423a55ff938be896ae56fcad5`) closes a persisted case
+read-boundary gap. A shared finite, byte-bounded decoder is applied to local
+SQLite hypotheses, evidence and tags; oversized, non-finite, malformed and
+recursive values cause the complete case row to fail closed rather than
+exposing a partial record. The same decoder remains the history boundary.
+
+The case/API/State-of-Art suites pass **12**, **440** and **295** tests;
+compilation and `git diff --check` pass. This is local clinical-case
+read-model evidence only. Live durable case storage, tenant/recovery drills,
+provider/corpus, independent review and promotion authority remain
+unavailable; promotion remains disallowed.

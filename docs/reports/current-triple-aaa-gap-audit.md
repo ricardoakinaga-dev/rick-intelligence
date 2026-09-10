@@ -56,8 +56,8 @@ converted to PASS by the presence of host processes.
 ### Current clean revalidation — 2026-09-10
 
 The latest source implementation candidate is
-`ea6fd613ffcc8b18fc11d55941266e28387f9b92` with tree
-`c8ae0fb2614bee70a4e096c6676c8e4d1a9f782e3`. The ignored integrated packet
+`49784e50c16baa92eac41280a7d14d84ae1a8515` with tree
+`e20480c92212957423a55ff938be896ae56fcad5`. The ignored integrated packet
 `.runtime/phase-3/triple-aaa-verify.json` is the authority for the exact clean
 checkout, tree, artifact set, packet hash and current classification; the
 latest clean run reports `17` foundation PASS results and `24` mandatory
@@ -66,7 +66,7 @@ latest clean run reports `17` foundation PASS results and `24` mandatory
 commit, so this audit does not hard-code a future documentation commit or
 self-reference its own bytes.
 
-The current API matrix has **437 passed** tests and the State-of-Art suite has
+The current API matrix has **440 passed** tests and the State-of-Art suite has
 **295 passed** tests. `make validate`, `make compose-static`, `make ops-static`,
 `make security-adversarial` and `make api-contract` pass. The canonical
 `make up` attempt failed closed before service startup because the required
@@ -828,3 +828,19 @@ read-model evidence only. Approved disposable PostgreSQL/runtime, live
 history durability and tenant drills, provider/corpus, independent review,
 sealed packet and human Go/No-Go remain unavailable; promotion remains
 disallowed.
+
+## 41. Persisted SQLite case JSON decoding closure — 2026-09-10
+
+Source implementation candidate `49784e50c16baa92eac41280a7d14d84ae1a8515`
+(tree `e20480c92212957423a55ff938be896ae56fcad5`) closes a concrete local
+clinical-case read-boundary gap. The shared finite, byte-bounded decoder now
+caps persisted hypotheses, evidence and tags at 256 KiB before parsing,
+rejects non-finite/recursive/malformed values, and omits the complete case row
+when any of those fields is corrupt. The adversarial regression proves that an
+oversized padded row and a `NaN` row do not become a partial case record.
+
+The focused case suite passes **12**, the API matrix **440**, and the
+State-of-Art suite **295**; compilation and `git diff --check` pass. This is
+local case read-model evidence only. Approved durable case storage, tenant and
+recovery drills, provider/corpus, independent review, sealed packet and human
+Go/No-Go remain unavailable; promotion remains disallowed.

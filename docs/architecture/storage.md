@@ -22,6 +22,12 @@ decoding, reject non-finite or malformed values and omit corrupt response rows;
 this protects the API read boundary without claiming that local history is the
 production durability authority.
 
+The local SQLite clinical-case read model uses the same finite, byte-bounded
+JSON boundary for hypotheses, evidence and tags. If any persisted case field
+is oversized, non-finite or malformed, the case is omitted from reads rather
+than exposed as a partial record; this is local fail-closed behavior, not a
+claim of production clinical-data durability.
+
 The local object store is intentionally rejected in production. The S3 adapter
 signs requests with AWS Signature Version 4, keeps credentials outside the
 package, supports S3-compatible endpoints and validates response sizes and

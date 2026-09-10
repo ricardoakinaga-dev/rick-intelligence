@@ -54,11 +54,12 @@ storage holds immutable bytes, Qdrant is a rebuildable projection, and the
 evidence/decision layer is the authority for supported responses. Every
 protected boundary must carry tenant/workspace scope and server-derived IDs.
 
-The local and PostgreSQL chat-history read models at source candidate
-`3ce7bc177046d4d4675278ab4bbfc44cdff85874` cap persisted JSON before decoding,
-reject non-finite/malformed values and omit corrupt response rows. This is a
-local read-boundary safeguard only; it does not prove live history durability,
-tenant isolation or recovery.
+The local and PostgreSQL chat-history read models, plus the local SQLite
+clinical-case read model, at source candidate
+`49784e50c16baa92eac41280a7d14d84ae1a8515` cap persisted JSON before decoding,
+reject non-finite/malformed values and omit corrupt response or case rows.
+This is a local read-boundary safeguard only; it does not prove live history or
+case durability, tenant isolation or recovery.
 
 ## 7. CI and release lanes
 

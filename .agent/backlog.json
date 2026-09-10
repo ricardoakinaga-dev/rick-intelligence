@@ -868,7 +868,11 @@
     ".agent/verification.jsonl#VER-PH3-2-JOBS-JSON-BOUNDARY-20260910",
     ".agent/verification.jsonl#VER-PH3-2-QUEUE-JSON-BOUNDARY-20260910",
     ".agent/verification.jsonl#VER-PH3-2-VECTOR-JSON-BOUNDARY-20260910",
-    ".agent/verification.jsonl#VER-PH3-2-HISTORY-JSON-BOUNDARY-20260910"
+    ".agent/verification.jsonl#VER-PH3-2-HISTORY-JSON-BOUNDARY-20260910",
+    "apps/api/src/services/json_boundary.py",
+    "apps/api/src/services/case_store.py",
+    "apps/api/tests/test_cases.py",
+    ".agent/verification.jsonl#VER-PH3-2-CASE-JSON-BOUNDARY-20260910"
       ],
       "next_action": {
         "id": "PH3-2-LAB-READINESS:WAIT_RUNTIME",
@@ -881,7 +885,7 @@
         "Docker daemon access to /var/run/docker.sock is denied in the current session",
         "Disposable runtime secrets and endpoint authority are unavailable"
       ],
-      "reason": "The current local implementation and fail-closed API/Redis, worker, citation-support, release, same-run CI evidence, authenticated promotion-seal, shared-runtime-preflight, current-artifact promotion binding, promoted-capability independent-review binding, canonical accessibility gates, deterministic real frontend browser probe, Compose resource/capability hardening, preserved-CVG corpus preflight, runtime-before-release ordering, commit-bound manifest adapters, raw status/exit-status synchronization, bounded provider embeddings, truthful live provider readiness, bounded provider function tools/JSON/streaming calls, bounded durable-job and legacy queue payload decoding, bounded persisted SQLite vector decoding, bounded persisted SQLite/PostgreSQL chat-history decoding and the external-only promotion return-code contract are covered by the current local matrices, make validate and targeted static gates. The exact source implementation candidate 3ce7bc177046d4d4675278ab4bbfc44cdff85874 has tree b2d2661e0ae385e08e00329fd9a6f2633dacf260; the next integrated packet must bind the resulting clean control-plane checkout and is expected to report STATE_OF_ART_CANDIDATE with external blockers. Docker daemon access, runtime/provider/corpus, image proof, independent review, sealing and human Go/No-Go remain unavailable. No promotion claim is made."
+      "reason": "The current local implementation and fail-closed API/Redis, worker, citation-support, release, same-run CI evidence, authenticated promotion-seal, shared-runtime-preflight, current-artifact promotion binding, promoted-capability independent-review binding, canonical accessibility gates, deterministic real frontend browser probe, Compose resource/capability hardening, preserved-CVG corpus preflight, runtime-before-release ordering, commit-bound manifest adapters, raw status/exit-status synchronization, bounded provider embeddings, truthful live provider readiness, bounded provider function tools/JSON/streaming calls, bounded durable-job and legacy queue payload decoding, bounded persisted SQLite vector decoding, bounded persisted SQLite/PostgreSQL chat-history decoding, shared finite/byte-bounded JSON decoding and fail-closed persisted SQLite case-row decoding and the external-only promotion return-code contract are covered by the current local matrices, make validate and targeted static gates. The exact source implementation candidate 49784e50c16baa92eac41280a7d14d84ae1a8515 has tree e20480c92212957423a55ff938be896ae56fcad5; the next integrated packet must bind the resulting clean control-plane checkout and is expected to report STATE_OF_ART_CANDIDATE with external blockers. Docker daemon access, runtime/provider/corpus, image proof, independent review, sealing and human Go/No-Go remain unavailable. No promotion claim is made."
     }
   ]
 }
