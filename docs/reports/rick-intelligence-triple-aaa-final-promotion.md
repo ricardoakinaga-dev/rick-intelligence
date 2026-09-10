@@ -18,8 +18,8 @@ The authoritative identity is always the same-run packet at
 artifact-set digest, packet hash and quality-bar hash must be read from that
 packet together. This report never substitutes a manually typed SHA and is
 invalid if the packet is absent, stale, dirty or inconsistent with the exact
-candidate. The latest source-closure packet and its hashes are recorded in
-section 22 of the current gap audit.
+candidate. The latest source-closure notes are recorded in section 23 of the
+current gap audit; the packet remains authoritative for exact hashes.
 
 ## 3. Prompt provenance
 

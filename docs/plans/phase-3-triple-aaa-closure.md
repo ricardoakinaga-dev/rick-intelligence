@@ -335,3 +335,20 @@ touch and console/request checks. The integrated lanes now truthfully report
 SBOM evidence was not run. This does not supply production runtime,
 independent visual review, image provenance/signing, external service
 authority, sealed promotion evidence or human Go/No-Go.
+
+## 21. Checkout-bound frontend evidence — 2026-09-10
+
+Candidate `96b69cf8b8dd69314f08296b850b6b1424022309` (tree
+`4343081d0cf004c0dc58526972362f6d9b6408dd`) hardens the integrated verifier
+against stale or cross-checkout frontend evidence. It captures the verifier
+checkout before local lanes and requires the shared frontend envelope to
+match commit, tree and fingerprint, remain clean/current, and explicitly
+declare checkout availability. The new negative regression rejects an
+envelope from another commit; the focused promotion/Phase 3 regression suite
+has 102 passing tests and `make validate` passes.
+
+The regenerated packet remains diagnostic `STATE_OF_ART_CANDIDATE` / exit
+`2`, with scoped browser and accessibility observations visible while
+runtime, image provenance, independent review, sealing and human authority
+remain externally blocked. Any later documentation commit requires one more
+integrated run before the packet can be treated as current.

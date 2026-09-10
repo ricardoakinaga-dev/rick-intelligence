@@ -26,6 +26,7 @@ preserving the frozen Gauntlet bar, Phase 2 history and legacy repositories.
 - [x] (2026-09-10) Bind the canonical local CI lanes at source candidate 957b534d7b33a025525cb1dd667872791239ed43 (tree 65dcad96347adbd34e267537c424bef444ec48d7): bounded redacted raw artifacts carry same-run GitHub provider/workflow/run/attempt/ref/SHA provenance, release validation rejects replay/mismatch/path/hash errors, `supply-chain` keeps runtime primary, and the frontend runtime job emits the Phase 3 envelope; `256` State-of-Art tests and static/API checks pass, while live runtime promotion remains blocked.
 - [x] (2026-09-10) Harden the promotion packet at source candidate ca54b4ab9db1f39f94a14ad600f690d438cd144b (tree 354485c5e88aacf9b9217cc92b6d87c68e60bfbc): Ed25519 signatures require an explicit trust store, bind all seal metadata and the current clean checkout, and reject stale/future packets; `264` State-of-Art tests, `make validate`, workflow parsing and a fresh independent crypto review pass, while live runtime and human promotion remain blocked.
 - [x] (2026-09-10) Correct scoped frontend-lane projection at source candidate fe0f06ccc4deed9a56e1a806842b71d3da8ace66 (tree 0080bb23a61486e538fbf5876c5bd38e81a23ab1): execute the shared frontend/supply adapter once, preserve source exit `2`, project browser/accessibility PASS independently from blocked image evidence, and cover missing/failed/malformed artifact negatives; 51 focused tests pass and the clean integrated packet reports `STATE_OF_ART_CANDIDATE` / exit `2`.
+- [x] (2026-09-10) Bind the scoped frontend projection to the exact verifier checkout at source candidate 96b69cf8b8dd69314f08296b850b6b1424022309 (tree 4343081d0cf004c0dc58526972362f6d9b6408dd): require matching commit/tree/fingerprint, a clean/current envelope and explicit checkout availability, and reject a cross-commit artifact fail-closed; 102 focused promotion/Phase 3 tests and `make validate` pass, while the clean integrated packet remains `STATE_OF_ART_CANDIDATE` / exit `2`.
 - [ ] (2026-09-09) Execute the disposable runtime; currently blocked by Docker daemon access and unresolved external authority.
 - [ ] (2026-09-09) Complete independent runtime/design/security reviews and the human Go/No-Go.
 
@@ -59,6 +60,7 @@ access, so no live claim can be made.
 - 2026-09-10: Bind FAST/UNIT/CONTRACT/SECURITY/SUPPLY_CHAIN CI observations to the current GitHub Actions run and exact checkout; keep `supply-chain` runtime evidence primary, use CI only as a supplemental observation, and keep the frontend adapter envelope separate from local CI. A fresh post-fix read-only review found zero concrete findings; no runtime or Triple AAA claim is made.
 - 2026-09-10: Reject self-declared promotion authority: require Ed25519 verification against an explicit trust store, require current clean checkout binding and reject seals outside the bounded freshness window. Preserve external runtime and human authority as separate blockers.
 - 2026-09-10: Keep the combined frontend adapter as one current observation while deriving independent `frontend-e2e`, `frontend-accessibility` and `supply-chain` lane statuses. A real browser/API PASS must remain visible even when image digest/SBOM evidence is externally blocked; production safety and promotion remain false.
+- 2026-09-10: Require the integrated verifier to bind the frontend envelope to the checkout captured before lane execution. Cross-commit, dirty, unavailable or non-current identity now fails closed; the browser/accessibility projection remains diagnostic only and never authorizes promotion.
 
 ## Outcomes & Retrospective
 
@@ -171,14 +173,15 @@ made.
 ## Current candidate closure
 
 The current source implementation candidate is
-fe0f06ccc4deed9a56e1a806842b71d3da8ace66 with tree
-0080bb23a61486e538fbf5876c5bd38e81a23ab1. It contains the corrected
+96b69cf8b8dd69314f08296b850b6b1424022309 with tree
+4343081d0cf004c0dc58526972362f6d9b6408dd. It contains the corrected
 PostgreSQL worker gate, canonical two-process Redis/API HTTP gate, strict
 release artifact postconditions and manifest consistency checks, plus bounded
 same-run CI envelopes with redacted raw artifacts, exact workflow/run/ref/SHA
 provenance, runtime-primary supply-chain binding, frontend Phase 3 transport,
-authenticated promotion packet sealing and scoped frontend-lane projection.
-The focused promotion/frontend suite has 51 passing tests and the relevant
+authenticated promotion packet sealing, scoped frontend-lane projection and
+checkout-bound frontend evidence. The focused promotion/frontend suite has
+102 passing tests and the relevant
 static/API checks pass; the full preserved `make test` remains incomplete
 because the CVG dataset and local Playwright browser are unavailable. The
 prior integrated verifier artifact is stale after this source change and is

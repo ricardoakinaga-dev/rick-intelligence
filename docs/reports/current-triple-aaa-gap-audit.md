@@ -204,6 +204,26 @@ image SBOM/provenance/signing, full service runtime, corpus/provider
 authority, independent reviewers, sealed packet and human Go/No-Go remain
 external blockers. No State of Art, AAA or Triple AAA claim is made.
 
+## 23. Checkout-bound frontend envelope — 2026-09-10
+
+Candidate `96b69cf8b8dd69314f08296b850b6b1424022309` (tree
+`4343081d0cf004c0dc58526972362f6d9b6408dd`) closes the remaining local
+evidence-integrity gap in the scoped frontend projection. The integrated
+verifier captures the clean checkout before running the shared adapter and
+requires the envelope to match the exact commit, tree and checkout
+fingerprint, with `checkout_available=true`, `clean_worktree=true` and
+`freshness=CURRENT`. A mismatch now fails closed instead of projecting a
+browser/accessibility PASS from evidence produced by another checkout.
+
+The regression suite covers cross-commit rejection, while the clean
+integrated run for this implementation change regenerated
+`.runtime/phase-3/triple-aaa-verify.json` and continued to classify the result
+as `STATE_OF_ART_CANDIDATE`
+with JSON/Make exit `2`: local lanes pass, and unavailable runtime,
+provenance, independent-review, sealing and human-authority lanes remain
+`BLOCKED_EXTERNAL`. The packet itself is the only authority for its exact
+identity fields; no State of Art, AAA or Triple AAA promotion claim is made.
+
 ## 5. Priority and dependency order
 
 ### P0 — release truth and runtime foundation
