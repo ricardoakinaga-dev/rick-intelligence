@@ -256,3 +256,25 @@ capability matrix is BLOCKED_EXTERNAL with six external blocks and three
 NOT_RUN rows; and the strict release verifier rejects the manifest with
 BLOCKED_RUNTIME_REJECTED. Therefore the promotion decision remains NO-GO and
 no Triple AAA claim is made.
+
+## 12. Release-manifest consistency correction — 2026-09-10
+
+The current pushed source candidate is now:
+
+- HEAD / origin/main: `b4c8ac0c8fee311ede12c417d0be1cbfd5aada38`
+- Tree: `b8e92492f2216c0c5c0ecdc90ccdfd5807c77d15`
+- Worktree: clean
+
+The typed release manifest now fails closed when the legacy `evidence_path`
+alias conflicts with `evidence_paths`, when the manifest status does not match
+the aggregate of mandatory gate results, or when a gate's reviewer identity
+differs from the declared reviewer record. The focused release checks pass
+(`38` tests), as does the combined local suite (`300` tests) and `make
+validate`.
+
+This is local contract evidence only. The previous integrated verifier packet
+is stale after the source change and is not reused as current promotion proof;
+Docker/Compose, live service, distributed, provider/corpus, operational,
+frontend-runtime, supply-chain and human-approval evidence remain unavailable
+or unverified. The candidate remains `STATE_OF_ART_CANDIDATE`, promotion is
+disallowed and no Triple AAA claim is made.

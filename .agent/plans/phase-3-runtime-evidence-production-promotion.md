@@ -22,6 +22,7 @@ preserving the frozen Gauntlet bar, Phase 2 history and legacy repositories.
 - [x] (2026-09-10) Correct the canonical Redis slice at source implementation candidate 8f2741d39d83622dc966b859fac06630848d916b: the two-process gate now drives two real `apps/api` HTTP processes, verifies replay/tenant/bounded-TTL behavior, and binds production composition and admission to the injected Redis client/namespace; local API, locking and State-of-Art suites pass, while the real Redis run remains BLOCKED_EXTERNAL.
 - [x] (2026-09-10) Bind citation-support metrics to strict Decision gates at source candidate 4302d48ae90bd17aec9380bbc3ab2d2e1244dbcb; local decision/evidence/Professor/API suites pass, while live golden/provider evidence remains required.
 - [x] (2026-09-10) Harden the release packet at source candidate 7f8fcdfec613085af0384fc76a5bcdb9184ef994: command exit zero cannot override blocked/invalid phase3 or release artifacts, mandatory runtime gates consume named envelopes (including multi-replica Redis and DR/citation/decision), and runtime/frontend/operational diagnostics are transported by the same CI run; `297` combined tests, `make validate`, YAML parsing and independent patch review pass, while promotion remains blocked.
+- [x] (2026-09-10) Harden release-manifest consistency at source candidate b4c8ac0c8fee311ede12c417d0be1cbfd5aada38 (tree b8e92492f2216c0c5c0ecdc90ccdfd5807c77d15): conflicting evidence aliases, status aggregates and gate/declaration reviewer identity mismatches now fail closed; `300` combined tests and `make validate` pass, while runtime promotion remains blocked.
 - [ ] (2026-09-09) Execute the disposable runtime; currently blocked by Docker daemon access and unresolved external authority.
 - [ ] (2026-09-09) Complete independent runtime/design/security reviews and the human Go/No-Go.
 
@@ -164,16 +165,17 @@ made.
 ## Current candidate closure
 
 The current source implementation candidate is
-7f8fcdfec613085af0384fc76a5bcdb9184ef994 with tree
-de0e1412f43a05750996a9376f6149e140d12d37. It contains the corrected
-PostgreSQL worker gate, canonical two-process Redis/API HTTP gate and strict
-release artifact postconditions, including request-ID replay, tenant
-isolation, bounded TTL, multi-replica Redis binding, named runtime envelopes
-and same-run CI diagnostics. Local suites pass and the independent patch
-review found no defect in this scope, but the integrated verifier remains
-ADVANCED_ENGINEERING with promotion disallowed because matrix/release
-evidence, live runtime, distributed, operational, frontend-runtime,
-provider/corpus and human-approval gates remain open.
+b4c8ac0c8fee311ede12c417d0be1cbfd5aada38 with tree
+b8e92492f2216c0c5c0ecdc90ccdfd5807c77d15. It contains the corrected
+PostgreSQL worker gate, canonical two-process Redis/API HTTP gate, strict
+release artifact postconditions and manifest consistency checks, including
+request-ID replay, tenant isolation, bounded TTL, multi-replica Redis
+binding, named runtime envelopes and same-run CI diagnostics. The combined
+local suite has 300 passing tests and `make validate` passes. The prior
+integrated verifier artifact is stale after this source change and is not
+treated as current promotion evidence; live runtime, distributed,
+operational, frontend-runtime, provider/corpus and human-approval gates
+remain open.
 
 ## Risks and Human Decisions
 

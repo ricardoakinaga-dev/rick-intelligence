@@ -1,12 +1,12 @@
 # Phase 3 — Runtime Evidence & Production Promotion
 
 **Status:** `ACTIVE — Phase 3.1 locally verified; Phase 3.2 external runtime gates blocked`
-**Date:** 2026-09-09
+**Date:** 2026-09-10
 **Frozen candidate:** `56a76004a75ec94178e35c82eab8405b5ac74729`
 **Prompt copy:** [`docs/prompts/phase-3-runtime-evidence-production-promotion-2026-09-09.txt`](../prompts/phase-3-runtime-evidence-production-promotion-2026-09-09.txt)
 **Current audit:** [`docs/reports/phase-3-runtime-evidence-current-audit.md`](../reports/phase-3-runtime-evidence-current-audit.md)
 **Living ExecPlan:** [`../../.agent/plans/phase-3-runtime-evidence-production-promotion.md`](../../.agent/plans/phase-3-runtime-evidence-production-promotion.md)
-**Current source implementation candidate:** `8f2741d39d83622dc966b859fac06630848d916b` (tree `2bf66ea20c2d7c2d0f92d3c343c6f4a2e2907d72`)
+**Current source implementation candidate:** `b4c8ac0c8fee311ede12c417d0be1cbfd5aada38` (tree `b8e92492f2216c0c5c0ecdc90ccdfd5807c77d15`)
 
 ## Purpose
 
@@ -221,17 +221,17 @@ rollback owner and final promotion.
 ## Current candidate closure
 
 The current source implementation candidate is
-8f2741d39d83622dc966b859fac06630848d916b with tree
-2bf66ea20c2d7c2d0f92d3c343c6f4a2e2907d72. It has the corrected PostgreSQL
-acknowledgement wiring and a canonical two-process Redis/API HTTP gate with
-request-ID replay, tenant isolation, bounded TTL, strict injected
-client/namespace binding and production admission checks. The API (432),
-locking (52) and State-of-Art (148) local suites pass, while the real Redis
-run fails closed as BLOCKED_EXTERNAL. A fresh independent read-only review
-found residual runtime/telemetry risks and did not approve promotion; live
-runtime, distributed, operational, provider/corpus, frontend-runtime,
-supply-chain and human-approval gates remain open, so no Triple AAA claim is
-made.
+b4c8ac0c8fee311ede12c417d0be1cbfd5aada38 with tree
+b8e92492f2216c0c5c0ecdc90ccdfd5807c77d15. It retains the corrected
+PostgreSQL acknowledgement wiring, canonical two-process Redis/API HTTP
+gate, strict release artifact postconditions and same-run diagnostic
+transport, and adds fail-closed checks for conflicting evidence aliases,
+inconsistent gate aggregates and mismatched gate/declaration reviewer
+identities. The combined local suite has 300 passing tests and `make
+validate` passes. The prior integrated verifier artifact is stale after this
+source change and is not treated as current promotion evidence; live runtime,
+distributed, operational, provider/corpus, frontend-runtime, supply-chain
+and human-approval gates remain open, so no Triple AAA claim is made.
 
 ## Current next action
 

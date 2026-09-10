@@ -14,7 +14,7 @@
   "active_execplan": ".agent/plans/phase-3-runtime-evidence-production-promotion.md",
   "active_task": "PH3-2-LAB-READINESS",
   "verification_state": "PARTIAL",
-  "repository_state": "Current Phase 3 source implementation candidate is 7f8fcdfec613085af0384fc76a5bcdb9184ef994 (tree de0e1412f43a05750996a9376f6149e140d12d37). It adds fail-closed artifact postconditions for phase3/release generation, maps named runtime envelopes including multi-replica Redis, golden ingestion, evidence, citation, decision, observability, DR/restore, frontend and supply-chain, and uploads/downloads same-run runtime diagnostics in canonical CI; local verification and the fresh patch review pass. The integrated verifier correctly returns ADVANCED_ENGINEERING with promotion_allowed=false because the matrix/manifest and live runtime lanes remain blocked or non-promotable; no Triple AAA claim is made.",
+  "repository_state": "Current Phase 3 source implementation candidate is b4c8ac0c8fee311ede12c417d0be1cbfd5aada38 (tree b8e92492f2216c0c5c0ecdc90ccdfd5807c77d15). It retains the fail-closed release artifact postconditions, named runtime envelopes and same-run CI diagnostics, and additionally rejects conflicting evidence aliases, inconsistent manifest status aggregates and mismatched gate/declaration reviewer identities. The current local verification passes, but the prior integrated verifier artifact is not reused as current proof after this source change; live runtime lanes remain blocked, promotion is disallowed and no Triple AAA claim is made.",
   "instruction_scope_refs": [
     ".agent/PLANS.md",
     "cvg-master-rag-v2/AGENTS.md",
@@ -23,8 +23,8 @@
     "docs/plans/phase-3-runtime-evidence-production-promotion.md"
   ],
   "last_gate_record": ".agent/gates/phase-3-2-lab-readiness-implementation-ready.json",
-  "last_event_id": "EVT-PH3-2-RELEASE-FAIL-CLOSED-20260910",
-  "state_revision": 240,
+  "last_event_id": "EVT-PH3-2-RELEASE-MANIFEST-CONSISTENCY-20260910",
+  "state_revision": 241,
   "next_gate": "VERIFIED",
   "active_action_id": "PH3-2-LAB-READINESS:WAIT_RUNTIME",
   "blocked_by": [
@@ -32,5 +32,5 @@
     "Disposable runtime secrets and endpoint authority are unavailable"
   ],
   "human_approval_required": [],
-  "updated_at": "2026-09-10T05:48:39Z"
+  "updated_at": "2026-09-10T06:03:47Z"
 }
