@@ -480,7 +480,7 @@ async def test_streaming_provider_tool_calls_are_budgeted_before_content_is_publ
         async def stream(self, *, messages, conversation_id: str):
             yield ChatCompletionChunk(
                 model="tool-stream-provider",
-                delta="",
+                delta="partial [cite:ev-1]",
                 tool_calls=[
                     {
                         "index": 0,
@@ -504,6 +504,7 @@ async def test_streaming_provider_tool_calls_are_budgeted_before_content_is_publ
 
     assert events[-1]["kind"] == "final"
     assert events[-1]["response"].metadata["failure_stage"] == "tool_calls_budget_exceeded"
+    assert not any(event["kind"] == "delta" for event in events)
 
 
 @pytest.mark.asyncio

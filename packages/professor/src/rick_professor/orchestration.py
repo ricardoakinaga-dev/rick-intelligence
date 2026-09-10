@@ -956,22 +956,24 @@ class ProfessorOrchestrator:
                 correlation_id = chunk.correlation_id
                 if chunk.usage is not None:
                     usage = chunk.usage
-                stream_tool_indexes.update(delta.index for delta in chunk.tool_calls or [])
+                new_tool_indexes = {
+                    delta.index for delta in chunk.tool_calls or []
+                }.difference(stream_tool_indexes)
+                if new_tool_indexes:
+                    self._consume_tool_calls(budget, len(new_tool_indexes))
+                    stream_tool_indexes.update(new_tool_indexes)
                 if chunk.delta:
                     content_parts.append(chunk.delta)
                     yield {"kind": "delta", "delta": chunk.delta}
                 if chunk.finish_reason:
                     finish_reason = chunk.finish_reason
+        except _BudgetExceeded as error:
+            yield {"kind": "final", "response": self._failed(request, f"{error.budget_name}_budget_exceeded", evidence, metadata=decision_metadata)}
+            return
         except asyncio.CancelledError:
             raise
         except Exception:
             yield {"kind": "final", "response": self._failed(request, "provider_failed", evidence, metadata=decision_metadata)}
-            return
-
-        try:
-            self._consume_tool_calls(budget, len(stream_tool_indexes))
-        except _BudgetExceeded as error:
-            yield {"kind": "final", "response": self._failed(request, f"{error.budget_name}_budget_exceeded", evidence, metadata=decision_metadata)}
             return
 
         content = "".join(content_parts).strip()
