@@ -82,6 +82,21 @@ COMPOSE_ENV_EXAMPLES = {
 }
 
 
+def _missing_cvg_approved_corpus(cvg_root: Path = CVG) -> list[Path]:
+    """Return mandatory preserved-corpus artifacts that are unavailable.
+
+    The preserved CVG full suite is intentionally corpus-backed.  Running it
+    without its approved dataset produces a large, misleading derivative red
+    surface (empty retrieval, missing evaluation data and absent tenant
+    fixtures).  This preflight does not substitute a fixture or declare the
+    suite green; it gives the caller a typed external blocker before the
+    corpus-dependent command starts.
+    """
+
+    required = (cvg_root / "src/data/default/dataset.json",)
+    return [path for path in required if not path.is_file() or path.is_symlink()]
+
+
 def _command_text(command: Sequence[str]) -> str:
     return " ".join(str(part) for part in command)
 
@@ -642,14 +657,40 @@ def mode_test_fast() -> int:
 
 
 def mode_test() -> int:
-    cases = [
-        root_check_case(),
-        python_case("CVG complete preserved suite", ["-m", "pytest", "-q"], cwd=CVG, env=cvg_env(), timeout=1200),
-        npm_case("Professor complete tests", PROFESSOR, ["test", "--", "--test-force-exit"], timeout=600),
-        npm_case("Locker complete tests", LOCKER, ["test"], timeout=300),
-        npm_case("CVG frontend lint and browser smoke", FRONTEND, ["test"], timeout=1200),
-    ]
-    return 0 if run_preserving_generated_artifacts(cases) else 1
+    cases = [root_check_case()]
+    missing_corpus = _missing_cvg_approved_corpus()
+    if missing_corpus:
+        relative_paths = ", ".join(path.relative_to(ROOT).as_posix() for path in missing_corpus)
+        print(
+            "==> CVG complete preserved suite: BLOCKED_EXTERNAL",
+            flush=True,
+        )
+        print(
+            "<== CVG complete preserved suite: BLOCKED_EXTERNAL "
+            f"(approved corpus artifact unavailable: {relative_paths})",
+            file=sys.stderr,
+            flush=True,
+        )
+    else:
+        cases.append(
+            python_case(
+                "CVG complete preserved suite",
+                ["-m", "pytest", "-q"],
+                cwd=CVG,
+                env=cvg_env(),
+                timeout=1200,
+            )
+        )
+    cases.extend(
+        [
+            npm_case("Professor complete tests", PROFESSOR, ["test", "--", "--test-force-exit"], timeout=600),
+            npm_case("Locker complete tests", LOCKER, ["test"], timeout=300),
+            npm_case("CVG frontend lint and browser smoke", FRONTEND, ["test"], timeout=1200),
+        ]
+    )
+    if not run_preserving_generated_artifacts(cases):
+        return 1
+    return 2 if missing_corpus else 0
 
 
 def mode_lint() -> int:

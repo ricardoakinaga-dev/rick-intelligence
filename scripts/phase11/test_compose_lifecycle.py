@@ -222,3 +222,56 @@ def test_rendered_compose_rejects_unbounded_or_privileged_services() -> None:
     assert "fixture.yml:api: privileged mode is forbidden" in errors
     assert "fixture.yml:api: deploy.resources.limits.cpus must be finite" in errors
     assert "fixture.yml:api: deploy.resources.limits.memory must be finite" in errors
+
+
+def test_missing_cvg_approved_corpus_is_explicitly_blocked(tmp_path) -> None:
+    missing = runner._missing_cvg_approved_corpus(tmp_path)
+
+    assert [path.relative_to(tmp_path).as_posix() for path in missing] == [
+        "src/data/default/dataset.json"
+    ]
+
+    dataset = tmp_path / "src/data/default/dataset.json"
+    dataset.parent.mkdir(parents=True)
+    dataset.write_text("{}", encoding="utf-8")
+
+    assert runner._missing_cvg_approved_corpus(tmp_path) == []
+
+
+def test_full_test_mode_skips_only_blocked_cvg_lane(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[tuple[str, list[str], object, object, int]] = []
+
+    monkeypatch.setattr(
+        runner,
+        "_missing_cvg_approved_corpus",
+        lambda: [runner.CVG / "src/data/default/dataset.json"],
+    )
+    monkeypatch.setattr(
+        runner,
+        "run_preserving_generated_artifacts",
+        lambda cases: calls.extend(cases) or True,
+    )
+
+    assert runner.mode_test() == 2
+    labels = [case[0] for case in calls]
+    assert labels == [
+        "current root boundary validator",
+        "Professor complete tests",
+        "Locker complete tests",
+        "CVG frontend lint and browser smoke",
+    ]
+
+
+def test_full_test_mode_runs_cvg_lane_when_corpus_is_available(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[tuple[str, list[str], object, object, int]] = []
+
+    monkeypatch.setattr(runner, "_missing_cvg_approved_corpus", lambda: [])
+    monkeypatch.setattr(
+        runner,
+        "run_preserving_generated_artifacts",
+        lambda cases: calls.extend(cases) or True,
+    )
+
+    assert runner.mode_test() == 0
+    labels = [case[0] for case in calls]
+    assert "CVG complete preserved suite" in labels
