@@ -18,12 +18,7 @@ concurrency:
 env:
   PYTHON_VERSION: "3.12.3"
   NODE_VERSION: "22.19.0"
-  PYTHONPATH: >-
-    apps/api/src:apps/worker:packages/contracts/src:packages/jobs/src:
-    packages/authorization/src:packages/identity/src:packages/observability/src:
-    packages/knowledge/src:packages/ingestion/src:packages/retrieval/src:
-    packages/providers/src:packages/locking/src:packages/professor/src:
-    packages/evidence/src:packages/decision/src:packages/storage/src
+  PYTHONPATH: apps/api/src:apps/worker:packages/contracts/src:packages/jobs/src:packages/authorization/src:packages/identity/src:packages/observability/src:packages/knowledge/src:packages/ingestion/src:packages/retrieval/src:packages/providers/src:packages/locking/src:packages/professor/src:packages/evidence/src:packages/decision/src:packages/storage/src
 
 jobs:
   fast:

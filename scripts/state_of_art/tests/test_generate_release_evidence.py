@@ -41,6 +41,14 @@ PROMPT_SCORECARD_DIMENSIONS = (
     "Production Readiness",
 )
 
+CANONICAL_PYTHONPATH = (
+    "apps/api/src:apps/worker:packages/contracts/src:packages/jobs/src:"
+    "packages/authorization/src:packages/identity/src:packages/observability/src:"
+    "packages/knowledge/src:packages/ingestion/src:packages/retrieval/src:"
+    "packages/providers/src:packages/locking/src:packages/professor/src:"
+    "packages/evidence/src:packages/decision/src:packages/storage/src"
+)
+
 
 def _reviewer() -> ReviewerRef:
     return ReviewerRef(
@@ -290,3 +298,11 @@ def test_final_promotion_report_matches_prompt_section_and_scorecard_contract() 
     assert [int(number) for number, _dimension in rows] == list(range(1, 26))
     assert [dimension.strip() for _number, dimension in rows] == list(PROMPT_SCORECARD_DIMENSIONS)
     assert "**Decision:** `NO-GO / NOT PROMOTED`." in text
+
+
+def test_canonical_workflows_keep_pythonpath_entries_contiguous() -> None:
+    root = Path(__file__).parents[3]
+    for relative in (".github/workflows/quality.yml", ".github/workflows/state-of-art-quality.yml"):
+        text = (root / relative).read_text(encoding="utf-8")
+        assert f"PYTHONPATH: {CANONICAL_PYTHONPATH}" in text
+        assert "PYTHONPATH: >-" not in text

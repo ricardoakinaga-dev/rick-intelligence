@@ -20,6 +20,9 @@ jobs:
     name: release / integrity
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONPATH: apps/api/src:apps/worker:packages/contracts/src:packages/jobs/src:packages/authorization/src:packages/identity/src:packages/observability/src:packages/knowledge/src:packages/ingestion/src:packages/retrieval/src:packages/providers/src:packages/locking/src:packages/professor/src:packages/evidence/src:packages/decision/src:packages/storage/src
     permissions:
       contents: read
     steps:
@@ -29,8 +32,6 @@ jobs:
           fetch-depth: 0
 
       - name: Run pinned gate tests
-        env:
-          PYTHONDONTWRITEBYTECODE: "1"
         run: |
           python3 -m pip install --disable-pip-version-check --no-cache-dir "pytest==8.0.2" -r scripts/state_of_art/requirements.txt
           python3 -m pytest -q -p no:cacheprovider scripts/state_of_art/tests
