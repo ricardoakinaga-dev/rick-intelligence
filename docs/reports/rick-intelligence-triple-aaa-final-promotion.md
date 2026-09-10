@@ -154,6 +154,14 @@ security categories, service readiness or preservation claims are projected.
 This closes local validator ambiguity only; Docker, approved corpus and final
 promotion authority remain required.
 
+At source candidate `6840096c43fa4bf45fa4db60861038ef9939c12c`, immutable
+archive manifests, promotion trust stores, release-integrity runtime/CI
+envelopes and evidence, and local web-performance samples also reject
+duplicate keys, non-finite values, invalid UTF-8 and oversized JSON before
+integrity or status projection. This is local release-boundary hardening only;
+Docker/services, provider/corpus authority, independent review, sealed packet
+and human Go/No-Go authority remain required.
+
 ## 7. CI and release lanes
 
 The canonical workflow names FAST, UNIT, CONTRACT, SECURITY, RAG_EVAL,

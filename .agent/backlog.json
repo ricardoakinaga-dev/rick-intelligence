@@ -985,7 +985,16 @@
     "scripts/phase11/test_check_skeleton.py",
     "scripts/phase11/test_compose_lifecycle.py",
     "docs/architecture/release-integrity.md",
-    ".agent/verification.jsonl#VER-PH3-2-PHASE11-VALIDATOR-JSON-BOUNDARY-20260910"
+    ".agent/verification.jsonl#VER-PH3-2-PHASE11-VALIDATOR-JSON-BOUNDARY-20260910",
+    "scripts/state_of_art/archive_controller.py",
+    "scripts/state_of_art/packet_seal.py",
+    "scripts/state_of_art/release_integrity.py",
+    "scripts/state_of_art/summarize_web_performance.py",
+    "scripts/state_of_art/test_controller_recovery.py",
+    "scripts/state_of_art/tests/test_packet_seal.py",
+    "scripts/state_of_art/tests/test_release_integrity.py",
+    "scripts/state_of_art/tests/test_summarize_web_performance.py",
+    ".agent/verification.jsonl#VER-PH3-2-RELEASE-JSON-BOUNDARY-20260910"
       ],
       "next_action": {
         "id": "PH3-2-LAB-READINESS:WAIT_RUNTIME",

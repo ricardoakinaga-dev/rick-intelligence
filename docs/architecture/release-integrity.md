@@ -246,3 +246,11 @@ invalid UTF-8 and oversized records fail before security categories, service
 readiness, preservation policy or dependency-boundary claims are projected.
 This closes local validator ambiguity without creating Docker, corpus or
 promotion authority.
+
+The release/control-plane readers at source candidate
+`6840096c43fa4bf45fa4db60861038ef9939c12c` also use the same boundary for
+immutable archive manifests, promotion trust stores, release-integrity
+runtime/CI envelopes and evidence, and local web-performance samples. Duplicate
+keys, non-finite values, invalid UTF-8 and oversized inputs therefore fail
+closed before archive, signature, release-status or metric projection; this
+remains local integrity protection and is not runtime or promotion authority.

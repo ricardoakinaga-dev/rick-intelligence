@@ -1179,3 +1179,21 @@ suite passes **305**; compilation and `git diff --check` pass. This is local
 validator-integrity evidence only. It does not supply Docker/services,
 approved corpus authority, independent review, sealed packet or human Go/No-Go
 authority; promotion remains disallowed.
+
+## 63. Release/control-plane JSON boundary closure — 2026-09-10
+
+Source implementation candidate `6840096c43fa4bf45fa4db60861038ef9939c12c`
+(tree `cbfbd4a7d44abf6ee39376f43b62f4a3a21f81a5`) closes the remaining
+permissive JSON readers outside Phase 11: immutable archive manifests,
+promotion trust stores, release-integrity runtime/CI envelopes and evidence,
+and local web-performance samples now use the bounded UTF-8, finite-value and
+duplicate-key rejecting decoder before integrity, status, signature or metric
+projection.
+
+The focused release/control-plane suite passes **24** tests, archive recovery
+passes **6** tests, and the complete State-of-Art suite passes **308**;
+compilation and `git diff --check` pass. A pre-existing canonical-controller
+fixture references an absent historical artifact and remains outside this
+lane's pass count. This is local evidence-boundary integrity only; it does not
+supply Docker/services, provider/corpus authority, independent review, sealed
+packet or human Go/No-Go authority; promotion remains disallowed.
