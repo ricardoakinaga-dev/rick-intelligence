@@ -18,6 +18,7 @@ import codecs
 from collections.abc import Mapping
 import hashlib
 import io
+import json
 import math
 import multiprocessing as mp
 import os
@@ -57,6 +58,7 @@ MAX_PARSER_TIMEOUT_SECONDS = 300.0
 DEFAULT_PARSER_MEMORY_BYTES = 512 * 1024 * 1024
 MAX_PARSER_MEMORY_BYTES = 2 * 1024 * 1024 * 1024
 MAX_PARSER_RESULT_BYTES = 32 * 1024 * 1024
+PARSER_WIRE_VERSION = 1
 MAX_FILENAME_CHARS = 256
 MAX_RAW_FILENAME_CHARS = 4_096
 MAX_PARSER_AUX_CHARS = MAX_PARSED_TEXT_CHARS
@@ -501,12 +503,106 @@ def _isolated_parser_copy(parser: DocumentParser) -> DocumentParser:
     return parser
 
 
+def _parser_auxiliary_to_wire(value: object) -> object:
+    """Copy validated parser metadata into JSON-native values only."""
+
+    if isinstance(value, str):
+        return value
+    if value is None or isinstance(value, (bool, int)):
+        return value
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            raise ValueError("parser metadata contains a non-finite number")
+        return value
+    if isinstance(value, Mapping):
+        wire: dict[str, object] = {}
+        for key, item in value.items():
+            if not isinstance(key, str) or key in wire:
+                raise ValueError("parser metadata contains an invalid field")
+            wire[key] = _parser_auxiliary_to_wire(item)
+        return wire
+    if isinstance(value, (list, tuple)):
+        return [_parser_auxiliary_to_wire(item) for item in value]
+    raise ValueError("parser metadata contains an unsupported value")
+
+
+def _parsed_document_to_wire(value: object) -> dict[str, object]:
+    """Convert a validated result into a closed JSON transport schema."""
+
+    document = _validate_parsed_document(value)
+    return {
+        "text": document.text,
+        "pages": [
+            {"page_number": page.page_number, "text": page.text}
+            for page in document.pages
+        ],
+        "sections": [_parser_auxiliary_to_wire(section) for section in document.sections],
+        "metadata": _parser_auxiliary_to_wire(document.metadata),
+    }
+
+
+def _reject_duplicate_json_keys(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    result: dict[str, object] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("duplicate parser result field")
+        result[key] = value
+    return result
+
+
+def _reject_json_constant(value: str) -> object:
+    raise ValueError(f"invalid JSON constant: {value}")
+
+
+def _wire_to_parsed_document(value: object) -> ParsedDocument:
+    if not isinstance(value, dict) or set(value) != {"text", "pages", "sections", "metadata"}:
+        raise ValueError("parser result document schema is invalid")
+    raw_pages = value["pages"]
+    raw_sections = value["sections"]
+    raw_metadata = value["metadata"]
+    if not isinstance(raw_pages, list) or not isinstance(raw_sections, list):
+        raise ValueError("parser result document schema is invalid")
+    pages: list[ParsedPage] = []
+    for raw_page in raw_pages:
+        if not isinstance(raw_page, dict) or set(raw_page) != {"page_number", "text"}:
+            raise ValueError("parser result page schema is invalid")
+        pages.append(ParsedPage(page_number=raw_page["page_number"], text=raw_page["text"]))
+    return ParsedDocument(
+        text=value["text"],
+        pages=pages,
+        sections=raw_sections,
+        metadata=raw_metadata,
+    )
+
+
 def _encode_parser_envelope(envelope: tuple[str, object]) -> bytes | None:
-    """Serialize a parser result only when its wire representation is bounded."""
+    """Serialize a parser result through a JSON-only, bounded wire schema."""
 
     try:
-        payload = pickle.dumps(envelope, protocol=pickle.HIGHEST_PROTOCOL)
-    except (MemoryError, OSError, OverflowError, pickle.PickleError):
+        if not isinstance(envelope, tuple) or len(envelope) != 2:
+            return None
+        status, value = envelope
+        if status == "ok":
+            body = {
+                "version": PARSER_WIRE_VERSION,
+                "status": "ok",
+                "document": _parsed_document_to_wire(value),
+            }
+        elif status == "error" and isinstance(value, str) and len(value) <= 64:
+            body = {
+                "version": PARSER_WIRE_VERSION,
+                "status": "error",
+                "code": value,
+            }
+        else:
+            return None
+        payload = json.dumps(
+            body,
+            ensure_ascii=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        ).encode("ascii")
+    except (MemoryError, OSError, OverflowError, TypeError, ValueError, RecursionError):
         return None
     if len(payload) > MAX_PARSER_RESULT_BYTES:
         return None
@@ -514,11 +610,30 @@ def _encode_parser_envelope(envelope: tuple[str, object]) -> bytes | None:
 
 
 def _decode_parser_envelope(payload: bytes) -> object:
-    """Decode the child response after the connection applied its byte cap."""
+    """Decode only the JSON child response after the connection byte cap."""
 
-    if len(payload) > MAX_PARSER_RESULT_BYTES:
+    if not isinstance(payload, bytes) or len(payload) > MAX_PARSER_RESULT_BYTES:
         raise ValueError("parser result exceeds the wire limit")
-    return pickle.loads(payload)
+    try:
+        envelope = json.loads(
+            payload.decode("utf-8"),
+            object_pairs_hook=_reject_duplicate_json_keys,
+            parse_constant=_reject_json_constant,
+        )
+        if not isinstance(envelope, dict) or envelope.get("version") != PARSER_WIRE_VERSION:
+            raise ValueError("parser result envelope schema is invalid")
+        status = envelope.get("status")
+        if status == "error":
+            if set(envelope) != {"version", "status", "code"} or not isinstance(envelope["code"], str):
+                raise ValueError("parser result error schema is invalid")
+            return ("error", envelope["code"])
+        if status == "ok":
+            if set(envelope) != {"version", "status", "document"}:
+                raise ValueError("parser result success schema is invalid")
+            return ("ok", _wire_to_parsed_document(envelope["document"]))
+        raise ValueError("parser result status is invalid")
+    except (UnicodeDecodeError, json.JSONDecodeError, RecursionError, TypeError, ValueError) as exc:
+        raise ValueError("parser result envelope is invalid") from exc
 
 
 def _parser_process_entry(
@@ -568,7 +683,9 @@ def _parser_process_entry(
         # The parent receives a stable safe error, never an exception string
         # or an object graph supplied by a third-party parser.
         try:
-            connection.send(("error", "ingestion_failed"))
+            payload = _encode_parser_envelope(("error", "ingestion_failed"))
+            if payload is not None:
+                connection.send_bytes(payload)
         except (BrokenPipeError, EOFError, OSError):
             pass
     finally:
@@ -671,7 +788,7 @@ class ProcessParserRunner:
                         envelope = _decode_parser_envelope(
                             parent.recv_bytes(MAX_PARSER_RESULT_BYTES)
                         )
-                    except (EOFError, OSError, ValueError, TypeError, pickle.UnpicklingError) as exc:
+                    except (EOFError, OSError, ValueError, TypeError) as exc:
                         raise ParseError() from exc
                     break
                 if not process.is_alive():
@@ -682,7 +799,7 @@ class ProcessParserRunner:
                             envelope = _decode_parser_envelope(
                                 parent.recv_bytes(MAX_PARSER_RESULT_BYTES)
                             )
-                        except (EOFError, OSError, ValueError, TypeError, pickle.UnpicklingError) as exc:
+                        except (EOFError, OSError, ValueError, TypeError) as exc:
                             raise ParseError() from exc
                     else:
                         raise ParseError()

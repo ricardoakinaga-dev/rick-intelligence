@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import pickle
 import stat
 import sys
 import time
@@ -37,6 +38,7 @@ from rick_ingestion import (  # noqa: E402
     validate_filename,
     validate_file,
 )
+import rick_ingestion.parsers as parser_module  # noqa: E402
 
 
 def _write(path: Path, data: bytes) -> Path:
@@ -332,6 +334,13 @@ def test_process_runner_rejects_an_oversized_result_before_transport(tmp_path: P
         )
 
     assert error.value.code == "request_too_large"
+
+
+def test_parser_result_wire_rejects_pickle_payload() -> None:
+    payload = pickle.dumps(("error", "ingestion_failed"), protocol=pickle.HIGHEST_PROTOCOL)
+
+    with pytest.raises(ValueError):
+        parser_module._decode_parser_envelope(payload)
 
 
 def test_process_runner_hard_stops_a_blocking_parser(tmp_path: Path) -> None:
