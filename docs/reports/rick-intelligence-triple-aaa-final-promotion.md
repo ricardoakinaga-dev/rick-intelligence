@@ -122,6 +122,13 @@ non-finite provider-controlled JSON cannot become a local contract pass. This
 is local provider-gate hardening only; live endpoint, corpus, budget and
 promotion authority remain required.
 
+At source candidate `6d84f3cae289e4294458f312b5bf99a318a1b138`, the Phase 11
+file-security gate applies the strict boundary to both directions of its
+isolated worker protocol. Ambiguous or non-finite worker data cannot alter
+authorization, preflight or safety-case observations. This is local worker
+boundary hardening only; external process-isolation, corpus and promotion
+evidence remain required.
+
 ## 7. CI and release lanes
 
 The canonical workflow names FAST, UNIT, CONTRACT, SECURITY, RAG_EVAL,

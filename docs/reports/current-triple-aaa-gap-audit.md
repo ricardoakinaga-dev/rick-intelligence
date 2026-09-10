@@ -1103,3 +1103,18 @@ State-of-Art suite passes **302**; compilation and `git diff --check` pass.
 This is local provider-gate integrity evidence only. It does not supply an
 approved live provider endpoint/corpus/budget, independent review, sealed
 packet or human Go/No-Go authority; promotion remains disallowed.
+
+## 58. Phase 11 file-security worker JSON boundary closure — 2026-09-10
+
+Source implementation candidate `6d84f3cae289e4294458f312b5bf99a318a1b138`
+(tree `9ce5549d3c2589895c8c28601fa43337d6926d20`) closes the permissive JSON
+paths at the isolated file-security worker boundary. Bounded worker input and
+output now share the strict UTF-8, finite-value and duplicate-key decoder
+before authorization, preflight or malicious-case observations are projected.
+
+The focused file-security runtime suite passes **9** tests and the complete
+State-of-Art suite passes **303**; compilation and `git diff --check` pass.
+This is local worker-boundary integrity evidence only. It does not supply the
+approved external file-security runtime/corpus, distributed process-isolation
+drill, independent review, sealed packet or human Go/No-Go authority;
+promotion remains disallowed.

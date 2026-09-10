@@ -64,3 +64,10 @@ worker-entrypoint tests, infrastructure static tests, `make ops-static` and
 packet. Disposable PostgreSQL migration, FK, trigger, two-worker, crash,
 restart, replay, SIGTERM and handler-isolation execution remains
 `BLOCKED_EXTERNAL` until the required services and supervisor are available.
+
+The Phase 11 file-security runtime gate also treats its isolated worker as an
+untrusted JSON boundary. Its bounded input and output are decoded as strict
+UTF-8 JSON with finite values and unique object keys before authorization,
+preflight or safety observations are projected. Ambiguous worker data fails
+closed; this local control does not replace the external process-isolation and
+malicious-corpus evidence required for promotion.
