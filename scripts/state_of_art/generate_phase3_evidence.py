@@ -239,7 +239,7 @@ def _capability_definitions() -> tuple[dict[str, Any], ...]:
             "status": "PARTIAL",
             "code_tests": [".github/workflows/quality.yml", "infrastructure/docker/api.Dockerfile", "infrastructure/docker/worker.Dockerfile", "scripts/phase11/frontend_supply_runtime_gate.py", "scripts/state_of_art/run_phase3_frontend_supply.py"],
             "artifacts": common + [(".github/workflows/quality.yml", "supply-chain CI lane"), ("infrastructure/docker/api.Dockerfile", "API image"), ("scripts/phase11/frontend_supply_runtime_gate.py", "supply-chain/container hardening runtime gate"), ("scripts/state_of_art/run_phase3_frontend_supply.py", "Phase 3 frontend/supply evidence adapter")],
-            "runtime_evidence": [(".runtime/phase-3/frontend-supply-runtime-evidence.json", "supply-chain runtime evidence envelope")],
+            "runtime_evidence": [(".runtime/phase-3/supply-chain-runtime-evidence.json", "supply-chain runtime evidence envelope")],
             "limitations": "Partial dependency audits and pinned workflows exist; SBOM, signed provenance and full image hardening are open.",
             "next_action": "Add scanners, SBOM, signatures, immutable digests and container hardening evidence.",
         },

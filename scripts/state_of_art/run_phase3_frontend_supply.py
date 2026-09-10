@@ -32,6 +32,7 @@ RAW_OUTPUT = ".runtime/phase-3/raw/frontend-supply-runtime-gate.json"
 # current P1 rows.
 CAPABILITY_ID = "P1-06"
 COVERED_CAPABILITY_IDS = ("P1-06", "P1-07")
+SUPPLY_OUTPUT = ".runtime/phase-3/supply-chain-runtime-evidence.json"
 
 
 def run(
@@ -57,6 +58,17 @@ def run(
     # mapping; this does not change the underlying raw gate artifact.
     output_path = (root / output).resolve() if not Path(output).is_absolute() else Path(output).resolve()
     output_path.write_text(json.dumps(envelope, ensure_ascii=False, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+    supply_envelope = dict(envelope)
+    supply_envelope["capability_id"] = "P1-07"
+    supply_envelope["record_id"] = envelope["record_id"].replace("P1-06", "P1-07", 1)
+    supply_envelope["reviewer"] = {
+        **dict(envelope.get("reviewer", {})),
+        "id": "automated-phase3-p1-07",
+        "name": "Phase 3 P1-07 runtime adapter",
+    }
+    supply_path = (root / SUPPLY_OUTPUT).resolve()
+    supply_path.parent.mkdir(parents=True, exist_ok=True)
+    supply_path.write_text(json.dumps(supply_envelope, ensure_ascii=False, sort_keys=True, indent=2) + "\n", encoding="utf-8")
     return envelope
 
 

@@ -28,7 +28,7 @@ def run(root: Path, *, lane: str, output: str) -> dict[str, Any]:
     return run_gate_adapter(
         root,
         phase3_lane.main,
-        capability_id=f"P1-05-{lane}",
+        capability_id="P1-05",
         output=output,
         raw_output=raw_output,
         environment=f"phase3-{lane}-approved-disposable-harness",
