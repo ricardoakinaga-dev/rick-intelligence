@@ -122,6 +122,10 @@ def test_blocked_gate_emits_current_commit_bound_envelope(
 
     assert envelope["status"] == "BLOCKED_EXTERNAL"
     assert envelope["exit_status"] == 2
+    raw_path = next(tmp_path.glob("raw-*.json"))
+    raw = json.loads(raw_path.read_text(encoding="utf-8"))
+    assert raw["status"] == "BLOCKED_EXTERNAL"
+    assert raw["exit_status"] == 2
     assert envelope["freshness"] == "CURRENT"
     assert envelope["production_safe"] is False
     assert envelope["clean_worktree"] is True
@@ -146,7 +150,11 @@ def test_gate_failure_is_not_normalized_to_runtime_pass(
 
     envelope = adapter.run(tmp_path, output="evidence.json")
 
-    assert envelope["status"] == "FAILED"
+    assert envelope["status"] == "FAIL"
+    raw_path = next(tmp_path.glob("raw-*.json"))
+    raw = json.loads(raw_path.read_text(encoding="utf-8"))
+    assert raw["status"] == "FAIL"
+    assert raw["exit_status"] == 1
     assert envelope["exit_status"] == 1
 
 
@@ -169,7 +177,11 @@ def test_missing_raw_output_cannot_reuse_a_stale_pass(
 
     envelope = adapter.run(tmp_path, output="evidence.json")
 
-    assert envelope["status"] == "FAILED"
+    assert envelope["status"] == "FAIL"
+    raw_path = next(tmp_path.glob("raw-*.json"))
+    raw = json.loads(raw_path.read_text(encoding="utf-8"))
+    assert raw["status"] == "FAIL"
+    assert raw["exit_status"] == 1
     assert envelope["exit_status"] == 1
     assert envelope["production_safe"] is False
 
@@ -220,7 +232,7 @@ def test_gate_cannot_create_shared_preflight_after_it_started(
 
     envelope = adapter.run(tmp_path, output="evidence.json")
 
-    assert envelope["status"] == "FAILED"
+    assert envelope["status"] == "FAIL"
     assert envelope["exit_status"] == 1
     assert envelope["production_safe"] is False
     assert envelope["preflight"]["status"] == "INVALID"
@@ -252,7 +264,7 @@ def test_missing_checkout_identity_cannot_emit_a_successful_runtime_envelope(
 
     envelope = adapter.run(tmp_path, output="evidence.json")
 
-    assert envelope["status"] == "FAILED"
+    assert envelope["status"] == "FAIL"
     assert envelope["exit_status"] == 1
     assert envelope["checkout_available"] is False
     assert envelope["production_safe"] is False
@@ -275,7 +287,7 @@ def test_missing_raw_digest_cannot_emit_a_successful_runtime_envelope(
 
     envelope = adapter.run(tmp_path, output="evidence.json")
 
-    assert envelope["status"] == "FAILED"
+    assert envelope["status"] == "FAIL"
     assert envelope["exit_status"] == 1
     assert envelope["artifact_sha256"] is None
     assert envelope["production_safe"] is False
@@ -307,7 +319,7 @@ def test_checkout_mutation_during_gate_is_rejected(
 
     envelope = adapter.run(tmp_path, output="evidence.json")
 
-    assert envelope["status"] == "FAILED"
+    assert envelope["status"] == "FAIL"
     assert envelope["exit_status"] == 1
     assert envelope["checkout_sentinel"]["unchanged"] is False
 
@@ -328,7 +340,7 @@ def test_malformed_raw_gate_output_cannot_emit_a_successful_runtime_envelope(
 
     envelope = adapter.run(tmp_path, output="evidence.json")
 
-    assert envelope["status"] == "FAILED"
+    assert envelope["status"] == "FAIL"
     assert envelope["exit_status"] == 1
     assert envelope["production_safe"] is False
 
@@ -352,7 +364,7 @@ def test_dirty_checkout_cannot_emit_a_successful_runtime_envelope(
 
     envelope = adapter.run(tmp_path, output="evidence.json")
 
-    assert envelope["status"] == "FAILED"
+    assert envelope["status"] == "FAIL"
     assert envelope["exit_status"] == 1
     assert envelope["freshness"] == "DIRTY_CHECKOUT"
     assert envelope["clean_worktree"] is False
@@ -463,7 +475,7 @@ def test_gate_exception_retains_sanitized_raw_diagnostic(
 
     raw_path = next(tmp_path.glob("raw-*.json"))
     raw = raw_path.read_text(encoding="utf-8")
-    assert envelope["status"] == "FAILED"
+    assert envelope["status"] == "FAIL"
     assert envelope["artifact_sha256"]
     assert "remote secret" not in raw
     assert "RuntimeError" in raw

@@ -182,7 +182,10 @@ def _normalize_status(raw: Mapping[str, Any], exit_status: int) -> str:
         return "BLOCKED_EXTERNAL"
     if raw_status == "PASS" and exit_status == 0:
         return "PASS"
-    return "FAILED"
+    # Runtime envelopes and release manifests use FAIL as the typed negative
+    # result.  The richer capability-level FAILED state remains a matrix
+    # concern and must not leak into this contract.
+    return "FAIL"
 
 
 def _fallback_payload(error_name: str) -> dict[str, Any]:
@@ -278,15 +281,11 @@ def run_gate_adapter(
     observed_at = datetime.now(timezone.utc).isoformat()
     status = _normalize_status(raw_payload, exit_status)
     if not checkout_unchanged:
-        status = "FAILED"
-        exit_status = 1
-    raw_digest_value = _sha256(raw_path)
-    if raw_digest_value is None:
-        status = "FAILED"
+        status = "FAIL"
         exit_status = 1
     if status == "BLOCKED_EXTERNAL":
         exit_status = 2
-    elif status == "FAILED" and exit_status == 0:
+    elif status == "FAIL" and exit_status == 0:
         exit_status = 1
 
     preflight_payload, preflight_after_errors, preflight_digest = load_preflight(
@@ -326,8 +325,26 @@ def run_gate_adapter(
         # A service gate cannot upgrade a run into runtime evidence without the
         # same-run shared lab attestation.  Missing infrastructure is an
         # external block; a present but contradictory attestation is a failure.
-        status = "BLOCKED_EXTERNAL" if preflight_status == "MISSING" else "FAILED"
+        status = "BLOCKED_EXTERNAL" if preflight_status == "MISSING" else "FAIL"
         exit_status = 2 if status == "BLOCKED_EXTERNAL" else 1
+
+    # The raw artifact is part of the typed release contract, not an opaque
+    # command log. Persist the adapter's final status and exit code after all
+    # checkout/preflight checks so a blocked or invalid envelope cannot point
+    # at a superficially successful raw result.
+    underlying_status = raw_payload.get("status")
+    if isinstance(underlying_status, str) and underlying_status != status:
+        raw_payload["underlying_status"] = underlying_status
+    raw_payload["status"] = status
+    raw_payload["exit_status"] = exit_status
+    _write_json(raw_path, raw_payload)
+    raw_digest_value = _sha256(raw_path)
+    if raw_digest_value is None:
+        status = "FAIL"
+        exit_status = 1
+        raw_payload["status"] = status
+        raw_payload["exit_status"] = exit_status
+        _write_json(raw_path, raw_payload)
     production_safe = (
         checkout_unchanged
         and raw_digest_value is not None

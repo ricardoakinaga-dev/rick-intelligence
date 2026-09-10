@@ -17,7 +17,6 @@ import json
 import os
 from pathlib import Path
 import signal
-import shutil
 import subprocess
 import sys
 
@@ -272,18 +271,16 @@ def _local_lanes() -> tuple[Lane, ...]:
 
 
 def _external_lanes() -> tuple[Lane, ...]:
-    browser_available = any(
-        shutil.which(name)
-        for name in ("chromium", "chromium-browser", "google-chrome", "google-chrome-stable")
-    )
-    browser_enabled = os.environ.get("RICK_FRONTEND_E2E_ENABLED") == "1"
-    frontend_command = ("make", "web-e2e") if browser_available and browser_enabled else None
+    # The Phase 3 adapter owns the blocked/not-run classification and always
+    # refreshes the shared frontend/supply envelope. Skipping it when a browser
+    # is absent would leave a previous commit's envelope in the release packet.
+    frontend_command = ("make", "phase3-frontend-supply-runtime")
     return (
         Lane("release-integrity", None, external=True, detail="clean checkout and current mandatory evidence are required", blocked_if_not_run=True),
         Lane("lab-readiness", None, external=True, detail="approved disposable Docker daemon is unavailable", blocked_if_not_run=True),
-        Lane("postgresql-runtime", ("make", "postgres-runtime"), external=True, blocked_return_codes=frozenset({2})),
+        Lane("postgresql-runtime", ("make", "phase3-postgres-runtime"), external=True, blocked_return_codes=frozenset({2})),
         Lane("multi-worker-runtime", ("make", "phase3-multi-worker-runtime"), external=True, detail="two-process worker fencing requires an approved disposable PostgreSQL runtime", blocked_return_codes=frozenset({2})),
-        Lane("redis-runtime", ("make", "redis-runtime"), external=True, blocked_return_codes=frozenset({2})),
+        Lane("redis-runtime", ("make", "phase3-redis-runtime"), external=True, blocked_return_codes=frozenset({2})),
         Lane(
             "redis-multi-replica",
             ("make", "phase3-redis-multi-replica-runtime"),
@@ -294,21 +291,17 @@ def _external_lanes() -> tuple[Lane, ...]:
         Lane("object-qdrant-runtime", ("make", "phase3-object-qdrant-runtime"), external=True, detail="object/vector lifecycle requires approved disposable object and Qdrant services", blocked_return_codes=frozenset({2})),
         Lane("ingestion-e2e", ("make", "phase3-golden-runtime"), external=True, detail="golden API→queue→worker→object→vector lifecycle requires RICK_GOLDEN_RUNTIME_PATH", blocked_return_codes=frozenset({2})),
         Lane("tenant-evidence-runtime", ("make", "phase3-tenant-evidence-runtime"), external=True, detail="live tenant/evidence negative matrix requires RICK_TENANT_EVIDENCE_RUNTIME_PATH", blocked_return_codes=frozenset({2})),
-        Lane("provider-rag-runtime", ("make", "provider-rag-runtime"), external=True, detail="approved provider and RICK_GOLDEN_RUNTIME_PATH corpus/budget authority are required", blocked_return_codes=frozenset({2})),
+        Lane("provider-rag-runtime", ("make", "phase3-provider-runtime"), external=True, detail="approved provider and RICK_GOLDEN_RUNTIME_PATH corpus/budget authority are required", blocked_return_codes=frozenset({2})),
         Lane("observability-runtime", ("make", "phase3-observability-runtime"), external=True, detail="collector/backend export and alert authority are required", blocked_return_codes=frozenset({2})),
         Lane(
             "frontend-e2e",
-            ("make", "phase3-frontend-supply-runtime") if frontend_command is not None else None,
+            frontend_command,
             external=True,
-            detail=(
-                "browser/runtime/API authority is unavailable; set RICK_FRONTEND_E2E_ENABLED=1 only in an approved lab"
-                if frontend_command is None
-                else "browser/accessibility runtime command returned"
-            ),
-            blocked_if_not_run=frontend_command is None,
+            detail="browser/runtime/API authority is unavailable or the adapter returned a negative observation",
+            blocked_return_codes=frozenset({2}),
         ),
-        Lane("frontend-accessibility", ("make", "frontend-supply-runtime") if frontend_command is not None else None, external=True, detail="fresh browser accessibility evidence is unavailable", blocked_return_codes=frozenset({2}), blocked_if_not_run=frontend_command is None),
-        Lane("supply-chain", ("make", "frontend-supply-runtime") if frontend_command is not None else None, external=True, detail="current SBOM, image, provenance and signature evidence is unavailable", blocked_return_codes=frozenset({2}), blocked_if_not_run=frontend_command is None),
+        Lane("frontend-accessibility", frontend_command, external=True, detail="fresh browser accessibility evidence is unavailable or blocked", blocked_return_codes=frozenset({2})),
+        Lane("supply-chain", frontend_command, external=True, detail="current SBOM, image, provenance and signature evidence is unavailable or blocked", blocked_return_codes=frozenset({2})),
         Lane("restore-drill", ("make", "phase3-restore-runtime"), external=True, detail="restore authority and disposable backups are unavailable", blocked_return_codes=frozenset({2})),
         Lane("file-security-runtime", ("make", "phase3-file-security-runtime"), external=True, detail="hostile file corpus requires an approved isolated worker runtime", blocked_return_codes=frozenset({2})),
         Lane("performance", ("make", "phase3-performance"), external=True, detail="performance requires an approved RICK_PHASE3_PERFORMANCE_COMMAND harness", blocked_return_codes=frozenset({2})),

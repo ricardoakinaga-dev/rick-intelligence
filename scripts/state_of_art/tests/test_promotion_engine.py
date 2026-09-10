@@ -317,6 +317,17 @@ def test_integrated_verifier_refreshes_runtime_before_release_artifacts(
     assert order.index("release-evidence-generation") < order.index("release-integrity")
 
 
+def test_integrated_verifier_uses_commit_bound_adapters_for_manifest_lanes() -> None:
+    lanes = {lane.lane_id: lane for lane in triple_aaa_verify._external_lanes()}
+
+    assert lanes["postgresql-runtime"].command == ("make", "phase3-postgres-runtime")
+    assert lanes["redis-runtime"].command == ("make", "phase3-redis-runtime")
+    assert lanes["provider-rag-runtime"].command == ("make", "phase3-provider-runtime")
+    for lane_id in ("frontend-e2e", "frontend-accessibility", "supply-chain"):
+        assert lanes[lane_id].command == ("make", "phase3-frontend-supply-runtime")
+        assert lanes[lane_id].blocked_if_not_run is False
+
+
 @pytest.mark.parametrize(
     ("lane_id", "artifact", "expected_status"),
     (

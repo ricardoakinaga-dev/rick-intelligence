@@ -54,6 +54,7 @@ RUNTIME_EVIDENCE_STATUSES = frozenset(
         "PARTIAL",
         "MISSING",
         "BLOCKED_EXTERNAL",
+        "FAIL",
         "FAILED",
         "NOT_RUN",
     }
@@ -765,6 +766,7 @@ def evaluate_matrix(
                                         "PASS": {"PASS"},
                                         "VERIFIED_RUNTIME": {"PASS"},
                                         "PROMOTABLE": {"PASS"},
+                                        "FAIL": {"FAIL"},
                                         "FAILED": {"FAIL"},
                                         "BLOCKED_EXTERNAL": {"BLOCKED_EXTERNAL"},
                                     }.get(str(runtime_status), set())
