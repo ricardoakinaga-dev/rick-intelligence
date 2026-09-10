@@ -47,7 +47,29 @@ _CASE_IDS = (
     "unknown-chunk",
     "prompt-injection-document",
     "path-traversal-polyglot-file",
+    # Section 31 requires negative coverage for metadata and timing channels,
+    # not only for content/evidence authorization.
+    "tenant-id-enumeration",
+    "document-count-enumeration",
+    "error-shape-differential",
+    "timing-sensitive-identifier",
+    "object-existence-enumeration",
+    "job-existence-enumeration",
+    "collection-existence-enumeration",
+    "telemetry-identifier-enumeration",
 )
+_METADATA_CASE_IDS = frozenset(
+    {
+        "tenant-id-enumeration",
+        "document-count-enumeration",
+        "error-shape-differential",
+        "object-existence-enumeration",
+        "job-existence-enumeration",
+        "collection-existence-enumeration",
+        "telemetry-identifier-enumeration",
+    }
+)
+_TIMING_CASE_IDS = frozenset({"timing-sensitive-identifier"})
 _DENY_STATUSES = frozenset({"blocked", "denied", "rejected", "filtered", "no_evidence", "abstain", "escalate"})
 _SAFE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$")
 
@@ -179,6 +201,47 @@ def _case_payload(case_id: str, run_id: str) -> dict[str, object]:
             "content_type": "application/pdf",
             "polyglot_marker": f"polyglot-{run_id}",
         },
+        "tenant-id-enumeration": {
+            "tenant_id": "tenant-b",
+            "probe_marker": f"tenant-enumeration-{run_id}",
+            "metadata_field": "tenant_id",
+        },
+        "document-count-enumeration": {
+            "document_count_for_other_tenant": 17,
+            "probe_marker": f"document-count-{run_id}",
+            "metadata_field": "document_count",
+        },
+        "error-shape-differential": {
+            "error_for_other_tenant": "document_not_found",
+            "probe_marker": f"error-shape-{run_id}",
+            "metadata_field": "error_shape",
+        },
+        "timing-sensitive-identifier": {
+            "identifier": f"tenant-b-document-{run_id}",
+            "probe_marker": f"timing-identifier-{run_id}",
+            "metadata_field": "timing",
+        },
+        "object-existence-enumeration": {
+            "object_key": f"tenant-b/private-{run_id}",
+            "probe_marker": f"object-existence-{run_id}",
+            "metadata_field": "object_existence",
+        },
+        "job-existence-enumeration": {
+            "job_id": f"tenant-b-job-{run_id}",
+            "probe_marker": f"job-existence-{run_id}",
+            "metadata_field": "job_existence",
+        },
+        "collection-existence-enumeration": {
+            "collection_id": f"tenant-b-collection-{run_id}",
+            "probe_marker": f"collection-existence-{run_id}",
+            "metadata_field": "collection_existence",
+        },
+        "telemetry-identifier-enumeration": {
+            "trace_id": f"tenant-b-trace-{run_id}",
+            "request_id": f"tenant-b-request-{run_id}",
+            "probe_marker": f"telemetry-identifier-{run_id}",
+            "metadata_field": "telemetry_identifiers",
+        },
     }
     common["mutation"] = mutations[case_id]
     common["case_id"] = case_id
@@ -240,6 +303,10 @@ def _case_observation(value: object) -> tuple[bool, dict[str, object]]:
         "status": status,
         "evidence_count": _value(value, "evidence_count"),
         "citation_count": _value(value, "citation_count"),
+        # Metadata/timing assertions are mandatory for their corresponding
+        # cases.  A generic blocked status alone cannot prove no enumeration.
+        "metadata_leak_free": _value(value, "metadata_leak_free"),
+        "timing_leak_free": _value(value, "timing_leak_free"),
     }
     return blocked and allowed is not True, observed
 
@@ -295,14 +362,30 @@ async def run_gate(
                 try:
                     response = await _invoke(target, case=case, timeout=timeout)
                     accepted, observed = _case_observation(response)
-                    marker = str(case["mutation"].get("injection_marker") or case["mutation"].get("polyglot_marker") or "")
+                    marker = str(
+                        case["mutation"].get("probe_marker")
+                        or case["mutation"].get("injection_marker")
+                        or case["mutation"].get("polyglot_marker")
+                        or ""
+                    )
                     leak_free = _leak_free(response, marker)
                     observed["leak_free"] = leak_free
+                    metadata_ok = (
+                        case_id not in _METADATA_CASE_IDS
+                        or observed.get("metadata_leak_free") is True
+                    )
+                    timing_ok = (
+                        case_id not in _TIMING_CASE_IDS
+                        or observed.get("timing_leak_free") is True
+                    )
+                    case_ok = accepted and leak_free and metadata_ok and timing_ok
                     cases.append(
                         CaseResult(
                             case_id,
-                            PASS if accepted and leak_free else FAIL,
-                            "negative case rejected by the live evidence boundary" if accepted and leak_free else "negative case was accepted or leaked probe data",
+                            PASS if case_ok else FAIL,
+                            "negative case rejected without content, metadata or timing leakage"
+                            if case_ok
+                            else "negative case was accepted, leaked probe data, or lacked the required metadata/timing attestation",
                             observed,
                         )
                     )
