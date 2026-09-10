@@ -205,3 +205,21 @@ dropping all Linux capabilities and forbidding privilege escalation. The
 static Compose gate renders JSON and rejects missing limits, privileged mode,
 host/none networking and missing hardening. This is configuration evidence
 only; actual container behavior still requires the approved disposable lab.
+
+## 13. Frontend runtime evidence stabilization — 2026-09-10
+
+The exact source candidate `02dfbd2875372643c82f861e6178602ce6530d86` adds a
+real application icon, a client-only hydration readiness marker and a
+fail-closed browser probe synchronization point. It also prevents Playwright
+screenshot caret hiding from creating React hydration drift and scopes the
+negative-login assertion to the form error rather than the framework route
+announcer.
+
+The managed API/Web run passed all browser dimensions and interaction checks,
+with real login, workbench and chat responses and no unexpected console or
+request failures. Source supply checks passed, while image digest and image
+SBOM checks remained `NOT_RUN` without reviewed immutable image references.
+The combined regression is 305 tests; frontend/supply focus is 20 tests. This
+is current local evidence and a deterministic test-boundary correction, not
+production approval or an independent visual review. The next action remains
+approved disposable runtime execution and fresh independent review.

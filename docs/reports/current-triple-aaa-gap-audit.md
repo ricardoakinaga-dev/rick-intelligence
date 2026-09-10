@@ -298,3 +298,32 @@ combined State-of-Art/Phase 11 regression passes 302 tests; `make validate`,
 This closes a local configuration boundary only. No live container, health,
 resource-usage, image-scan, SBOM, signature, runtime or promotion authority is
 inferred; the candidate remains `STATE_OF_ART_CANDIDATE` / `NO-GO`.
+
+## 15. Frontend runtime evidence stabilization — 2026-09-10
+
+The exact clean source candidate `02dfbd2875372643c82f861e6178602ce6530d86`
+(tree `aa6e3f6f8e611fe1316afce1acb73d82367db7b0`) closes three local browser
+probe defects exposed by a real API-backed run. The canonical web app now
+publishes a native `icon.svg`, the session provider exposes a client-only
+hydration marker used only to synchronize browser interaction, and the probe
+waits for that marker before submitting the login form. Screenshot capture
+uses Playwright's `caret: "initial"` so it does not mutate hydrated input DOM;
+the negative-login assertion targets the form alert instead of Next's route
+announcer.
+
+Against that clean candidate, `make frontend-supply-runtime` produced a real
+managed API/Web browser packet with `runtime_claim=true` and browser evidence
+`PASS` at 375x812, 768x1024 and 1440x1000. Login, authenticated workbench and
+chat states used the real API; axe, keyboard/focus, contrast, reduced-motion,
+touch, console and request checks passed. Lockfiles, source SBOMs, secret scan
+and license checks also passed. The overall gate remains
+`BLOCKED_EXTERNAL` because immutable container digests and image SBOMs were
+not available; this is not production or independent visual approval.
+
+The local regression boundary is now **305 State-of-Art/Phase 11 tests**, 20
+focused frontend/supply tests, web lint/typecheck/build, `make validate`,
+`make ops-static` and `make compose-static`. The exact clean integrated
+verifier bound commit `02dfbd2`/tree `aa6e3f6` and classified
+`STATE_OF_ART_CANDIDATE` with JSON exit `1`; required runtime, release,
+independent-review, sealed-packet and human Go/No-Go lanes remain blocked or
+non-promotable. No AAA or Triple AAA claim is made.
