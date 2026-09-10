@@ -14,7 +14,7 @@
   "active_execplan": ".agent/plans/phase-3-runtime-evidence-production-promotion.md",
   "active_task": "PH3-2-LAB-READINESS",
   "verification_state": "PARTIAL",
-  "repository_state": "Current source candidate is ee5a88a0728042193d80104fe183586a1b254b37 (tree 7ddc811003d2d0a954cf3c0a236ba93b883a1185); the prior clean integrated packet for 7d50c68fb964edd015d6eea0f7f14c7fb790fa5b is stale after this source change. It includes the corrected PostgreSQL worker gate, canonical two-process Redis/API HTTP gate, strict release artifact postconditions and manifest consistency checks, bounded same-run CI envelopes with redacted raw artifacts, exact workflow/run/ref/SHA provenance, runtime-primary supply-chain binding, frontend Phase 3 transport, authenticated promotion packet sealing, scoped frontend-lane projection, checkout-bound frontend evidence, reproducible release-test dependencies, a bounded cancellation-aware synchronous provider-embedding bridge, a bounded authenticated live provider-health probe, bounded function-tool/JSON/streaming tool-call contracts, streaming tool-call reassembly, context-budget rejection before I/O and normal JSON-object response validation without retry. Clean provider/API/State-of-Art regressions pass 63, 437 and 295 tests respectively; the next integrated packet must bind this candidate and remains expected to classify STATE_OF_ART_CANDIDATE with external blockers. No State of Art, AAA or Triple AAA promotion claim is made.",
+  "repository_state": "Current source candidate is 6095bafcc368a4b7ee7d468bd4bac98e7b153faf (tree 10f363d35567e1c5763652161004a399f02cc51e); the prior clean integrated packet for 28a3dae3308849da4494219811c7c7e832496dd0 is stale after this source change. It includes the corrected PostgreSQL worker gate, canonical two-process Redis/API HTTP gate, strict release artifact postconditions and manifest consistency checks, bounded same-run CI envelopes with redacted raw artifacts, exact workflow/run/ref/SHA provenance, runtime-primary supply-chain binding, frontend Phase 3 transport, authenticated promotion packet sealing, scoped frontend-lane projection, checkout-bound frontend evidence, reproducible release-test dependencies, a bounded cancellation-aware synchronous provider-embedding bridge, a bounded authenticated live provider-health probe, bounded function-tool/JSON/streaming tool-call contracts, streaming tool-call and streaming JSON reassembly, context-budget rejection before I/O and normal JSON-object response validation without retry. Clean provider/API/State-of-Art regressions pass 64, 437 and 295 tests respectively; the next integrated packet must bind this candidate and remains expected to classify STATE_OF_ART_CANDIDATE with external blockers. No State of Art, AAA or Triple AAA promotion claim is made.",
   "instruction_scope_refs": [
     ".agent/PLANS.md",
     "cvg-master-rag-v2/AGENTS.md",
@@ -23,8 +23,8 @@
     "docs/plans/phase-3-runtime-evidence-production-promotion.md"
   ],
   "last_gate_record": ".agent/gates/phase-3-2-lab-readiness-implementation-ready.json",
-  "last_event_id": "EVT-PH3-2-PROVIDER-JSON-RESPONSE-20260910",
-  "state_revision": 265,
+  "last_event_id": "EVT-PH3-2-PROVIDER-STREAMING-JSON-20260910",
+  "state_revision": 266,
   "next_gate": "VERIFIED",
   "active_action_id": "PH3-2-LAB-READINESS:WAIT_RUNTIME",
   "blocked_by": [
@@ -32,5 +32,5 @@
     "Disposable runtime secrets and endpoint authority are unavailable"
   ],
   "human_approval_required": [],
-  "updated_at": "2026-09-10T12:25:32Z"
+  "updated_at": "2026-09-10T12:30:43Z"
 }
