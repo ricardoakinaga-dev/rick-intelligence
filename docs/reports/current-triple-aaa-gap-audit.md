@@ -1217,3 +1217,19 @@ source candidate reports **17 PASS**, **24 BLOCKED_EXTERNAL**,
 control/recovery integrity evidence only; Docker/services, provider/corpus,
 independent review, sealed packet and human Go/No-Go authority remain
 unavailable, so promotion remains disallowed.
+
+## 65. Latest exact-candidate revalidation — 2026-09-10
+
+The current candidate superseding the historical section above is
+`a4dc0b03abb388beaff88389b3e6935bc09379e4` (tree
+`d93b0fdec006b15a2fa43cb9b44387519f2cf02c`). The supplied runtime-closure
+prompt and its archived copy now compare byte-for-byte: 27,366 bytes and SHA-256
+`064be5e04ed483d5d95ef803a66faf6675f7c1f00633cdea83d5abfdd5370d5f`.
+
+On this exact clean candidate, `make ci` and the current capability-matrix
+validator pass. The release manifest binds commit, tree, checkout fingerprint
+and artifact digest `5cc08237f5ae50f63927cc07b9e81715b8580b0588c80ae6b3b0cb28c128306a`,
+while retaining `BLOCKED_EXTERNAL`. The integrated packet remains
+`STATE_OF_ART_CANDIDATE` with exit **2**, **17** local PASS lanes and **24**
+mandatory external blockers. No live service, failure, recovery, independent
+review or sealed-promotion claim is inferred from these local results.
