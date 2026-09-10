@@ -130,6 +130,36 @@ def test_job_journal_reopens_with_wal_private_files_and_atomic_upsert(tmp_path: 
     reopened.close()
 
 
+def test_job_journal_rejects_oversized_or_nonfinite_persisted_json(tmp_path: Path) -> None:
+    journal_path = tmp_path / "jobs.sqlite"
+    journal = JobJournal(journal_path)
+    journal.upsert(_job("corrupt-job"))
+    journal.close()
+
+    with sqlite3.connect(journal_path) as connection:
+        oversized = '{"allowed_collection_ids":["collection-a"]}' + (" " * (32 * 1024))
+        connection.execute(
+            "UPDATE ingestion_jobs SET acl_json=? WHERE job_id=?",
+            (oversized, "corrupt-job"),
+        )
+        connection.commit()
+
+    reopened = JobJournal(journal_path)
+    assert reopened.get("corrupt-job") is None
+    reopened.close()
+
+    with sqlite3.connect(journal_path) as connection:
+        connection.execute(
+            "UPDATE ingestion_jobs SET metadata_json=? WHERE job_id=?",
+            ('{"execution":NaN}', "corrupt-job"),
+        )
+        connection.commit()
+
+    reopened = JobJournal(journal_path)
+    assert reopened.get("corrupt-job") is None
+    reopened.close()
+
+
 def test_journal_hardening_failure_rolls_back_before_commit(tmp_path: Path, monkeypatch) -> None:
     journal = JobJournal(tmp_path / "jobs.sqlite")
 

@@ -65,6 +65,7 @@ ERROR_CODES = frozenset(
 )
 
 _UNSET = object()
+_INVALID_JSON = object()
 
 
 class JobJournalError(RuntimeError):
@@ -165,14 +166,31 @@ def _json_text(value: Mapping[str, Any], *, label: str) -> str:
     return encoded
 
 
-def _decode_mapping(value: object) -> dict[str, Any]:
+def _reject_json_constant(_value: str) -> object:
+    raise ValueError("non-finite JSON number")
+
+
+def _decode_mapping(value: object) -> dict[str, Any] | object:
     if not isinstance(value, str):
-        return {}
+        return _INVALID_JSON
+    if len(value.encode("utf-8")) > MAX_JSON_BYTES:
+        return _INVALID_JSON
     try:
-        decoded = json.loads(value)
-    except (TypeError, ValueError, json.JSONDecodeError):
-        return {}
-    return dict(decoded) if isinstance(decoded, Mapping) else {}
+        decoded = json.loads(value, parse_constant=_reject_json_constant)
+        if not isinstance(decoded, Mapping):
+            return _INVALID_JSON
+        encoded = json.dumps(
+            decoded,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        )
+        if len(encoded.encode("utf-8")) > MAX_JSON_BYTES:
+            return _INVALID_JSON
+    except (RecursionError, TypeError, UnicodeError, ValueError, json.JSONDecodeError):
+        return _INVALID_JSON
+    return dict(decoded)
 
 
 def _normalize_acl_snapshot(
@@ -365,6 +383,10 @@ class JobJournal:
     def _row_record(row: sqlite3.Row | None) -> dict[str, Any] | None:
         if row is None:
             return None
+        acl_snapshot = _decode_mapping(row["acl_json"])
+        metadata = _decode_mapping(row["metadata_json"])
+        if acl_snapshot is _INVALID_JSON or metadata is _INVALID_JSON:
+            return None
         return {
             "job_id": row["job_id"],
             "document_id": row["document_id"],
@@ -385,8 +407,8 @@ class JobJournal:
             "display_filename": row["display_filename"],
             "request_id": row["request_id"],
             "correlation_id": row["correlation_id"],
-            "acl_snapshot": _decode_mapping(row["acl_json"]),
-            "metadata": _normalize_metadata(_decode_mapping(row["metadata_json"])),
+            "acl_snapshot": acl_snapshot,
+            "metadata": _normalize_metadata(metadata),
             "updated_at": float(row["updated_at"]),
         }
 
