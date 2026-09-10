@@ -136,6 +136,12 @@ This prevents ambiguous local observations from becoming gate passes; it does
 not provide distributed observability runtime, live-drill or promotion
 evidence.
 
+At source candidate `9d68b79e27a0e89f3e9772feda0fcfb209bc4b35`, the guarded
+Compose lifecycle parser applies the strict boundary to whole-output and
+JSON-lines service inventories before readiness projection. Ambiguous records
+cannot alter service identity or health status; this does not prove Docker
+startup, service health or production promotion.
+
 ## 7. CI and release lanes
 
 The canonical workflow names FAST, UNIT, CONTRACT, SECURITY, RAG_EVAL,

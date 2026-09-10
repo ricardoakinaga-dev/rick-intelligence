@@ -1134,3 +1134,17 @@ This is local observability-gate integrity evidence only. It does not supply
 approved collector/trace/metrics/alert runtime, distributed export or live
 drills, independent review, sealed packet or human Go/No-Go authority;
 promotion remains disallowed.
+
+## 60. Phase 11 Compose inventory JSON boundary closure — 2026-09-10
+
+Source implementation candidate `9d68b79e27a0e89f3e9772feda0fcfb209bc4b35`
+(tree `72112510d0ac16cdcfa86f06d8ef0dfb1925aa94`) closes the permissive JSON
+paths in the root Compose lifecycle runner. Whole-output and JSON-lines service
+inventory records now share the strict UTF-8, finite-value and duplicate-key
+decoder before service names, health and readiness are projected.
+
+The Compose lifecycle suite passes **21** tests and the complete State-of-Art
+suite passes **304**; compilation and `git diff --check` pass. This is local
+Compose-parser integrity evidence only. It does not supply an approved Docker
+daemon, disposable service inventory/health, independent review, sealed packet
+or human Go/No-Go authority; promotion remains disallowed.

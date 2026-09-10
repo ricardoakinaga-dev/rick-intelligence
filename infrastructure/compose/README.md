@@ -30,3 +30,9 @@ fail-closed worker launcher and requires an externally reviewed
 worker does not serve. `worker` and `worker-b` use distinct injected
 `RICK_WORKER_ID` values and the same durable dependency set so the lab can
 exercise fencing against one queue.
+
+The guarded lifecycle parses Docker Compose service inventory through the
+shared bounded strict JSON decoder. Duplicate object keys, non-finite values,
+invalid UTF-8 and oversized inventory records cannot change the service name or
+health projection used by readiness; malformed records fail closed. This is a
+local parser guarantee, not evidence that Docker services are running.
