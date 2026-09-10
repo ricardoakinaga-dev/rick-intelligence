@@ -254,3 +254,12 @@ runtime/CI envelopes and evidence, and local web-performance samples. Duplicate
 keys, non-finite values, invalid UTF-8 and oversized inputs therefore fail
 closed before archive, signature, release-status or metric projection; this
 remains local integrity protection and is not runtime or promotion authority.
+
+At source candidate `c179acc196ffa19ccdbae6a91ab5c05233af1314`, the same
+contract covers runtime preflight, derived review-control state, quality-bar
+validation, backup/restore manifests, release manifests and the vendored
+Gauntlet state/history readers. State JSON is bounded at 32 MiB, JSONL records
+at 1 MiB, and invalid UTF-8, non-finite constants and duplicate keys fail
+closed before recovery or promotion fields are trusted. This strengthens the
+local control/recovery boundary only; it does not create runtime or approval
+evidence.

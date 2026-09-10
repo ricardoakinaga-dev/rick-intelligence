@@ -52,6 +52,7 @@ preserving the frozen Gauntlet bar, Phase 2 history and legacy repositories.
 - [x] (2026-09-10) Bound persisted SQLite/PostgreSQL audit JSON at source candidate 0cfe1cc2bf669b0d47b1993a38525804836f7a08 (tree 1b6c49a12925fbf1d355a56ec27d9d21dd12045f): audit reads cap JSON at 64 KiB, reject non-finite/malformed/recursive values and filter corrupt SQLite rows before JSON1 predicates; audit tests pass 10, the API matrix 443 and State-of-Art 295, while live external audit durability remains blocked.
 - [x] (2026-09-10) Bound SQLite/PostgreSQL knowledge metadata JSON at source candidate 134ec271097c32caa33b774be1b5f3e3974ffb08 (tree aa93b2f1bc7ebd59355dfdfcc74b28c558857fbf): metadata writes cap canonical JSON at 256 KiB and reject non-finite values, reads omit corrupt collection/document/chunk rows; knowledge tests pass 22, the API matrix 443 and State-of-Art 295, while live durable-store evidence remains blocked.
 - [x] (2026-09-10) Bound cleanup-lease marker JSON at source candidate 5b3a652fbfae2aa4d9e839d1dfacb156dbd6dae9 (tree 37359cb1cec80c40776d0d40e92d1df71719b708): private fallback markers cap finite JSON at 8 KiB, validate version/job/scope and leave sources untouched for corrupt markers; the job-journal suite passes 15, the API matrix 444 and State-of-Art 295, while live runtime evidence remains blocked.
+- [x] (2026-09-10) Harden release, control-plane and recovery JSON boundaries at source candidate c179acc196ffa19ccdbae6a91ab5c05233af1314 (tree e02f74de83dd6d6f5bfff5d38a0e0e5831d386d6): preflight, review-control, quality-bar, backup/restore, release-manifest and Gauntlet state/history readers now reject duplicate keys, non-finite values, invalid UTF-8 and bounded-overflow inputs before projection; focused boundary checks pass 34 and the complete State-of-Art suite passes 314, with make validate, ops-static and compose-static green. The clean integrated packet reports 17 PASS, 24 BLOCKED_EXTERNAL, STATE_OF_ART_CANDIDATE and exit 2; Docker, runtime/provider/corpus, independent-review, sealing and human Go-No-Go remain external blockers.
 - [ ] (2026-09-09) Execute the disposable runtime; currently blocked by Docker daemon access and unresolved external authority.
 - [ ] (2026-09-09) Complete independent runtime/design/security reviews and the human Go/No-Go.
 
@@ -203,8 +204,8 @@ made.
 ## Current candidate closure
 
 The current source implementation candidate is
-5b3a652fbfae2aa4d9e839d1dfacb156dbd6dae9 with tree
-37359cb1cec80c40776d0d40e92d1df71719b708. It contains the corrected
+c179acc196ffa19ccdbae6a91ab5c05233af1314 with tree
+e02f74de83dd6d6f5bfff5d38a0e0e5831d386d6. It contains the corrected
 PostgreSQL worker gate, canonical two-process Redis/API HTTP gate, strict
 release artifact postconditions and manifest consistency checks, plus bounded
 same-run CI envelopes with redacted raw artifacts, exact workflow/run/ref/SHA
@@ -239,8 +240,12 @@ rows, plus bounded finite cleanup-lease marker JSON with fail-closed corrupt
 private-source cleanup. The final
 documentation/control-plane follow-up is bound to the resulting clean
 checkout, while live provider/runtime evidence remains external.
-The provider, Professor, job-journal, audit, knowledge, API and State-of-Art
-suites have 64, 36, 15, 10, 22, 444 and 295 passing tests respectively and the
+It also hardens the root preflight, derived review-control, quality-bar,
+backup/restore, release-manifest and vendored Gauntlet state/history readers
+with bounded strict JSON, including duplicate-key, non-finite and invalid
+UTF-8 rejection before control or recovery projection. The provider,
+Professor, job-journal, audit, knowledge, API and State-of-Art suites have 66,
+36, 16, 10, 23, 446 and 314 passing tests respectively and the
 relevant static checks pass;
 the full preserved `make test` remains incomplete
 because the CVG dataset and local Playwright browser are unavailable. The

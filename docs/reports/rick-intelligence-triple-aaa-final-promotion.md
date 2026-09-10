@@ -162,6 +162,15 @@ integrity or status projection. This is local release-boundary hardening only;
 Docker/services, provider/corpus authority, independent review, sealed packet
 and human Go/No-Go authority remain required.
 
+At source candidate `c179acc196ffa19ccdbae6a91ab5c05233af1314`, runtime
+preflight, review-control, quality-bar, backup/restore, release-manifest and
+vendored Gauntlet state/history readers also use bounded strict JSON. Duplicate
+keys, non-finite constants, invalid UTF-8 and oversized inputs fail closed
+before control, recovery or promotion projection. The focused boundary set
+passes 34 tests and the complete State-of-Art suite passes 314; the clean
+source packet remains `STATE_OF_ART_CANDIDATE` with 17 PASS, 24
+`BLOCKED_EXTERNAL`, exit 2 and no promotion claim.
+
 ## 7. CI and release lanes
 
 The canonical workflow names FAST, UNIT, CONTRACT, SECURITY, RAG_EVAL,

@@ -56,8 +56,8 @@ converted to PASS by the presence of host processes.
 ### Current clean revalidation — 2026-09-10
 
 The latest source implementation candidate is
-`5b3a652fbfae2aa4d9e839d1dfacb156dbd6dae9` with tree
-`37359cb1cec80c40776d0d40e92d1df71719b708`. The ignored integrated packet
+`c179acc196ffa19ccdbae6a91ab5c05233af1314` with tree
+`e02f74de83dd6d6f5bfff5d38a0e0e5831d386d6`. The ignored integrated packet
 `.runtime/phase-3/triple-aaa-verify.json` is the authority for the exact clean
 checkout, tree, artifact set, packet hash and current classification; the
 latest clean run reports `17` foundation PASS results and `24` mandatory
@@ -66,8 +66,8 @@ latest clean run reports `17` foundation PASS results and `24` mandatory
 commit, so this audit does not hard-code a future documentation commit or
 self-reference its own bytes.
 
-The current API matrix has **443 passed** tests and the State-of-Art suite has
-**295 passed** tests. `make validate`, `make compose-static`, `make ops-static`,
+The current API matrix has **446 passed** tests and the State-of-Art suite has
+**314 passed** tests. `make validate`, `make compose-static`, `make ops-static`,
 `make security-adversarial` and `make api-contract` pass. The canonical
 `make up` attempt failed closed before service startup because the required
 `RICK_WORKER_IMAGE` environment value is absent; Docker daemon access remains
@@ -1197,3 +1197,23 @@ fixture references an absent historical artifact and remains outside this
 lane's pass count. This is local evidence-boundary integrity only; it does not
 supply Docker/services, provider/corpus authority, independent review, sealed
 packet or human Go/No-Go authority; promotion remains disallowed.
+
+## 64. Control, recovery and release JSON boundary closure — 2026-09-10
+
+Source candidate `c179acc196ffa19ccdbae6a91ab5c05233af1314` (tree
+`e02f74de83dd6d6f5bfff5d38a0e0e5831d386d6`) extends the bounded strict JSON
+contract to the runtime preflight, derived review-control views, quality-bar
+validator, backup/restore manifests and release-manifest reader, plus the
+vendored Gauntlet state and JSONL history readers called by the control-plane
+check. Duplicate object keys, non-finite constants, invalid UTF-8 and
+oversized inputs fail closed before status, integrity, recovery or promotion
+fields are projected; JSONL records are streamed and bounded individually.
+
+The focused boundary set passes **34** tests and the complete State-of-Art
+suite passes **314**. `make validate`, `make ops-static`, `make compose-static`,
+compilation and `git diff --check` pass. The clean integrated packet for this
+source candidate reports **17 PASS**, **24 BLOCKED_EXTERNAL**,
+`STATE_OF_ART_CANDIDATE`, exit `2` and `promotion_allowed=false`. This is local
+control/recovery integrity evidence only; Docker/services, provider/corpus,
+independent review, sealed packet and human Go/No-Go authority remain
+unavailable, so promotion remains disallowed.
