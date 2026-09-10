@@ -61,3 +61,19 @@ def test_postgres_runtime_gate_uses_canonical_acknowledge_contract() -> None:
     assert "queue.ack(" not in source
     assert "queue_a.ack(" not in source
     assert source.count(".acknowledge(") == 3
+
+
+def test_postgres_runtime_gate_declares_all_required_query_plan_probes() -> None:
+    source = (Path(__file__).parents[2] / "phase11" / "postgres_runtime_gate.py").read_text(
+        encoding="utf-8"
+    )
+
+    for probe in (
+        "query-plan-skip-locked",
+        "query-plan-lease-lookup",
+        "query-plan-retry-queue",
+        "query-plan-dead-letter-listing",
+        "query-plan-tenant-scoped-job",
+        "query-plan-document-lookup",
+    ):
+        assert probe in source

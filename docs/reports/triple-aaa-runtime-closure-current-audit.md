@@ -394,3 +394,18 @@ Promotion packet validation also requires the signed body to carry the current
 `state-of-art-triple-aaa-verify.v2` payload schema. A valid seal over a packet
 with an omitted or foreign body schema is rejected before promotion; no external
 packet is available in this environment.
+
+## 80. PostgreSQL query-plan coverage — 2026-09-10
+
+The PostgreSQL runtime gate now declares six explicit `EXPLAIN (FORMAT JSON)`
+probes required by the prompt: job claim with `SKIP LOCKED`, lease lookup,
+retry queue, dead-letter listing, tenant-scoped job lookup and document lookup.
+Each probe is evaluated only inside the approved live DSN gate; the local
+contract test verifies that the complete set cannot regress to a single
+happy-path query. No plan result is claimed here because the disposable
+PostgreSQL authority remains unavailable.
+
+The provider boundary also enforces a finite tool-call budget before request
+I/O and on complete or streamed responses. The local provider suite covers
+pre-I/O rejection and oversized response rejection; live provider evidence
+remains unavailable and therefore non-promotable.

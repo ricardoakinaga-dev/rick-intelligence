@@ -69,6 +69,10 @@ The API image carries the ordered migration runner and Compose runs it as a
 one-shot dependency before API/Worker A/B. This closes the prior missing
 migration-runner seam in source configuration. Live migration, transaction,
 constraint, queue, DLQ, replay, backup and fencing evidence was not observed.
+The runtime gate declares six explicit `EXPLAIN (FORMAT JSON)` probes covering
+claim with `SKIP LOCKED`, lease lookup, retry queue, dead-letter listing,
+tenant-scoped job lookup and document lookup; they execute only when the
+approved disposable PostgreSQL DSN is available.
 
 ## 7. Worker Fencing
 
@@ -157,7 +161,11 @@ provider health, rate-limit, timeout, budget, cancellation and credential
 rotation evidence is not available. The release-evidence schema now makes the
 provider runtime envelope an explicit mandatory gate, so a manifest cannot be
 structurally complete while omitting provider evidence; this local control
-does not turn the unavailable provider authority into a PASS.
+does not turn the unavailable provider authority into a PASS. The resilience
+boundary also rejects tool definitions and complete or streamed tool-call
+responses above its finite budget before they can become unbounded provider
+work; this remains local contract evidence until a live provider run is
+approved.
 
 ## 16. Retrieval
 

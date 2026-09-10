@@ -36,6 +36,79 @@ EXPECTED_INDEXES = {
     "rick_ingestion_jobs_contract_dead_idx",
 }
 
+# These are EXPLAIN-only probes. They run inside the same real PostgreSQL
+# gate as migration/queue checks and never claim a runtime result when the
+# approved DSN is absent. Keeping the set explicit prevents one happy-path
+# claim plan from standing in for the prompt's query-plan review.
+QUERY_PLAN_CASES = (
+    (
+        "query-plan-skip-locked",
+        """
+        EXPLAIN (FORMAT JSON)
+        SELECT job_id
+        FROM rick_ingestion_jobs
+        WHERE tenant_id=%s AND workspace_id=%s AND collection_id=%s
+          AND contract_state='QUEUED' AND available_at <= clock_timestamp()
+        ORDER BY created_at, job_id
+        LIMIT 1 FOR UPDATE SKIP LOCKED
+        """,
+    ),
+    (
+        "query-plan-lease-lookup",
+        """
+        EXPLAIN (FORMAT JSON)
+        SELECT job_id, lease_worker_id, lease_until, version
+        FROM rick_ingestion_jobs
+        WHERE tenant_id=%s AND workspace_id=%s AND collection_id=%s AND job_id=%s
+        """,
+    ),
+    (
+        "query-plan-retry-queue",
+        """
+        EXPLAIN (FORMAT JSON)
+        SELECT job_id
+        FROM rick_ingestion_jobs
+        WHERE tenant_id=%s AND workspace_id=%s AND collection_id=%s
+          AND contract_state='RETRYING' AND available_at <= clock_timestamp()
+        ORDER BY available_at, created_at, job_id
+        LIMIT 100
+        """,
+    ),
+    (
+        "query-plan-dead-letter-listing",
+        """
+        EXPLAIN (FORMAT JSON)
+        SELECT job_id, updated_at, failure
+        FROM rick_ingestion_jobs
+        WHERE tenant_id=%s AND workspace_id=%s AND collection_id=%s
+          AND contract_state='DEAD_LETTER'
+        ORDER BY updated_at, job_id
+        LIMIT 100
+        """,
+    ),
+    (
+        "query-plan-tenant-scoped-job",
+        """
+        EXPLAIN (FORMAT JSON)
+        SELECT job_id, contract_state, version
+        FROM rick_ingestion_jobs
+        WHERE tenant_id=%s AND workspace_id=%s AND collection_id=%s
+        ORDER BY created_at, job_id
+        LIMIT 100
+        """,
+    ),
+    (
+        "query-plan-document-lookup",
+        """
+        EXPLAIN (FORMAT JSON)
+        SELECT document_id, document_version, status, content_checksum
+        FROM rick_documents
+        WHERE tenant_id=%s AND workspace_id=%s AND collection_id=%s
+          AND document_id=%s
+        """,
+    ),
+)
+
 
 @dataclass(frozen=True)
 class GateResult:
@@ -140,26 +213,22 @@ def _schema_checks(connection: object) -> list[GateResult]:
                 "claim/idempotency/dead-letter indexes present" if not missing_indexes else f"missing indexes: {sorted(missing_indexes)}",
             )
         )
-        try:
-            _query(
-                cur,
-                """
-                EXPLAIN (FORMAT JSON)
-                SELECT job_id
-                FROM rick_ingestion_jobs
-                WHERE tenant_id=%s AND workspace_id=%s AND collection_id=%s
-                  AND contract_state='QUEUED' AND available_at <= clock_timestamp()
-                ORDER BY created_at, job_id
-                LIMIT 1 FOR UPDATE SKIP LOCKED
-                """,
-                ("runtime-gate", "runtime-gate", "runtime-gate"),
-            )
-            plan_result = "PASS"
-            plan_detail = "FOR UPDATE SKIP LOCKED query parsed and planned"
-        except Exception:
-            plan_result = "FAIL"
-            plan_detail = "query plan for FOR UPDATE SKIP LOCKED failed"
-        results.append(GateResult("query-plan-skip-locked", plan_result, plan_detail))
+        for plan_name, query in QUERY_PLAN_CASES:
+            params = ("runtime-gate", "runtime-gate", "runtime-gate", "runtime-document")
+            # Lease and document probes identify one row; the remaining
+            # scope probes intentionally use only the three scope values.
+            bound_params = params if plan_name in {
+                "query-plan-lease-lookup",
+                "query-plan-document-lookup",
+            } else params[:3]
+            try:
+                _query(cur, query, bound_params)
+                plan_result = "PASS"
+                plan_detail = "EXPLAIN query parsed and planned"
+            except Exception:
+                plan_result = "FAIL"
+                plan_detail = "EXPLAIN query plan failed"
+            results.append(GateResult(plan_name, plan_result, plan_detail))
     return results
 
 
