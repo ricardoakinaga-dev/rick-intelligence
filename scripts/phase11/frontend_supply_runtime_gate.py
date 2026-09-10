@@ -36,6 +36,13 @@ from urllib.request import Request, urlopen
 
 
 ROOT = Path(__file__).resolve().parents[2]
+
+try:
+    from scripts.state_of_art.json_boundary import load_json, loads_json
+except ModuleNotFoundError:  # Direct execution from the scripts/phase11 directory.
+    sys.path.insert(0, str(ROOT))
+    from scripts.state_of_art.json_boundary import load_json, loads_json
+
 VIEWPORTS: tuple[dict[str, int], ...] = (
     {"name": "mobile", "width": 375, "height": 812},
     {"name": "tablet", "width": 768, "height": 1024},
@@ -956,7 +963,7 @@ def _run_browser_probe(
                 status = "BLOCKED_EXTERNAL" if process.returncode == EXIT_BLOCKED else "FAIL"
                 return _blocked_browser_checks(detail), False, {"status": status, "runtime_claim": False}
             try:
-                report = json.loads(report_path.read_text(encoding="utf-8"))
+                report = load_json(report_path)
             except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
                 return _blocked_browser_checks(f"browser evidence artifact is malformed ({type(exc).__name__})", evidence=[_relative(root, report_path)]), False, {"status": "FAIL", "runtime_claim": False}
             if not isinstance(report, dict):
@@ -986,7 +993,7 @@ def audit_frontend_sources(root: Path) -> dict[str, Any]:
     if missing:
         return _check("frontend-source-audit", "FAIL", "canonical web package/config/workflow files are missing", evidence=[], observations=values)
     try:
-        package = json.loads(package_path.read_text(encoding="utf-8"))
+        package = load_json(package_path)
         scripts = package.get("scripts", {}) if isinstance(package, dict) else {}
         config = config_path.read_text(encoding="utf-8")
         workflow = workflow_path.read_text(encoding="utf-8")
@@ -1029,7 +1036,7 @@ def _node_components(root: Path) -> list[tuple[str, Path, Path, dict[str, Any]]]
         if not package_path.is_file():
             continue
         try:
-            package = json.loads(package_path.read_text(encoding="utf-8"))
+            package = load_json(package_path)
         except (OSError, UnicodeDecodeError, json.JSONDecodeError):
             package = {}
         components.append((relative, package_path, lock_path, package if isinstance(package, dict) else {}))
@@ -1058,7 +1065,7 @@ def check_lockfiles(root: Path, *, npm: str | None = None, timeout: float = 90.0
             missing.append(relative)
             continue
         try:
-            lock = json.loads(lock_path.read_text(encoding="utf-8"))
+            lock = load_json(lock_path)
         except (OSError, UnicodeDecodeError, json.JSONDecodeError):
             malformed.append(relative)
             continue
@@ -1096,7 +1103,7 @@ def check_lockfiles(root: Path, *, npm: str | None = None, timeout: float = 90.0
 
 def _parse_sbom(value: str) -> tuple[bool, int, str]:
     try:
-        payload = json.loads(value)
+        payload = loads_json(value)
     except (TypeError, ValueError, json.JSONDecodeError):
         return False, 0, "SBOM output was not valid JSON"
     if not isinstance(payload, dict):
@@ -1128,7 +1135,7 @@ def check_sbom(root: Path, evidence_dir: Path, *, npm: str | None = None, syft: 
             ok, count, detail = _parse_sbom(result.stdout)
             report_path = evidence_dir / f"sbom-{relative.replace('/', '-')}.json"
             if result.returncode == 0 and ok:
-                _write_json(report_path, json.loads(result.stdout))
+                _write_json(report_path, loads_json(result.stdout))
                 reports.append(_relative(root, report_path))
                 counts[relative] = count
             elif result.returncode != 0 and _NETWORK_FAILURE.search(_command_tail(result)):
@@ -1140,7 +1147,7 @@ def check_sbom(root: Path, evidence_dir: Path, *, npm: str | None = None, syft: 
         ok, count, _detail = _parse_sbom(result.stdout)
         report_path = evidence_dir / "sbom-repository.json"
         if result.returncode == 0 and ok:
-            _write_json(report_path, json.loads(result.stdout))
+            _write_json(report_path, loads_json(result.stdout))
             reports.append(_relative(root, report_path))
             counts["repository"] = count
         elif result.returncode != 0 and _NETWORK_FAILURE.search(_command_tail(result)):
@@ -1221,7 +1228,7 @@ def check_licenses(root: Path) -> dict[str, Any]:
             missing.append(relative)
             continue
         try:
-            lock = json.loads(lock_path.read_text(encoding="utf-8"))
+            lock = load_json(lock_path)
         except (OSError, UnicodeDecodeError, json.JSONDecodeError):
             unknown.append(f"{relative}:malformed")
             continue
@@ -1254,7 +1261,7 @@ def _manifest_digest_state(root: Path) -> tuple[str, dict[str, Any]]:
     if not path.is_file():
         return "FAIL", {"detail": "release manifest is missing"}
     try:
-        manifest = json.loads(path.read_text(encoding="utf-8"))
+        manifest = load_json(path)
     except (OSError, UnicodeDecodeError, json.JSONDecodeError):
         return "FAIL", {"detail": "release manifest is malformed"}
     if not isinstance(manifest, dict):
@@ -1361,7 +1368,7 @@ def check_container_sbom(root: Path, evidence_dir: Path, *, trivy: str | None = 
                 failures.append(name)
             continue
         path = evidence_dir / f"container-sbom-{name.removeprefix('RICK_').removesuffix('_IMAGE').lower()}.json"
-        _write_json(path, json.loads(result.stdout))
+        _write_json(path, loads_json(result.stdout))
         reports.append(_relative(root, path))
     if failures:
         return _check("container-sbom", "FAIL", "container SBOM tool failed or emitted an invalid inventory", evidence=reports, tool="trivy" if trivy else "syft", observations={"failed_services": failures, "reports": reports})

@@ -166,6 +166,10 @@ def test_sbom_parser_requires_non_empty_cyclonedx_components() -> None:
     assert gate._parse_sbom("not-json")[0] is False  # noqa: SLF001
 
 
+def test_frontend_supply_json_boundary_rejects_duplicate_fields() -> None:
+    assert gate._parse_sbom('{"bomFormat":"CycloneDX","bomFormat":"forged","components":[{}]}')[0] is False  # noqa: SLF001
+
+
 def test_secret_scan_finds_high_signal_candidate_without_echoing_value(tmp_path: Path) -> None:
     value = "sk-" + "A" * 40
     path = tmp_path / "source.txt"
