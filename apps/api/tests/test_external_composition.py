@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 import sys
 from types import ModuleType, SimpleNamespace
@@ -112,7 +113,13 @@ def settings():
 
 def test_external_composition_builds_the_complete_graph_without_network_io(tmp_path):
     calls = []
-    client = httpx.AsyncClient(transport=httpx.MockTransport(lambda request: httpx.Response(500)))
+    provider_requests = []
+
+    def provider_handler(request):
+        provider_requests.append(request)
+        return httpx.Response(500, request=request)
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(provider_handler))
     redis_client = Redis()
     namespace, rate_limiter, lease = canonical_redis_capabilities(redis_client)
     identity = SimpleNamespace(
@@ -146,10 +153,11 @@ def test_external_composition_builds_the_complete_graph_without_network_io(tmp_p
         assert getattr(providers, name) is not None
     assert set(providers.health_checks) >= {
         "postgres", "qdrant", "queue", "identity", "chat_backend",
-        "audit_sink", "chat_history", "object_store", "retrieval", "worker",
+        "audit_sink", "chat_history", "object_store", "retrieval", "worker", "provider",
     }
-
-    import asyncio
+    assert asyncio.run(providers.health_checks["provider"]()) is False
+    assert provider_requests[-1].method == "GET"
+    assert provider_requests[-1].url.path.endswith("/models")
 
     asyncio.run(client.aclose())
     providers.object_store.close()

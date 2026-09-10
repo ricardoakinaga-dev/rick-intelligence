@@ -169,9 +169,24 @@ async def _run_checks(
 
     client = OpenAICompatibleClient(config)
     assertions: list[_Assertion] = []
+    provider_health_ok = False
     chat_ok = False
     embedding_ok = False
     try:
+        try:
+            provider_health_ok = await client.health_check()
+            assertions.append(
+                _Assertion(
+                    "provider-health-probe",
+                    PASS if provider_health_ok else FAIL,
+                    "authenticated models probe returned a valid response"
+                    if provider_health_ok
+                    else "provider health probe did not satisfy the contract",
+                )
+            )
+        except Exception:
+            assertions.append(_Assertion("provider-health-probe", FAIL, "live provider health probe failed"))
+
         try:
             chat = await client.chat_completion(
                 messages=[
@@ -225,7 +240,7 @@ async def _run_checks(
                 "canonical OpenAI-compatible client is configured",
             )
         )
-        status = PASS if chat_ok and embedding_ok else FAIL
+        status = PASS if provider_health_ok and chat_ok and embedding_ok else FAIL
         production_safe = bool(
             status == PASS
             and config.is_production

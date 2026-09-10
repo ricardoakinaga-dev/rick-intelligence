@@ -22,6 +22,15 @@ class FakeProvider:
         return EmbeddingResult(model="test", dimensions=1, vector=[1.0], correlation_id=correlation_id or "corr")
 
 
+class HealthAwareProvider(FakeProvider):
+    def __init__(self, available: bool = True):
+        super().__init__()
+        self.available = available
+
+    async def health_check(self):
+        return self.available
+
+
 @pytest.mark.asyncio
 async def test_resilient_provider_opens_after_finite_transient_failures_and_recovers():
     now = [10.0]
@@ -33,6 +42,7 @@ async def test_resilient_provider_opens_after_finite_transient_failures_and_reco
             await provider.chat_completion(messages=[{"role": "user", "content": "hello"}])
         assert caught.value.code == "server_error"
     assert provider.is_open is True
+    assert await provider.health_check() is False
     with pytest.raises(ProviderError) as opened:
         await provider.chat_completion(messages=[{"role": "user", "content": "hello"}])
     assert opened.value.code == "unavailable"
@@ -62,3 +72,20 @@ async def test_resilient_provider_preserves_correlation_and_embedding_contract()
     provider = ResilientProvider(fake)
     result = await provider.get_embedding("ok", correlation_id="corr-fixed")
     assert result.correlation_id == "corr-fixed"
+
+
+@pytest.mark.asyncio
+async def test_resilient_provider_delegates_live_health_and_fails_closed() -> None:
+    fake = HealthAwareProvider()
+    provider = ResilientProvider(fake)
+
+    assert await provider.health_check() is True
+    fake.available = False
+    assert await provider.health_check() is False
+
+
+@pytest.mark.asyncio
+async def test_resilient_provider_falls_back_to_local_readiness_without_live_hook() -> None:
+    provider = ResilientProvider(FakeProvider())
+
+    assert await provider.health_check() is True

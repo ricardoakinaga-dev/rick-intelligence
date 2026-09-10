@@ -1,9 +1,9 @@
 """Async OpenAI-compatible provider boundary.
 
-Only this module knows about HTTP.  Chat and embedding calls share the same
-request, classification, retry, timeout, and correlation path so a caller
-cannot accidentally get different reliability or redaction behavior between
-the two operations.
+Only this module knows about HTTP. Chat and embedding calls share the same
+request, classification, retry, timeout, and correlation path, while the
+health probe uses the same bounded client and redaction boundary so readiness
+cannot be inferred from object construction.
 """
 
 from __future__ import annotations
@@ -52,7 +52,7 @@ MessageInput = ProviderMessage | Mapping[str, object]
 
 
 class OpenAICompatibleClient:
-    """Typed async client for ``/chat/completions`` and ``/embeddings``.
+    """Typed async client for chat, embedding, and provider health requests.
 
     The client is lazy: constructing it does not perform I/O.  ``transport``
     can be an ``httpx.AsyncBaseTransport`` (for example ``MockTransport``) and
@@ -165,6 +165,31 @@ class OpenAICompatibleClient:
         if self._client is not None and self._owns_client:
             await self._client.aclose()
             self._client = None
+
+    async def health_check(self) -> bool:
+        """Perform one bounded, authenticated provider reachability probe.
+
+        Readiness must not be inferred from construction or from a local
+        circuit state.  The models endpoint is part of the OpenAI-compatible
+        surface and verifies that the configured endpoint and credential can
+        answer without sending a paid chat or embedding request.
+        """
+
+        operation: ProviderOperation = "chat_completion"
+        try:
+            correlation = self._prepare_operation(operation, None)
+            model = _validate_model(self.config.chat_model, operation, correlation)
+            return await asyncio.wait_for(
+                self._health_request(correlation, model),
+                timeout=_request_timeout_seconds(self.config.timeout),
+            )
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            # A readiness probe is a boolean port.  The public health route
+            # must not expose provider URLs, response bodies, or exception
+            # details when the probe fails.
+            return False
 
     async def chat_completion(
         self,
@@ -497,6 +522,31 @@ class OpenAICompatibleClient:
             return json.loads(text, parse_constant=_reject_json_constant)
         except (TypeError, ValueError, RecursionError):
             raise provider_error("invalid_json", operation, correlation_id, attempt, status=status) from None
+
+    async def _health_request(self, correlation_id: str, model: str) -> bool:
+        url = f"{self.config.base_url.rstrip('/')}/models"
+        headers = {
+            "Accept": "application/json",
+            "X-Correlation-ID": correlation_id,
+        }
+        if self.config.api_key:
+            headers["Authorization"] = f"Bearer {self.config.api_key}"
+
+        async with self._ensure_client().stream(
+            "GET",
+            url,
+            headers=headers,
+        ) as response:
+            status = response.status_code
+            raw = await _read_bounded_response(response)
+        if not 200 <= status <= 299 or raw is None:
+            return False
+        try:
+            body = json.loads(raw.decode("utf-8"), parse_constant=_reject_json_constant)
+        except (UnicodeDecodeError, TypeError, ValueError, RecursionError):
+            return False
+        return _health_payload_is_valid(body, model)
+
     def _ensure_client(self) -> httpx.AsyncClient:
         if self._client is None:
             self._client = httpx.AsyncClient(
@@ -588,6 +638,37 @@ async def _read_bounded_response(response: httpx.Response) -> bytes | None:
         chunks.append(chunk)
         size += len(chunk)
     return b"".join(chunks)
+
+
+def _request_timeout_seconds(timeout: float | httpx.Timeout) -> float:
+    if isinstance(timeout, httpx.Timeout):
+        values = [
+            value
+            for value in (timeout.connect, timeout.read, timeout.write, timeout.pool)
+            if value is not None
+        ]
+        return max(float(value) for value in values)
+    return float(timeout)
+
+
+def _health_payload_is_valid(body: object, expected_model: str) -> bool:
+    """Validate only the bounded shape needed for a truthful health result."""
+
+    if not isinstance(body, Mapping):
+        return False
+    models = body.get("data")
+    if models is None:
+        # Some compatible gateways return a small health object rather than a
+        # model list.  A successful JSON object still proves endpoint/auth
+        # reachability; model advertisement is checked when supplied.
+        return True
+    if not isinstance(models, list):
+        return False
+    return any(
+        isinstance(item, Mapping)
+        and (item.get("id") == expected_model or item.get("model") == expected_model)
+        for item in models
+    )
 
 
 # Explicit class aliases preserve discoverability for callers that use the

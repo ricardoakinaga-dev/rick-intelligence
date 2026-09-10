@@ -77,6 +77,30 @@ class ResilientProvider:
 
         return not self.is_open
 
+    async def health_check(self) -> bool:
+        """Run the underlying provider's live probe, failing closed.
+
+        ``readiness_check`` remains a cheap local signal for callers that need
+        to avoid I/O.  The canonical API readiness composition registers this
+        method explicitly so an open network path cannot be reported healthy
+        merely because the circuit is closed.
+        """
+
+        if self.is_open:
+            return False
+        target = getattr(self.provider, "health_check", None)
+        if not callable(target):
+            return self.readiness_check()
+        try:
+            result = target()
+            if inspect.isawaitable(result):
+                result = await result
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            return False
+        return result is True
+
     def _is_open_locked(self) -> bool:
         if self._open_until <= 0:
             return False

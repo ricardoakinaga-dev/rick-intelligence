@@ -498,7 +498,12 @@ def build_external_providers(
         ("provider", provider),
         ("lease", lease),
     ):
-        for method_name in ("readiness_check", "health_check", "check_readiness", "check_health"):
+        method_names = (
+            ("health_check", "readiness_check", "check_readiness", "check_health")
+            if name == "provider"
+            else ("readiness_check", "health_check", "check_readiness", "check_health")
+        )
+        for method_name in method_names:
             method = getattr(component, method_name, None)
             if callable(method):
                 health_checks[name] = probe(method)

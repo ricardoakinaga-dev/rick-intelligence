@@ -108,6 +108,75 @@ async def test_chat_and_embedding_use_one_typed_http_boundary_and_propagate_corr
 
 
 @pytest.mark.asyncio
+async def test_health_check_probes_models_with_auth_and_validates_configured_model() -> None:
+    requests: list[httpx.Request] = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        assert request.method == "GET"
+        assert request.url.path == "/v1/models"
+        return _response(
+            request,
+            200,
+            {"object": "list", "data": [{"id": "chat-test-model"}]},
+        )
+
+    provider = OpenAICompatibleClient(_config(), transport=httpx.MockTransport(handler))
+    try:
+        assert await provider.health_check() is True
+    finally:
+        await _close(provider)
+
+    assert len(requests) == 1
+    assert requests[0].headers["x-correlation-id"]
+    assert requests[0].headers["authorization"] == "Bearer test-only-key"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("status", "body"),
+    [
+        (401, {"error": {"code": "unauthorized"}}),
+        (200, {"object": "list", "data": [{"id": "other-model"}]}),
+        (200, []),
+    ],
+)
+async def test_health_check_fails_closed_for_unhealthy_or_wrong_model_responses(
+    status: int,
+    body: object,
+) -> None:
+    requests: list[httpx.Request] = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return _response(request, status, body)
+
+    provider = OpenAICompatibleClient(_config(), transport=httpx.MockTransport(handler))
+    try:
+        assert await provider.health_check() is False
+    finally:
+        await _close(provider)
+
+    assert len(requests) == 1
+
+
+@pytest.mark.asyncio
+async def test_health_check_has_an_explicit_timeout_for_an_unresponsive_transport() -> None:
+    async def handler(request: httpx.Request) -> httpx.Response:
+        await asyncio.sleep(10)
+        return _response(request, 200, {"data": [{"id": "chat-test-model"}]})
+
+    provider = OpenAICompatibleClient(
+        _config(timeout=0.01),
+        transport=httpx.MockTransport(handler),
+    )
+    try:
+        assert await asyncio.wait_for(provider.health_check(), timeout=0.2) is False
+    finally:
+        await _close(provider)
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("exception", "expected_code"),
     [
