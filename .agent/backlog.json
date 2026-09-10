@@ -857,7 +857,8 @@
     ".agent/verification.jsonl#VER-PH3-2-PROVIDER-CONTEXT-BUDGET-20260910",
     ".agent/verification.jsonl#VER-PH3-2-PROVIDER-JSON-RESPONSE-20260910",
     ".agent/verification.jsonl#VER-PH3-2-PROVIDER-STREAMING-JSON-20260910",
-    ".agent/verification.jsonl#VER-PH3-2-PROFESSOR-TOOL-BUDGET-20260910"
+    ".agent/verification.jsonl#VER-PH3-2-PROFESSOR-TOOL-BUDGET-20260910",
+    ".agent/verification.jsonl#VER-PH3-2-PROFESSOR-STREAM-BUDGET-20260910"
       ],
       "next_action": {
         "id": "PH3-2-LAB-READINESS:WAIT_RUNTIME",

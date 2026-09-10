@@ -648,3 +648,20 @@ suite **295**. This is local orchestration evidence only: the approved
 provider/corpus, distributed runtime, adversarial RAG, independent review,
 sealed packet and human Go/No-Go remain unavailable. No promotion claim is
 made.
+
+## 30. Professor streaming budget closure — 2026-09-10
+
+Source implementation candidate `a480e6cc67ada68fc91e0c7034a37f53f23051b3`
+(tree `3e470607d31cc0ff45d2d2648f35ae9eaa647c14`) tightens the Professor
+streaming path: a newly observed tool-call index is charged immediately to
+`max_tool_calls`, and an over-budget index returns
+`tool_calls_budget_exceeded` before the chunk's content delta is published.
+The focused negative uses non-empty partial content and asserts that no delta
+event is emitted. The normal, fallback and streaming paths therefore share a
+fail-closed tool-call budget boundary.
+
+The Professor suite passes **29**, the API matrix **437**, and the State-of-Art
+suite **295**. This remains local orchestration evidence only; the approved
+provider/corpus, distributed runtime, adversarial RAG, independent review,
+sealed packet and human Go-No-Go remain unavailable. No promotion claim is
+made.

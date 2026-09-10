@@ -453,3 +453,14 @@ budget returns `tool_calls_budget_exceeded` without executing or accepting a
 tool result. The Professor suite passes **29**, while the API and State-of-Art
 suites pass **437** and **295**. This closes a local control boundary only and
 does not replace the approved provider/corpus/runtime or promotion evidence.
+
+## 29. Professor streaming budget closure — 2026-09-10
+
+Source candidate `a480e6cc67ada68fc91e0c7034a37f53f23051b3` (tree
+`3e470607d31cc0ff45d2d2648f35ae9eaa647c14`) now rejects a newly observed
+streaming tool-call index as soon as it exceeds `max_tool_calls`, before the
+chunk's content delta is published. The focused negative covers a non-empty
+partial response and proves that no delta event escapes the fail-closed path.
+The Professor, API and State-of-Art suites pass **29**, **437** and **295**;
+this remains local orchestration evidence and does not replace external
+runtime, provider, corpus or promotion evidence.
