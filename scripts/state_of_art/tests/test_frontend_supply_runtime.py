@@ -131,6 +131,18 @@ def test_axe_incomplete_results_are_not_promoted() -> None:
     assert "item.incomplete && item.incomplete.length === 0" in gate._BROWSER_PROBE  # noqa: SLF001
 
 
+def test_browser_screenshots_do_not_mutate_hydrated_inputs() -> None:
+    assert gate._BROWSER_PROBE.count('caret: "initial"') == 3  # noqa: SLF001
+
+
+def test_browser_probe_waits_for_client_hydration_before_interaction() -> None:
+    assert 'document.documentElement.dataset.rickHydrated === "true"' in gate._BROWSER_PROBE  # noqa: SLF001
+
+
+def test_browser_probe_targets_login_error_instead_of_next_route_announcer() -> None:
+    assert '.login-form [role="alert"]' in gate._BROWSER_PROBE  # noqa: SLF001
+
+
 def test_lockfile_structural_mismatch_fails_closed(tmp_path: Path) -> None:
     _write_node_component(tmp_path)
     package = json.loads((tmp_path / "apps/web/package.json").read_text(encoding="utf-8"))

@@ -7,6 +7,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "RICK Intelligence",
   description: "Plataforma veterinária de conhecimento com evidências rastreáveis.",
+  icons: { icon: "/icon.svg" },
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

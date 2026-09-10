@@ -676,12 +676,13 @@ async function runViewport(browser, viewport, index) {
   const result = { name: viewport.name, viewport, states: {}, checks: {}, screenshots: [], api_responses: [], console_errors: [], request_failures: [] };
   try {
     await page.goto(`${webBase}/login?next=%2Fapp`, { waitUntil: "domcontentloaded" });
+    await page.waitForFunction(() => document.documentElement.dataset.rickHydrated === "true", null, { timeout: 15000 });
     await waitVisible(page.getByRole("heading", { name: "Entre para continuar." }));
     result.states.login = { observed: true, url: new URL(page.url()).pathname };
     const loginAxe = await axeAudit(page);
     const loginContrast = await contrastAudit(page);
     const loginScreenshot = path.join(screenshotDir, `login-${viewport.name}.png`);
-    await page.screenshot({ path: loginScreenshot, fullPage: true });
+    await page.screenshot({ path: loginScreenshot, fullPage: true, caret: "initial" });
     result.screenshots.push({ state: "login", path: loginScreenshot, sha256: await sha256(loginScreenshot) });
     result.checks.axe_login = loginAxe;
     result.checks.contrast_login = loginContrast;
@@ -691,7 +692,7 @@ async function runViewport(browser, viewport, index) {
       await page.getByLabel("E-mail").fill(email);
       await page.getByLabel("Senha").fill(failedPassword);
       await page.getByRole("button", { name: "Entrar", exact: true }).click();
-      await waitVisible(page.getByRole("alert"));
+      await waitVisible(page.locator('.login-form [role="alert"]'));
       result.states.login_error = { observed: true, stayed_on_login: new URL(page.url()).pathname === "/login" };
     }
 
@@ -709,7 +710,7 @@ async function runViewport(browser, viewport, index) {
     const focus = await focusAudit(page);
     const reduced = await page.evaluate(() => ({ preference: window.matchMedia("(prefers-reduced-motion: reduce)").matches, animations: document.getAnimations().map((animation) => ({ playState: animation.playState, duration: animation.effect && animation.effect.getComputedTiming().duration })).filter((item) => item.playState === "running") }));
     const appScreenshot = path.join(screenshotDir, `workbench-${viewport.name}.png`);
-    await page.screenshot({ path: appScreenshot, fullPage: true });
+    await page.screenshot({ path: appScreenshot, fullPage: true, caret: "initial" });
     result.screenshots.push({ state: "authenticated", path: appScreenshot, sha256: await sha256(appScreenshot) });
     result.checks.axe_authenticated = appAxe;
     result.checks.contrast_authenticated = appContrast;
@@ -730,7 +731,7 @@ async function runViewport(browser, viewport, index) {
     result.checks.touch = await touchAudit(page);
     result.checks.viewport = await page.evaluate((expected) => ({ inner_width: window.innerWidth, inner_height: window.innerHeight, expected_width: expected.width, expected_height: expected.height, matches: window.innerWidth === expected.width && window.innerHeight === expected.height, touch_points: navigator.maxTouchPoints }), viewport);
     const chatScreenshot = path.join(screenshotDir, `chat-${viewport.name}.png`);
-    await page.screenshot({ path: chatScreenshot, fullPage: true });
+    await page.screenshot({ path: chatScreenshot, fullPage: true, caret: "initial" });
     result.screenshots.push({ state: "chat", path: chatScreenshot, sha256: await sha256(chatScreenshot) });
     result.api_responses = apiResponses;
     result.console_errors = consoleErrors;

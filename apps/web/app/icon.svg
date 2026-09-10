@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title id="title">RICK Intelligence</title>
+  <rect width="64" height="64" rx="16" fill="#0f6c61"/>
+  <path d="M19 16h14.2c8.1 0 13.3 4.1 13.3 10.7 0 4.5-2.4 7.9-6.7 9.5L47.8 48H37.7l-6.4-10.1H28V48h-9V16Zm9 7.5v7h4.7c2.9 0 4.8-1.2 4.8-3.5s-1.9-3.5-4.8-3.5H28Z" fill="#fff"/>
+  <path d="M19 51h26" stroke="#9fe0d2" stroke-width="3" stroke-linecap="round"/>
+</svg>

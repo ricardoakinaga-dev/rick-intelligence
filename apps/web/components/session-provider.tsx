@@ -50,9 +50,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     mounted.current = true;
+    document.documentElement.dataset.rickHydrated = "true";
     void refresh();
     return () => {
       mounted.current = false;
+      delete document.documentElement.dataset.rickHydrated;
       nextGeneration();
     };
   }, [nextGeneration, refresh]);
