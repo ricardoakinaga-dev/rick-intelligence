@@ -151,6 +151,13 @@ def test_redaction_removes_credentials_and_queries_from_non_http_urls() -> None:
     assert "password" not in repr(embedded)
     assert "secret" not in repr(embedded)
 
+    escaped = safe_event({
+        "message": r"prefix https:\/\/user:password@vector.example\/path?token=secret suffix",
+    })
+    assert escaped["fields"]["message"] == "prefix https://vector.example/path suffix"
+    assert "password" not in repr(escaped)
+    assert "secret" not in repr(escaped)
+
 
 def test_metrics_are_bounded_and_deterministic() -> None:
     histogram = Histogram("api.latency", max_samples=2)

@@ -62,6 +62,12 @@ def _safe_url(value: str) -> str:
 def _redact_embedded_urls(value: str) -> str:
     """Redact credentials and query material even inside free-form text."""
 
+    # Diagnostics can contain a JSON-escaped URL copied from a nested payload.
+    # Normalize only escaped slashes before parsing; the output is still passed
+    # through the same authority/query-stripping path and never returns the
+    # original credential-bearing spelling.
+    value = value.replace(r"\/", "/")
+
     def replace(match: re.Match[str]) -> str:
         candidate = match.group(0)
         trailing = ""
@@ -187,7 +193,12 @@ def redact(
         cleaned = safe_text(value)
         if cleaned is None:
             return None
-        if "://" in cleaned or cleaned.startswith("//"):
+        if (
+            "://" in cleaned
+            or cleaned.startswith("//")
+            or r":\/" in cleaned
+            or cleaned.startswith(r"\/\/")
+        ):
             cleaned = _redact_embedded_urls(cleaned)
         return budget.text(cleaned)
     return budget.marker()
