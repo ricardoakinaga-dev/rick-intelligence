@@ -260,3 +260,18 @@ exit `1` and Make exit `2`. Runtime, release-integrity, provider/corpus,
 image, restore, chaos, soak, independent-review, sealing and human Go/No-Go
 evidence remain required. The source-of-truth correction is therefore
 published without promoting the candidate.
+
+## 17. Current-HEAD integrated verification — 2026-09-10
+
+The exact clean candidate `0ac7df070690fe0ba0b4d0ce14a94683a262b3b7` (tree
+`7ec0f386198e21c05a4327f90d2c535e47eac37b`, checkout fingerprint
+`e4a06df1d6bd4cc35b0a16d92236534eb74d039ab86f71f7199487cb99746bbe`) bound a
+fresh `make triple-aaa-verify` packet with artifact set
+`c8874a3834245d451f9e92f9965cb66e07c524f3e6f22e2b256f44849e2a46c0`.
+Fifteen foundation lanes passed; the verifier classified the candidate as
+`STATE_OF_ART_CANDIDATE` with JSON exit `1`, while GNU Make returned `2`.
+Release evidence is externally blocked, and release-integrity plus the
+Phase 3 evidence verifier reject non-promotable current evidence. Runtime,
+provider/corpus, image, recovery, independent-review, sealing and human
+promotion lanes remain required. The packet is current diagnostic evidence
+only and cannot authorize promotion.

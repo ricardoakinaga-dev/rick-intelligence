@@ -388,3 +388,25 @@ non-promotable evidence, and all live service, provider/corpus, image-proof,
 restore, chaos, soak, independent-review, sealed-packet and final Go/No-Go
 lanes remain blocked or non-promotable. The packet is diagnostic evidence only;
 no `STATE_OF_ART`, `AAA` or `TRIPLE_AAA` claim is made.
+
+## 19. Current-HEAD integrated verification — 2026-09-10
+
+The exact clean candidate `0ac7df070690fe0ba0b4d0ce14a94683a262b3b7`
+(tree `7ec0f386198e21c05a4327f90d2c535e47eac37b`, checkout fingerprint
+`e4a06df1d6bd4cc35b0a16d92236534eb74d039ab86f71f7199487cb99746bbe`) was
+verified with `make triple-aaa-verify`. The packet
+(`.runtime/phase-3/triple-aaa-verify.json`, SHA-256
+`be8e0353b7e0f79de50eac2891a6b8f0c4ec2f0009cfde064e47e4bf00f57926`)
+bound artifact set
+`c8874a3834245d451f9e92f9965cb66e07c524f3e6f22e2b256f44849e2a46c0` and
+quality-bar hash `7acea6e5c28a3127bbd002d44950183f916418ed8301026e94e38b20a006fd03`.
+
+Fifteen foundation lanes passed. The derived classification remains
+`STATE_OF_ART_CANDIDATE` with verifier JSON exit `1` and GNU Make exit `2`.
+Release-evidence generation is `BLOCKED_EXTERNAL`; `release-integrity` and
+`phase3-evidence-verify` reject the current non-promotable evidence, while
+the live service, provider/corpus, frontend authority, image/provenance,
+restore, performance, chaos, soak, independent-review, sealed-packet and
+human Go/No-Go lanes remain blocked. This refresh binds the diagnostic
+packet to the current clean checkout; it does not promote the candidate and
+does not claim State of Art, AAA or Triple AAA.
