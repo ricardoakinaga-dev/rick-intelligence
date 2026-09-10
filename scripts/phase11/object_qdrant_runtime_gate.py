@@ -29,6 +29,13 @@ import uuid
 
 
 ROOT = Path(__file__).resolve().parents[2]
+
+try:
+    from scripts.state_of_art.json_boundary import loads_json
+except ModuleNotFoundError:  # Direct execution from the scripts/phase11 directory.
+    sys.path.insert(0, str(ROOT))
+    from scripts.state_of_art.json_boundary import loads_json
+
 DEFAULT_OUTPUT = ".runtime/phase-2/object-qdrant-runtime-gate.json"
 DEFAULT_TIMEOUT_SECONDS = 5.0
 FAULT_TIMEOUT_SECONDS = 0.25
@@ -264,7 +271,7 @@ class _QdrantTransport:
 
     def _observe_filter(self, body: bytes) -> None:
         try:
-            parsed = json.loads(body.decode("utf-8"))
+            parsed = loads_json(body)
         except (UnicodeDecodeError, json.JSONDecodeError):
             return
         if not isinstance(parsed, Mapping) or not isinstance(parsed.get("filter"), Mapping):
@@ -881,7 +888,7 @@ def _qdrant_json_body(response: _QdrantResponse) -> object:
     if not response.content:
         raise RuntimeError("Qdrant response body was empty")
     try:
-        return json.loads(response.content.decode("utf-8"))
+        return loads_json(response.content)
     except (UnicodeDecodeError, json.JSONDecodeError) as error:
         raise RuntimeError("Qdrant response body was malformed") from error
 

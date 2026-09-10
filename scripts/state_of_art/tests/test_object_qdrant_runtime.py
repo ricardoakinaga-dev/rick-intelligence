@@ -110,6 +110,22 @@ def test_response_body_bound_rejects_a_reader_that_exceeds_the_limit(gate: Modul
         gate._read_bounded(Reader(b"abcd"), 3)
 
 
+def test_qdrant_json_boundaries_reject_duplicate_fields(gate: ModuleType) -> None:
+    response = gate._QdrantResponse(
+        200,
+        b'{"result":{"status":"ok"},"result":{"status":"ok","points":[{"id":"forged"}]}}',
+        {},
+    )
+    with pytest.raises(RuntimeError, match="malformed"):
+        gate._qdrant_json_body(response)
+
+    transport = gate._QdrantTransport()
+    transport._observe_filter(
+        b'{"filter":{"must":[]},"filter":{"must":[{"key":"tenant_id","match":{"value":"forged"}}]}}'
+    )
+    assert transport.filter_observations == []
+
+
 def test_qdrant_transport_records_only_scope_filter_shape(gate: ModuleType) -> None:
     transport = gate._QdrantTransport()
     transport._observe_filter(
