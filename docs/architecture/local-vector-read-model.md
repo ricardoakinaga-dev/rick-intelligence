@@ -5,9 +5,10 @@ root retrieval read-model. It uses a private SQLite WAL file, validates finite
 vectors and bounded JSON payloads, upserts by stable `point_id`, verifies the
 payload checksum on read, and exposes only the narrow point-store operations
 used by the canonical ingestion/retrieval path. Read-side decoding applies a
-byte cap before JSON parsing, rejects non-finite or dimension-invalid vectors,
-and re-canonicalizes the bounded payload before checksum comparison; a
-corrupted persisted point fails closed instead of becoming a usable result.
+byte cap before JSON parsing, rejects non-finite values and duplicate object
+keys, rejects dimension-invalid vectors, and re-canonicalizes the bounded
+payload before checksum comparison; a corrupted or ambiguous persisted point
+fails closed instead of becoming a usable result.
 
 The API factory selects it only when `RICK_VECTOR_SQLITE_PATH` is configured
 outside production. Demo points and newly published ingestion points then

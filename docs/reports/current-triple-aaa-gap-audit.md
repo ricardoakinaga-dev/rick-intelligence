@@ -1022,3 +1022,19 @@ The provider suite passes **66** tests, the provider-contract slice passes
 provider-contract evidence only. Approved live provider/corpus/budget
 authority, independent review, sealed packet and human Go/No-Go remain
 unavailable; promotion remains disallowed.
+
+## 53. Persisted SQLite vector duplicate-key closure — 2026-09-10
+
+Source implementation candidate `bb238b1b4165dc4e580d7d9aa294703ff9c41783`
+(tree `30f073d27b71b8e2e57596815d74725307cd15c8`) closes the remaining
+ambiguity in the hermetic SQLite vector read-model. The bounded persisted JSON
+decoder now rejects duplicate object keys before vector or payload projection;
+a payload whose duplicate key would otherwise select the last value fails
+closed while the canonical checksum remains valid.
+
+The retrieval package passes **40** tests and the combined
+knowledge/ingestion/retrieval domain suite passes **165**; compilation and
+`git diff --check` pass. This is local read-model evidence only. Live Qdrant
+schema/filter/alias/rebuild/restore, approved object storage, distributed
+runtime, independent review, sealed packet and human Go/No-Go remain
+unavailable; promotion remains disallowed.
