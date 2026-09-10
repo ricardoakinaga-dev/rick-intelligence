@@ -573,3 +573,22 @@ composition/health tests (**27 tests**) and provider runtime-gate tests
 not prove an approved external provider, production spending/budgets, the
 disposable service lab, or any promotion authority. The integrated packet
 must be regenerated on the final clean documentation commit.
+
+## 26. Provider tools and structured-response closure — 2026-09-10
+
+Source implementation candidate `09a467652c3c9ba85770937e3cdce8c39f545e44`
+(tree `bdb09d2e7ff379e654eac310f3b9f7503c8685a8`) closes the local provider
+contract gap identified by the prompt's Phase 3.8 bar. Normal and streaming
+requests now accept bounded function tools; response contracts validate
+complete tool calls and streaming partial tool-call deltas; tool arguments must
+be bounded JSON objects; malformed definitions/calls fail closed before a
+network request. The runtime gate adds a real `tool-call-contract` assertion,
+and the loopback runtime fixture exercises it without being promoted to live
+provider evidence.
+
+Current local evidence is **59 provider tests**, **6 provider-contract tests**,
+**437 API tests**, **295 State-of-Art tests** and **3 provider-runtime tests**;
+`git diff --check` and Python compilation pass. The exact source implementation
+is locally verified, but the capability remains `BLOCKED_EXTERNAL` for the
+approved provider/corpus, production budgets, distributed runtime and
+promotion evidence. No State of Art, AAA or Triple AAA claim is made.

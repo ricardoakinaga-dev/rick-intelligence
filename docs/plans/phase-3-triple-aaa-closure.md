@@ -4,7 +4,7 @@
 **Prompt:** [`phase-3-triple-aaa-closure-2026-09-09.txt`](../prompts/phase-3-triple-aaa-closure-2026-09-09.txt)  
 **Source attachment SHA-256:** `0d431cf3ec75e4d6455735d32f135b3270b59996866a28fd7296d73a18cabf3d`  
 **Stored copy SHA-256:** `0d431cf3ec75e4d6455735d32f135b3270b59996866a28fd7296d73a18cabf3d`
-**Source implementation candidate:** `ea6fd613ffcc8b18fc11d55941266e28387f9b92` / tree `c8ae0fb2614bee70a4e096c6676c8e4d1a9f782e3`
+**Source implementation candidate:** `09a467652c3c9ba85770937e3cdce8c39f545e44` / tree `bdb09d2e7ff379e654eac310f3b9f7503c8685a8`
 **Entry audit:** [`current-triple-aaa-gap-audit.md`](../reports/current-triple-aaa-gap-audit.md)
 
 ## 1. Outcome and constraints
@@ -396,3 +396,20 @@ State-of-Art suite (295), focused composition/health tests (27) and provider
 runtime-gate tests (3). This closes a local readiness-contract defect only;
 approved live provider/corpus, distributed runtime, image proof, independent
 review, sealing and human Go/No-Go evidence remain required.
+
+## 25. Provider tools and structured-response closure — 2026-09-10
+
+Source candidate `09a467652c3c9ba85770937e3cdce8c39f545e44` (tree
+`bdb09d2e7ff379e654eac310f3b9f7503c8685a8`) adds bounded function-tool
+serialization to both normal and streaming provider requests, typed complete
+tool calls and partial streaming tool-call deltas, and fail-closed JSON object
+validation for tool arguments. The runtime gate now exercises
+`tool-call-contract` in addition to health, chat, JSON response, streaming and
+embedding contracts. Provider resilience and the deterministic test provider
+preserve the same boundary.
+
+The provider suite passes **59**, the provider contract slice passes **6**, the
+API matrix passes **437**, the State-of-Art suite passes **295**, and the
+provider runtime fixture passes **3**. These are current local contract
+observations only; approved live provider credentials/corpus, distributed
+runtime, independent review, sealed packet and human Go/No-Go remain open.

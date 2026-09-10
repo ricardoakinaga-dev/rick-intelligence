@@ -844,7 +844,14 @@
     ".agent/verification.jsonl#VER-PH3-2-PROVIDER-HEALTH-PROBE-20260910",
     "packages/providers/src/rick_providers/client.py",
     "packages/providers/src/rick_providers/resilience.py",
-    "scripts/phase11/provider_runtime_gate.py"
+    "packages/contracts/src/rick_contracts/providers.py",
+    "packages/providers/src/rick_providers/deterministic.py",
+    "packages/providers/src/rick_providers/protocols.py",
+    "packages/providers/tests/test_provider.py",
+    "packages/contracts/tests/test_phase15_contracts.py",
+    "scripts/phase11/provider_runtime_gate.py",
+    "scripts/state_of_art/tests/test_provider_runtime.py",
+    ".agent/verification.jsonl#VER-PH3-2-PROVIDER-TOOLS-JSON-STREAM-20260910"
       ],
       "next_action": {
         "id": "PH3-2-LAB-READINESS:WAIT_RUNTIME",
@@ -857,7 +864,7 @@
         "Docker daemon access to /var/run/docker.sock is denied in the current session",
         "Disposable runtime secrets and endpoint authority are unavailable"
       ],
-      "reason": "The current local implementation and fail-closed API/Redis, worker, citation-support, release, same-run CI evidence, authenticated promotion-seal, shared-runtime-preflight, current-artifact promotion binding, promoted-capability independent-review binding, canonical accessibility gates, deterministic real frontend browser probe, Compose resource/capability hardening, preserved-CVG corpus preflight, runtime-before-release ordering, commit-bound manifest adapters, raw status/exit-status synchronization, bounded provider embeddings, truthful live provider readiness and the external-only promotion return-code contract are covered by the current local matrices, make validate and targeted static gates. Source implementation candidate 2238b99ec797b0b2416208dd0e0b02c74897f7d9 has tree 6dad82375d875faf0521e7f012c839889e5cc040; the ignored integrated packet is authoritative for the exact clean checkout and must be regenerated after the final documentation commit. The provider health boundary is locally verified, while the packet currently remains STATE_OF_ART_CANDIDATE with 17 foundation lanes passing and 24 mandatory lanes BLOCKED_EXTERNAL. The canonical make up attempt failed closed before startup because RICK_WORKER_IMAGE is missing, while Docker daemon access, runtime/provider/corpus, image proof, independent review, sealing and human Go/No-Go remain unavailable. No promotion claim is made."
+      "reason": "The current local implementation and fail-closed API/Redis, worker, citation-support, release, same-run CI evidence, authenticated promotion-seal, shared-runtime-preflight, current-artifact promotion binding, promoted-capability independent-review binding, canonical accessibility gates, deterministic real frontend browser probe, Compose resource/capability hardening, preserved-CVG corpus preflight, runtime-before-release ordering, commit-bound manifest adapters, raw status/exit-status synchronization, bounded provider embeddings, truthful live provider readiness, bounded provider function tools/JSON/streaming calls and the external-only promotion return-code contract are covered by the current local matrices, make validate and targeted static gates. Source implementation candidate 09a467652c3c9ba85770937e3cdce8c39f545e44 has tree bdb09d2e7ff379e654eac310f3b9f7503c8685a8; the ignored integrated packet is authoritative for the exact clean checkout and must be regenerated after the final documentation commit. The provider tool/structured-response boundary is locally verified, while the packet currently remains STATE_OF_ART_CANDIDATE with 17 foundation lanes passing and 24 mandatory lanes BLOCKED_EXTERNAL. The canonical make up attempt failed closed before startup because RICK_WORKER_IMAGE is missing, while Docker daemon access, runtime/provider/corpus, image proof, independent review, sealing and human Go/No-Go remain unavailable. No promotion claim is made."
     }
   ]
 }

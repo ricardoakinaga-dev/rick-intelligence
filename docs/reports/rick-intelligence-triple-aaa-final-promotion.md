@@ -146,13 +146,16 @@ tool/JSON handling, budgets, ACL and adversarial RAG. Citation relevance,
 validity, support, faithfulness and unsupported-claim metrics must feed
 conservative answer/retry/clarify/abstain/escalate decisions.
 
-The local source correction at `2238b99ec797b0b2416208dd0e0b02c74897f7d9` adds a bounded authenticated
+The local source corrections at `2238b99ec797b0b2416208dd0e0b02c74897f7d9`
+and `09a467652c3c9ba85770937e3cdce8c39f545e44` add a bounded authenticated
 `GET /models` provider-health probe, strict model-list validation, resilient
-delegation and an explicit live-health prerequisite in the provider runtime
-gate. Its 54 provider tests, 437 API tests, 295 State-of-Art tests and focused
-loopback gate tests pass. This is local contract evidence only; the approved
-external provider, budget/cancellation behavior, corpus metrics and runtime
-promotion evidence remain open.
+delegation, bounded function tools, typed complete/streaming tool calls, JSON
+argument validation and explicit live-health, JSON, streaming and tool-call
+prerequisites in the provider runtime gate. The current source candidate has
+59 provider tests, 6 provider-contract tests, 437 API tests, 295 State-of-Art
+tests and 3 provider-runtime tests passing. This is local contract evidence
+only; the approved external provider, budget/cancellation behavior, corpus
+metrics and runtime promotion evidence remain open.
 
 ## 18. Observability and SLO
 
