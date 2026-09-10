@@ -446,6 +446,6 @@ register, a derived 26-dimension scorecard at or above `96/100` and explicit
 acceptance, mitigation, review date and future expiration; Critical/High risks
 are counted from the register and reject promotion.
 
-The focused promotion/seal suite passes **45** tests. This closes a local
+The focused promotion/seal suite passes **46** tests. This closes a local
 underspecified-packet path; no packet is available here and no runtime or
 independent-review evidence is claimed.
