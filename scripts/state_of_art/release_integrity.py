@@ -675,6 +675,8 @@ def _evaluate_typed_manifest(
         }.get(gate.result)
         if envelope.get("exit_status") != expected_exit:
             failures.append(f"gate {gate.gate_id} runtime envelope exit_status does not match the manifest")
+        if type(envelope.get("exit_code")) is not type(envelope.get("exit_status")) or envelope.get("exit_code") != envelope.get("exit_status"):
+            failures.append(f"gate {gate.gate_id} runtime envelope exit_code does not match exit_status")
         for field, expected in (
             ("commit_sha", binding.commit_sha),
             ("tree_sha", binding.tree_sha),
@@ -684,6 +686,50 @@ def _evaluate_typed_manifest(
                 failures.append(f"gate {gate.gate_id} runtime envelope {field} is not bound to the manifest")
         if envelope.get("clean_worktree") is not True:
             failures.append(f"gate {gate.gate_id} runtime envelope is not clean")
+        if envelope.get("freshness") != "CURRENT":
+            failures.append(f"gate {gate.gate_id} runtime envelope is not current")
+        for field in ("lane", "gate_id", "environment", "procedure", "started_at", "finished_at", "observed_at"):
+            if not isinstance(envelope.get(field), str) or not envelope[field].strip():
+                failures.append(f"gate {gate.gate_id} runtime envelope has no {field}")
+        if envelope.get("gate_id") not in {gate.gate_id, expected_capability}:
+            failures.append(f"gate {gate.gate_id} runtime envelope gate_id does not match the gate")
+        for field in ("started_at", "finished_at", "observed_at"):
+            if isinstance(envelope.get(field), str):
+                _validate_current_timestamp(envelope[field], f"gate {gate.gate_id}.runtime.{field}", failures)
+        if all(isinstance(envelope.get(field), str) for field in ("started_at", "finished_at")):
+            try:
+                started = datetime.fromisoformat(envelope["started_at"].replace("Z", "+00:00"))
+                finished = datetime.fromisoformat(envelope["finished_at"].replace("Z", "+00:00"))
+            except ValueError:
+                pass
+            else:
+                if started.tzinfo is not None and finished.tzinfo is not None and finished < started:
+                    failures.append(f"gate {gate.gate_id} runtime finished_at precedes started_at")
+        commands = envelope.get("commands")
+        if not isinstance(commands, Sequence) or isinstance(commands, (str, bytes, bytearray)) or not commands:
+            failures.append(f"gate {gate.gate_id} runtime envelope has no command observations")
+        else:
+            for index, command in enumerate(commands):
+                if not isinstance(command, Mapping):
+                    failures.append(f"gate {gate.gate_id} runtime command {index} is invalid")
+                    continue
+                argv = command.get("argv")
+                command_status = command.get("status")
+                command_exit = command.get("exit_status")
+                if not isinstance(argv, Sequence) or isinstance(argv, (str, bytes, bytearray)) or not argv:
+                    failures.append(f"gate {gate.gate_id} runtime command {index} has no argv")
+                if command_status != gate.result:
+                    failures.append(f"gate {gate.gate_id} runtime command {index} status does not match the envelope")
+                if command_exit != expected_exit:
+                    failures.append(f"gate {gate.gate_id} runtime command {index} exit_status does not match the envelope")
+        artifact_hashes = envelope.get("artifact_hashes")
+        if (
+            not isinstance(artifact_hashes, Sequence)
+            or isinstance(artifact_hashes, (str, bytes, bytearray))
+            or not artifact_hashes
+            or any(not isinstance(value, str) or not SHA256_RE.fullmatch(value.removeprefix("sha256:")) for value in artifact_hashes)
+        ):
+            failures.append(f"gate {gate.gate_id} runtime envelope has no valid artifact_hashes")
         if gate.result == PASS and envelope.get("production_safe") is not True:
             failures.append(
                 f"gate {gate.gate_id} PASS runtime envelope is not production-safe"

@@ -60,8 +60,11 @@ through the same bounded CI-envelope helper as the other local lanes. The
 envelope records start/finish timestamps and exit code, and release validation
 checks lifecycle order, status/exit consistency, candidate commit/tree/
 fingerprint, clean sentinel, lane scope, command status and raw-artifact hash.
-There is no current same-SHA remote result in this environment; skipped or
-unavailable lanes remain non-promotable.
+The runtime adapter applies the same provenance boundary to service evidence:
+lane/gate identity, start/finish timestamps, exit-code consistency, command
+observations and artifact hashes are mandatory and fail closed. There is no
+current same-SHA remote result in this environment; skipped or unavailable
+lanes remain non-promotable.
 
 ## 6. PostgreSQL
 

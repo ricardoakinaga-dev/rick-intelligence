@@ -421,3 +421,14 @@ requested resource, drift and leak observations. A structured
 `BLOCKED_EXTERNAL` observation may remain blocked without fabricating runtime
 measurements. Local contract tests cover complete and incomplete matrices; no
 live operational result is claimed while the approved lab is unavailable.
+
+## 82. Runtime envelope provenance closure — 2026-09-10
+
+Runtime evidence envelopes now carry the prompt's lane/gate identity, start and
+finish timestamps, both `exit_status` and `exit_code`, command observations and
+artifact hash list in addition to the existing checkout, preflight and raw
+artifact binding. Release-integrity validation rejects a runtime envelope that
+omits or contradicts any of those fields, including stale timestamps, a
+different gate identity or a mismatched command/artifact result. Fixture tests
+cover PASS, blocked, stale and malformed cases; this strengthens the evidence
+boundary without creating runtime evidence.

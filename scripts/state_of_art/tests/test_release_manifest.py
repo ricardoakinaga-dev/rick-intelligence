@@ -146,8 +146,19 @@ class ReleaseManifestTests(unittest.TestCase):
                         "schema_version": "state-of-art-runtime-evidence.v1",
                         "record_id": f"fixture-{runtime_gate_id}",
                         "capability_id": runtime_gate_id,
+                        "lane": runtime_gate_id,
+                        "gate_id": runtime_gate_id,
                         "status": gate_result,
                         "exit_status": (
+                            0
+                            if gate_result == "PASS"
+                            else 1
+                            if gate_result in {"FAIL", "STALE", "INVALID"}
+                            else 2
+                            if gate_result == "BLOCKED_EXTERNAL"
+                            else None
+                        ),
+                        "exit_code": (
                             0
                             if gate_result == "PASS"
                             else 1
@@ -183,6 +194,8 @@ class ReleaseManifestTests(unittest.TestCase):
                         },
                         "procedure": f"fixture runtime procedure for {runtime_gate_id}",
                         "environment": "fixture",
+                        "started_at": observed_at,
+                        "finished_at": observed_at,
                         "limitations": ["fixture is not a production run"],
                         "next_action": "replace fixture with an approved runtime observation",
                         "observed_at": observed_at,
@@ -193,6 +206,23 @@ class ReleaseManifestTests(unittest.TestCase):
                                 "description": "fixture raw gate result",
                                 "path": raw_relative,
                                 "sha256": raw_hash,
+                            }
+                        ],
+                        "artifact_hashes": [raw_hash],
+                        "commands": [
+                            {
+                                "argv": ["fixture-runtime-gate", runtime_gate_id],
+                                "index": 1,
+                                "status": gate_result,
+                                "exit_status": (
+                                    0
+                                    if gate_result == "PASS"
+                                    else 1
+                                    if gate_result in {"FAIL", "STALE", "INVALID"}
+                                    else 2
+                                    if gate_result == "BLOCKED_EXTERNAL"
+                                    else None
+                                ),
                             }
                         ],
                     },

@@ -233,6 +233,7 @@ def run_gate_adapter(
     """Execute one gate and emit a typed, commit-bound evidence envelope."""
 
     root = root.resolve()
+    started_at = datetime.now(timezone.utc).isoformat()
     output_path = _safe_path(root, output)
     raw_base_path = _safe_path(root, raw_output)
     if output_path == raw_base_path:
@@ -280,7 +281,6 @@ def run_gate_adapter(
     checkout_after = _capture_checkout(root, checkout_capture)
     checkout_unchanged = _same_checkout(checkout_before, checkout_after)
     checkout_clean = checkout_after.get("available") is True and checkout_after.get("status") == "CLEAN"
-    observed_at = datetime.now(timezone.utc).isoformat()
     status = _normalize_status(raw_payload, exit_status)
     if not checkout_unchanged:
         status = "FAIL"
@@ -347,6 +347,8 @@ def run_gate_adapter(
         raw_payload["status"] = status
         raw_payload["exit_status"] = exit_status
         _write_json(raw_path, raw_payload)
+    finished_at = datetime.now(timezone.utc).isoformat()
+    observed_at = finished_at
     production_safe = (
         checkout_unchanged
         and raw_digest_value is not None
@@ -378,6 +380,10 @@ def run_gate_adapter(
         "schema_version": SCHEMA_VERSION,
         "record_id": f"PH3-{capability_id}-{observed_at.replace('-', '').replace(':', '').replace('.', '')}",
         "capability_id": capability_id,
+        # Keep the generic §9 lane/gate vocabulary alongside the existing
+        # capability id.  The raw gate remains nested under ``gate`` below.
+        "lane": capability_id,
+        "gate_id": capability_id,
         "status": status,
         "commit_sha": checkout_after.get("head"),
         "tree_sha": checkout_after.get("tree"),
@@ -387,7 +393,10 @@ def run_gate_adapter(
         "artifact_sha256": raw_digest_value,
         "environment": environment,
         "procedure": procedure,
+        "started_at": started_at,
+        "finished_at": finished_at,
         "exit_status": exit_status,
+        "exit_code": exit_status,
         "observed_at": observed_at,
         "freshness": "CURRENT" if checkout_unchanged else (
             "DIRTY_CHECKOUT" if checkout_after.get("status") != "CLEAN" else "INVALID_CHECKOUT"
@@ -427,6 +436,15 @@ def run_gate_adapter(
                 "path": str(raw_path.relative_to(root)),
                 "sha256": raw_digest_value,
                 "description": "underlying Phase 11 runtime gate result",
+            }
+        ],
+        "artifact_hashes": [raw_digest_value] if raw_digest_value is not None else [],
+        "commands": [
+            {
+                "argv": ["runtime-gate", capability_id],
+                "index": 1,
+                "status": status,
+                "exit_status": exit_status,
             }
         ],
         "gate": raw_payload,
