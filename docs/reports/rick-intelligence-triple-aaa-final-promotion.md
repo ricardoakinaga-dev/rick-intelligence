@@ -142,6 +142,12 @@ JSON-lines service inventories before readiness projection. Ambiguous records
 cannot alter service identity or health status; this does not prove Docker
 startup, service health or production promotion.
 
+At source candidate `1a901eae0878cbc7ff8a6977b75103f9576f5241`, the
+frontend/supply gate applies the strict boundary to package, lock, browser,
+SBOM and release/container artifacts before source, license, digest or runtime
+projection. This prevents ambiguous local artifacts from becoming supply-chain
+claims; browser, image and external authority remain required.
+
 ## 7. CI and release lanes
 
 The canonical workflow names FAST, UNIT, CONTRACT, SECURITY, RAG_EVAL,

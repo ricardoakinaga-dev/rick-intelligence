@@ -932,3 +932,19 @@ suite passes **304**; compilation and `git diff --check` pass. This is local
 Compose-parser integrity evidence only. It does not supply an approved Docker
 daemon, disposable service inventory/health, independent review, sealed packet
 or human Go/No-Go authority; promotion remains disallowed.
+
+## 61. Phase 11 frontend/supply JSON boundary closure — 2026-09-10
+
+Source implementation candidate `1a901eae0878cbc7ff8a6977b75103f9576f5241`
+(tree `97904d0ad086f6d15b8232f3532c893a6a837a03`) closes permissive JSON paths
+in the frontend and supply-chain gate. Package manifests, lockfiles, browser
+evidence, SBOMs and release/container manifests now share the strict UTF-8,
+finite-value and duplicate-key decoder before source, license, digest or
+runtime evidence is projected.
+
+The focused frontend/supply suite passes **21** tests and the complete
+State-of-Art suite passes **305**; compilation and `git diff --check` pass.
+This is local frontend/supply-gate integrity evidence only. It does not supply
+approved browser/image/SBOM runtime, external supply authority, independent
+review, sealed packet or human Go/No-Go authority; promotion remains
+disallowed.

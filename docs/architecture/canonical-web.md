@@ -195,3 +195,11 @@ performance de API/worker, deployment/rollback e aceitação final independente.
 A ausência de trace bruto tab-a-tab e de integrações externas continua
 explícita. O caller está pronto para integrar esses contratos; ele não deve
 mascarar a ausência deles.
+
+The Phase 11 frontend/supply gate treats package manifests, lockfiles, browser
+evidence, SBOM output and release/container manifests as untrusted JSON. All
+readers use the shared bounded strict decoder, so duplicate keys, non-finite
+values, invalid UTF-8 and oversized artifacts fail closed before source,
+license, digest or runtime claims are projected. This protects local evidence
+integrity only; it does not create browser, image or external supply-chain
+authority.
