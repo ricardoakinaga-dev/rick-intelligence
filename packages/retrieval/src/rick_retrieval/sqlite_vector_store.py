@@ -23,6 +23,7 @@ from typing import Any, Iterator
 
 MAX_POINT_ID = 256
 MAX_VECTOR_DIMENSIONS = 16_384
+MAX_VECTOR_JSON_BYTES = 1 * 1024 * 1024
 MAX_PAYLOAD_BYTES = 256 * 1024
 MAX_POINTS_PER_WRITE = 1_000
 MAX_POINTS_PER_READ = 100_000
@@ -260,17 +261,52 @@ def _validate_point(point: object) -> tuple[str, str, str, str]:
     return point_id, vector_json, payload_json, checksum
 
 
-def _decode_point(row: sqlite3.Row) -> dict[str, Any]:
-    try:
-        vector = json.loads(row["vector_json"])
-        payload = json.loads(row["payload_json"])
-    except (TypeError, ValueError, json.JSONDecodeError) as exc:
-        raise SQLiteVectorStoreError("persisted point is corrupt") from exc
-    if not isinstance(vector, list) or not isinstance(payload, dict):
+def _reject_json_constant(_value: str) -> object:
+    raise ValueError("non-finite JSON constants are not allowed")
+
+
+def _decode_stored_json(value: object, *, maximum_bytes: int) -> object:
+    if not isinstance(value, str):
         raise SQLiteVectorStoreError("persisted point is corrupt")
-    checksum = hashlib.sha256(
-        json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
-    ).hexdigest()
+    try:
+        if len(value.encode("utf-8")) > maximum_bytes:
+            raise SQLiteVectorStoreError("persisted point is corrupt")
+        return json.loads(value, parse_constant=_reject_json_constant)
+    except SQLiteVectorStoreError:
+        raise
+    except (TypeError, UnicodeError, ValueError, RecursionError):
+        raise SQLiteVectorStoreError("persisted point is corrupt") from None
+
+
+def _decode_point(row: sqlite3.Row) -> dict[str, Any]:
+    vector = _decode_stored_json(row["vector_json"], maximum_bytes=MAX_VECTOR_JSON_BYTES)
+    payload = _decode_stored_json(row["payload_json"], maximum_bytes=MAX_PAYLOAD_BYTES)
+    if not isinstance(vector, list) or not 0 < len(vector) <= MAX_VECTOR_DIMENSIONS or not isinstance(payload, dict):
+        raise SQLiteVectorStoreError("persisted point is corrupt")
+    for value in vector:
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise SQLiteVectorStoreError("persisted point is corrupt")
+        try:
+            converted = float(value)
+        except (OverflowError, TypeError, ValueError):
+            raise SQLiteVectorStoreError("persisted point is corrupt") from None
+        if not math.isfinite(converted):
+            raise SQLiteVectorStoreError("persisted point is corrupt")
+    try:
+        payload_json = json.dumps(
+            payload,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        )
+        if len(payload_json.encode("utf-8")) > MAX_PAYLOAD_BYTES:
+            raise SQLiteVectorStoreError("persisted point is corrupt")
+        checksum = hashlib.sha256(payload_json.encode("utf-8")).hexdigest()
+    except SQLiteVectorStoreError:
+        raise
+    except (TypeError, UnicodeError, ValueError, OverflowError, RecursionError):
+        raise SQLiteVectorStoreError("persisted point is corrupt") from None
     if checksum != row["payload_checksum"]:
         raise SQLiteVectorStoreError("persisted point integrity check failed")
     return {"point_id": row["point_id"], "vector": vector, "payload": payload}
@@ -280,6 +316,7 @@ __all__ = [
     "MAX_PAYLOAD_BYTES",
     "MAX_POINTS_PER_WRITE",
     "MAX_VECTOR_DIMENSIONS",
+    "MAX_VECTOR_JSON_BYTES",
     "SQLiteVectorStore",
     "SQLiteVectorStoreConfigurationError",
     "SQLiteVectorStoreError",

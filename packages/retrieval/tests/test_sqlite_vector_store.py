@@ -1,11 +1,19 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import os
 
 import pytest
 
 from rick_retrieval import SQLiteVectorStore
-from rick_retrieval.sqlite_vector_store import SQLiteVectorStoreConfigurationError, SQLiteVectorStoreError, SQLiteVectorStoreValidationError
+from rick_retrieval.sqlite_vector_store import (
+    MAX_PAYLOAD_BYTES,
+    SQLiteVectorStoreConfigurationError,
+    SQLiteVectorStoreError,
+    SQLiteVectorStoreValidationError,
+    _decode_point,
+)
 
 
 def _point(point_id: str = "point-1") -> dict[str, object]:
@@ -21,6 +29,25 @@ def _point(point_id: str = "point-1") -> dict[str, object]:
             "text": "safe evidence",
         },
     }
+
+
+def _stored_point(*, vector_json: str, payload: dict[str, object]) -> dict[str, str]:
+    payload_json = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return {
+        "point_id": "point-1",
+        "vector_json": vector_json,
+        "payload_json": payload_json,
+        "payload_checksum": hashlib.sha256(payload_json.encode("utf-8")).hexdigest(),
+    }
+
+
+def test_persisted_point_decoder_rejects_unbounded_payload_and_nonfinite_vector() -> None:
+    oversized_payload = {"tenant_id": "tenant-1", "text": "a" * MAX_PAYLOAD_BYTES}
+    with pytest.raises(SQLiteVectorStoreError):
+        _decode_point(_stored_point(vector_json="[0.1]", payload=oversized_payload))
+
+    with pytest.raises(SQLiteVectorStoreError):
+        _decode_point(_stored_point(vector_json="[NaN]", payload=_point()["payload"]))
 
 
 def test_sqlite_vector_points_survive_reopen_and_converge(tmp_path):
