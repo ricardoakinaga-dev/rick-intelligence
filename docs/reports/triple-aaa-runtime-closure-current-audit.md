@@ -186,7 +186,9 @@ candidate therefore stays **BLOCKED_EXTERNAL / NO-GO**.
 
 ## 67. Downstream W3C HTTP propagation closure — 2026-09-10
 
-The source-level observability boundary now projects bounded W3C
+Source candidate `36dcbb74311d8f35199e7c3e29e0a0530a7d156a` (tree
+`7e256b03a5fa54e6b3062d7c47b654e1c0271552`) adds the downstream HTTP
+propagation boundary. It now projects bounded W3C
 `traceparent`/`tracestate` identity into provider, Qdrant and S3-compatible HTTP
 requests after their request/authentication setup. The shared helper copies
 only those two fields, rejects oversized or non-ASCII values, excludes
