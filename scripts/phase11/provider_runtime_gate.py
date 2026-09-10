@@ -23,6 +23,13 @@ import uuid
 
 
 ROOT = Path(__file__).resolve().parents[2]
+
+try:
+    from scripts.state_of_art.json_boundary import loads_json
+except ModuleNotFoundError:  # Direct execution from the scripts/phase11 directory.
+    sys.path.insert(0, str(ROOT))
+    from scripts.state_of_art.json_boundary import loads_json
+
 DEFAULT_OUTPUT = ".runtime/phase-3/provider-runtime-gate.json"
 DEFAULT_CHAT_MODEL = "gpt-4o-mini"
 DEFAULT_EMBEDDING_MODEL = "text-embedding-3-small"
@@ -59,8 +66,10 @@ def _report_status_tool() -> dict[str, object]:
     }
 
 
-def _reject_json_constant(value: str) -> None:
-    raise ValueError(f"non-finite JSON constant: {value}")
+def _parse_provider_json(value: str) -> object:
+    """Decode provider-controlled JSON before contract projection."""
+
+    return loads_json(value)
 
 
 @dataclass(frozen=True)
@@ -289,7 +298,7 @@ async def _run_checks(
                 response_format={"type": "json_object"},
                 correlation_id=f"phase11-provider-json-{uuid.uuid4().hex[:12]}",
             )
-            decoded = json.loads(structured.content, parse_constant=_reject_json_constant)
+            decoded = _parse_provider_json(structured.content)
             json_ok = bool(structured.model == config.chat_model and isinstance(decoded, dict))
             assertions.append(
                 _Assertion(
@@ -317,7 +326,7 @@ async def _run_checks(
             )
             tool_call = (tool_result.tool_calls or [None])[0]
             decoded_arguments = (
-                json.loads(tool_call.function.arguments, parse_constant=_reject_json_constant)
+                _parse_provider_json(tool_call.function.arguments)
                 if tool_call is not None
                 else None
             )
@@ -389,7 +398,7 @@ async def _run_checks(
                 json_deltas.append(chunk.delta)
                 if chunk.finish_reason:
                     json_finish_reason = chunk.finish_reason
-            decoded = json.loads("".join(json_deltas), parse_constant=_reject_json_constant)
+            decoded = _parse_provider_json("".join(json_deltas))
             streaming_json_ok = bool(
                 isinstance(decoded, dict)
                 and decoded.get("status") == "ok"
@@ -446,7 +455,7 @@ async def _run_checks(
                     current["arguments"] += delta.function.arguments
             assembled = streamed_tool_calls.get(0)
             decoded_arguments = (
-                json.loads(assembled["arguments"], parse_constant=_reject_json_constant)
+                _parse_provider_json(assembled["arguments"])
                 if assembled
                 else None
             )

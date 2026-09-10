@@ -193,6 +193,11 @@ def test_missing_provider_authority_is_blocked(tmp_path: Path, monkeypatch: pyte
     assert payload["production_safe"] is False
 
 
+def test_provider_json_contract_rejects_duplicate_fields() -> None:
+    with pytest.raises(json.JSONDecodeError):
+        provider_runtime_gate._parse_provider_json('{"status":"ok","status":"forged"}')
+
+
 def test_real_openai_compatible_endpoint_passes_semantic_checks(provider_url: str, tmp_path: Path) -> None:
     output = tmp_path / "provider.json"
     status, assertions, production_safe, endpoint = asyncio.run(
