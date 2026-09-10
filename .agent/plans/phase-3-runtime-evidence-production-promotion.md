@@ -234,3 +234,5 @@ future slices add raw runtime logs/traces/metrics, signed manifests,
 `docs/reports/disaster-recovery-runtime-evidence.md` and
 `docs/reports/state-of-art-triple-aaa-promotion-report.md`. `.agent` state,
 backlog and append-only ledgers remain the canonical execution pointers.
+- [x] (2026-09-10) Make provider readiness truthful at source candidate 2238b99ec797b0b2416208dd0e0b02c74897f7d9 (tree 6dad82375d875faf0521e7f012c839889e5cc040): the OpenAI-compatible client performs a bounded authenticated `/models` probe, ResilientProvider delegates live health separately from local circuit state, composition selects that live check, and the provider runtime gate requires it before chat/embedding PASS; provider/API/State-of-Art matrices pass 54/437/295 tests, while approved live provider evidence remains external.
+- 2026-09-10: Treat provider readiness as a live dependency check in the canonical production composition. The local circuit-state signal remains available for cheap callers, but `/health/ready` must use the bounded authenticated provider probe; hermetic tests cannot close the approved external provider/corpus gate.

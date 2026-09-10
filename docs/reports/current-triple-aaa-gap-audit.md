@@ -552,3 +552,24 @@ restore, performance, chaos, soak, independent-review, sealed-packet and
 human Go/No-Go lanes remain blocked. This refresh binds the diagnostic
 packet to the current clean checkout; it does not promote the candidate and
 does not claim State of Art, AAA or Triple AAA.
+
+## 25. Truthful provider readiness boundary — 2026-09-10
+
+Source implementation candidate `2238b99ec797b0b2416208dd0e0b02c74897f7d9` (tree
+`6dad82375d875faf0521e7f012c839889e5cc040`) closes a local readiness gap. The
+OpenAI-compatible client now exposes a bounded, authenticated `GET /models`
+probe that validates bounded JSON and the configured chat model, applies an
+explicit timeout and fails closed without exposing provider response data.
+`ResilientProvider.health_check()` delegates that live probe while retaining
+the cheap local circuit-state `readiness_check()` for callers that explicitly
+avoid I/O. The production external composition selects the live provider
+health hook, and the provider runtime gate requires `provider-health-probe`
+before chat and embedding assertions can produce an overall PASS.
+
+The exact source commit passed the canonical provider suite (**54 tests**),
+API matrix (**437 tests**), State-of-Art suite (**295 tests**), focused
+composition/health tests (**27 tests**) and provider runtime-gate tests
+(**3 tests**). The loopback fixture is hermetic local evidence only; it does
+not prove an approved external provider, production spending/budgets, the
+disposable service lab, or any promotion authority. The integrated packet
+must be regenerated on the final clean documentation commit.

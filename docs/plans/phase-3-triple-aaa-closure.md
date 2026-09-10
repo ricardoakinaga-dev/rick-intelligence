@@ -379,3 +379,20 @@ the latest clean run is `STATE_OF_ART_CANDIDATE` / JSON exit `2`, with
 secrets, provider/corpus, image provenance, independent review, sealed packet
 and human Go/No-Go remain external blockers. The provider bridge correction is
 local reliability evidence and does not close live provider or budget gates.
+
+## 24. Truthful provider readiness boundary — 2026-09-10
+
+Source implementation candidate `2238b99ec797b0b2416208dd0e0b02c74897f7d9` (tree
+`6dad82375d875faf0521e7f012c839889e5cc040`) adds a bounded authenticated
+`GET /models` health probe to the OpenAI-compatible client, strict bounded
+JSON/model validation and fail-closed error handling. `ResilientProvider`
+delegates the live hook while keeping its local circuit-state check separate;
+the production composition now chooses the live provider health method, and
+the provider runtime gate records `provider-health-probe` as a prerequisite
+for chat and embedding success.
+
+The exact source commit passes the provider suite (54), API matrix (437),
+State-of-Art suite (295), focused composition/health tests (27) and provider
+runtime-gate tests (3). This closes a local readiness-contract defect only;
+approved live provider/corpus, distributed runtime, image proof, independent
+review, sealing and human Go/No-Go evidence remain required.

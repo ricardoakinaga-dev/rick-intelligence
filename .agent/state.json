@@ -14,7 +14,7 @@
   "active_execplan": ".agent/plans/phase-3-runtime-evidence-production-promotion.md",
   "active_task": "PH3-2-LAB-READINESS",
   "verification_state": "PARTIAL",
-  "repository_state": "Current Phase 3 source implementation candidate is ea6fd613ffcc8b18fc11d55941266e28387f9b92 (tree c8ae0fb2614bee70a4e096c6676c8e4d1a9f782e). It includes the corrected PostgreSQL worker gate, canonical two-process Redis/API HTTP gate, strict release artifact postconditions and manifest consistency checks, bounded same-run CI envelopes with redacted raw artifacts, exact workflow/run/ref/SHA provenance, runtime-primary supply-chain binding, frontend Phase 3 transport, authenticated promotion packet sealing, scoped frontend-lane projection, checkout-bound frontend evidence, reproducible release-test dependencies and a bounded, cancellation-aware synchronous provider-embedding bridge. Clean API and State-of-Art regressions pass 437 and 295 tests respectively; the integrated packet remains diagnostic and current for the final documentation follow-up, with external runtime, provider/corpus, image proof, independent review, sealing and human promotion boundaries unavailable. No State of Art, AAA or Triple AAA promotion claim is made.",
+  "repository_state": "Current Phase 3 source implementation candidate is 2238b99ec797b0b2416208dd0e0b02c74897f7d9 (tree 6dad82375d875faf0521e7f012c839889e5cc040). It includes the corrected PostgreSQL worker gate, canonical two-process Redis/API HTTP gate, strict release artifact postconditions and manifest consistency checks, bounded same-run CI envelopes with redacted raw artifacts, exact workflow/run/ref/SHA provenance, runtime-primary supply-chain binding, frontend Phase 3 transport, authenticated promotion packet sealing, scoped frontend-lane projection, checkout-bound frontend evidence, reproducible release-test dependencies, a bounded cancellation-aware synchronous provider-embedding bridge and a bounded authenticated live provider-health probe used by production readiness. Clean provider/API/State-of-Art regressions pass 54, 437 and 295 tests respectively; the integrated packet remains diagnostic, with external runtime, provider/corpus, image proof, independent review, sealing and human promotion boundaries unavailable. No State of Art, AAA or Triple AAA promotion claim is made.",
   "instruction_scope_refs": [
     ".agent/PLANS.md",
     "cvg-master-rag-v2/AGENTS.md",
@@ -23,8 +23,8 @@
     "docs/plans/phase-3-runtime-evidence-production-promotion.md"
   ],
   "last_gate_record": ".agent/gates/phase-3-2-lab-readiness-implementation-ready.json",
-  "last_event_id": "EVT-PH3-2-COMPOSE-READINESS-PREFLIGHT-20260910",
-  "state_revision": 259,
+  "last_event_id": "EVT-PH3-2-PROVIDER-HEALTH-PROBE-20260910",
+  "state_revision": 260,
   "next_gate": "VERIFIED",
   "active_action_id": "PH3-2-LAB-READINESS:WAIT_RUNTIME",
   "blocked_by": [
@@ -32,5 +32,5 @@
     "Disposable runtime secrets and endpoint authority are unavailable"
   ],
   "human_approval_required": [],
-  "updated_at": "2026-09-10T11:10:46Z"
+  "updated_at": "2026-09-10T11:36:00Z"
 }

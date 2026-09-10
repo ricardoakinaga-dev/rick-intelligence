@@ -18,7 +18,7 @@ The authoritative identity is always the same-run packet at
 artifact-set digest, packet hash and quality-bar hash must be read from that
 packet together. This report never substitutes a manually typed SHA and is
 invalid if the packet is absent, stale, dirty or inconsistent with the exact
-candidate. The latest source-closure notes are recorded in section 23 of the
+candidate. The latest source-closure notes are recorded in section 25 of the
 current gap audit; the packet remains authoritative for exact hashes.
 
 ## 3. Prompt provenance
@@ -145,6 +145,14 @@ timeouts, cancellation, 429/500, retry/backoff, circuit behavior, context,
 tool/JSON handling, budgets, ACL and adversarial RAG. Citation relevance,
 validity, support, faithfulness and unsupported-claim metrics must feed
 conservative answer/retry/clarify/abstain/escalate decisions.
+
+The local source correction at `2238b99ec797b0b2416208dd0e0b02c74897f7d9` adds a bounded authenticated
+`GET /models` provider-health probe, strict model-list validation, resilient
+delegation and an explicit live-health prerequisite in the provider runtime
+gate. Its 54 provider tests, 437 API tests, 295 State-of-Art tests and focused
+loopback gate tests pass. This is local contract evidence only; the approved
+external provider, budget/cancellation behavior, corpus metrics and runtime
+promotion evidence remain open.
 
 ## 18. Observability and SLO
 
