@@ -59,6 +59,13 @@ DEFAULT_PARSER_MEMORY_BYTES = 512 * 1024 * 1024
 MAX_PARSER_MEMORY_BYTES = 2 * 1024 * 1024 * 1024
 MAX_PARSER_RESULT_BYTES = 32 * 1024 * 1024
 PARSER_WIRE_VERSION = 1
+# Parser diagnostics are deliberately discarded in the isolated child.  A
+# third-party parser must not be able to fill the API/worker log pipe or leak
+# document contents through inherited stdout/stderr.  The effective bound is
+# therefore zero bytes for both streams; structured parser results use the
+# bounded JSON envelope above.
+MAX_PARSER_STDOUT_BYTES = 0
+MAX_PARSER_STDERR_BYTES = 0
 MAX_FILENAME_CHARS = 256
 MAX_RAW_FILENAME_CHARS = 4_096
 MAX_PARSER_AUX_CHARS = MAX_PARSED_TEXT_CHARS
@@ -647,6 +654,7 @@ def _parser_process_entry(
     """Parse one validated path in a fresh process and return a safe envelope."""
 
     try:
+        _redirect_parser_streams()
         if os.name == "posix":
             try:
                 os.setsid()
@@ -695,7 +703,37 @@ def _parser_process_entry(
             pass
 
 
-class ProcessParserRunner:
+def _redirect_parser_streams() -> None:
+    """Keep untrusted parser stdout/stderr from becoming an unbounded sink.
+
+    The parser result is the only child-to-parent channel that carries useful
+    data and it already has a hard JSON byte ceiling.  Child diagnostics are
+    intentionally discarded: retaining arbitrary parser output would require
+    another concurrent bounded reader and could expose document contents in
+    worker logs.  Redirecting the file descriptors also covers native parser
+    code that writes around Python's ``sys.stdout``/``sys.stderr`` wrappers.
+    """
+
+    try:
+        devnull = os.open(os.devnull, os.O_WRONLY)
+    except OSError:
+        return
+    try:
+        for stream_fd in (1, 2):
+            try:
+                os.dup2(devnull, stream_fd)
+            except OSError:
+                # A platform without conventional standard streams still has
+                # the parent-side wall-clock/process-group boundary.
+                pass
+    finally:
+        try:
+            os.close(devnull)
+        except OSError:
+            pass
+
+
+class ProcessIsolatedExecutor:
     """Hard parser boundary for externally composed worker ingestion.
 
     Each parse gets a fresh ``spawn`` child. The parent enforces the wall-clock
@@ -833,6 +871,10 @@ class ProcessParserRunner:
                 except (OSError, ValueError):
                     pass
             parent.close()
+
+
+class ProcessParserRunner(ProcessIsolatedExecutor):
+    """Backward-compatible parser-specific name for the isolated executor."""
 
 
 def execute_parser(

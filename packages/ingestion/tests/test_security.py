@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import os
 import pickle
 import stat
 import sys
@@ -27,6 +28,7 @@ from rick_ingestion import (  # noqa: E402
     ParsedDocument,
     ParserLimits,
     ParserTimeoutError,
+    ProcessIsolatedExecutor,
     ProcessParserRunner,
     execute_parser,
     generated_storage_name,
@@ -64,6 +66,22 @@ class _BlockingParser:
 class _OversizedParser:
     def parse(self, path: Path, *, workspace_id: str) -> ParsedDocument:
         return ParsedDocument(text="x" * (MAX_PARSED_TEXT_CHARS + 1))
+
+
+class _LoudParser:
+    """Exercise native stdout/stderr writes inside the isolated child."""
+
+    def parse(self, path: Path, *, workspace_id: str) -> ParsedDocument:
+        os.write(1, b"O" * (1024 * 1024))
+        os.write(2, b"E" * (1024 * 1024))
+        return ParsedDocument(text="quiet result")
+
+
+class _AbruptExitParser:
+    """Exercise safe mapping when native code exits without an envelope."""
+
+    def parse(self, path: Path, *, workspace_id: str) -> ParsedDocument:
+        os._exit(23)
 
 
 @pytest.mark.parametrize(
@@ -319,6 +337,43 @@ def test_process_runner_parses_in_a_fresh_child(tmp_path: Path) -> None:
     )
 
     assert result.text == "isolated text\n"
+
+
+def test_process_isolated_executor_bounds_native_stdout_and_stderr(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    path = _write(tmp_path / "payload.txt", b"payload\n")
+
+    result = execute_parser(
+        _LoudParser(),
+        path,
+        workspace_id="workspace",
+        runner=ProcessIsolatedExecutor(),
+        timeout_seconds=5,
+    )
+
+    captured = capsys.readouterr()
+    assert result.text == "quiet result"
+    assert captured.out == ""
+    assert captured.err == ""
+    assert ProcessParserRunner().process_isolated is True
+
+
+def test_process_isolated_executor_maps_abrupt_child_exit_to_safe_error(tmp_path: Path) -> None:
+    path = _write(tmp_path / "payload.txt", b"payload\n")
+
+    with pytest.raises(ParseError) as error:
+        execute_parser(
+            _AbruptExitParser(),
+            path,
+            workspace_id="workspace",
+            runner=ProcessIsolatedExecutor(),
+            timeout_seconds=5,
+        )
+
+    assert error.value.code == "ingestion_failed"
+    assert str(error.value) == "Could not parse document."
 
 
 def test_process_runner_rejects_an_oversized_result_before_transport(tmp_path: Path) -> None:
