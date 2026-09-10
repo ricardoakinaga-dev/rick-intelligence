@@ -10,9 +10,29 @@ x-service-hardening: &service-hardening
   tmpfs:
     - /tmp:rw,noexec,nosuid,size=64m
 
+# Stateful images retain write access only to their declared data volumes, but
+# still run without privilege escalation or ambient Linux capabilities.
+x-stateful-hardening: &stateful-hardening
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  init: true
+
+# Every service gets a finite staging budget.  These limits are configuration
+# guardrails, not runtime performance evidence; promotion still requires an
+# observed packet from the approved lab.
+x-service-resources: &service-resources
+  resources:
+    limits:
+      cpus: "1.00"
+      memory: 1G
+
 services:
   postgres:
+    <<: *stateful-hardening
     image: postgres:16.4-alpine
+    deploy: *service-resources
     environment:
       POSTGRES_DB: ${POSTGRES_DB:?inject through staging secret configuration}
       POSTGRES_USER: ${POSTGRES_USER:?inject through staging secret configuration}
@@ -27,7 +47,9 @@ services:
     networks: [private]
 
   redis:
+    <<: *stateful-hardening
     image: redis:7.4-alpine
+    deploy: *service-resources
     environment:
       REDIS_PASSWORD: ${REDIS_PASSWORD:?inject through staging secret configuration}
     command:
@@ -44,7 +66,9 @@ services:
     networks: [private]
 
   qdrant:
+    <<: *stateful-hardening
     image: qdrant/qdrant:v1.12.5
+    deploy: *service-resources
     environment:
       QDRANT__SERVICE__API_KEY: ${QDRANT_API_KEY:?inject through staging secret configuration}
     volumes:
@@ -59,7 +83,9 @@ services:
     networks: [private]
 
   object-store:
+    <<: *stateful-hardening
     image: minio/minio:RELEASE.2025-02-28T09-55-16Z
+    deploy: *service-resources
     command: ["server", "/data", "--console-address", ":9001"]
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:?inject through staging secret configuration}
@@ -78,6 +104,7 @@ services:
   jaeger:
     <<: *service-hardening
     image: jaegertracing/all-in-one:1.68.0
+    deploy: *service-resources
     environment:
       COLLECTOR_OTLP_ENABLED: "true"
       SPAN_STORAGE_TYPE: memory
@@ -91,6 +118,7 @@ services:
   otel-collector:
     <<: *service-hardening
     image: otel/opentelemetry-collector-contrib:0.123.0
+    deploy: *service-resources
     command: ["--config=/etc/otelcol-contrib/config.yaml"]
     volumes:
       - ./infrastructure/compose/otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml:ro
@@ -106,6 +134,7 @@ services:
   metrics:
     <<: *service-hardening
     image: prom/prometheus:v2.55.1
+    deploy: *service-resources
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --rule.file=/etc/prometheus/alerts.yml
@@ -128,6 +157,7 @@ services:
   api:
     <<: *service-hardening
     image: ${RICK_API_IMAGE:?inject the exact immutable API image digest}
+    deploy: *service-resources
     environment:
       RICK_ENV: production
       RICK_IDENTITY_MODE: production
@@ -173,6 +203,7 @@ services:
   worker:
     <<: *service-hardening
     image: ${RICK_WORKER_IMAGE:?inject the exact immutable worker image digest}
+    deploy: *service-resources
     environment:
       RICK_ENV: production
       RICK_EXTERNAL_DATABASE_DSN: ${RICK_EXTERNAL_DATABASE_DSN:?inject through the secret manager}
@@ -209,6 +240,7 @@ services:
   worker-b:
     <<: *service-hardening
     image: ${RICK_WORKER_IMAGE:?inject the exact immutable worker image digest}
+    deploy: *service-resources
     environment:
       RICK_ENV: production
       RICK_EXTERNAL_DATABASE_DSN: ${RICK_EXTERNAL_DATABASE_DSN:?inject through the secret manager}
@@ -245,6 +277,7 @@ services:
   web:
     <<: *service-hardening
     image: ${RICK_WEB_IMAGE:?inject the exact immutable web image digest}
+    deploy: *service-resources
     environment:
       RICK_API_INTERNAL_URL: http://api:8000
       NODE_ENV: production

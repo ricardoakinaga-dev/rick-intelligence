@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 
+from scripts.phase11 import check_compose
 from scripts.phase11 import runner
 
 
@@ -187,3 +188,37 @@ def test_down_invalidates_shared_preflight_before_teardown(monkeypatch: pytest.M
 
     assert runner.mode_compose("down") == 0
     assert invalidations == [True]
+
+
+def _rendered_service(*, read_only: bool = True) -> dict[str, object]:
+    return {
+        "security_opt": ["no-new-privileges:true"],
+        "cap_drop": ["ALL"],
+        "init": True,
+        "read_only": read_only,
+        "deploy": {"resources": {"limits": {"cpus": "1.00", "memory": "1G"}}},
+    }
+
+
+def test_rendered_compose_requires_hardening_and_resource_limits() -> None:
+    payload = {
+        "services": {
+            name: _rendered_service(read_only=name not in check_compose.STATEFUL_SERVICES)
+            for name in check_compose.REQUIRED_SERVICES
+        }
+    }
+
+    assert check_compose._validate_rendered_services("fixture.yml", payload) == []
+
+
+def test_rendered_compose_rejects_unbounded_or_privileged_services() -> None:
+    payload = {"services": {name: _rendered_service() for name in check_compose.REQUIRED_SERVICES}}
+    api = payload["services"]["api"]
+    assert isinstance(api, dict)
+    api["privileged"] = True
+    api["deploy"] = {"resources": {"limits": {"cpus": "0", "memory": ""}}}
+    errors = check_compose._validate_rendered_services("fixture.yml", payload)
+
+    assert "fixture.yml:api: privileged mode is forbidden" in errors
+    assert "fixture.yml:api: deploy.resources.limits.cpus must be finite" in errors
+    assert "fixture.yml:api: deploy.resources.limits.memory must be finite" in errors

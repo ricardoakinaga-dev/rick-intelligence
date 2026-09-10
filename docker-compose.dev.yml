@@ -10,10 +10,33 @@ x-service-hardening: &service-hardening
   cap_drop:
     - ALL
   init: true
+  read_only: true
+  tmpfs:
+    - /tmp:rw,noexec,nosuid,size=64m
+
+# Stateful images retain write access only to their declared data volumes, but
+# still run without privilege escalation or ambient Linux capabilities.
+x-stateful-hardening: &stateful-hardening
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  init: true
+
+# Every service gets a finite local-lab budget.  These are Compose resource
+# limits, not a performance claim; the runtime packet must still observe the
+# actual host/container behavior before promotion.
+x-service-resources: &service-resources
+  resources:
+    limits:
+      cpus: "1.00"
+      memory: 1G
 
 services:
   postgres:
+    <<: *stateful-hardening
     image: postgres:16.4-alpine
+    deploy: *service-resources
     environment:
       POSTGRES_DB: ${POSTGRES_DB:?set a disposable development database name}
       POSTGRES_USER: ${POSTGRES_USER:?set a disposable development database user}
@@ -30,7 +53,9 @@ services:
     networks: [private]
 
   redis:
+    <<: *stateful-hardening
     image: redis:7.4-alpine
+    deploy: *service-resources
     environment:
       REDIS_PASSWORD: ${REDIS_PASSWORD:?inject a disposable development password}
     command:
@@ -49,7 +74,9 @@ services:
     networks: [private]
 
   qdrant:
+    <<: *stateful-hardening
     image: qdrant/qdrant:v1.12.5
+    deploy: *service-resources
     environment:
       QDRANT__SERVICE__API_KEY: ${QDRANT_API_KEY:?inject a disposable development API key}
     ports:
@@ -66,7 +93,9 @@ services:
     networks: [private]
 
   object-store:
+    <<: *stateful-hardening
     image: minio/minio:RELEASE.2025-02-28T09-55-16Z
+    deploy: *service-resources
     command: ["server", "/data", "--console-address", ":9001"]
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:?inject a disposable development access key}
@@ -88,6 +117,7 @@ services:
   jaeger:
     <<: *service-hardening
     image: jaegertracing/all-in-one:1.68.0
+    deploy: *service-resources
     environment:
       COLLECTOR_OTLP_ENABLED: "true"
       SPAN_STORAGE_TYPE: memory
@@ -103,6 +133,7 @@ services:
   otel-collector:
     <<: *service-hardening
     image: otel/opentelemetry-collector-contrib:0.123.0
+    deploy: *service-resources
     command: ["--config=/etc/otelcol-contrib/config.yaml"]
     volumes:
       - ./infrastructure/compose/otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml:ro
@@ -122,6 +153,7 @@ services:
   metrics:
     <<: *service-hardening
     image: prom/prometheus:v2.55.1
+    deploy: *service-resources
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --rule.file=/etc/prometheus/alerts.yml
@@ -146,6 +178,7 @@ services:
   api:
     <<: *service-hardening
     image: ${RICK_API_IMAGE:?supply an immutable API image reference}
+    deploy: *service-resources
     environment:
       RICK_ENV: production
       RICK_IDENTITY_MODE: production
@@ -193,6 +226,7 @@ services:
   worker:
     <<: *service-hardening
     image: ${RICK_WORKER_IMAGE:?supply an immutable worker image reference}
+    deploy: *service-resources
     environment:
       RICK_ENV: production
       RICK_EXTERNAL_DATABASE_DSN: ${RICK_EXTERNAL_DATABASE_DSN:?inject the development database DSN}
@@ -229,6 +263,7 @@ services:
   worker-b:
     <<: *service-hardening
     image: ${RICK_WORKER_IMAGE:?supply an immutable worker image reference}
+    deploy: *service-resources
     environment:
       RICK_ENV: production
       RICK_EXTERNAL_DATABASE_DSN: ${RICK_EXTERNAL_DATABASE_DSN:?inject the development database DSN}
@@ -265,6 +300,7 @@ services:
   web:
     <<: *service-hardening
     image: ${RICK_WEB_IMAGE:?supply an immutable web image reference}
+    deploy: *service-resources
     environment:
       RICK_API_INTERNAL_URL: http://api:8000
       NODE_ENV: production
