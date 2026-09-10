@@ -65,6 +65,25 @@ def test_readiness_reports_selected_runtime_components_without_changing_liveness
     assert all(set(check) == {"name", "ok", "required"} for check in body["checks"])
 
 
+def test_api_can_share_worker_graph_without_claiming_worker_readiness() -> None:
+    class UnstartedWorker:
+        def health_check(self):
+            return False
+
+    providers = Providers(
+        settings=make_settings(),
+        identity=InMemoryIdentityProvider(),
+        chat_backend=StubChatBackend(),
+        audit_sink=InMemoryAuditSink(),
+        worker=UnstartedWorker(),
+    )
+    providers._worker_health_check_required = False
+
+    states = asyncio.run(lifecycle.collect_readiness_states(providers))
+
+    assert all(state.name != "worker" for state in states)
+
+
 def test_readiness_preserves_custom_checks_and_distinguishes_degraded_and_not_ready() -> None:
     optional = lambda: DependencyState(name="optional-store", ok=False, required=False, detail="offline")
     degraded = _client(health_checks={"optional-store": optional})

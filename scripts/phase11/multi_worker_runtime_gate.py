@@ -278,11 +278,25 @@ def _run_concurrent_claim(
         raise RuntimeError("worker observations did not come from two distinct processes")
     if claimed[0].get("heartbeat") is not True:
         raise RuntimeError("winning worker did not renew its lease")
+    outbox_connection = dependencies[0].connect(dsn)
+    try:
+        with outbox_connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT COUNT(*) FROM rick_outbox "
+                "WHERE aggregate_id=%s AND event_type='jobs.acknowledged'",
+                (job_id,),
+            )
+            row = cursor.fetchone()
+    finally:
+        outbox_connection.close()
+    if not row or int(row[0]) != 1:
+        raise RuntimeError("concurrent claim produced more than one durable publication event")
     return [
         GateResult("process-isolation", "PASS", "two distinct worker processes used independent database sessions"),
         GateResult("single-owner-claim", "PASS", "exactly one worker claimed the queued job"),
         GateResult("heartbeat", "PASS", "the winning worker renewed its durable lease"),
         GateResult("single-publication", "PASS", "exactly one worker acknowledged the publication"),
+        GateResult("publication-outbox-fence", "PASS", "the durable outbox contains one idempotent publication event"),
     ]
 
 
@@ -365,16 +379,25 @@ def _run_crash_recovery(
     with psycopg.connect(dsn) as connection:
         with connection.cursor() as cursor:
             cursor.execute(
-                "SELECT COUNT(*) FROM rick_ingestion_job_events WHERE job_id=%s AND event_type='acknowledged'",
+                "SELECT COUNT(*) FROM rick_ingestion_job_events "
+                "WHERE job_id=%s AND event_type='acknowledged'",
                 (job_id,),
             )
-            row = cursor.fetchone()
-    if not row or int(row[0]) != 1:
-        raise RuntimeError("crash recovery produced an unexpected publication event count")
+            lifecycle_row = cursor.fetchone()
+            cursor.execute(
+                "SELECT COUNT(*) FROM rick_outbox "
+                "WHERE aggregate_id=%s AND event_type='jobs.acknowledged'",
+                (job_id,),
+            )
+            outbox_row = cursor.fetchone()
+    if not lifecycle_row or int(lifecycle_row[0]) != 1:
+        raise RuntimeError("crash recovery produced an unexpected lifecycle publication count")
+    if not outbox_row or int(outbox_row[0]) != 1:
+        raise RuntimeError("crash recovery produced an unexpected durable publication count")
     return [
         GateResult("crash-recovery", "PASS", "a crashed worker's durable lease was reclaimed by a second process"),
         GateResult("stale-ack-rejection", "PASS", "the crashed worker's stale lease could not acknowledge after reclaim"),
-        GateResult("recovered-single-publication", "PASS", "the recovered job has exactly one acknowledged lifecycle event"),
+        GateResult("recovered-single-publication", "PASS", "the recovered job has one lifecycle and one outbox publication event"),
     ]
 
 

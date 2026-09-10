@@ -216,6 +216,7 @@ services:
       RICK_OBJECT_STORE_ACCESS_KEY_ID: ${OBJECT_STORE_ACCESS_KEY_ID:?inject through the secret manager}
       RICK_OBJECT_STORE_SECRET_ACCESS_KEY: ${OBJECT_STORE_SECRET_ACCESS_KEY:?inject through the secret manager}
       RICK_LOCKER_BASE_URL: ${RICK_LOCKER_BASE_URL:?inject the reviewed lease boundary}
+      LLM_PROVIDER: ${LLM_PROVIDER:?inject the reviewed provider kind}
       LLM_API_KEY: ${LLM_API_KEY:?inject through the secret manager}
       LLM_BASE_URL: ${LLM_BASE_URL:?inject the reviewed provider endpoint}
       LLM_MODEL: ${LLM_MODEL:?inject the reviewed chat model}
@@ -271,6 +272,12 @@ services:
       RICK_WORKER_SCOPE_WORKSPACE: ${RICK_WORKER_SCOPE_WORKSPACE:?inject the worker workspace scope}
       RICK_WORKER_SCOPE_COLLECTION: ${RICK_WORKER_SCOPE_COLLECTION:?inject the worker collection scope}
       RICK_COMPOSITION_CREATED_BY: ${RICK_COMPOSITION_CREATED_BY:?inject the composition actor}
+      LLM_PROVIDER: ${LLM_PROVIDER:?inject the reviewed provider kind}
+      LLM_API_KEY: ${LLM_API_KEY:?inject through the secret manager}
+      LLM_BASE_URL: ${LLM_BASE_URL:?inject the reviewed provider endpoint}
+      LLM_MODEL: ${LLM_MODEL:?inject the reviewed chat model}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:?inject the reviewed embedding model}
+      EMBEDDING_DIMENSION: ${EMBEDDING_DIMENSION:-1536}
       OTEL_SERVICE_NAME: rick-worker
       OTEL_EXPORTER_OTLP_ENDPOINT: ${RICK_OTEL_ENDPOINT:?inject the collector endpoint}
       OTEL_EXPORTER_OTLP_PROTOCOL: grpc
@@ -315,6 +322,12 @@ services:
       RICK_WORKER_SCOPE_WORKSPACE: ${RICK_WORKER_SCOPE_WORKSPACE:?inject the worker workspace scope}
       RICK_WORKER_SCOPE_COLLECTION: ${RICK_WORKER_SCOPE_COLLECTION:?inject the worker collection scope}
       RICK_COMPOSITION_CREATED_BY: ${RICK_COMPOSITION_CREATED_BY:?inject the composition actor}
+      LLM_PROVIDER: ${LLM_PROVIDER:?inject the reviewed provider kind}
+      LLM_API_KEY: ${LLM_API_KEY:?inject through the secret manager}
+      LLM_BASE_URL: ${LLM_BASE_URL:?inject the reviewed provider endpoint}
+      LLM_MODEL: ${LLM_MODEL:?inject the reviewed chat model}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:?inject the reviewed embedding model}
+      EMBEDDING_DIMENSION: ${EMBEDDING_DIMENSION:-1536}
       OTEL_SERVICE_NAME: rick-worker-b
       OTEL_EXPORTER_OTLP_ENDPOINT: ${RICK_OTEL_ENDPOINT:?inject the collector endpoint}
       OTEL_EXPORTER_OTLP_PROTOCOL: grpc

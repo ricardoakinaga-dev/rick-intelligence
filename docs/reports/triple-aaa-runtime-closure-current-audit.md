@@ -34,13 +34,12 @@ RAG_EVAL/FRONTEND/SUPPLY_CHAIN/PHASE3_EVIDENCE have not all been rerun here.
 Historical counts in older reports are not current same-SHA CI evidence.
 
 After this slice, `make triple-aaa-capability-matrix` passes with 11 rows and
-the exact prompt state enum. After the implementation was committed, a fresh
-`make triple-aaa-verify` observed commit
-`46fdb41df195b5242b2928835a5880c5025ed107`, tree
-`b5bc1a75514ebd68e11849c99a851fa9fc58f4cb`, a clean checkout and exit `2` /
-`STATE_OF_ART_CANDIDATE`. The packet records only typed external blockers and
-sets `promotion_allowed=false`; it is current diagnostic evidence, not a
-promotion approval.
+the exact prompt state enum. The verifier packet is regenerated after each
+clean implementation commit and is authoritative for the candidate commit,
+tree, artifact digest, worktree state and classification. A diagnostic packet
+with exit `2` / `STATE_OF_ART_CANDIDATE` records typed external blockers and
+sets `promotion_allowed=false`; it is not a promotion approval. No report text
+substitutes for that same-run packet.
 
 The inspected sources include README, Makefile, CONTRIBUTING, active `.agent`
 state/plan/ledger tails, existing gap/promotion/blocker reports, Phase 3 matrix

@@ -596,6 +596,10 @@ class OpenAICompatibleClient:
                 timeout=self.config.timeout,
                 transport=self._transport,
                 follow_redirects=False,
+                # Provider credentials and requests must stay on the explicit
+                # configured origin; ambient proxy variables are not runtime
+                # authority and may redirect them across a trust boundary.
+                trust_env=False,
             )
         return self._client
 

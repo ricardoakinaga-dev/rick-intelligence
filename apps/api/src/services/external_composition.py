@@ -586,6 +586,10 @@ def build_external_providers(
     # provider client. Expose it only to the explicit composition owner so
     # application shutdown can stop that loop before closing the provider.
     providers._embedding_adapter = embeddings
+    # The API process shares the complete provider graph with the worker but
+    # does not own that worker's polling loop. Readiness must not synthesize a
+    # worker probe from the merely-present object.
+    providers._worker_health_check_required = inputs.worker_health_check_required
     return providers
 
 

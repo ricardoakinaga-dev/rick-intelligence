@@ -13,6 +13,7 @@ ROUTERS = [health.router, auth.router, sessions.router, chat.router, cases.route
 ROUTE_REGISTRY: list[dict] = [
     {"method": "GET", "path": "/health/live", "auth": "public", "permission": None},
     {"method": "GET", "path": "/health/ready", "auth": "public", "permission": None},
+    {"method": "GET", "path": "/metrics", "auth": "public", "permission": None},
     {"method": "POST", "path": "/api/v1/auth/login", "auth": "public", "permission": None},
     {"method": "POST", "path": "/api/v1/auth/recovery", "auth": "public", "permission": None},
     {"method": "POST", "path": "/api/v1/auth/request-password-reset", "auth": "public", "permission": None},

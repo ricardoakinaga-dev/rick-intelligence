@@ -787,10 +787,10 @@ class ApiTelemetry:
     def prometheus_text(self) -> str:
         """Return a bounded Prometheus exposition for this API process.
 
-        This is intentionally a protected, process-local inspection endpoint.
-        It contains no event payloads, identities, paths, query strings, or
-        unbounded labels. A collector may scrape it through an authenticated
-        management route and aggregate it outside the application.
+        This is a bounded, process-local exposition. It contains no event
+        payloads, identities, paths, query strings, or unbounded labels. The
+        private deployment network may scrape it with Prometheus; the JSON
+        management routes retain their explicit permission boundary.
         """
 
         current = self.snapshot()

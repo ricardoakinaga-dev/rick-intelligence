@@ -11,6 +11,9 @@ PUBLIC_ALLOWLIST = frozenset(
     {
         ("GET", "/health/live"),
         ("GET", "/health/ready"),
+        # The private Prometheus scrape target exposes only bounded aggregate
+        # metrics; administrative JSON and Prometheus views remain protected.
+        ("GET", "/metrics"),
         ("POST", "/api/v1/auth/login"),
         ("POST", "/api/v1/auth/recovery"),
         ("POST", "/api/v1/auth/request-password-reset"),

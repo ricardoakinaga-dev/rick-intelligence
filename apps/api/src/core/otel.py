@@ -28,9 +28,34 @@ class OpenTelemetryRuntime:
 class _HTTPSpanMiddleware:
     """Small ASGI middleware that emits one bounded span per HTTP request."""
 
-    def __init__(self, app: object, *, tracer: object) -> None:
+    def __init__(self, app: object, *, tracer: object, extract_context: object | None = None) -> None:
         self.app = app
         self.tracer = tracer
+        self.extract_context = extract_context
+
+    @staticmethod
+    def _carrier(scope: dict[str, Any]) -> dict[str, str]:
+        """Project only W3C propagation headers into a bounded carrier."""
+
+        raw_headers = scope.get("headers")
+        if not isinstance(raw_headers, (list, tuple)):
+            return {}
+        carrier: dict[str, str] = {}
+        for item in raw_headers[:32]:
+            if not isinstance(item, (list, tuple)) or len(item) != 2:
+                continue
+            raw_name, raw_value = item
+            if not isinstance(raw_name, (bytes, bytearray)) or not isinstance(raw_value, (bytes, bytearray)):
+                continue
+            try:
+                name = bytes(raw_name).decode("ascii").lower()
+                value = bytes(raw_value).decode("ascii")
+            except UnicodeDecodeError:
+                continue
+            if name not in {"traceparent", "tracestate", "baggage"} or not value or len(value) > 4096:
+                continue
+            carrier[name] = value
+        return carrier
 
     async def __call__(self, scope: dict[str, Any], receive: object, send: object) -> None:
         if scope.get("type") != "http":
@@ -47,7 +72,17 @@ class _HTTPSpanMiddleware:
                     status_code = raw_status
             await send(message)
 
-        with self.tracer.start_as_current_span("HTTP " + method[:16]) as span:
+        parent_context = None
+        extractor = self.extract_context
+        if callable(extractor):
+            try:
+                parent_context = extractor(self._carrier(scope))
+            except Exception:
+                # A malformed propagation header must not break the request;
+                # the span remains a new root with bounded attributes.
+                parent_context = None
+        span_kwargs = {} if parent_context is None else {"context": parent_context}
+        with self.tracer.start_as_current_span("HTTP " + method[:16], **span_kwargs) as span:
             span.set_attribute("http.request.method", method[:16])
             try:
                 await self.app(scope, receive, observed_send)
@@ -71,7 +106,7 @@ def install_otel(app: object, telemetry: object) -> OpenTelemetryRuntime:
         return runtime
 
     try:
-        from opentelemetry import trace
+        from opentelemetry import propagate, trace
         from opentelemetry.sdk.resources import Resource
         from opentelemetry.sdk.trace import TracerProvider
         from opentelemetry.sdk.trace.export import BatchSpanProcessor
@@ -93,7 +128,7 @@ def install_otel(app: object, telemetry: object) -> OpenTelemetryRuntime:
         add_middleware = getattr(app, "add_middleware", None)
         if not callable(add_middleware):
             raise RuntimeError("ASGI application does not expose middleware registration")
-        add_middleware(_HTTPSpanMiddleware, tracer=tracer)
+        add_middleware(_HTTPSpanMiddleware, tracer=tracer, extract_context=propagate.extract)
         runtime = OpenTelemetryRuntime("CONFIGURED", endpoint, provider)
     except Exception:
         # A missing SDK or a malformed exporter must be visible in telemetry;

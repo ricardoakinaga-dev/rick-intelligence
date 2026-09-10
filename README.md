@@ -37,7 +37,7 @@ The final local report, scorecard and external blocker matrix are
 [`phase-2-final-report.md`](docs/progress/phase-2-final-report.md),
 [`state-of-art-triple-aaa-final-audit.md`](docs/reports/state-of-art-triple-aaa-final-audit.md)
 and [`external-evidence-blockers.md`](docs/reports/external-evidence-blockers.md).
-The current 28-section promotion packet is
+The current 29-section promotion packet is
 [`rick-intelligence-triple-aaa-final-promotion.md`](docs/reports/rick-intelligence-triple-aaa-final-promotion.md)
 and remains explicitly `NO-GO` until runtime evidence is sealed.
 The current closure prompt is archived at

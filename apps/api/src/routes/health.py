@@ -110,3 +110,20 @@ async def admin_metrics_prometheus(request: Request, session=Depends(require_per
     if not callable(exporter):
         return PlainTextResponse("# telemetry unavailable\n", status_code=503)
     return PlainTextResponse(exporter(), media_type="text/plain; version=0.0.4")
+
+
+@router.get("/metrics", response_class=PlainTextResponse)
+def metrics(request: Request):
+    """Expose only bounded process metrics for an internal Prometheus scrape.
+
+    The exposition contains counters, readiness state and bounded latency
+    summaries; it never includes request payloads, identities or credentials.
+    Authentication remains on the administrative JSON and Prometheus routes,
+    while the private Compose network restricts this scrape target.
+    """
+
+    telemetry = getattr(request.app.state, "telemetry", None)
+    exporter = getattr(telemetry, "prometheus_text", None)
+    if not callable(exporter):
+        return PlainTextResponse("# telemetry unavailable\n", status_code=503)
+    return PlainTextResponse(exporter(), media_type="text/plain; version=0.0.4")

@@ -376,6 +376,8 @@ def build_readiness_checks(providers: object) -> dict[str, object]:
             ("redis", "rate_limiter", True),
         )
     for name, attribute_name, required in selected_components:
+        if name == "worker" and getattr(providers, "_worker_health_check_required", True) is not True:
+            continue
         component = storage if name == "storage" else getattr(providers, attribute_name, None)
         if component is None and production:
             checks.setdefault(name, lambda name=name: DependencyState(

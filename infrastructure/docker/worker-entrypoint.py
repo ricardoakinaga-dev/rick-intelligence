@@ -81,12 +81,12 @@ def _call_startup(worker: object) -> None:
         _fail("configured worker startup is not ready")
 
 
-def _shutdown_worker(worker: object, *, timeout: float = 30.0) -> None:
+def _shutdown_worker(worker: object, *, timeout: float = 30.0) -> bool:
     shutdown = getattr(worker, "shutdown", None)
     if not callable(shutdown):
         shutdown = getattr(worker, "close", None)
     if not callable(shutdown):
-        return
+        return True
     try:
         parameters = inspect.signature(shutdown).parameters.values()
         names = {parameter.name for parameter in parameters}
@@ -100,6 +100,7 @@ def _shutdown_worker(worker: object, *, timeout: float = 30.0) -> None:
     result = shutdown(**kwargs)
     if inspect.isawaitable(result):
         asyncio.run(result)
+    return result is not False and getattr(result, "timed_out", False) is not True
 
 
 def _install_stop_handlers(worker: object) -> tuple[object, object] | None:
@@ -156,6 +157,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     worker = _load_worker()
     if args.health_check:
+        exit_code = 1
         try:
             _call_startup(worker)
             check = getattr(worker, "readiness_check", None)
@@ -166,13 +168,15 @@ def main(argv: list[str] | None = None) -> int:
             result = check()
             if inspect.isawaitable(result):
                 result = asyncio.run(result)
-            return 0 if _health_value(result) else 1
+            exit_code = 0 if _health_value(result) else 1
         except SystemExit:
             raise
         except Exception:
-            return 1
+            exit_code = 1
         finally:
-            _shutdown_worker(worker, timeout=30.0)
+            if not _shutdown_worker(worker, timeout=30.0):
+                exit_code = 1
+        return exit_code
     try:
         _call_startup(worker)
     except SystemExit:
@@ -181,17 +185,19 @@ def main(argv: list[str] | None = None) -> int:
         _fail(f"configured worker startup failed with {type(exc).__name__}")
     previous_handlers = _install_stop_handlers(worker)
     started_at = time.monotonic()
+    exit_code = 0
     try:
         worker.run_forever()
     except KeyboardInterrupt:
-        return 0
+        exit_code = 0
     except Exception as exc:  # Keep process logs free of secret-bearing text.
         print(f"worker stopped with {type(exc).__name__}", file=sys.stderr)
-        return 1
+        exit_code = 1
     finally:
         _restore_stop_handlers(previous_handlers)
-        _shutdown_worker(worker, timeout=max(1.0, 30.0 - (time.monotonic() - started_at)))
-    return 0
+        if not _shutdown_worker(worker, timeout=max(1.0, 30.0 - (time.monotonic() - started_at))):
+            exit_code = 1
+    return exit_code
 
 
 if __name__ == "__main__":

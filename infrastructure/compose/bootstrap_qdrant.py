@@ -66,6 +66,34 @@ def _request(endpoint: str, method: str, path: str, *, body: object | None = Non
         raise RuntimeError(f"Qdrant {method} {path} failed") from error
 
 
+def _require_success(status: int, operation: str) -> None:
+    """Keep a one-shot bootstrap fail-closed on every mutation response."""
+
+    if not 200 <= status < 300:
+        raise RuntimeError(f"Qdrant {operation} returned an unexpected status")
+
+
+def _dense_schema(payload: object) -> tuple[int, str]:
+    """Extract the named dense vector schema from Qdrant's collection shape."""
+
+    if not isinstance(payload, dict):
+        raise RuntimeError("Qdrant collection schema is unavailable")
+    result = payload.get("result")
+    config = result.get("config") if isinstance(result, dict) else None
+    params = config.get("params") if isinstance(config, dict) else None
+    vectors = params.get("vectors") if isinstance(params, dict) else None
+    if not isinstance(vectors, dict):
+        raise RuntimeError("Qdrant collection vectors schema is unavailable")
+    # This composition requires the explicit `dense` vector used by the
+    # retrieval adapter; an unnamed collection is a schema mismatch.
+    dense = vectors.get("dense")
+    size = dense.get("size") if isinstance(dense, dict) else None
+    distance = dense.get("distance") if isinstance(dense, dict) else None
+    if type(size) is not int or not isinstance(distance, str):
+        raise RuntimeError("Qdrant dense vector schema is invalid")
+    return size, distance.strip().lower()
+
+
 def main() -> int:
     endpoint = _endpoint()
     collection = _required("RICK_QDRANT_COLLECTION")
@@ -80,24 +108,30 @@ def main() -> int:
         raise RuntimeError("embedding dimensions are out of range")
 
     path = f"/collections/{quote(collection, safe='')}"
-    status, _ = _request(endpoint, "GET", path)
+    status, collection_payload = _request(endpoint, "GET", path)
     if status == 404:
-        _request(
+        create_status, _ = _request(
             endpoint,
             "PUT",
             path,
             body={"vectors": {"dense": {"size": dimensions, "distance": "Cosine"}}},
         )
+        _require_success(create_status, "collection create")
     elif status != 200:
         raise RuntimeError("Qdrant collection preflight failed")
+    else:
+        observed_dimensions, observed_distance = _dense_schema(collection_payload)
+        if observed_dimensions != dimensions or observed_distance != "cosine":
+            raise RuntimeError("Qdrant collection schema does not match the configured embedding")
 
     for field in ("tenant_id", "workspace_id", "collection_id"):
-        _request(
+        index_status, _ = _request(
             endpoint,
             "PUT",
             f"{path}/index",
             body={"field_name": field, "field_schema": "keyword", "wait": True},
         )
+        _require_success(index_status, f"index {field}")
     return 0
 
 

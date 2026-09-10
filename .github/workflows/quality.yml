@@ -218,6 +218,8 @@ jobs:
         run: make phase3-evidence
       - name: Validate matrix binding and status semantics
         run: python3 scripts/state_of_art/generate_phase3_evidence.py --verify
+      - name: Validate the current Triple AAA prompt matrix
+        run: make triple-aaa-capability-matrix
       - name: Upload raw Phase 3 matrix
         if: always()
         uses: actions/upload-artifact@v4.6.2

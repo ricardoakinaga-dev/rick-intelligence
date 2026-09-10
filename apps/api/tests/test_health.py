@@ -93,3 +93,11 @@ def test_prometheus_metrics_are_protected_and_finite(client):
     assert "# TYPE rick_api_retrieval_latency_ms histogram" in response.text
     assert "/api/v1/admin/metrics/prometheus" not in response.text
     assert "authorization" not in response.text.lower()
+
+
+def test_internal_metrics_scrape_is_bounded_and_public(client):
+    response = client.get("/metrics")
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/plain")
+    assert "rick_api_process_up 1" in response.text
+    assert "authorization" not in response.text.lower()

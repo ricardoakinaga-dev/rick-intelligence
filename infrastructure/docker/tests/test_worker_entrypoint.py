@@ -56,6 +56,17 @@ class _LifecycleWorker(_Worker):
         self.closed = True
 
 
+class _TimedOutWorker(_Worker):
+    def startup(self) -> None:
+        return None
+
+    def readiness_check(self) -> bool:
+        return True
+
+    def shutdown(self, *, timeout: float):
+        return types.SimpleNamespace(timed_out=True)
+
+
 class WorkerEntrypointTests(unittest.TestCase):
     def test_missing_composition_fails_closed_without_printing_environment(self) -> None:
         with patch.dict(os.environ, {}, clear=True):
@@ -90,6 +101,14 @@ class WorkerEntrypointTests(unittest.TestCase):
         self.assertTrue(worker.started)
         self.assertTrue(worker.ran)
         self.assertTrue(worker.closed)
+
+    def test_shutdown_timeout_is_not_reported_as_a_healthy_worker(self) -> None:
+        worker = _TimedOutWorker()
+        module = types.ModuleType("rec33_timeout_composition")
+        module.make_worker = lambda: worker
+        with patch.dict(sys.modules, {"rec33_timeout_composition": module}):
+            with patch.dict(os.environ, {ENTRYPOINT.COMPOSITION_ENV: "rec33_timeout_composition:make_worker"}, clear=True):
+                self.assertEqual(ENTRYPOINT.main(["--health-check"]), 1)
 
 
 if __name__ == "__main__":

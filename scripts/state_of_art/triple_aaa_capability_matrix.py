@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 from pathlib import Path
 import sys
 from typing import Any
@@ -16,6 +17,8 @@ except ImportError:  # pragma: no cover
 
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_PATH = ROOT / "docs/reports/triple-aaa-runtime-capability-matrix.json"
+EXPECTED_PROMPT = "docs/prompts/triple-aaa-runtime-closure-2026-09-10.txt"
+EXPECTED_PROMPT_SHA256 = "064be5e04ed483d5d95ef803a66faf6675f7c1f00633cdea83d5abfdd5370d5f"
 ALLOWED_STATES = frozenset({
     "DONE_LOCAL_SCOPE", "LOCAL_VERIFIED", "VERIFIED_RUNTIME", "PARTIAL",
     "NOT_RUN", "BLOCKED_EXTERNAL", "FAILED", "PROMOTABLE",
@@ -37,6 +40,20 @@ def validate(path: Path = DEFAULT_PATH) -> dict[str, Any]:
         return {"status": "FAIL", "errors": ["matrix root must be an object"]}
     if document.get("schema") != "rick-triple-aaa-runtime-capability-matrix.v1":
         errors.append("schema mismatch")
+    if document.get("prompt") != EXPECTED_PROMPT:
+        errors.append("prompt binding mismatch")
+    if document.get("prompt_sha256") != EXPECTED_PROMPT_SHA256:
+        errors.append("prompt hash mismatch")
+    prompt_path = ROOT / EXPECTED_PROMPT
+    try:
+        observed_prompt_hash = hashlib.sha256(prompt_path.read_bytes()).hexdigest()
+    except OSError:
+        observed_prompt_hash = None
+    if observed_prompt_hash != EXPECTED_PROMPT_SHA256:
+        errors.append("archived prompt bytes do not match the expected hash")
+    binding = document.get("candidate_binding")
+    if not isinstance(binding, dict) or binding.get("packet") != ".runtime/phase-3/triple-aaa-verify.json":
+        errors.append("candidate binding must point to the same-run verifier packet")
     rows = document.get("rows")
     if not isinstance(rows, list) or not rows:
         errors.append("rows must be a non-empty array")

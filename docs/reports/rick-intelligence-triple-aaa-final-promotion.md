@@ -67,9 +67,10 @@ constraint, queue, DLQ, replay, backup and fencing evidence was not observed.
 
 The canonical worker validates scope, leases, heartbeats, cooperative
 cancellation and stale acknowledgement boundaries. Two worker services are
-declared and share the durable queue. The existing runtime gate still does not
-prove every requested crash point or an independent durable outbox/publication
-fence; live Worker A/B evidence is therefore blocked.
+declared and share the durable queue. The runtime gate now checks both the
+lifecycle acknowledgement and the durable outbox publication fence, but it
+still does not prove every requested crash point in a live Worker A/B run.
+That runtime evidence is therefore blocked.
 
 ## 8. Redis
 
@@ -89,8 +90,10 @@ and credential-policy evidence is not run.
 
 ## 10. Qdrant
 
-Compose performs an idempotent collection preflight, creates the named dense
-schema when absent and ensures tenant/workspace/collection keyword indexes.
+Compose performs an idempotent collection preflight, rejects a mismatched
+existing named dense schema, creates it when absent and ensures
+tenant/workspace/collection keyword indexes. Every mutation response is checked
+for success.
 The adapter and local tests validate request and response boundaries. Live
 schema, filters, alias swap, reindex, partial failure, deletion, rebuild and
 restore evidence remains external.
@@ -150,9 +153,11 @@ signature/provenance inspection and a fresh full security review remain open.
 [`docs/operations/slo.md`](../operations/slo.md) separates `LOCAL OBSERVATION`,
 `STAGING SLO` and `PRODUCTION SLO`; missing measurements stay `no_data`. API
 images include an optional OTLP tracer provider and bounded HTTP middleware
-when `OTEL_TRACES_EXPORTER=otlp` is configured, while local metrics remain
-bounded and redacted. Collector delivery, trace propagation, alert routing,
-SLO windows and no-data behavior were not observed in a live stack.
+when `OTEL_TRACES_EXPORTER=otlp` is configured. The middleware accepts only
+bounded W3C propagation headers, and Compose exposes a private `/metrics`
+scrape target with Prometheus configured for the API. Collector delivery,
+trace propagation across the live graph, alert routing, SLO windows and
+no-data behavior were not observed in a live stack.
 
 ## 19. Disaster Recovery
 

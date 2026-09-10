@@ -27,6 +27,7 @@ PROMPT_SCORECARD_DIMENSIONS = (
     "Evidence",
     "Decision",
     "Professor",
+    "Provider",
     "Security",
     "Multi-tenancy",
     "Observability",
@@ -292,10 +293,10 @@ def test_final_promotion_report_matches_prompt_section_and_scorecard_contract() 
     text = report.read_text(encoding="utf-8")
 
     sections = re.findall(r"^## (\d+)\.", text, flags=re.MULTILINE)
-    assert sections == [str(number) for number in range(1, 29)]
+    assert sections == [str(number) for number in range(1, 30)]
 
     rows = re.findall(r"^\| (\d+) \| ([^|]+) \| `[^`]+` \|", text, flags=re.MULTILINE)
-    assert [int(number) for number, _dimension in rows] == list(range(1, 26))
+    assert [int(number) for number, _dimension in rows] == list(range(1, 27))
     assert [dimension.strip() for _number, dimension in rows] == list(PROMPT_SCORECARD_DIMENSIONS)
     assert "**Decision:** `NO-GO / NOT PROMOTED`." in text
 

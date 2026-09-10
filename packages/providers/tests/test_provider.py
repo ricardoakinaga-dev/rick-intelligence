@@ -66,6 +66,18 @@ def _response(request: httpx.Request, status: int, body: object) -> httpx.Respon
     return httpx.Response(status, json=body, request=request)
 
 
+def test_default_provider_client_ignores_ambient_proxy_environment() -> None:
+    provider = OpenAICompatibleClient(
+        _config(),
+        transport=httpx.MockTransport(lambda request: _response(request, 200, {})),
+    )
+    client = provider._ensure_client()
+    try:
+        assert client._trust_env is False
+    finally:
+        asyncio.run(provider.aclose())
+
+
 async def _close(provider: OpenAICompatibleClient) -> None:
     await provider.aclose()
 

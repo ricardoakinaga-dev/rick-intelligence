@@ -370,7 +370,10 @@ class _HttpxTransport:
         except ImportError:
             raise QdrantDependencyError() from None
         try:
-            self._client = httpx.Client(transport=transport)
+            # The configured endpoint is the authority. Environment proxy
+            # variables must not silently redirect a signed vector request to
+            # another network boundary.
+            self._client = httpx.Client(transport=transport, trust_env=False)
         except Exception:
             raise QdrantConfigurationError() from None
 

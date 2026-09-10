@@ -1,8 +1,11 @@
 {
   "schema": "rick-triple-aaa-runtime-capability-matrix.v1",
-  "candidate_commit": "d7daacbd33794c555aea4b55416bc58cabffa530",
-  "candidate_tree": "1f3a1ed48bc76dcec24dd1f9595f7d7c3bdc6cf2",
   "prompt": "docs/prompts/triple-aaa-runtime-closure-2026-09-10.txt",
+  "prompt_sha256": "064be5e04ed483d5d95ef803a66faf6675f7c1f00633cdea83d5abfdd5370d5f",
+  "candidate_binding": {
+    "packet": ".runtime/phase-3/triple-aaa-verify.json",
+    "rule": "same-run verifier packet supplies commit, tree, clean-worktree and promotion classification"
+  },
   "rows": [
     {
       "CAPABILITY": "Current prompt preservation",
