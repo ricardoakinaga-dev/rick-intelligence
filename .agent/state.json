@@ -14,7 +14,7 @@
   "active_execplan": ".agent/plans/phase-3-runtime-evidence-production-promotion.md",
   "active_task": "PH3-2-LAB-READINESS",
   "verification_state": "PARTIAL",
-  "repository_state": "Current Phase 3 source implementation candidate is b4c8ac0c8fee311ede12c417d0be1cbfd5aada38 (tree b8e92492f2216c0c5c0ecdc90ccdfd5807c77d15). It retains the fail-closed release artifact postconditions, named runtime envelopes and same-run CI diagnostics, and additionally rejects conflicting evidence aliases, inconsistent manifest status aggregates and mismatched gate/declaration reviewer identities. The current local verification passes, but the prior integrated verifier artifact is not reused as current proof after this source change; live runtime lanes remain blocked, promotion is disallowed and no Triple AAA claim is made.",
+  "repository_state": "Current Phase 3 source implementation candidate is 957b534d7b33a025525cb1dd667872791239ed43 (tree 65dcad96347adbd34e267537c424bef444ec48d7). It binds FAST, UNIT, CONTRACT, SECURITY and SUPPLY_CHAIN local CI lanes to bounded raw artifacts with same-run GitHub provenance, preserves the supply-chain runtime envelope as primary, and wires the frontend runtime adapter to the Phase 3 envelope. The current local verification passes, but the prior integrated verifier artifact is not reused as current proof after this source change; live runtime lanes remain blocked, promotion is disallowed and no Triple AAA claim is made.",
   "instruction_scope_refs": [
     ".agent/PLANS.md",
     "cvg-master-rag-v2/AGENTS.md",
@@ -23,8 +23,8 @@
     "docs/plans/phase-3-runtime-evidence-production-promotion.md"
   ],
   "last_gate_record": ".agent/gates/phase-3-2-lab-readiness-implementation-ready.json",
-  "last_event_id": "EVT-PH3-2-RELEASE-MANIFEST-CONSISTENCY-20260910",
-  "state_revision": 241,
+  "last_event_id": "EVT-PH3-2-CI-SAME-RUN-EVIDENCE-20260910",
+  "state_revision": 242,
   "next_gate": "VERIFIED",
   "active_action_id": "PH3-2-LAB-READINESS:WAIT_RUNTIME",
   "blocked_by": [
@@ -32,5 +32,5 @@
     "Disposable runtime secrets and endpoint authority are unavailable"
   ],
   "human_approval_required": [],
-  "updated_at": "2026-09-10T06:03:47Z"
+  "updated_at": "2026-09-10T06:36:22Z"
 }

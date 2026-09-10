@@ -782,7 +782,10 @@
         "scripts/state_of_art/generate_release_evidence.py",
         ".github/workflows/quality.yml",
         ".agent/verification.jsonl#VER-PH3-2-RELEASE-FAIL-CLOSED-20260910",
-        ".agent/verification.jsonl#VER-PH3-2-RELEASE-MANIFEST-CONSISTENCY-20260910"
+        ".agent/verification.jsonl#VER-PH3-2-RELEASE-MANIFEST-CONSISTENCY-20260910",
+        "scripts/state_of_art/ci_lane_evidence.py",
+        "scripts/state_of_art/tests/test_ci_lane_evidence.py",
+        ".agent/verification.jsonl#VER-PH3-2-CI-SAME-RUN-EVIDENCE-20260910"
       ],
       "next_action": {
         "id": "PH3-2-LAB-READINESS:WAIT_RUNTIME",
@@ -795,7 +798,7 @@
         "Docker daemon access to /var/run/docker.sock is denied in the current session",
         "Disposable runtime secrets and endpoint authority are unavailable"
       ],
-      "reason": "The current local implementation and fail-closed API/Redis, worker, citation-support and release gates are covered by the combined State-of-Art/API/evidence/Decision/Professor suites (300 passed) plus static checks. The manifest consistency correction is locally verified at source candidate b4c8ac0c8fee311ede12c417d0be1cbfd5aada38 with tree b8e92492f2216c0c5c0ecdc90ccdfd5807c77d15; the prior integrated verifier artifact is stale after this source change. The real two-process Redis/API run remains BLOCKED_EXTERNAL, and live startup, readiness, PostgreSQL execution, distributed service checks, frontend runtime and teardown cannot be executed without approved external runtime access"
+      "reason": "The current local implementation and fail-closed API/Redis, worker, citation-support, release and same-run CI evidence gates are covered by 256 State-of-Art tests, make validate, make test-fast, make ops-static, make compose-static, make api-contract, make api16-root, make api-security, make security-adversarial and workflow YAML parsing. The exact pushed source candidate is 957b534d7b33a025525cb1dd667872791239ed43 with tree 65dcad96347adbd34e267537c424bef444ec48d7; a fresh read-only post-fix review found zero concrete findings. The prior integrated verifier artifact is stale after this source change. The full make test remains externally incomplete because the preserved CVG dataset and local Playwright browser are unavailable; real Redis/API, Docker startup, readiness, PostgreSQL execution, distributed service checks, frontend runtime and teardown cannot be executed without approved external runtime access"
     }
   ]
 }
