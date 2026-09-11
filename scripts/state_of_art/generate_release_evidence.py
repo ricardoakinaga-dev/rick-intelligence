@@ -69,8 +69,6 @@ DEFAULT_ARTIFACTS = (
     "docs/reports/triple-aaa-runtime-capability-matrix.json",
     "scripts/state_of_art/triple_aaa_capability_matrix.py",
     "scripts/state_of_art/verify_sealed_promotion.py",
-    "scripts/state_of_art/promotion_engine.py",
-    "scripts/state_of_art/packet_seal.py",
     "apps/worker/deployment_composition.py",
     "apps/api/src/services/object_store_transport.py",
     "apps/api/src/core/otel.py",

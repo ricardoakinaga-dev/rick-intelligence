@@ -47,6 +47,8 @@ MAX_EVIDENCE_FUTURE_SKEW_SECONDS = 5 * 60
 RELEASE_INTEGRITY_COMMAND = ("git", "diff", "--check", "&&", "make", "validate")
 RELEASE_INTEGRITY_PROCEDURE = "run git diff --check and make validate against the exact checkout"
 CI_ENVELOPE_SCHEMA = "state-of-art-ci-evidence.v1"
+FINAL_PROMOTION_GATES = frozenset({"production-runtime", "sealed-packet", "final-go-no-go"})
+FINAL_PROMOTION_ARTIFACT = ".runtime/final-promotion.json"
 
 # Release-manifest gate names intentionally differ from the Phase 3 capability
 # IDs.  Keep this mapping explicit so an envelope for one capability cannot be
@@ -523,6 +525,27 @@ def _validate_gate_procedure(gate: Any, failures: list[str]) -> None:
         if gate.gate_id not in gate.procedure:
             failures.append(f"gate {gate.gate_id} procedure does not identify its gate")
         return
+    if len(command) == 2 and command[0] == "sealed-promotion":
+        if gate.gate_id not in FINAL_PROMOTION_GATES:
+            failures.append(f"gate {gate.gate_id} sealed-promotion procedure is not a final promotion gate")
+            return
+        target = command[1]
+        target_path = Path(target)
+        if target.startswith(".runtime/"):
+            if target != FINAL_PROMOTION_ARTIFACT or target_path.is_absolute() or ".." in target_path.parts:
+                failures.append(f"gate {gate.gate_id} sealed-promotion target must be {FINAL_PROMOTION_ARTIFACT}")
+        elif gate.result == PASS:
+            failures.append(f"gate {gate.gate_id} PASS requires a safe final promotion artifact")
+        elif target != gate.gate_id:
+            failures.append(f"gate {gate.gate_id} non-PASS sealed-promotion target is invalid")
+        evidence_paths = {item.path for item in gate.evidence_paths}
+        if target.startswith(".runtime/") and target not in evidence_paths:
+            failures.append(f"gate {gate.gate_id} sealed-promotion target must be listed in evidence_paths")
+        if gate.result == PASS and target not in evidence_paths:
+            failures.append(f"gate {gate.gate_id} PASS requires its final promotion artifact in evidence_paths")
+        if gate.gate_id not in gate.procedure:
+            failures.append(f"gate {gate.gate_id} procedure does not identify its gate")
+        return
     if len(command) != 2 or command[0] != "runtime-envelope" or not command[1].strip():
         failures.append(f"gate {gate.gate_id} command is not an approved runtime-envelope procedure")
         return
@@ -872,6 +895,32 @@ def _evaluate_typed_manifest(
         if len(raw_hashes) == 1 and normalized_artifact_sha != raw_hashes[0]:
             failures.append(f"gate {gate.gate_id} runtime envelope artifact_sha256 does not match its raw artifact")
 
+    def check_final_promotion(gate: Any, evidence_path: str) -> None:
+        """Validate the typed final-promotion summary behind authority gates."""
+
+        target = gate.command[1] if len(gate.command) == 2 and gate.command[0] == "sealed-promotion" else ""
+        if not target or evidence_path != target:
+            return
+        safe_path, path_error = _safe_evidence_path(root, evidence_path)
+        if path_error or safe_path is None or not safe_path.is_file():
+            return  # check_file emits the authoritative path error.
+        try:
+            summary = load_json(safe_path)
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+            failures.append(f"gate {gate.gate_id} final promotion artifact is not readable JSON")
+            return
+        if not isinstance(summary, Mapping) or summary.get("schema_version") != "state-of-art-final-promotion.v1":
+            failures.append(f"gate {gate.gate_id} final promotion artifact has an unsupported schema")
+            return
+        if summary.get("status") != gate.result:
+            failures.append(f"gate {gate.gate_id} final promotion status does not match the manifest")
+        expected_exit = {"PASS": 0, "BLOCKED_EXTERNAL": 2, "FAIL": 1, "NOT_RUN": None}.get(gate.result)
+        if summary.get("exit_status") != expected_exit:
+            failures.append(f"gate {gate.gate_id} final promotion exit_status does not match the manifest")
+        allowed = summary.get("promotion_allowed")
+        if not isinstance(allowed, bool) or allowed is not (gate.result == PASS):
+            failures.append(f"gate {gate.gate_id} final promotion flag is inconsistent with the manifest")
+
     def check_ci_envelope(gate: Any, evidence_path: str) -> None:
         """Validate the same-run local CI observation behind a CI gate."""
 
@@ -1066,6 +1115,7 @@ def _evaluate_typed_manifest(
         for index, evidence in enumerate(gate.evidence_paths):
             check_file(evidence.path, evidence.sha256, f"gate {gate.gate_id}.evidence_paths[{index}]")
             check_runtime_envelope(gate, evidence.path)
+            check_final_promotion(gate, evidence.path)
             check_ci_envelope(gate, evidence.path)
 
     if len(ci_run_ids) > 1:
