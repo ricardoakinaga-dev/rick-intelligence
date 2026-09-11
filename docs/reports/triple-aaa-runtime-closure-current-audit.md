@@ -543,3 +543,25 @@ real heartbeat renewal and pool-disconnect reconnect checks, and requires an
 explicit `RICK_REDIS_FAULT_HARNESS` result for circuit recovery. No harness or
 live service is available in this checkout, so these controls preserve the
 external blocker rather than manufacturing a PASS.
+
+## 93. Fresh current-checkout revalidation — 2026-09-10
+
+The archived closure prompt remains byte-exact (`cmp` PASS; SHA-256
+`064be5e04ed483d5d95ef803a66faf6675f7c1f00633cdea83d5abfdd5370d5f`). The
+current checkout was revalidated after the local closure changes: `make ci`,
+Compose/ops/quality-bar static checks, the 398-test state-of-art regression
+scope, adversarial corpus checks, storage (26), backup/restore (7), jobs (37),
+API 1.5 (472 API tests plus package suites) and API 1.6 (169 domain, 73
+worker/health and 472 API tests) all passed. The complete component command
+returned its typed external-block exit because the approved CVG corpus file is
+not present; Professor (37), Locker (2) and the frontend smoke (7/7) passed.
+
+The Docker readiness probe still fails with permission denied on
+`/var/run/docker.sock`. A fresh `make triple-aaa-verify` therefore records
+`STATE_OF_ART_CANDIDATE`, exit `2`, promotion `false`, 15 PASS lanes and 26
+`BLOCKED_EXTERNAL` lanes. `make phase3-evidence-verify` remains
+`BLOCKED_EXTERNAL` (6 blocked, 3 local-verified, 3 not-run and 6 partial), and
+release integrity remains blocked by mandatory runtime, independent-review,
+sealed-packet and final-authority gates. The worktree was restored clean after
+benchmark commands; none of these local results is presented as production
+runtime proof or promotion authority.
