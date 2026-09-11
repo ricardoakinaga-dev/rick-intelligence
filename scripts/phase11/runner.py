@@ -512,8 +512,8 @@ def _write_phase3_preflight(compose: Path, run_id: str) -> bool:
     return True
 
 
-def _collect_compose_diagnostics(compose: Path) -> Path | None:
-    """Persist bounded local diagnostics after a failed start without claiming readiness."""
+def _collect_compose_diagnostics(compose: Path, *, phase: str = "failure") -> Path | None:
+    """Persist bounded redacted Compose diagnostics before state can disappear."""
 
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ") + f"-{os.getpid()}"
     directory = COMPOSE_RUNTIME_DIR / stamp
@@ -522,6 +522,7 @@ def _collect_compose_diagnostics(compose: Path) -> Path | None:
         (directory / "metadata.txt").write_text(
             "compose=" + compose.relative_to(ROOT).as_posix() + "\n"
             + "project=" + _compose_project(compose) + "\n"
+            + "phase=" + phase + "\n"
             + "captured_at=" + datetime.now(timezone.utc).isoformat() + "\n",
             encoding="utf-8",
         )
@@ -970,6 +971,9 @@ def mode_compose(action: str) -> int:
         if started:
             run_id = os.environ.get("RICK_PHASE3_RUN_ID", "").strip() or uuid.uuid4().hex
             if _write_phase3_preflight(compose, run_id):
+                snapshot = _collect_compose_diagnostics(compose, phase="ready")
+                if snapshot:
+                    print(f"<== bounded Compose readiness snapshot: {snapshot}", flush=True)
                 return 0
             diagnostics = _collect_compose_diagnostics(compose)
             suffix = f" Diagnostics: {diagnostics}." if diagnostics else ""
@@ -988,6 +992,9 @@ def mode_compose(action: str) -> int:
         )
         return 1
     if action == "down":
+        snapshot = _collect_compose_diagnostics(compose, phase="pre-teardown")
+        if snapshot:
+            print(f"<== bounded Compose pre-teardown snapshot: {snapshot}", flush=True)
         _invalidate_phase3_preflight()
         command = _compose_command(
             compose,

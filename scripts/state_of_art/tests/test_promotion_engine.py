@@ -7,9 +7,11 @@ from pathlib import Path
 import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
+from scripts.state_of_art import packet_seal
 from scripts.state_of_art.packet_seal import seal_payload
 from scripts.state_of_art import promotion_engine
 from scripts.state_of_art import triple_aaa_verify
+from scripts.state_of_art import verify_sealed_promotion
 
 
 FIXTURE_PRIVATE_KEY = Ed25519PrivateKey.from_private_bytes(bytes(range(32)))
@@ -20,6 +22,7 @@ FIXTURE_CHECKOUT = {
     "fingerprint": "c" * 64,
     "artifact_set_sha256": "d" * 64,
     "quality_bar_sha256": "f" * 64,
+    "source_prompt_sha256": promotion_engine.SOURCE_PROMPT_SHA256,
     "status": "CLEAN",
 }
 FRONTEND_CHECKOUT = {
@@ -54,6 +57,22 @@ def _write_frontend_runtime_artifact(
         "reduced-motion",
         "contrast",
         "touch",
+        "screen-reader",
+        "zoom",
+        "lockfiles",
+        "sbom",
+        "secret-scan",
+        "licenses",
+        "state-upload",
+        "state-documents",
+        "state-sources",
+        "state-jobs",
+        "state-offline",
+        "state-stream-interruption",
+        "state-permission-denied",
+        "state-worker-unavailable",
+        "state-provider-unavailable",
+        "state-slow-backend",
         "container-digests",
         "container-sbom",
     )
@@ -63,6 +82,7 @@ def _write_frontend_runtime_artifact(
     payload = {
         "schema_version": "state-of-art-runtime-evidence.v1",
         "status": "BLOCKED_EXTERNAL",
+        "production_safe": True,
         "commit_sha": commit_sha,
         "tree_sha": tree_sha,
         "checkout_fingerprint": checkout_fingerprint,
@@ -85,7 +105,9 @@ def _write_frontend_runtime_artifact(
     }
     artifact_path = root / triple_aaa_verify.FRONTEND_RUNTIME_ARTIFACT
     artifact_path.parent.mkdir(parents=True, exist_ok=True)
-    artifact_path.write_text(json.dumps(payload), encoding="utf-8")
+    serialized = json.dumps(payload)
+    artifact_path.write_text(serialized, encoding="utf-8")
+    (root / triple_aaa_verify.SUPPLY_RUNTIME_ARTIFACT).write_text(serialized, encoding="utf-8")
 
 
 def _results(*, status: str = "PASS", external: bool = False) -> list[dict[str, object]]:
@@ -135,6 +157,12 @@ def _sealed_packet(results: list[dict[str, object]]) -> dict[str, object]:
         {
             "schema_version": promotion_engine.PROMOTION_PACKET_SCHEMA,
             "sealed": True,
+            "source_prompt": promotion_engine.SOURCE_PROMPT_PATH,
+            "source_prompt_sha256": promotion_engine.SOURCE_PROMPT_SHA256,
+            "current_capability_matrix": {
+                "path": "artifact://fixture/current-triple-aaa-runtime-capability-matrix.json",
+                "sha256": "2" * 64,
+            },
             "quality_bar": {
                 "path": promotion_engine.QUALITY_BAR_PATH,
                 "sha256": "f" * 64,
@@ -243,6 +271,81 @@ def test_signed_packet_without_prompt_evidence_sections_cannot_promote() -> None
     assert "PACKET_CONTENT_REJECTED" in result["rejection_codes"]
 
 
+@pytest.mark.parametrize("field", ("source_prompt", "source_prompt_sha256", "current_capability_matrix"))
+def test_signed_packet_requires_archived_prompt_and_current_matrix_bindings(field: str) -> None:
+    observations = _results()
+    packet = _sealed_packet(observations)
+    packet.pop(field)
+
+    result = promotion_engine.evaluate(
+        observations,
+        packet=_reseal(packet),
+        checkout=FIXTURE_CHECKOUT,
+        trusted_public_keys=FIXTURE_TRUST_STORE,
+    )
+
+    assert result["promotion_allowed"] is False
+    assert "PACKET_CONTENT_REJECTED" in result["rejection_codes"]
+
+
+def test_signed_packet_prompt_hash_must_match_current_checkout() -> None:
+    observations = _results()
+    packet = _sealed_packet(observations)
+    packet["source_prompt_sha256"] = "0" * 64
+
+    result = promotion_engine.evaluate(
+        observations,
+        packet=_reseal(packet),
+        checkout=FIXTURE_CHECKOUT,
+        trusted_public_keys=FIXTURE_TRUST_STORE,
+    )
+
+    assert result["promotion_allowed"] is False
+    assert "PACKET_BINDING_REJECTED" in result["rejection_codes"]
+
+
+def test_final_sealed_promotion_verifier_binds_packet_to_observation_packet(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    observations = _results()
+    packet = _sealed_packet(observations)
+    verifier_packet = {
+        "schema_version": promotion_engine.PROMOTION_PACKET_SCHEMA,
+        "results": observations,
+    }
+    packet_path = tmp_path / "sealed.json"
+    verifier_path = tmp_path / "verifier.json"
+    trust_path = tmp_path / "trust.json"
+    packet_path.write_text(json.dumps(packet), encoding="utf-8")
+    verifier_path.write_text(json.dumps(verifier_packet), encoding="utf-8")
+    trust_path.write_text(
+        json.dumps({"keys": {"fixture-release-key": packet_seal.encode_public_key(FIXTURE_PRIVATE_KEY.public_key())}}),
+        encoding="utf-8",
+    )
+    prompt = tmp_path / promotion_engine.SOURCE_PROMPT_PATH
+    prompt.parent.mkdir(parents=True, exist_ok=True)
+    prompt.write_bytes((Path(__file__).resolve().parents[3] / promotion_engine.SOURCE_PROMPT_PATH).read_bytes())
+    monkeypatch.setattr(verify_sealed_promotion, "capture_checkout", lambda _root: dict(FIXTURE_CHECKOUT))
+    monkeypatch.setattr(verify_sealed_promotion, "_manifest_artifact_hash", lambda _root: "d" * 64)
+    monkeypatch.setattr(
+        verify_sealed_promotion,
+        "_sha256_file",
+        lambda path: "f" * 64 if path.name == "current-triple-aaa-quality-bar-v1.json" else promotion_engine.SOURCE_PROMPT_SHA256,
+    )
+
+    result = verify_sealed_promotion.verify(
+        packet_path=packet_path,
+        verifier_packet_path=verifier_path,
+        trust_store_path=trust_path,
+        seal_reference="artifact://release/fixture",
+        root=tmp_path,
+    )
+
+    assert result["promotion_allowed"] is True
+    assert result["exit_code"] == promotion_engine.EXIT_PASS
+
+
 def test_medium_risk_requires_acceptance_and_expiration_fields() -> None:
     observations = _results()
     packet = _sealed_packet(observations)
@@ -301,6 +404,11 @@ def test_packet_requires_current_checkout_quality_bar_binding() -> None:
 def test_local_packet_reference_must_exist_and_match_its_hash(tmp_path: Path) -> None:
     observations = _results()
     packet = _sealed_packet(observations)
+    prompt_target = tmp_path / promotion_engine.SOURCE_PROMPT_PATH
+    prompt_target.parent.mkdir(parents=True, exist_ok=True)
+    prompt_target.write_bytes(
+        (Path(__file__).resolve().parents[3] / promotion_engine.SOURCE_PROMPT_PATH).read_bytes()
+    )
     packet["performance"][0]["path"] = "missing-evidence.json"  # type: ignore[index]
 
     missing = promotion_engine.evaluate(
@@ -326,6 +434,24 @@ def test_local_packet_reference_must_exist_and_match_its_hash(tmp_path: Path) ->
     )
     assert valid["promotion_allowed"] is True
     assert valid["exit_code"] == promotion_engine.EXIT_PASS
+
+
+def test_malformed_local_packet_reference_is_rejected_without_raising(tmp_path: Path) -> None:
+    observations = _results()
+    packet = _sealed_packet(observations)
+    packet["performance"][0]["path"] = "\x00"  # type: ignore[index]
+
+    result = promotion_engine.evaluate(
+        observations,
+        packet=_reseal(packet),
+        checkout=FIXTURE_CHECKOUT,
+        trusted_public_keys=FIXTURE_TRUST_STORE,
+        evidence_root=tmp_path,
+    )
+
+    assert result["promotion_allowed"] is False
+    assert result["exit_code"] == promotion_engine.EXIT_FAILED
+    assert "PACKET_BINDING_REJECTED" in result["rejection_codes"]
 
 
 def test_external_block_returns_candidate_and_exit_two() -> None:
@@ -574,12 +700,57 @@ def test_integrated_verifier_refreshes_runtime_before_release_artifacts(
     assert "supply-chain" not in order
 
 
+def test_integrated_verifier_does_not_reuse_stale_current_matrix(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fake_run(
+        lane: triple_aaa_verify.Lane,
+        *,
+        timeout_seconds: int,
+        expected_checkout: dict[str, object] | None = None,
+    ) -> dict[str, object]:
+        del timeout_seconds, expected_checkout
+        return {
+            "id": lane.lane_id,
+            "status": "PASS",
+            "required": lane.required,
+            "external": lane.external,
+            "return_code": 0,
+            "detail": "fixture observation",
+        }
+
+    monkeypatch.setattr(triple_aaa_verify, "ROOT", tmp_path)
+    monkeypatch.setattr(triple_aaa_verify, "_run", fake_run)
+    monkeypatch.setattr(
+        triple_aaa_verify,
+        "capture_checkout",
+        lambda _root: {
+            "head": "a" * 40,
+            "tree": "b" * 40,
+            "fingerprint": "c" * 64,
+            "status": "CLEAN",
+            "branch": "main",
+        },
+    )
+    stale = tmp_path / ".runtime/phase-3/current-triple-aaa-runtime-capability-matrix.json"
+    stale.parent.mkdir(parents=True, exist_ok=True)
+    stale.write_text('{"stale":true}\n', encoding="utf-8")
+
+    assert triple_aaa_verify.main(["--output", ".runtime/verify-stale.json", "--lane-timeout", "10"]) == 1
+
+    packet = json.loads((tmp_path / ".runtime/verify-stale.json").read_text(encoding="utf-8"))
+    assert "current_capability_matrix" not in packet
+    assert "current_capability_matrix_error" in packet or not stale.exists()
+    assert not stale.exists()
+
+
 def test_integrated_verifier_uses_commit_bound_adapters_for_manifest_lanes() -> None:
     lanes = {lane.lane_id: lane for lane in triple_aaa_verify._external_lanes()}
 
     assert lanes["postgresql-runtime"].command == ("make", "phase3-postgres-runtime")
     assert lanes["redis-runtime"].command == ("make", "phase3-redis-runtime")
-    assert lanes["provider-rag-runtime"].command == ("make", "phase3-provider-runtime")
+    assert lanes["provider-rag-runtime"].command == ("make", "phase3-provider-rag-runtime")
     for lane_id in ("frontend-e2e", "frontend-accessibility", "supply-chain"):
         assert lanes[lane_id].command == ("make", "phase3-frontend-supply-runtime")
         assert lanes[lane_id].blocked_if_not_run is False
@@ -606,6 +777,31 @@ def test_frontend_e2e_projects_browser_pass_from_combined_blocked_adapter(
     assert result["return_code"] == 0
     assert result["source_return_code"] == 2
     assert result["source_status"] == "BLOCKED_EXTERNAL"
+
+
+def test_frontend_e2e_rejects_managed_runtime_claim_without_production_safety(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(triple_aaa_verify, "ROOT", tmp_path)
+    _write_frontend_runtime_artifact(tmp_path)
+    payload_path = tmp_path / triple_aaa_verify.FRONTEND_RUNTIME_ARTIFACT
+    payload = json.loads(payload_path.read_text(encoding="utf-8"))
+    payload["production_safe"] = False
+    payload_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = triple_aaa_verify._run(
+        triple_aaa_verify.Lane(
+            "frontend-e2e",
+            ("/bin/sh", "-c", "exit 2"),
+            external=True,
+            blocked_return_codes=frozenset({2}),
+        ),
+        timeout_seconds=10,
+    )
+
+    assert result["status"] == "BLOCKED_EXTERNAL"
+    assert "production-safe" in str(result["detail"])
 
 
 def test_frontend_projection_rejects_artifact_from_another_commit(

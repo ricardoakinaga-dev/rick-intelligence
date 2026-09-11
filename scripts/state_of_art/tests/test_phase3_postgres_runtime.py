@@ -77,3 +77,13 @@ def test_postgres_runtime_gate_declares_all_required_query_plan_probes() -> None
         "query-plan-document-lookup",
     ):
         assert probe in source
+
+
+def test_postgres_runtime_gate_requires_transaction_rollback_and_crash_authority() -> None:
+    source = (Path(__file__).parents[2] / "phase11" / "postgres_runtime_gate.py").read_text(
+        encoding="utf-8"
+    )
+
+    for case in ("transaction-rollback", "crash-before-commit", "crash-after-commit"):
+        assert case in source
+    assert "RICK_POSTGRES_CRASH_HARNESS" in source

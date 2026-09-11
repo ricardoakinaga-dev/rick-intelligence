@@ -68,6 +68,9 @@ DEFAULT_ARTIFACTS = (
     "docs/reports/current-triple-aaa-quality-bar-v1.json",
     "docs/reports/triple-aaa-runtime-capability-matrix.json",
     "scripts/state_of_art/triple_aaa_capability_matrix.py",
+    "scripts/state_of_art/verify_sealed_promotion.py",
+    "scripts/state_of_art/promotion_engine.py",
+    "scripts/state_of_art/packet_seal.py",
     "apps/worker/deployment_composition.py",
     "apps/api/src/services/object_store_transport.py",
     "apps/api/src/core/otel.py",
@@ -178,6 +181,7 @@ DEFAULT_ARTIFACTS = (
     "scripts/state_of_art/run_phase3_file_security.py",
     "scripts/state_of_art/run_phase3_operational.py",
     "scripts/state_of_art/tests/test_phase3_postgres_runtime.py",
+    "scripts/state_of_art/tests/test_redis_runtime_gate.py",
     "scripts/phase11/multi_worker_runtime_gate.py",
     "scripts/state_of_art/run_phase3_multi_worker.py",
     "scripts/state_of_art/tests/test_multi_worker_runtime.py",
@@ -243,6 +247,8 @@ RUNTIME_GATE_ARTIFACTS = {
     "supply-chain": ".runtime/phase-3/supply-chain-runtime-evidence.json",
     "provider": ".runtime/phase-3/provider-runtime-evidence.json",
 }
+FINAL_PROMOTION_GATES = frozenset({"production-runtime", "sealed-packet", "final-go-no-go"})
+FINAL_PROMOTION_ARTIFACT = ".runtime/final-promotion.json"
 CI_GATE_ARTIFACTS = {
     # These are local CI gates only.  They never replace the named live
     # runtime envelopes above, and their envelope explicitly carries the
@@ -430,7 +436,7 @@ def _runtime_result(
 ) -> GateResult:
     """Aggregate an observed runtime envelope or preserve a real NOT_RUN state."""
 
-    relative = RUNTIME_GATE_ARTIFACTS.get(gate_id)
+    relative = FINAL_PROMOTION_ARTIFACT if gate_id in FINAL_PROMOTION_GATES else RUNTIME_GATE_ARTIFACTS.get(gate_id)
     evidence_paths: tuple[EvidenceRef, ...]
     command: tuple[str, ...]
     procedure: str
@@ -439,8 +445,12 @@ def _runtime_result(
     limitations = "No current runtime artifact was supplied for this mandatory gate."
     if relative is not None and (root / relative).is_file():
         evidence_paths = (_evidence_ref(root, relative, f"runtime envelope for {gate_id}"),)
-        command = ("runtime-envelope", relative)
-        procedure = f"validate the supplied runtime envelope for {gate_id} against this checkout"
+        command = (("sealed-promotion", relative) if gate_id in FINAL_PROMOTION_GATES else ("runtime-envelope", relative))
+        procedure = (
+            f"validate the independently authorized final promotion packet for {gate_id}"
+            if gate_id in FINAL_PROMOTION_GATES
+            else f"validate the supplied runtime envelope for {gate_id} against this checkout"
+        )
         try:
             raw = load_json(root / relative)
         except (OSError, UnicodeDecodeError, json.JSONDecodeError):
@@ -467,8 +477,16 @@ def _runtime_result(
             limitations = "runtime envelope is not a JSON object"
     else:
         evidence_paths = (_evidence_ref(root, audit_path, f"current audit for missing {gate_id} evidence"),)
-        command = ("runtime-envelope", relative if relative and (root / relative).is_file() else gate_id)
-        procedure = f"await the approved runtime procedure for {gate_id}; no artifact is claimed"
+        command = (
+            ("sealed-promotion", relative if relative and (root / relative).is_file() else gate_id)
+            if gate_id in FINAL_PROMOTION_GATES
+            else ("runtime-envelope", relative if relative and (root / relative).is_file() else gate_id)
+        )
+        procedure = (
+            f"await an independently authorized final promotion packet for {gate_id}; no artifact is claimed"
+            if gate_id in FINAL_PROMOTION_GATES
+            else f"await the approved runtime procedure for {gate_id}; no artifact is claimed"
+        )
     if supplemental_ci_relative and relative is not None and (root / relative).is_file():
         ci_path = root / supplemental_ci_relative
         if ci_path.is_file():

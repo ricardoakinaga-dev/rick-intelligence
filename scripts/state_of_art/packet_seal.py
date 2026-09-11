@@ -263,8 +263,14 @@ def verify_seal(
     digest = seal.get("digest")
     if not isinstance(digest, str) or _DIGEST_RE.fullmatch(digest) is None:
         errors.append("seal.digest")
-    elif _digest(_body(payload), seal) != digest:
-        errors.append("seal.digest does not match packet bytes")
+    else:
+        try:
+            digest_matches = _digest(_body(payload), seal) == digest
+        except (TypeError, UnicodeError, ValueError, RecursionError):
+            digest_matches = False
+            errors.append("seal.digest cannot be verified against packet bytes")
+        if not digest_matches and "seal.digest cannot be verified against packet bytes" not in errors:
+            errors.append("seal.digest does not match packet bytes")
 
     signature_text = seal.get("signature")
     signature = b""

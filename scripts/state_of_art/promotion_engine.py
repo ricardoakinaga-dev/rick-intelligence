@@ -44,6 +44,8 @@ CLASSIFICATIONS = (
 )
 PROMOTION_PACKET_SCHEMA = "state-of-art-triple-aaa-verify.v2"
 QUALITY_BAR_PATH = "docs/reports/current-triple-aaa-quality-bar-v1.json"
+SOURCE_PROMPT_PATH = "docs/prompts/triple-aaa-runtime-closure-2026-09-10.txt"
+SOURCE_PROMPT_SHA256 = "064be5e04ed483d5d95ef803a66faf6675f7c1f00633cdea83d5abfdd5370d5f"
 
 # A sealed packet is the final evidence index, rather than a second summary
 # of the lane statuses.  Keep its required sections explicit so a signer
@@ -397,7 +399,10 @@ def _validate_packet_reference(
     assert isinstance(raw_path, str)
     if raw_path.startswith("artifact://"):
         return "", None
-    local_path, path_error = _packet_local_file(raw_path, evidence_root=evidence_root)
+    try:
+        local_path, path_error = _packet_local_file(raw_path, evidence_root=evidence_root)
+    except (OSError, RuntimeError, ValueError):
+        return "PACKET_BINDING_REJECTED", f"{field} cannot be verified: invalid local path"
     if path_error or local_path is None:
         return "PACKET_BINDING_REJECTED", f"{field} cannot be verified: {path_error or 'invalid path'}"
     try:
@@ -437,6 +442,46 @@ def _validate_packet_content(
 
     codes: set[str] = set()
     errors: list[str] = []
+
+    source_prompt = packet.get("source_prompt")
+    if source_prompt != SOURCE_PROMPT_PATH:
+        codes.add("PACKET_CONTENT_REJECTED")
+        errors.append("sealed packet source_prompt must point to the archived closure prompt")
+    source_prompt_hash = _packet_reference_hash(packet.get("source_prompt_sha256"))
+    if source_prompt_hash != SOURCE_PROMPT_SHA256:
+        codes.add("PACKET_CONTENT_REJECTED")
+        errors.append("sealed packet source_prompt_sha256 does not match the archived closure prompt")
+    expected_prompt_hash = checkout.get("source_prompt_sha256") if checkout is not None else None
+    if _packet_reference_hash(expected_prompt_hash) != SOURCE_PROMPT_SHA256:
+        codes.add("PACKET_BINDING_REJECTED")
+        errors.append("current checkout source_prompt_sha256 is required to promote a sealed packet")
+    elif source_prompt_hash != expected_prompt_hash.removeprefix("sha256:").lower():
+        codes.add("PACKET_BINDING_REJECTED")
+        errors.append("sealed packet source_prompt_sha256 does not match this checkout")
+    if evidence_root is not None:
+        prompt_path = evidence_root / SOURCE_PROMPT_PATH
+        try:
+            observed_prompt_hash = sha256(prompt_path.read_bytes()).hexdigest()
+        except (OSError, ValueError, RuntimeError):
+            observed_prompt_hash = None
+        if observed_prompt_hash != SOURCE_PROMPT_SHA256:
+            codes.add("PACKET_BINDING_REJECTED")
+            errors.append("archived closure prompt bytes do not match the frozen hash")
+
+    current_matrix = packet.get("current_capability_matrix")
+    if not isinstance(current_matrix, Mapping):
+        codes.add("PACKET_CONTENT_REJECTED")
+        errors.append("sealed packet current_capability_matrix evidence is required")
+    else:
+        rejection_code, rejection = _validate_packet_reference(
+            current_matrix,
+            field="sealed packet current_capability_matrix",
+            evidence_root=evidence_root,
+        )
+        if rejection_code:
+            codes.add(rejection_code)
+        if rejection:
+            errors.append(rejection)
 
     quality_bar = packet.get("quality_bar")
     if not isinstance(quality_bar, Mapping):

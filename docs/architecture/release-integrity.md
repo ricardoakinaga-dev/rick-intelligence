@@ -177,7 +177,8 @@ make an underspecified packet promotable.
 Packet references may point at a retained immutable `artifact://` object. A
 checkout-local reference must be relative, must not traverse a symlink or
 escape the checkout, and is rehashed before promotion; missing or mismatched
-bytes reject the packet.
+bytes reject the packet. Malformed local path bytes are also rejected as a
+typed binding failure rather than being allowed to abort packet verification.
 
 ## Shared disposable-runtime preflight
 
@@ -282,3 +283,18 @@ at 1 MiB, and invalid UTF-8, non-finite constants and duplicate keys fail
 closed before recovery or promotion fields are trusted. This strengthens the
 local control/recovery boundary only; it does not create runtime or approval
 evidence.
+
+The current Triple AAA matrix is content-addressed when carried by a verifier
+packet: the validator requires the frozen eleven-capability set and compares
+the packet's declared path and SHA-256 with the bytes being checked. The
+verifier removes any previous projection before binding a new one. Sealed
+promotion packets must also bind the archived closure prompt and the current
+matrix; `verify_sealed_promotion.py` checks that external seal against the
+exact observation packet without rerunning runtime lanes.
+
+The release workflow keeps the integrated runtime job's shared preflight and
+packet in the canonical `.runtime/phase-3` directory. Supplemental artifacts
+from independent browser and operational jobs use separate directories, so a
+different job cannot overwrite the canonical preflight. A protected promotion
+environment supplies the independent packet, trust store and immutable
+reference; absent authority is a blocking condition.

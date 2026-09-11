@@ -319,6 +319,7 @@ jobs:
       (needs.nightly.result == 'success' || github.event_name != 'schedule')
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    environment: triple-aaa-promotion
     permissions:
       contents: read
     steps:
@@ -386,25 +387,25 @@ jobs:
         uses: actions/download-artifact@v4.3.0
         with:
           name: phase3-frontend-runtime-${{ github.run_id }}
-          path: .runtime/phase-3
+          path: .runtime/phase-3/supplemental/frontend-runtime
       - name: Download performance diagnostics from this workflow run
         if: needs.performance.result == 'success'
         uses: actions/download-artifact@v4.3.0
         with:
           name: phase3-performance-${{ github.run_id }}
-          path: .runtime/phase-3
+          path: .runtime/phase-3/supplemental/performance
       - name: Download chaos diagnostics from this workflow run
         if: needs.chaos.result == 'success'
         uses: actions/download-artifact@v4.3.0
         with:
           name: phase3-chaos-${{ github.run_id }}
-          path: .runtime/phase-3
+          path: .runtime/phase-3/supplemental/chaos
       - name: Download soak diagnostics from this workflow run
         if: needs.soak.result == 'success'
         uses: actions/download-artifact@v4.3.0
         with:
           name: phase3-soak-${{ github.run_id }}
-          path: .runtime/phase-3
+          path: .runtime/phase-3/supplemental/soak
       - name: Download the exact Phase 3 matrix from this workflow run
         if: needs.phase3-evidence.result == 'success'
         uses: actions/download-artifact@v4.3.0
@@ -418,6 +419,37 @@ jobs:
           python3 scripts/state_of_art/triple_aaa_capability_matrix.py \
             --path .runtime/phase-3/current-triple-aaa-runtime-capability-matrix.json \
             --packet .runtime/phase-3/triple-aaa-verify.json
+      - name: Materialize the protected independent promotion packet
+        env:
+          RICK_PROMOTION_PACKET_B64: ${{ secrets.RICK_PROMOTION_PACKET_B64 }}
+          RICK_PROMOTION_TRUST_STORE_B64: ${{ secrets.RICK_PROMOTION_TRUST_STORE_B64 }}
+          RICK_PROMOTION_SEAL_REFERENCE: ${{ secrets.RICK_PROMOTION_SEAL_REFERENCE }}
+        run: |
+          python3 - <<'PY'
+          import base64
+          import os
+          from pathlib import Path
+
+          packet = os.environ.get("RICK_PROMOTION_PACKET_B64", "").strip()
+          trust_store = os.environ.get("RICK_PROMOTION_TRUST_STORE_B64", "").strip()
+          reference = os.environ.get("RICK_PROMOTION_SEAL_REFERENCE", "").strip()
+          if not packet or not trust_store or not reference:
+              raise SystemExit("protected independent packet, trust store and immutable reference are required")
+          root = Path(".runtime")
+          root.mkdir(parents=True, exist_ok=True)
+          (root / "sealed-promotion-packet.json").write_bytes(base64.b64decode(packet, validate=True))
+          (root / "promotion-trust-store.json").write_bytes(base64.b64decode(trust_store, validate=True))
+          print("protected promotion inputs materialized; packet bytes remain sealed and are not printed")
+          PY
+      - name: Verify the sealed packet without rerunning runtime lanes
+        env:
+          RICK_PROMOTION_SEAL_REFERENCE: ${{ secrets.RICK_PROMOTION_SEAL_REFERENCE }}
+        run: |
+          python3 scripts/state_of_art/verify_sealed_promotion.py \
+            --packet .runtime/sealed-promotion-packet.json \
+            --verifier-packet .runtime/phase-3/triple-aaa-verify.json \
+            --trust-store .runtime/promotion-trust-store.json \
+            --seal-reference "$RICK_PROMOTION_SEAL_REFERENCE"
       - name: Generate truthful release evidence
         run: make release-evidence
       - name: Reject incomplete or stale promotion evidence
@@ -595,22 +627,22 @@ jobs:
         uses: actions/download-artifact@v4.3.0
         with:
           name: phase3-frontend-runtime-${{ github.run_id }}
-          path: .runtime/phase-3
+          path: .runtime/phase-3/supplemental/frontend-runtime
       - name: Download the exact scheduled performance artifacts
         uses: actions/download-artifact@v4.3.0
         with:
           name: phase3-performance-${{ github.run_id }}
-          path: .runtime/phase-3
+          path: .runtime/phase-3/supplemental/performance
       - name: Download the exact scheduled chaos artifacts
         uses: actions/download-artifact@v4.3.0
         with:
           name: phase3-chaos-${{ github.run_id }}
-          path: .runtime/phase-3
+          path: .runtime/phase-3/supplemental/chaos
       - name: Download the exact scheduled soak artifacts
         uses: actions/download-artifact@v4.3.0
         with:
           name: phase3-soak-${{ github.run_id }}
-          path: .runtime/phase-3
+          path: .runtime/phase-3/supplemental/soak
       - name: Generate and require a promotable Phase 3 matrix
         run: |
           make phase3-evidence

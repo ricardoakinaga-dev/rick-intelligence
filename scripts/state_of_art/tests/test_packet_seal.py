@@ -150,3 +150,27 @@ def test_seal_does_not_accept_unbounded_reference() -> None:
         assert str(error) == "immutable_reference is invalid"
     else:  # pragma: no cover - assertion makes the expected failure explicit.
         raise AssertionError("unsafe seal reference was accepted")
+
+
+def test_verify_seal_rejects_unencodable_packet_without_raising() -> None:
+    payload = {
+        "schema_version": "state-of-art-triple-aaa-verify.v2",
+        "sealed": True,
+        "payload": "\ud800",
+        "seal": {
+            "schema": "state-of-art-packet-seal.v2",
+            "algorithm": "ed25519-sha256-canonical-json",
+            "sealed_at": datetime.now(timezone.utc).isoformat(),
+            "immutable_reference": "artifact://release/abc123",
+            "signer_id": "release-authority",
+            "key_id": "release-key-2026",
+            "immutable": True,
+            "digest": "a" * 64,
+            "signature": "A" * 88,
+        },
+    }
+
+    valid, errors = verify_seal(payload, trusted_public_keys=TRUST_STORE)
+
+    assert valid is False
+    assert "seal.digest cannot be verified against packet bytes" in errors

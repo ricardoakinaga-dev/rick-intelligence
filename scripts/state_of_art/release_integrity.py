@@ -636,7 +636,8 @@ def _evaluate_typed_manifest(
 
         target = gate.command[1] if len(gate.command) == 2 else ""
         if (
-            not target.startswith(".runtime/")
+            (gate.command[0] if gate.command else "") != "runtime-envelope"
+            or not target.startswith(".runtime/")
             or target.startswith(".runtime/ci/")
             or evidence_path != target
         ):

@@ -478,3 +478,68 @@ redactor before they are returned or persisted. URLs, bearer values, DSNs and
 secret-bearing keys are removed even when the operational harness is invoked
 directly; the bounded projection remains finite and structured. A live
 operational run is still unavailable and no runtime PASS is claimed.
+
+## 87. Malformed sealed-reference fail-closed handling — 2026-09-10
+
+The sealed-packet boundary now treats malformed local reference bytes, including
+embedded NULs and unencodable Unicode, as typed `PACKET_BINDING_REJECTED`
+failures. Packet seal digest verification likewise returns a rejection instead
+of raising when canonical JSON cannot be encoded. Regression tests cover both
+paths; this closes an exception-based anti-gaming/availability gap without
+creating any runtime or promotion evidence.
+
+## 88. Current matrix integrity and coverage — 2026-09-10
+
+The current prompt matrix now requires the exact eleven canonical capability
+names. A truncated or substituted row set is rejected, and `VERIFIED_RUNTIME`
+or `PROMOTABLE` rows require both runtime evidence and independent review
+references. When a verifier packet declares the current matrix projection, the
+validator recomputes its SHA-256 and checks that the declared path is the
+projection being validated. A prior projection is removed before each verifier
+run, so a failed bind cannot be silently reused. These are local integrity
+controls; the matrix remains `BLOCKED_EXTERNAL` where live evidence is absent.
+
+## 89. Sealed prompt and final-authority binding — 2026-09-10
+
+The sealed-packet contract now requires the byte-exact archived closure prompt,
+its frozen SHA-256, and a current-matrix reference. The independent final
+verifier consumes the sealed packet and the exact integrated observation packet
+without rerunning runtime lanes, then writes a typed final-promotion artifact.
+The scheduled release job requires a protected `triple-aaa-promotion`
+environment containing the external packet, trust store and immutable
+reference; missing authority fails closed. No seal or independent Go/No-Go is
+present in this environment.
+
+## 90. Browser and supply-chain projection closure — 2026-09-10
+
+Browser evidence now requires an approved `production_safe` runtime claim; a
+managed development runtime cannot project a frontend PASS. The accessibility
+projection includes screen-reader semantics and 200% zoom checks. Required
+browser state names cover upload, documents, sources, jobs, offline,
+interrupted stream, permission denied, worker unavailable, provider unavailable
+and slow backend; absent observations remain non-PASS. The supply-chain lane
+reads its dedicated P1-07 envelope and requires lockfiles, SBOM, secret scan,
+licenses, immutable image digests and image SBOM. These checks remain blocked
+until the approved browser/lab and image authority are available.
+
+## 91. Same-run artifact topology and teardown snapshots — 2026-09-10
+
+The integrated runtime job remains the canonical owner of the shared preflight
+and packet. Auxiliary frontend, performance, chaos and soak artifacts are
+downloaded into supplemental directories, preventing independent job
+preflights from overwriting the canonical identity. Successful Compose startup
+and pre-teardown now retain bounded redacted `ps`/log snapshots before the
+preflight is invalidated or services are removed. This preserves evidence
+without converting a local snapshot into runtime PASS.
+
+## 92. Database and Redis fault-authority closure — 2026-09-10
+
+The PostgreSQL gate now emits a live `transaction-rollback` result and names
+`crash-before-commit` and `crash-after-commit` as separate required results.
+Those crash outcomes remain `BLOCKED_EXTERNAL` until an explicitly supplied
+`RICK_POSTGRES_CRASH_HARNESS` returns their JSON assertions; hermetic queue
+tests are not treated as database crash proof. The Redis gate similarly emits
+real heartbeat renewal and pool-disconnect reconnect checks, and requires an
+explicit `RICK_REDIS_FAULT_HARNESS` result for circuit recovery. No harness or
+live service is available in this checkout, so these controls preserve the
+external blocker rather than manufacturing a PASS.

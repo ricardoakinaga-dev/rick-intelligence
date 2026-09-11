@@ -48,7 +48,10 @@ REQUIRED_GATES = (
     "visual",
     "supply-chain",
     "release-integrity",
+    "production-runtime",
     "independent-reviews",
+    "sealed-packet",
+    "final-go-no-go",
 )
 GateStatus = Literal["PASS", "FAIL", "BLOCKED_EXTERNAL", "NOT_RUN", "STALE", "INVALID"]
 ManifestStatus = Literal["PASS", "FAIL", "BLOCKED_EXTERNAL", "NOT_RUN"]

@@ -703,6 +703,32 @@ async function axeAudit(page) {
   });
 }
 
+async function screenReaderAudit(page) {
+  return page.evaluate(() => {
+    const controls = Array.from(document.querySelectorAll("button, a[href], input, textarea, select, [role='button']"));
+    const unlabeled = controls.filter((element) => {
+      const labelledBy = element.getAttribute("aria-labelledby");
+      const labelled = element.getAttribute("aria-label") || (labelledBy && document.getElementById(labelledBy)?.textContent) || (element.closest("label")?.textContent);
+      return !labelled || !labelled.trim();
+    });
+    const landmarks = Array.from(document.querySelectorAll("main, nav, header, footer, [role='main'], [role='navigation']"));
+    const headings = Array.from(document.querySelectorAll("h1, h2, h3, h4, h5, h6"));
+    return { controls: controls.length, unlabeled: unlabeled.length, landmarks: landmarks.length, headings: headings.length, passed: unlabeled.length === 0 && landmarks.length > 0 && headings.length > 0 };
+  });
+}
+
+async function zoomAudit(page) {
+  return page.evaluate(() => {
+    const root = document.documentElement;
+    const previous = root.style.zoom;
+    root.style.zoom = "2";
+    const overflow = root.scrollWidth > root.clientWidth;
+    const visibleMain = Boolean(document.querySelector("main"));
+    root.style.zoom = previous;
+    return { zoom_percent: 200, horizontal_overflow: overflow, visible_main: visibleMain, passed: !overflow && visibleMain };
+  });
+}
+
 async function runViewport(browser, viewport, index) {
   const context = await browser.newContext({ viewport: { width: viewport.width, height: viewport.height }, deviceScaleFactor: 1, hasTouch: viewport.width <= 375, reducedMotion: "reduce" });
   const page = await context.newPage();
@@ -756,6 +782,8 @@ async function runViewport(browser, viewport, index) {
     result.checks.contrast_authenticated = appContrast;
     result.checks.focus = focus;
     result.checks.reduced_motion = reduced;
+    result.checks.screen_reader = await screenReaderAudit(page);
+    result.checks.zoom = await zoomAudit(page);
 
     await page.goto(`${webBase}/app/chat`, { waitUntil: "domcontentloaded" });
     await waitVisible(page.getByLabel("Pergunta"));
@@ -819,6 +847,18 @@ async function main() {
       reduced_motion: all.every((item) => item.checks.reduced_motion && item.checks.reduced_motion.preference && item.checks.reduced_motion.animations.every((animation) => animation.playState !== "running" || animation.duration <= 1)),
       contrast: contrast.every((item) => item.failures && item.failures.length === 0 && item.unknown && item.unknown.length === 0),
       touch: all.filter((item) => item.viewport.width <= 375).every((item) => item.checks.touch && item.checks.touch.touch_points > 0 && item.checks.touch.below_minimum.length === 0),
+      screen_reader: all.every((item) => item.checks.screen_reader && item.checks.screen_reader.passed),
+      zoom: all.every((item) => item.checks.zoom && item.checks.zoom.passed),
+      state_upload: all.every((item) => item.states && item.states.upload && item.states.upload.observed === true),
+      state_documents: all.every((item) => item.states && item.states.documents && item.states.documents.observed === true),
+      state_sources: all.every((item) => item.states && item.states.sources && item.states.sources.observed === true),
+      state_jobs: all.every((item) => item.states && item.states.jobs && item.states.jobs.observed === true),
+      state_offline: all.every((item) => item.states && item.states.offline && item.states.offline.observed === true),
+      state_stream_interruption: all.every((item) => item.states && item.states.stream_interruption && item.states.stream_interruption.observed === true),
+      state_permission_denied: all.every((item) => item.states && item.states.permission_denied && item.states.permission_denied.observed === true),
+      state_worker_unavailable: all.every((item) => item.states && item.states.worker_unavailable && item.states.worker_unavailable.observed === true),
+      state_provider_unavailable: all.every((item) => item.states && item.states.provider_unavailable && item.states.provider_unavailable.observed === true),
+      state_slow_backend: all.every((item) => item.states && item.states.slow_backend && item.states.slow_backend.observed === true),
       no_console_or_request_failures: all.every((item) => item.checks.unexpected_runtime_errors && item.checks.unexpected_runtime_errors.passed),
     };
     report.status = Object.values(report.checks).every(Boolean) ? "PASS" : "FAIL";
@@ -861,6 +901,18 @@ def _blocked_browser_checks(detail: str, *, evidence: Sequence[str] = ()) -> lis
             "reduced-motion",
             "contrast",
             "touch",
+            "screen-reader",
+            "zoom",
+            "state-upload",
+            "state-documents",
+            "state-sources",
+            "state-jobs",
+            "state-offline",
+            "state-stream-interruption",
+            "state-permission-denied",
+            "state-worker-unavailable",
+            "state-provider-unavailable",
+            "state-slow-backend",
         )
     ]
 
@@ -878,6 +930,18 @@ def _browser_checks_from_report(root: Path, report: Mapping[str, Any], report_pa
         "reduced_motion": "reduced-motion",
         "contrast": "contrast",
         "touch": "touch",
+        "screen_reader": "screen-reader",
+        "zoom": "zoom",
+        "state_upload": "state-upload",
+        "state_documents": "state-documents",
+        "state_sources": "state-sources",
+        "state_jobs": "state-jobs",
+        "state_offline": "state-offline",
+        "state_stream_interruption": "state-stream-interruption",
+        "state_permission_denied": "state-permission-denied",
+        "state_worker_unavailable": "state-worker-unavailable",
+        "state_provider_unavailable": "state-provider-unavailable",
+        "state_slow_backend": "state-slow-backend",
     }
     result = []
     for key, name in names.items():

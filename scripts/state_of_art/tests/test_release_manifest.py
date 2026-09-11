@@ -264,7 +264,7 @@ class ReleaseManifestTests(unittest.TestCase):
                 exit_status=gate_exit_status,
                 result=gate_result,  # type: ignore[arg-type]
                 limitations=("fixture is not a production run",) if gate_result != "PASS" else (),
-                reviewer=independent_reviewer if gate_id == "independent-reviews" else reviewer,
+                reviewer=independent_reviewer if gate_id in {"independent-reviews", "final-go-no-go"} else reviewer,
                 evidence_paths=(evidence,) if gate_id == "release-integrity" else (runtime_refs[gate_id],),
             )
             for gate_id in REQUIRED_GATES

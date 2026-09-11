@@ -63,6 +63,18 @@ def _all_browser_checks(value: bool = True) -> dict[str, bool]:
         "reduced_motion": value,
         "contrast": value,
         "touch": value,
+        "screen_reader": value,
+        "zoom": value,
+        "state_upload": value,
+        "state_documents": value,
+        "state_sources": value,
+        "state_jobs": value,
+        "state_offline": value,
+        "state_stream_interruption": value,
+        "state_permission_denied": value,
+        "state_worker_unavailable": value,
+        "state_provider_unavailable": value,
+        "state_slow_backend": value,
     }
 
 

@@ -117,6 +117,7 @@ def test_up_validates_inventory_and_waits_for_health(monkeypatch: pytest.MonkeyP
     monkeypatch.setattr(runner, "run_case", fake_run_case)
     monkeypatch.setattr(runner, "_compose_capture", lambda *_args, **_kwargs: (True, inventory))
     monkeypatch.setattr(runner, "_write_phase3_preflight", lambda *_args, **_kwargs: True)
+    monkeypatch.setattr(runner, "_collect_compose_diagnostics", lambda *_args, **_kwargs: None)
 
     assert runner.mode_compose("up") == 0
     assert len(calls) == 2
@@ -158,7 +159,7 @@ def test_up_failure_is_not_reported_as_ready(monkeypatch: pytest.MonkeyPatch) ->
 
     monkeypatch.setattr(runner, "run_case", fake_run_case)
     monkeypatch.setattr(runner, "_compose_capture", lambda *_args, **_kwargs: (True, inventory))
-    monkeypatch.setattr(runner, "_collect_compose_diagnostics", lambda _compose: None)
+    monkeypatch.setattr(runner, "_collect_compose_diagnostics", lambda *_args, **_kwargs: None)
 
     assert runner.mode_compose("up") == 1
     assert any("--wait" in command for command in calls)
@@ -173,7 +174,7 @@ def test_up_started_but_shared_preflight_failed_is_not_ready(monkeypatch: pytest
     monkeypatch.setenv("RICK_COMPOSE_FILE", "docker-compose.dev.yml")
     monkeypatch.setattr(runner, "_compose_capture", lambda *_args, **_kwargs: (True, inventory))
     monkeypatch.setattr(runner, "_write_phase3_preflight", lambda *_args, **_kwargs: False)
-    monkeypatch.setattr(runner, "_collect_compose_diagnostics", lambda _compose: None)
+    monkeypatch.setattr(runner, "_collect_compose_diagnostics", lambda *_args, **_kwargs: None)
 
     def fake_run_case(_label: str, command: list[str], **_kwargs: object) -> bool:
         calls.append(command)
@@ -191,6 +192,7 @@ def test_down_invalidates_shared_preflight_before_teardown(monkeypatch: pytest.M
     monkeypatch.setattr(runner.shutil, "which", lambda _name: "/usr/bin/docker")
     monkeypatch.setenv("RICK_COMPOSE_FILE", "docker-compose.dev.yml")
     monkeypatch.setattr(runner, "_invalidate_phase3_preflight", lambda: invalidations.append(True))
+    monkeypatch.setattr(runner, "_collect_compose_diagnostics", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(runner, "run_case", lambda *_args, **_kwargs: True)
 
     assert runner.mode_compose("down") == 0

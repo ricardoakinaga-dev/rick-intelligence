@@ -12,9 +12,12 @@ from __future__ import annotations
 import argparse
 import asyncio
 from dataclasses import dataclass
+import inspect
 import json
 import os
 from pathlib import Path
+import shlex
+import subprocess
 import sys
 from urllib.parse import urlsplit
 import uuid
@@ -22,6 +25,7 @@ import uuid
 
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_OUTPUT = ".runtime/phase-2/redis-runtime-gate.json"
+REDIS_FAULT_CASES = ("circuit-breaker-recovery",)
 
 
 @dataclass(frozen=True)
@@ -105,6 +109,7 @@ async def _run_checks(
     lease_b = None
     limiter_a = None
     limiter_b = None
+    heartbeat = None
     results: list[GateResult] = []
     try:
         lease_a = create_redis_lease_client(settings, namespace_a, client=client)
@@ -130,6 +135,19 @@ async def _run_checks(
             raise RuntimeError("first lease acquisition was denied")
         blocked_b = await lease_b.acquire(f"fence-{run_id}", 1_500)
         renewed = await handle_a.renew(1_500)
+        heartbeat = handle_a.start_heartbeat(interval_ms=50)
+        await asyncio.sleep(0.15)
+        await heartbeat.stop()
+        heartbeat_renewed = heartbeat.failure is None and await handle_a.renew(1_500)
+        results.append(
+            GateResult(
+                "heartbeat-renewal",
+                "PASS" if heartbeat_renewed else "FAIL",
+                "caller-owned heartbeat renewed the live lease"
+                if heartbeat_renewed
+                else "heartbeat failed to renew the live lease",
+            )
+        )
         released = await handle_a.release()
         acquired_after_release = await lease_b.acquire(f"fence-{run_id}", 1_500)
         results.append(
@@ -155,6 +173,69 @@ async def _run_checks(
                 "PASS" if first and replay and second and not denied and other_tenant else "FAIL",
             )
         )
+
+        # Force the real client pool to drop open sockets, then require the
+        # next health probe to reconnect.  This exercises recovery through the
+        # vendor pool instead of treating a still-open connection as proof.
+        pool = getattr(client, "connection_pool", None)
+        disconnect = getattr(pool, "disconnect", None)
+        if not callable(disconnect):
+            results.append(GateResult("reconnect-recovery", "FAIL", "Redis client pool has no disconnect hook"))
+        else:
+            try:
+                disconnected = disconnect(inuse_connections=True)
+                if inspect.isawaitable(disconnected):
+                    await disconnected
+                recovered = await lease_a.health_check() and await limiter_a.health_check()
+            except Exception:
+                recovered = False
+            results.append(
+                GateResult(
+                    "reconnect-recovery",
+                    "PASS" if recovered else "FAIL",
+                    "health checks succeeded after the real pool was disconnected"
+                    if recovered
+                    else "Redis did not recover after the real pool disconnect",
+                )
+            )
+
+        raw_harness = os.environ.get("RICK_REDIS_FAULT_HARNESS", "").strip()
+        if not raw_harness:
+            results.extend(
+                GateResult(
+                    case,
+                    "BLOCKED_EXTERNAL",
+                    "an explicit disposable fault harness is required; circuit recovery is never inferred from a local mock",
+                )
+                for case in REDIS_FAULT_CASES
+            )
+        else:
+            try:
+                completed = subprocess.run(
+                    shlex.split(raw_harness),
+                    cwd=ROOT,
+                    env={**os.environ, "RICK_REDIS_URL": url, "RICK_REDIS_RUN_ID": run_id},
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    check=False,
+                    timeout=180,
+                )
+                payload = json.loads(completed.stdout)
+            except (OSError, ValueError, TypeError, subprocess.TimeoutExpired):
+                payload = None
+                completed = None
+            for case in REDIS_FAULT_CASES:
+                passed = isinstance(payload, dict) and completed is not None and completed.returncode == 0 and payload.get(case) == "PASS"
+                results.append(
+                    GateResult(
+                        case,
+                        "PASS" if passed else "FAIL",
+                        "approved disposable fault-harness result"
+                        if passed
+                        else "fault harness did not prove circuit recovery",
+                    )
+                )
         production_safe = bool(
             require_tls
             and settings.is_production
@@ -172,12 +253,19 @@ async def _run_checks(
                 else "runtime semantics passed without a production-safe TLS capability",
             )
         )
-        status = "PASS" if all(item.result in {"PASS", "PARTIAL"} for item in results) else "FAIL"
+        status = "FAIL" if any(item.result == "FAIL" for item in results) else (
+            "BLOCKED_EXTERNAL" if any(item.result == "BLOCKED_EXTERNAL" for item in results) else "PASS"
+        )
         return status, results, production_safe
     except Exception:
         results.append(GateResult("runtime", "FAIL", "live Redis runtime assertion failed"))
         return "FAIL", results, False
     finally:
+        if heartbeat is not None:
+            try:
+                await heartbeat.stop()
+            except Exception:
+                pass
         for capability in (lease_a, limiter_a, lease_b, limiter_b):
             if capability is not None:
                 try:

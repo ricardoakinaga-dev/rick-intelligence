@@ -42,6 +42,7 @@ PACKET_SCHEMA = "state-of-art-triple-aaa-verify.v2"
 PHASE3_EVIDENCE_ARTIFACT = ".runtime/phase-3/capability-matrix.json"
 RELEASE_EVIDENCE_ARTIFACT = "docs/progress/release-evidence.json"
 FRONTEND_RUNTIME_ARTIFACT = ".runtime/phase-3/frontend-supply-runtime-evidence.json"
+SUPPLY_RUNTIME_ARTIFACT = ".runtime/phase-3/supply-chain-runtime-evidence.json"
 FRONTEND_RUNTIME_COMMAND = ("make", "phase3-frontend-supply-runtime")
 
 _FRONTEND_LANE_IDS = frozenset({"frontend-e2e", "frontend-accessibility", "supply-chain"})
@@ -54,6 +55,18 @@ _FRONTEND_BROWSER_CHECKS = (
     "reduced-motion",
     "contrast",
     "touch",
+    "screen-reader",
+    "zoom",
+    "state-upload",
+    "state-documents",
+    "state-sources",
+    "state-jobs",
+    "state-offline",
+    "state-stream-interruption",
+    "state-permission-denied",
+    "state-worker-unavailable",
+    "state-provider-unavailable",
+    "state-slow-backend",
 )
 _FRONTEND_ACCESSIBILITY_CHECKS = (
     "viewport-matrix",
@@ -63,8 +76,17 @@ _FRONTEND_ACCESSIBILITY_CHECKS = (
     "reduced-motion",
     "contrast",
     "touch",
+    "screen-reader",
+    "zoom",
 )
-_FRONTEND_SUPPLY_CHECKS = ("container-digests", "container-sbom")
+_FRONTEND_SUPPLY_CHECKS = (
+    "lockfiles",
+    "sbom",
+    "secret-scan",
+    "licenses",
+    "container-digests",
+    "container-sbom",
+)
 
 
 _ARTIFACT_LANE_PATHS = {
@@ -93,6 +115,18 @@ def _sha256_file(path: Path) -> str | None:
         return digest.hexdigest()
     except OSError:
         return None
+
+
+def _remove_current_matrix(path: Path) -> None:
+    """Remove a prior projection before producing a new same-run packet."""
+
+    try:
+        if path.is_file() or path.is_symlink():
+            path.unlink()
+    except (OSError, ValueError, RuntimeError):
+        # A failed cleanup leaves the later bind/write validation to fail
+        # closed; it must never cause an old projection to be referenced.
+        return
 
 
 def _manifest_artifact_hash() -> str | None:
@@ -184,10 +218,10 @@ def _read_lane_artifact(lane_id: str) -> tuple[str, str, str] | None:
 def _read_frontend_runtime_artifact(
     *,
     expected_checkout: dict[str, object] | None = None,
+    relative_path: str = FRONTEND_RUNTIME_ARTIFACT,
 ) -> tuple[dict[str, object] | None, dict[str, str] | None, str, str]:
     """Read the combined frontend envelope without collapsing its lanes."""
 
-    relative_path = FRONTEND_RUNTIME_ARTIFACT
     path = ROOT / relative_path
     if not path.is_file():
         return None, None, "NOT_RUN", f"{relative_path} is absent"
@@ -268,6 +302,8 @@ def _frontend_browser_claim_status(payload: dict[str, object]) -> tuple[str, str
         return "FAIL", "browser evidence did not report PASS"
     if browser.get("runtime_claim") is not True or browser.get("fixture_interception") is not False:
         return "FAIL", "browser evidence does not prove a real non-intercepted runtime"
+    if payload.get("production_safe") is not True:
+        return "BLOCKED_EXTERNAL", "browser evidence is managed/local or lacks an approved production-safe runtime claim"
     return "PASS", "real non-intercepted browser evidence passed"
 
 
@@ -288,8 +324,9 @@ def _apply_frontend_lane_observation(
     result["source_detail"] = source_detail
     payload, checks, artifact_state, artifact_detail = _read_frontend_runtime_artifact(
         expected_checkout=expected_checkout,
+        relative_path=SUPPLY_RUNTIME_ARTIFACT if lane.lane_id == "supply-chain" else FRONTEND_RUNTIME_ARTIFACT,
     )
-    result["artifact_path"] = FRONTEND_RUNTIME_ARTIFACT
+    result["artifact_path"] = SUPPLY_RUNTIME_ARTIFACT if lane.lane_id == "supply-chain" else FRONTEND_RUNTIME_ARTIFACT
     result["artifact_classification"] = artifact_state if artifact_state != "READY" else (payload or {}).get("status", "UNKNOWN")
 
     if artifact_state != "READY" or payload is None or checks is None:
@@ -487,7 +524,7 @@ def _external_lanes() -> tuple[Lane, ...]:
         Lane("object-qdrant-runtime", ("make", "phase3-object-qdrant-runtime"), external=True, detail="object/vector lifecycle requires approved disposable object and Qdrant services", blocked_return_codes=frozenset({2})),
         Lane("ingestion-e2e", ("make", "phase3-golden-runtime"), external=True, detail="golden API→queue→worker→object→vector lifecycle requires RICK_GOLDEN_RUNTIME_PATH", blocked_return_codes=frozenset({2})),
         Lane("tenant-evidence-runtime", ("make", "phase3-tenant-evidence-runtime"), external=True, detail="live tenant/evidence negative matrix requires RICK_TENANT_EVIDENCE_RUNTIME_PATH", blocked_return_codes=frozenset({2})),
-        Lane("provider-rag-runtime", ("make", "phase3-provider-runtime"), external=True, detail="approved provider and RICK_GOLDEN_RUNTIME_PATH corpus/budget authority are required", blocked_return_codes=frozenset({2})),
+        Lane("provider-rag-runtime", ("make", "phase3-provider-rag-runtime"), external=True, detail="approved provider and RICK_GOLDEN_RUNTIME_PATH corpus/budget authority are required", blocked_return_codes=frozenset({2})),
         Lane("observability-runtime", ("make", "phase3-observability-runtime"), external=True, detail="collector/backend export and alert authority are required", blocked_return_codes=frozenset({2})),
         Lane(
             "frontend-e2e",
@@ -788,6 +825,7 @@ def main(argv: list[str] | None = None) -> int:
     # promotion engine can reject a packet from a different manifest.
     checkout["artifact_set_sha256"] = _manifest_artifact_hash()
     checkout["quality_bar_sha256"] = _sha256_file(ROOT / QUALITY_BAR)
+    checkout["source_prompt_sha256"] = _sha256_file(ROOT / SOURCE_PROMPT)
     _apply_packet_lanes(
         results,
         packet,
@@ -848,23 +886,32 @@ def main(argv: list[str] | None = None) -> int:
     output.relative_to(ROOT.resolve())
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(payload, ensure_ascii=False, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+    current_matrix = ROOT / ".runtime/phase-3/current-triple-aaa-runtime-capability-matrix.json"
+    _remove_current_matrix(current_matrix)
+    matrix_bound = False
     try:
-        triple_aaa_capability_matrix.bind_to_packet(
+        matrix_result = triple_aaa_capability_matrix.bind_to_packet(
             packet=output,
-            output=ROOT / ".runtime/phase-3/current-triple-aaa-runtime-capability-matrix.json",
+            output=current_matrix,
         )
+        matrix_bound = matrix_result.get("status") == "PASS" and current_matrix.is_file()
     except (OSError, ValueError, TypeError, RecursionError):
         # The verifier packet remains authoritative; a missing current-matrix
         # projection is intentionally not upgraded to PASS by this best-effort
         # diagnostic export.
-        pass
-    current_matrix = ROOT / ".runtime/phase-3/current-triple-aaa-runtime-capability-matrix.json"
-    if current_matrix.is_file():
+        matrix_bound = False
+    if matrix_bound:
         payload["current_capability_matrix"] = {
             "path": str(current_matrix.relative_to(ROOT)),
             "sha256": _sha256_file(current_matrix),
         }
         output.write_text(json.dumps(payload, ensure_ascii=False, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+        matrix_validation = triple_aaa_capability_matrix.validate(current_matrix, packet=output)
+        if matrix_validation.get("status") != "PASS":
+            payload.pop("current_capability_matrix", None)
+            payload["current_capability_matrix_error"] = "; ".join(matrix_validation.get("errors", []))
+            _remove_current_matrix(current_matrix)
+            output.write_text(json.dumps(payload, ensure_ascii=False, sort_keys=True, indent=2) + "\n", encoding="utf-8")
     print(json.dumps({"output": args.output, "classification": derived["classification"], "exit_code": derived["exit_code"]}, sort_keys=True))
     return int(derived["exit_code"])
 

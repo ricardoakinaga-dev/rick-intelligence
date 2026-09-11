@@ -14,6 +14,7 @@ from dataclasses import dataclass
 import json
 import os
 from pathlib import Path
+import shlex
 import subprocess
 import sys
 import time
@@ -108,6 +109,7 @@ QUERY_PLAN_CASES = (
         """,
     ),
 )
+TRANSACTION_FAULT_CASES = ("crash-before-commit", "crash-after-commit")
 
 
 @dataclass(frozen=True)
@@ -425,9 +427,90 @@ def _queue_checks(psycopg: object, dsn: str, scope: tuple[str, str, str], run_id
         expected_version=replay_job.version,
     )
     results.append(GateResult("ack-transaction", "PASS" if completed.state.value == "SUCCEEDED" else "FAIL"))
+    results.extend(_transaction_fault_checks(psycopg, dsn, scope, run_id))
     removed = queue_a.prune_terminal(scope=job_scope, older_than=time.time() + 60, limit=100)
     results.append(GateResult("retention", "PASS" if removed >= 2 else "FAIL", f"removed={removed}"))
     return results
+
+
+def _transaction_fault_checks(
+    psycopg: object,
+    dsn: str,
+    scope: tuple[str, str, str],
+    run_id: str,
+) -> list[GateResult]:
+    """Exercise rollback locally and require an explicit crash harness for both crash points."""
+
+    tenant, workspace, collection = scope
+    marker = f"runtime-rollback-{run_id}"
+    connection = None
+    try:
+        connection = psycopg.connect(dsn)
+        with connection.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO rick_ingestion_jobs
+                    (job_id, idempotency_key, tenant_id, workspace_id, collection_id,
+                     status, contract_state, operation)
+                VALUES (%s, %s, %s, %s, %s, 'queued', 'QUEUED', 'runtime_gate')
+                """,
+                (marker, marker, tenant, workspace, collection),
+            )
+        connection.rollback()
+        with connection.cursor() as cur:
+            cur.execute("SELECT COUNT(*) FROM rick_ingestion_jobs WHERE job_id=%s", (marker,))
+            remaining = int(cur.fetchone()[0])
+        rollback = GateResult(
+            "transaction-rollback",
+            "PASS" if remaining == 0 else "FAIL",
+            "rolled-back queue mutation was absent" if remaining == 0 else "rolled-back queue mutation remained durable",
+        )
+    except Exception:
+        rollback = GateResult("transaction-rollback", "FAIL", "live rollback assertion failed")
+    finally:
+        if connection is not None:
+            connection.close()
+
+    raw_harness = os.environ.get("RICK_POSTGRES_CRASH_HARNESS", "").strip()
+    if not raw_harness:
+        return [
+            rollback,
+            *[
+                GateResult(
+                    case,
+                    "BLOCKED_EXTERNAL",
+                    "explicit crash-before/after-commit harness is required; no crash result is inferred from a hermetic worker test",
+                )
+                for case in TRANSACTION_FAULT_CASES
+            ],
+        ]
+    try:
+        completed = subprocess.run(
+            shlex.split(raw_harness),
+            cwd=ROOT,
+            env={**os.environ, "RICK_POSTGRES_DSN": dsn, "RICK_POSTGRES_RUN_ID": run_id},
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=False,
+            timeout=180,
+        )
+        payload = json.loads(completed.stdout)
+    except (OSError, ValueError, TypeError, json.JSONDecodeError, subprocess.TimeoutExpired):
+        return [rollback, *[GateResult(case, "FAIL", "crash harness did not emit a valid JSON result") for case in TRANSACTION_FAULT_CASES]]
+    if not isinstance(payload, dict):
+        return [rollback, *[GateResult(case, "FAIL", "crash harness result is not an object") for case in TRANSACTION_FAULT_CASES]]
+    return [
+        rollback,
+        *[
+            GateResult(
+                case,
+                "PASS" if completed.returncode == 0 and payload.get(case) == "PASS" else "FAIL",
+                "approved crash harness result" if completed.returncode == 0 and payload.get(case) == "PASS" else "crash harness did not prove the requested case",
+            )
+            for case in TRANSACTION_FAULT_CASES
+        ],
+    ]
 
 
 def run_gate(dsn: str, *, allow_nonlocal: bool = False) -> tuple[str, list[GateResult]]:
@@ -466,7 +549,9 @@ def run_gate(dsn: str, *, allow_nonlocal: bool = False) -> tuple[str, list[GateR
                 results.append(GateResult("cleanup", "FAIL", "runtime fixture cleanup failed"))
         if connection is not None:
             connection.close()
-    status = "PASS" if all(item.result == "PASS" for item in results) else "FAIL"
+    status = "FAIL" if any(item.result == "FAIL" for item in results) else (
+        "BLOCKED_EXTERNAL" if any(item.result == "BLOCKED_EXTERNAL" for item in results) else "PASS"
+    )
     return status, results
 
 

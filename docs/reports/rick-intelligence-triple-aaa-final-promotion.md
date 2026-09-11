@@ -75,7 +75,10 @@ constraint, queue, DLQ, replay, backup and fencing evidence was not observed.
 The runtime gate declares six explicit `EXPLAIN (FORMAT JSON)` probes covering
 claim with `SKIP LOCKED`, lease lookup, retry queue, dead-letter listing,
 tenant-scoped job lookup and document lookup; they execute only when the
-approved disposable PostgreSQL DSN is available.
+approved disposable PostgreSQL DSN is available. It also emits a live rollback
+assertion and keeps crash-before-commit/crash-after-commit as separate required
+results; without the explicit crash harness those results stay externally
+blocked.
 
 ## 7. Worker Fencing
 
@@ -100,7 +103,9 @@ The composition binds one shared Redis client to the global rate limiter and
 lease namespace. Production settings retain authenticated TLS validation; the
 development lab uses an explicit disposable configuration. Live auth/TLS,
 reconnect, failover, namespace isolation, two-replica buckets and TTL evidence
-were not run.
+were not run. The single-node gate now exercises caller-owned heartbeat renewal
+and a real connection-pool disconnect/reconnect; circuit recovery still
+requires an explicitly supplied disposable fault harness.
 
 ## 9. Object Storage
 
@@ -150,7 +155,8 @@ the release and nightly boundaries require that projection to match the packet's
 commit, tree, checkout fingerprint, artifact digest, classification and exit
 code. Sealed packet evidence references are also rehashed when they resolve to
 checkout-local files; retained immutable `artifact://` references remain an
-explicit external authority boundary.
+explicit external authority boundary. Malformed local path bytes are rejected
+as binding failures without aborting verification.
 
 ## 14. Decision
 
@@ -341,3 +347,13 @@ severity/acceptance rules; a derived 26-dimension scorecard at or above
 `96/100`; and an explicit `final_classification: TRIPLE_AAA`. This local
 contract is fail-closed, verifies local reference bytes and does not supply any
 missing runtime or reviewer evidence.
+
+The current matrix validator additionally requires all eleven canonical
+capabilities and verifies the packet-declared projection SHA-256. The sealed
+packet must bind the archived prompt bytes and current matrix, and the final
+workflow verifier consumes the signed observation packet without rerunning
+runtime lanes. Frontend evidence is accepted only with an approved
+`production_safe` runtime; managed development mode remains blocked. These
+controls improve the local release boundary while the decision remains
+`NO-GO / NOT PROMOTED` until Docker/runtime, provider, operational, independent
+review and final authority evidence is supplied.

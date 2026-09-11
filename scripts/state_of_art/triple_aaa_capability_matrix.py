@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
+import re
 import sys
 from typing import Any
 
@@ -30,12 +31,40 @@ REQUIRED_COLUMNS = (
     "PRIORITY", "PROMOTION_CONDITION",
 )
 
+# The prompt freezes an eleven-capability closure matrix.  A non-empty row
+# list alone is insufficient: a truncated or substituted projection must not
+# be accepted as the current matrix for a release packet.
+EXPECTED_CAPABILITIES = (
+    "Current prompt preservation",
+    "Control plane and canonical CI",
+    "Disposable production-like lab",
+    "PostgreSQL durable queue and worker fencing",
+    "Redis coordination and multi-replica rate limit",
+    "Object storage and Qdrant lifecycle",
+    "Golden ingestion, lineage and evidence authority",
+    "Provider, Decision and citation verification",
+    "Observability, SLO, DR, chaos, soak and performance",
+    "Frontend, accessibility and supply chain",
+    "Independent reviews and sealed promotion",
+)
+
 
 PACKET_SCHEMA = "state-of-art-triple-aaa-verify.v2"
 
 
 def _load(path: Path) -> object:
     return load_json(path)
+
+
+def _sha256_file(path: Path) -> str | None:
+    try:
+        digest = hashlib.sha256()
+        with path.open("rb") as stream:
+            for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                digest.update(chunk)
+        return digest.hexdigest()
+    except (OSError, ValueError, RuntimeError):
+        return None
 
 
 def validate(path: Path = DEFAULT_PATH, *, packet: Path | None = None) -> dict[str, Any]:
@@ -90,6 +119,26 @@ def validate(path: Path = DEFAULT_PATH, *, packet: Path | None = None) -> dict[s
                     errors.append("candidate binding classification does not match the verifier packet")
                 if binding.get("exit_code") != packet_document.get("exit_code"):
                     errors.append("candidate binding exit_code does not match the verifier packet")
+            current_matrix = packet_document.get("current_capability_matrix")
+            if current_matrix is not None:
+                if not isinstance(current_matrix, dict):
+                    errors.append("bound verifier packet current_capability_matrix must be an object")
+                else:
+                    try:
+                        expected_path = path.resolve().relative_to(ROOT.resolve()).as_posix()
+                    except (OSError, ValueError, RuntimeError):
+                        expected_path = None
+                        errors.append("current matrix path must remain inside the checkout")
+                    if expected_path is not None and current_matrix.get("path") != expected_path:
+                        errors.append("bound verifier packet current_capability_matrix.path does not point to this matrix")
+                    declared_hash = current_matrix.get("sha256")
+                    normalized_hash = declared_hash.removeprefix("sha256:").lower() if isinstance(declared_hash, str) else ""
+                    if not normalized_hash or not re.fullmatch(r"[0-9a-f]{64}", normalized_hash):
+                        errors.append("bound verifier packet current_capability_matrix.sha256 is invalid")
+                    else:
+                        actual_hash = _sha256_file(path)
+                        if actual_hash != normalized_hash:
+                            errors.append("bound verifier packet current_capability_matrix.sha256 does not match this matrix")
     rows = document.get("rows")
     if not isinstance(rows, list) or not rows:
         errors.append("rows must be a non-empty array")
@@ -118,6 +167,22 @@ def validate(path: Path = DEFAULT_PATH, *, packet: Path | None = None) -> dict[s
         for column in ("BLOCKER", "OWNER", "PROMOTION_CONDITION"):
             if not isinstance(row.get(column), str) or not row[column].strip():
                 errors.append(f"row {index} {column} must be non-empty text")
+        if state in {"VERIFIED_RUNTIME", "PROMOTABLE"}:
+            if not isinstance(row.get("RUNTIME_EVIDENCE"), list) or not row["RUNTIME_EVIDENCE"]:
+                errors.append(f"row {index} {state} requires non-empty RUNTIME_EVIDENCE")
+            if not isinstance(row.get("INDEPENDENT_REVIEW"), list) or not row["INDEPENDENT_REVIEW"]:
+                errors.append(f"row {index} {state} requires non-empty INDEPENDENT_REVIEW")
+    expected_names = set(EXPECTED_CAPABILITIES)
+    if len(rows) != len(EXPECTED_CAPABILITIES):
+        errors.append(
+            f"rows must contain exactly {len(EXPECTED_CAPABILITIES)} canonical capabilities"
+        )
+    missing_capabilities = sorted(expected_names - names)
+    extra_capabilities = sorted(names - expected_names)
+    if missing_capabilities:
+        errors.append("matrix is missing canonical capabilities: " + ", ".join(missing_capabilities))
+    if extra_capabilities:
+        errors.append("matrix contains unsupported capabilities: " + ", ".join(extra_capabilities))
     return {"status": "PASS" if not errors else "FAIL", "errors": errors, "rows": len(rows)}
 
 
