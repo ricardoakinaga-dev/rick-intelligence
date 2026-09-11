@@ -449,3 +449,32 @@ are counted from the register and reject promotion.
 The focused promotion/seal suite passes **46** tests. This closes a local
 underspecified-packet path; no packet is available here and no runtime or
 independent-review evidence is claimed.
+
+## 84. Nightly artifact and current-matrix binding — 2026-09-10
+
+The scheduled nightly boundary now downloads the exact runtime, frontend,
+performance, chaos and soak artifacts produced by its dependency jobs before
+regenerating or verifying the Phase 3 evidence. The runtime job exports the
+current 2026-09-10 prompt matrix bound to the verifier packet's commit, tree,
+checkout fingerprint, artifact digest, classification and exit code; release
+and nightly validation reject a missing or drifted projection. The historical
+2026-09-09 Phase 3 schema remains available as predecessor evidence, while the
+current matrix is now carried as a same-run artifact instead of being checked
+only from the source checkout.
+
+## 85. Sealed reference byte verification — 2026-09-10
+
+Promotion packet references now accept retained immutable `artifact://` objects
+or verify checkout-local files against their declared SHA-256. Local paths
+must stay relative to the checkout, cannot traverse symlinks, and must exist;
+missing, unreadable or mismatched bytes reject the packet. The verifier passes
+the current checkout as the evidence root, closing the underspecified-reference
+anti-gaming path without inventing external artifacts.
+
+## 86. Operational projection redaction — 2026-09-10
+
+Performance, chaos and soak projections now pass through the shared runtime
+redactor before they are returned or persisted. URLs, bearer values, DSNs and
+secret-bearing keys are removed even when the operational harness is invoked
+directly; the bounded projection remains finite and structured. A live
+operational run is still unavailable and no runtime PASS is claimed.

@@ -24,8 +24,10 @@ from typing import Any
 
 try:
     from scripts.state_of_art.json_boundary import loads_json
+    from scripts.state_of_art.phase3_runtime_adapter import redact_runtime_value
 except ImportError:  # pragma: no cover - direct script execution fallback.
     from json_boundary import loads_json
+    from phase3_runtime_adapter import redact_runtime_value
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -295,10 +297,10 @@ def _parse_observation(raw: bytes, lane: str) -> tuple[str, dict[str, object], s
         "schema_version": payload["schema_version"],
         "lane": lane,
         "status": status,
-        "runtime": _bounded_projection(runtime),
-        "budgets": _bounded_projection(budgets),
-        "measurements": _bounded_projection(measurements),
-        "checks": _bounded_projection(payload.get("checks", {})),
+        "runtime": redact_runtime_value(_bounded_projection(runtime)),
+        "budgets": redact_runtime_value(_bounded_projection(budgets)),
+        "measurements": redact_runtime_value(_bounded_projection(measurements)),
+        "checks": redact_runtime_value(_bounded_projection(payload.get("checks", {}))),
     }
     return str(status), projected, "approved structured runtime observation received"
 

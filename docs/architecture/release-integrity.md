@@ -174,6 +174,11 @@ the `96/100` target, while the promotion engine still requires every mandatory
 lane and the independent signed Go/No-Go. A valid signature therefore cannot
 make an underspecified packet promotable.
 
+Packet references may point at a retained immutable `artifact://` object. A
+checkout-local reference must be relative, must not traverse a symlink or
+escape the checkout, and is rehashed before promotion; missing or mismatched
+bytes reject the packet.
+
 ## Shared disposable-runtime preflight
 
 The Phase 3 runtime adapters also require one common lab attestation before a

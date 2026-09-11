@@ -413,6 +413,11 @@ jobs:
           path: .runtime/phase-3
       - name: Require the downloaded matrix to be promotable
         run: python3 scripts/state_of_art/generate_phase3_evidence.py --verify --require-promotable
+      - name: Require the current prompt matrix to be bound to this packet
+        run: |
+          python3 scripts/state_of_art/triple_aaa_capability_matrix.py \
+            --path .runtime/phase-3/current-triple-aaa-runtime-capability-matrix.json \
+            --packet .runtime/phase-3/triple-aaa-verify.json
       - name: Generate truthful release evidence
         run: make release-evidence
       - name: Reject incomplete or stale promotion evidence
@@ -436,6 +441,13 @@ jobs:
         run: python -m pip install --disable-pip-version-check --no-cache-dir "pytest==8.0.2" "pydantic==2.6.1" "httpx==0.27.0" "psycopg[binary]==3.2.3" "redis==5.2.1" -r scripts/state_of_art/requirements.txt
       - name: Run the integrated fail-closed verification packet
         run: make triple-aaa-verify
+      - name: Export the current prompt matrix bound to this runtime packet
+        if: always()
+        run: |
+          python3 scripts/state_of_art/triple_aaa_capability_matrix.py \
+            --bind-packet \
+            --packet .runtime/phase-3/triple-aaa-verify.json \
+            --output .runtime/phase-3/current-triple-aaa-runtime-capability-matrix.json
       - name: Upload runtime packet and diagnostics
         if: always()
         uses: actions/upload-artifact@v4.6.2
@@ -574,10 +586,38 @@ jobs:
               exit 1
             fi
           done
+      - name: Download the exact scheduled runtime artifacts
+        uses: actions/download-artifact@v4.3.0
+        with:
+          name: phase3-runtime-${{ github.run_id }}
+          path: .runtime/phase-3
+      - name: Download the exact scheduled frontend runtime artifacts
+        uses: actions/download-artifact@v4.3.0
+        with:
+          name: phase3-frontend-runtime-${{ github.run_id }}
+          path: .runtime/phase-3
+      - name: Download the exact scheduled performance artifacts
+        uses: actions/download-artifact@v4.3.0
+        with:
+          name: phase3-performance-${{ github.run_id }}
+          path: .runtime/phase-3
+      - name: Download the exact scheduled chaos artifacts
+        uses: actions/download-artifact@v4.3.0
+        with:
+          name: phase3-chaos-${{ github.run_id }}
+          path: .runtime/phase-3
+      - name: Download the exact scheduled soak artifacts
+        uses: actions/download-artifact@v4.3.0
+        with:
+          name: phase3-soak-${{ github.run_id }}
+          path: .runtime/phase-3
       - name: Generate and require a promotable Phase 3 matrix
         run: |
           make phase3-evidence
           make phase3-evidence-verify
+          python3 scripts/state_of_art/triple_aaa_capability_matrix.py \
+            --path .runtime/phase-3/current-triple-aaa-runtime-capability-matrix.json \
+            --packet .runtime/phase-3/triple-aaa-verify.json
       - name: Upload strict-nightly diagnostic
         if: always()
         uses: actions/upload-artifact@v4.6.2

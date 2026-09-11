@@ -118,6 +118,26 @@ def test_structured_performance_observation_can_pass(tmp_path: Path) -> None:
     assert len(artifact["observation"]["measurements"]["results"]) == 20
 
 
+def test_structured_projection_redacts_secret_values() -> None:
+    payload = _performance_observation()
+    payload["runtime"]["database_url"] = "postgres://user:super-secret@example.invalid/db"  # type: ignore[index]
+    payload["budgets"]["api_key"] = "secret-api-key"  # type: ignore[index]
+    payload["measurements"]["results"][0]["authorization"] = "Bearer very-secret"  # type: ignore[index]
+
+    status, observation, reason = phase3_lane._parse_observation(
+        json.dumps(payload).encode(), "performance"
+    )
+
+    assert status == "PASS"
+    assert reason == "approved structured runtime observation received"
+    serialized = json.dumps(observation)
+    assert "super-secret" not in serialized
+    assert "secret-api-key" not in serialized
+    assert "very-secret" not in serialized
+    assert observation["runtime"]["database_url"] == "[REDACTED]"  # type: ignore[index]
+    assert observation["budgets"]["api_key"] == "[REDACTED]"  # type: ignore[index]
+
+
 def test_zero_exit_without_structured_pass_fails_closed(tmp_path: Path) -> None:
     artifact = phase3_lane.run_lane(
         tmp_path,

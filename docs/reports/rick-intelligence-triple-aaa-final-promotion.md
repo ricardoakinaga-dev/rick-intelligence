@@ -145,6 +145,12 @@ Evidence readers and the new capability validator fail closed on malformed,
 stale, dirty or incomplete artifacts. `make triple-aaa-capability-matrix`
 passes its bounded schema check. The current verifier packet is diagnostic and
 cannot be sealed while runtime and authority prerequisites are unavailable.
+The runtime job exports the current 2026-09-10 prompt matrix beside the packet;
+the release and nightly boundaries require that projection to match the packet's
+commit, tree, checkout fingerprint, artifact digest, classification and exit
+code. Sealed packet evidence references are also rehashed when they resolve to
+checkout-local files; retained immutable `artifact://` references remain an
+explicit external authority boundary.
 
 ## 14. Decision
 
@@ -333,5 +339,5 @@ soak, DR, frontend and supply-chain evidence references; twelve fresh
 independent review scopes; the eighteen-item rejection checklist; risk-register
 severity/acceptance rules; a derived 26-dimension scorecard at or above
 `96/100`; and an explicit `final_classification: TRIPLE_AAA`. This local
-contract is fail-closed and does not supply any missing runtime or reviewer
-evidence.
+contract is fail-closed, verifies local reference bytes and does not supply any
+missing runtime or reviewer evidence.

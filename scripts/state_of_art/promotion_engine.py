@@ -11,7 +11,9 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from datetime import datetime, timezone
+from hashlib import sha256
 import json
+from pathlib import Path
 import re
 from typing import Any
 
@@ -343,6 +345,70 @@ def _packet_nonempty_text(value: Any) -> bool:
     return isinstance(value, str) and bool(value.strip())
 
 
+def _packet_reference_hash(value: Any) -> str:
+    if not isinstance(value, str):
+        return ""
+    candidate = value.removeprefix("sha256:").lower()
+    return candidate if _SHA256_RE.fullmatch(candidate) else ""
+
+
+def _packet_local_file(
+    raw_path: str,
+    *,
+    evidence_root: Path | None,
+) -> tuple[Path | None, str | None]:
+    """Resolve a packet-local evidence path without following symlink swaps."""
+
+    if evidence_root is None:
+        return None, "local packet evidence requires an evidence root"
+    relative = Path(raw_path)
+    if relative.is_absolute() or ".." in relative.parts:
+        return None, "packet evidence path must be relative to the checkout"
+    root = evidence_root.resolve()
+    cursor = root
+    for component in relative.parts:
+        cursor /= component
+        if cursor.is_symlink():
+            return None, "packet evidence path must not traverse a symlink"
+    candidate = cursor.resolve()
+    try:
+        candidate.relative_to(root)
+    except ValueError:
+        return None, "packet evidence path must remain inside the checkout"
+    if not candidate.is_file():
+        return None, "packet evidence file is absent"
+    return candidate, None
+
+
+def _validate_packet_reference(
+    reference: Mapping[str, Any],
+    *,
+    field: str,
+    evidence_root: Path | None,
+) -> tuple[str, str | None]:
+    """Validate a SHA-256 reference and, for local paths, its actual bytes."""
+
+    raw_path = reference.get("path")
+    expected_hash = _packet_reference_hash(reference.get("sha256"))
+    if not _packet_nonempty_text(raw_path):
+        return "PACKET_CONTENT_REJECTED", f"{field}.path is required"
+    if not expected_hash:
+        return "PACKET_CONTENT_REJECTED", f"{field}.sha256 is invalid"
+    assert isinstance(raw_path, str)
+    if raw_path.startswith("artifact://"):
+        return "", None
+    local_path, path_error = _packet_local_file(raw_path, evidence_root=evidence_root)
+    if path_error or local_path is None:
+        return "PACKET_BINDING_REJECTED", f"{field} cannot be verified: {path_error or 'invalid path'}"
+    try:
+        digest = sha256(local_path.read_bytes()).hexdigest()
+    except OSError:
+        return "PACKET_BINDING_REJECTED", f"{field} cannot be read from the checkout"
+    if digest != expected_hash:
+        return "PACKET_BINDING_REJECTED", f"{field}.sha256 does not match the referenced bytes"
+    return "", None
+
+
 def _packet_date(value: Any) -> datetime | None:
     if not isinstance(value, str) or not value.strip():
         return None
@@ -359,6 +425,7 @@ def _validate_packet_content(
     packet: Mapping[str, Any],
     *,
     checkout: Mapping[str, Any] | None,
+    evidence_root: Path | None,
 ) -> tuple[set[str], list[str]]:
     """Validate the evidence, review, critic and scorecard sections of a seal.
 
@@ -401,12 +468,15 @@ def _validate_packet_content(
                 codes.add("PACKET_CONTENT_REJECTED")
                 errors.append(f"sealed packet {field}[{index}] must be an evidence object")
                 continue
-            if not _packet_nonempty_text(reference.get("path")):
-                codes.add("PACKET_CONTENT_REJECTED")
-                errors.append(f"sealed packet {field}[{index}].path is required")
-            if not _packet_sha256(reference.get("sha256")):
-                codes.add("PACKET_CONTENT_REJECTED")
-                errors.append(f"sealed packet {field}[{index}].sha256 is invalid")
+            rejection_code, rejection = _validate_packet_reference(
+                reference,
+                field=f"sealed packet {field}[{index}]",
+                evidence_root=evidence_root,
+            )
+            if rejection_code:
+                codes.add(rejection_code)
+            if rejection:
+                errors.append(rejection)
 
     review_approvals = packet.get("review_approvals")
     seen_scopes: set[str] = set()
@@ -439,9 +509,23 @@ def _validate_packet_content(
             if not _packet_nonempty_text(approval.get("reviewer_id")):
                 codes.add("INDEPENDENT_REVIEW_REJECTED")
                 errors.append(f"sealed packet review_approvals[{index}].reviewer_id is required")
-            if not _packet_nonempty_text(approval.get("review_ref")) or not _packet_sha256(approval.get("review_sha256")):
+            review_reference = approval.get("review_ref")
+            review_sha256 = approval.get("review_sha256")
+            if not _packet_nonempty_text(review_reference) or not _packet_sha256(review_sha256):
                 codes.add("INDEPENDENT_REVIEW_REJECTED")
                 errors.append(f"sealed packet review_approvals[{index}] must bind a review artifact")
+            elif isinstance(review_reference, str):
+                review_path, _separator, _fragment = review_reference.partition("#")
+                review_ref = {"path": review_path, "sha256": review_sha256}
+                rejection_code, rejection = _validate_packet_reference(
+                    review_ref,
+                    field=f"sealed packet review_approvals[{index}].review_ref",
+                    evidence_root=evidence_root,
+                )
+                if rejection_code:
+                    codes.add(rejection_code)
+                if rejection:
+                    errors.append(rejection)
         missing_scopes = sorted(expected_scopes - seen_scopes)
         if missing_scopes:
             codes.add("INDEPENDENT_REVIEW_REJECTED")
@@ -570,6 +654,7 @@ def _packet_rejections(
     results: Sequence[Mapping[str, Any]],
     checkout: Mapping[str, Any] | None = None,
     trusted_public_keys: Mapping[str, object] | None = None,
+    evidence_root: Path | None = None,
 ) -> tuple[list[str], list[str]]:
     """Validate the independently sealed packet that authorizes promotion.
 
@@ -603,7 +688,11 @@ def _packet_rejections(
         codes.add("PACKET_NOT_SEALED_REJECTED")
         errors.append("packet.sealed must be true")
 
-    content_codes, content_errors = _validate_packet_content(packet, checkout=checkout)
+    content_codes, content_errors = _validate_packet_content(
+        packet,
+        checkout=checkout,
+        evidence_root=evidence_root,
+    )
     codes.update(content_codes)
     errors.extend(content_errors)
 
@@ -679,6 +768,7 @@ def evaluate(
     packet: Mapping[str, Any] | None = None,
     checkout: Mapping[str, Any] | None = None,
     trusted_public_keys: Mapping[str, object] | None = None,
+    evidence_root: Path | None = None,
 ) -> dict[str, Any]:
     """Return a derived classification, rejection set and process exit code."""
 
@@ -707,6 +797,7 @@ def evaluate(
         results,
         checkout,
         trusted_public_keys,
+        evidence_root,
     )
     rejection_codes.extend(packet_rejection_codes)
     rejection_codes = sorted(set(rejection_codes))

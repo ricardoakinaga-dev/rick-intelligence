@@ -372,6 +372,30 @@ def test_nightly_boundary_waits_for_every_scheduled_runtime_lane() -> None:
         assert f'needs.{lane}.result' in nightly
 
 
+def test_nightly_boundary_downloads_every_scheduled_runtime_artifact() -> None:
+    workflow = Path(__file__).parents[3] / ".github/workflows/quality.yml"
+    nightly = workflow.read_text(encoding="utf-8").split("  nightly:\n", 1)[1]
+
+    for artifact in ("runtime", "frontend-runtime", "performance", "chaos", "soak"):
+        assert f"name: phase3-{artifact}-${{{{ github.run_id }}}}" in nightly
+        assert "uses: actions/download-artifact@v4.3.0" in nightly
+        assert "path: .runtime/phase-3" in nightly
+
+    assert "Download the exact scheduled runtime artifacts" in nightly
+    assert "Download the exact scheduled soak artifacts" in nightly
+
+
+def test_runtime_and_release_workflows_bind_the_current_prompt_matrix() -> None:
+    workflow = Path(__file__).parents[3] / ".github/workflows/quality.yml"
+    text = workflow.read_text(encoding="utf-8")
+
+    assert "Export the current prompt matrix bound to this runtime packet" in text
+    assert "--bind-packet" in text
+    assert "current-triple-aaa-runtime-capability-matrix.json" in text
+    assert text.count("--packet .runtime/phase-3/triple-aaa-verify.json") >= 3
+    assert "Require the current prompt matrix to be bound to this packet" in text
+
+
 def test_final_promotion_report_matches_prompt_section_and_scorecard_contract() -> None:
     report = Path(__file__).parents[3] / "docs/reports/rick-intelligence-triple-aaa-final-promotion.md"
     text = report.read_text(encoding="utf-8")

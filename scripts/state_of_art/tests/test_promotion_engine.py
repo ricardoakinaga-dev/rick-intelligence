@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from hashlib import sha256
 from pathlib import Path
 
 import pytest
@@ -104,7 +105,7 @@ def _results(*, status: str = "PASS", external: bool = False) -> list[dict[str, 
 
 def _sealed_packet(results: list[dict[str, object]]) -> dict[str, object]:
     evidence = {
-        field: [{"path": f".runtime/packet/{field}.json", "sha256": "e" * 64}]
+        field: [{"path": f"artifact://fixture/{field}.json", "sha256": "e" * 64}]
         for field in promotion_engine.PACKET_EVIDENCE_FIELDS
     }
     review_approvals = [
@@ -114,7 +115,7 @@ def _sealed_packet(results: list[dict[str, object]]) -> dict[str, object]:
             "independent": True,
             "fresh": True,
             "decision": "APPROVE",
-            "review_ref": f"reviews/{scope.lower().replace(' ', '-')}.json",
+            "review_ref": f"artifact://fixture/reviews/{scope.lower().replace(' ', '-')}.json",
             "review_sha256": "1" * 64,
         }
         for scope in promotion_engine.PACKET_REVIEW_SCOPES
@@ -295,6 +296,36 @@ def test_packet_requires_current_checkout_quality_bar_binding() -> None:
     assert result["promotion_allowed"] is False
     assert result["exit_code"] == promotion_engine.EXIT_FAILED
     assert "PACKET_BINDING_REJECTED" in result["rejection_codes"]
+
+
+def test_local_packet_reference_must_exist_and_match_its_hash(tmp_path: Path) -> None:
+    observations = _results()
+    packet = _sealed_packet(observations)
+    packet["performance"][0]["path"] = "missing-evidence.json"  # type: ignore[index]
+
+    missing = promotion_engine.evaluate(
+        observations,
+        packet=_reseal(packet),
+        checkout=FIXTURE_CHECKOUT,
+        trusted_public_keys=FIXTURE_TRUST_STORE,
+        evidence_root=tmp_path,
+    )
+    assert missing["promotion_allowed"] is False
+    assert "PACKET_BINDING_REJECTED" in missing["rejection_codes"]
+
+    evidence = tmp_path / "evidence.json"
+    evidence.write_text("{\"status\":\"PASS\"}\n", encoding="utf-8")
+    packet["performance"][0]["path"] = "evidence.json"  # type: ignore[index]
+    packet["performance"][0]["sha256"] = sha256(evidence.read_bytes()).hexdigest()  # type: ignore[index]
+    valid = promotion_engine.evaluate(
+        observations,
+        packet=_reseal(packet),
+        checkout=FIXTURE_CHECKOUT,
+        trusted_public_keys=FIXTURE_TRUST_STORE,
+        evidence_root=tmp_path,
+    )
+    assert valid["promotion_allowed"] is True
+    assert valid["exit_code"] == promotion_engine.EXIT_PASS
 
 
 def test_external_block_returns_candidate_and_exit_two() -> None:

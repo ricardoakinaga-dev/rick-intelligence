@@ -24,11 +24,13 @@ try:
     from scripts.state_of_art.json_boundary import load_json
     from scripts.state_of_art import packet_seal
     from scripts.state_of_art import promotion_engine
+    from scripts.state_of_art import triple_aaa_capability_matrix
     from scripts.state_of_art.release_integrity import capture_checkout
 except ImportError:  # pragma: no cover - direct script execution fallback.
     from json_boundary import load_json
     import packet_seal
     import promotion_engine
+    import triple_aaa_capability_matrix
     from release_integrity import capture_checkout
 
 
@@ -798,6 +800,7 @@ def main(argv: list[str] | None = None) -> int:
         packet=packet,
         checkout=checkout,
         trusted_public_keys=trusted_public_keys,
+        evidence_root=ROOT,
     )
     payload: dict[str, object] = {
         "schema_version": PACKET_SCHEMA,
@@ -845,6 +848,23 @@ def main(argv: list[str] | None = None) -> int:
     output.relative_to(ROOT.resolve())
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(payload, ensure_ascii=False, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+    try:
+        triple_aaa_capability_matrix.bind_to_packet(
+            packet=output,
+            output=ROOT / ".runtime/phase-3/current-triple-aaa-runtime-capability-matrix.json",
+        )
+    except (OSError, ValueError, TypeError, RecursionError):
+        # The verifier packet remains authoritative; a missing current-matrix
+        # projection is intentionally not upgraded to PASS by this best-effort
+        # diagnostic export.
+        pass
+    current_matrix = ROOT / ".runtime/phase-3/current-triple-aaa-runtime-capability-matrix.json"
+    if current_matrix.is_file():
+        payload["current_capability_matrix"] = {
+            "path": str(current_matrix.relative_to(ROOT)),
+            "sha256": _sha256_file(current_matrix),
+        }
+        output.write_text(json.dumps(payload, ensure_ascii=False, sort_keys=True, indent=2) + "\n", encoding="utf-8")
     print(json.dumps({"output": args.output, "classification": derived["classification"], "exit_code": derived["exit_code"]}, sort_keys=True))
     return int(derived["exit_code"])
 
