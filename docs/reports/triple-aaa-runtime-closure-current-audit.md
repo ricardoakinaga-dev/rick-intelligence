@@ -565,3 +565,13 @@ release integrity remains blocked by mandatory runtime, independent-review,
 sealed-packet and final-authority gates. The worktree was restored clean after
 benchmark commands; none of these local results is presented as production
 runtime proof or promotion authority.
+
+## 94. Alternate Docker endpoint probe — 2026-09-10
+
+The host exposes two historical user-session socket paths under
+`/run/user/1000/rick-intelligence-userns-docker-*`. Explicit `docker version`
+probes against both returned `Cannot connect to the Docker daemon`; neither is
+a live disposable authority. The only running `dockerd` is the root-owned
+host daemon behind `/var/run/docker.sock` (`root:docker`, mode `0660`), which
+the current user cannot access. No host-owned service was adopted and no
+runtime result was inferred from these endpoints.
