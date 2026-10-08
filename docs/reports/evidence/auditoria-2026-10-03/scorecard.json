@@ -1,0 +1,483 @@
+{
+  "date_local": "2026-10-03",
+  "timezone": "America/Sao_Paulo",
+  "head": "b52f32c141916a2ea3af1a6b913bd91f380606e0",
+  "rows": [
+    {
+      "id": 1,
+      "item": "Arquitetura e responsabilidades",
+      "score": 76,
+      "basis": "Boa separação apps/packages; fronteiras TypeScript não são verificadas pelo checker."
+    },
+    {
+      "id": 2,
+      "item": "Documentação e aderência",
+      "score": 78,
+      "basis": "Contratos e estados explícitos; três links inválidos e documentos correntes/históricos com referências defasadas."
+    },
+    {
+      "id": 3,
+      "item": "Identidade e sessões",
+      "score": 72,
+      "basis": "Snapshots/workspace cobertos; OIDC aceita membership desativada/incompleta e snapshot moderno malformado pode receber defaults."
+    },
+    {
+      "id": 4,
+      "item": "Autorização e isolamento",
+      "score": 66,
+      "basis": "Retirada do último grant reexpande acesso e mutações de coleção ignoram grants específicos; colisão de escopo em IDs."
+    },
+    {
+      "id": 5,
+      "item": "Kernel HTTP e controles defensivos",
+      "score": 80,
+      "basis": "759 testes API verdes e controles defensivos; revogação/exclusão podem acontecer antes de falhar a auditoria obrigatória."
+    },
+    {
+      "id": 6,
+      "item": "Contratos e compatibilidade",
+      "score": 82,
+      "basis": "Contratos tipados e SSE; parser web aceita substituição depois do terminal."
+    },
+    {
+      "id": 7,
+      "item": "Knowledge: catálogo, versões e proveniência",
+      "score": 76,
+      "basis": "Colisão de IDs e diferença entre memória e SQLite na ressurreição de tombstones."
+    },
+    {
+      "id": 8,
+      "item": "Ingestão e reindexação",
+      "score": 71,
+      "basis": "Reprodução de compensação destrutiva, reativação de coleção e publicação incoerente."
+    },
+    {
+      "id": 9,
+      "item": "Retrieval e busca híbrida",
+      "score": 82,
+      "basis": "Ranking e ACL cobertos; escopo vazio ainda invoca embed/search; sem campanha real."
+    },
+    {
+      "id": 10,
+      "item": "Evidence: fontes e citações",
+      "score": 77,
+      "basis": "Evidence emitida/revalidada pelo servidor; wildcard admin é rejeitado e finish_reason ausente pode chegar como aprovado."
+    },
+    {
+      "id": 11,
+      "item": "Decision: responder, abster e escalar",
+      "score": 89,
+      "basis": "Política explícita e testes negativos fortes; decisões/limiares de domínio externos pendentes."
+    },
+    {
+      "id": 12,
+      "item": "Professor e geração fundamentada",
+      "score": 82,
+      "basis": "Gates e budgets; aprovação indevida quando cliente inventa finish_reason=stop."
+    },
+    {
+      "id": 13,
+      "item": "Integração com providers",
+      "score": 81,
+      "basis": "Cliente tipado e retries; validação incompleta do término; nenhum provider real exercitado."
+    },
+    {
+      "id": 14,
+      "item": "Avaliação da qualidade RAG",
+      "score": 70,
+      "basis": "Pack com cinco casos sintéticos; campanha NOT_RUN/BLOCKED e sem amostra representativa."
+    },
+    {
+      "id": 15,
+      "item": "Chat, histórico e evidências na interface",
+      "score": 76,
+      "basis": "Fluxo funcional e contratos; parser aceita eventos pós-DONE e não cancela reader em erro."
+    },
+    {
+      "id": 16,
+      "item": "Documentos, busca e ingestão na interface",
+      "score": 78,
+      "basis": "UI e controles substanciais; matriz completa Next/API não repetida nesta auditoria."
+    },
+    {
+      "id": 17,
+      "item": "Administração, auditoria e casos",
+      "score": 68,
+      "basis": "Admin/outbox implementados; ordem mutação/auditoria incorreta em rotas, dados de casos tardios e limite de feedback a esclarecer."
+    },
+    {
+      "id": 18,
+      "item": "Containers e composição",
+      "score": 73,
+      "basis": "Hardening e composição definidos; imagens e stack integrado não executados nesta auditoria."
+    },
+    {
+      "id": 19,
+      "item": "Jobs, PostgreSQL e migrações",
+      "score": 79,
+      "basis": "Oito migrations e contratos verificados offline; banco instalado/concorrência real não executados."
+    },
+    {
+      "id": 20,
+      "item": "Worker e ciclo de vida",
+      "score": 79,
+      "basis": "Testes de execução e shutdown; perda de lease pode desfazer dados publicados e divergir do estado do job."
+    },
+    {
+      "id": 21,
+      "item": "Redis e coordenação",
+      "score": 86,
+      "basis": "Contratos owner-safe e negativos sólidos; Redis/failover/múltiplas réplicas reais NOT_RUN."
+    },
+    {
+      "id": 22,
+      "item": "Storage e persistência",
+      "score": 86,
+      "basis": "Escopo, checksum e adapters testados; S3/Qdrant/restore real pendentes."
+    },
+    {
+      "id": 23,
+      "item": "Observabilidade e SLO",
+      "score": 69,
+      "basis": "Redaction e bounds fortes; helper aceita NaN/latência negativa como healthy; entrega distribuída pendente."
+    },
+    {
+      "id": 24,
+      "item": "Recuperação, capacidade e tolerância a falhas",
+      "score": 55,
+      "basis": "Runbooks/helpers; sem restore/RPO/RTO/carga/chaos/soak atuais."
+    },
+    {
+      "id": 25,
+      "item": "CI e promoção de release",
+      "score": 58,
+      "basis": "FAST depende de arquivos ignorados; UNIT lock incompleto; regressão stale quebra outro workflow."
+    },
+    {
+      "id": 26,
+      "item": "Qualidade e alcance dos testes",
+      "score": 72,
+      "basis": "2070 testes Python passam; adversariais descobrem invariantes sem regressão, teste stale falha e cobertura unitária web é estreita."
+    },
+    {
+      "id": 27,
+      "item": "Acessibilidade",
+      "score": 77,
+      "basis": "Semântica e foco implementados; diálogo busy deixa Tab escapar; avaliação completa não executada."
+    },
+    {
+      "id": 28,
+      "item": "Toolchain e reprodutibilidade",
+      "score": 72,
+      "basis": "Locks/hashes/SHA de Actions; ambiente CI não inclui todos os imports e runtime local difere do contrato."
+    },
+    {
+      "id": 29,
+      "item": "Autoridade e integridade de evidências de release",
+      "score": 88,
+      "basis": "Verificações de assinatura, candidato e autoridade resistem aos negativos locais; selagem/proteção CI/promoção externas não executadas."
+    }
+  ],
+  "mean_rounded": 76,
+  "verdict": "NO-GO",
+  "source_mutation": "none observed across 4005 tracked/untracked files",
+  "status": "FINAL",
+  "audit_started_local": "2026-10-02",
+  "recorded_at_utc": "2026-10-03T03:03:01.515931+00:00",
+  "independence": "I1: três revisores sem histórico herdado; reproduções dos principais achados repetidas pelo integrador",
+  "limitations": "Auditoria local baseada em código e contratos. Não é pentest externo, certificação nem autorização de produção. Inventário completo de docs; leitura normativa e atual focada, históricos e evidências amostrados.",
+  "findings": [
+    {
+      "id": "A01",
+      "severity": "ALTA",
+      "title": "Revogar o último grant aumenta o acesso",
+      "observation": "Após retirar a única coleção autorizada, o armazenamento contém []; no próximo login KNOWLEDGE_MANAGER recebe [*] e VETERINARIAN recebe [rag_phase0].",
+      "source": "packages/authorization/src/rick_authorization/policy.py:251",
+      "evidence": "security-reproduction-lead.log",
+      "confidence": "alta na observação descrita",
+      "limitation": "Reprodução sintética local; comportamento em deployment real não executado."
+    },
+    {
+      "id": "A02",
+      "severity": "ALTA",
+      "title": "Gestor altera coleção fora dos grants",
+      "observation": "Gestor com grant apenas allowed conseguiu editar e arquivar secret no mesmo tenant/workspace. Os handlers passam _scope(session) sem collection_id.",
+      "source": "apps/api/src/routes/knowledge.py:477",
+      "evidence": "security-reproduction-lead.log",
+      "confidence": "alta na observação descrita",
+      "limitation": "Handlers reais executados com Request e sessão sintéticos; não é uma chamada HTTP ao deployment."
+    },
+    {
+      "id": "A03",
+      "severity": "ALTA",
+      "title": "OIDC aceita membership desativada ou incompleta",
+      "observation": "Token sintético válido autentica membership disabled/inactive; membership sem workspace/role recorre às claims do token, inclusive PLATFORM_ADMIN.",
+      "source": "packages/identity/src/rick_identity/oidc.py:244",
+      "evidence": "security-reproduction-lead.log",
+      "confidence": "alta na observação descrita",
+      "limitation": "Exposição depende do adapter selecionado e do contrato do membership_resolver; IdP real não foi consultado."
+    },
+    {
+      "id": "A04",
+      "severity": "ALTA",
+      "title": "Compensação de worker antigo desfaz publicação nova",
+      "observation": "Duas instâncias compartilham stores: B publica após A perder sua posse; A compensa e deixa o documento failed e zero vetores, enquanto B continua published. Não há fence de tentativa na compensação.",
+      "source": "packages/ingestion/src/rick_ingestion/pipeline.py:343",
+      "evidence": "domain-reproduction-lead.log",
+      "confidence": "alta na observação descrita",
+      "limitation": "Reprodução sintética local; comportamento em deployment real não executado."
+    },
+    {
+      "id": "A05",
+      "severity": "ALTA",
+      "title": "Perda de lease na saída deixa publicação incoerente",
+      "observation": "Guard perde lease no __exit__: job permanece published, documento passa a failed, vetores são apagados e published -> failed lança InvalidTransitionError.",
+      "source": "apps/worker/external_ingestion.py:48",
+      "evidence": "domain-reproduction-lead.log",
+      "confidence": "alta na observação descrita",
+      "limitation": "Reprodução sintética local; comportamento em deployment real não executado."
+    },
+    {
+      "id": "A06",
+      "severity": "ALTA",
+      "title": "IDs determinísticos colidem entre scopes",
+      "observation": "Com bytes e coleção iguais, tenant=default/workspace=tenant:t:w e tenant=t/workspace=w recebem o mesmo ID. No store local, a falha da segunda ingestão compensa o documento da primeira.",
+      "source": "packages/knowledge/src/rick_knowledge/identity.py:57",
+      "evidence": "boundary-reproduction-lead.log",
+      "confidence": "alta na observação descrita",
+      "limitation": "A colisão é determinística no pacote; o efeito destrutivo foi reproduzido no adapter em memória. Não se afirma bypass de todos os adapters de produção."
+    },
+    {
+      "id": "A07",
+      "severity": "ALTA",
+      "title": "Ingestão reativa coleção arquivada e apaga metadados",
+      "observation": "Uma coleção archived, versão 8, título/descrição/metadata revisados torna-se active, versão 1 e metadata vazio após ingestão. Upsert Collection padrão é incondicional.",
+      "source": "packages/ingestion/src/rick_ingestion/pipeline.py:755",
+      "evidence": "domain-reproduction-lead.log",
+      "confidence": "alta na observação descrita",
+      "limitation": "Reprodução sintética local; comportamento em deployment real não executado."
+    },
+    {
+      "id": "A08",
+      "severity": "ALTA",
+      "title": "Provider inventa sinal de conclusão",
+      "observation": "Resposta 200 sem finish_reason é convertida em stop. Professor retorna APPROVED_EVIDENCE e publication_validation=verified com evidência/validador sintéticos.",
+      "source": "packages/providers/src/rick_providers/client.py:974",
+      "evidence": "boundary-reproduction-lead.log",
+      "confidence": "alta na observação descrita",
+      "limitation": "MockTransport, evidência escopada e validador de publicação sintético; nenhuma resposta de modelo real foi consumida."
+    },
+    {
+      "id": "A09",
+      "severity": "ALTA",
+      "title": "Auditoria obrigatória falha após a mutação",
+      "observation": "Sink que retorna False causa provider_unavailable depois de revogar efetivamente a sessão. Exclusão de documento é chamada antes de emitir auditoria obrigatória.",
+      "source": "apps/api/src/routes/sessions.py:67",
+      "evidence": "security-reproduction-lead.log",
+      "confidence": "alta na observação descrita",
+      "limitation": "Revogação usa identity real em memória; exclusão foi verificada com fake registrador, sem apagar documento persistente real."
+    },
+    {
+      "id": "A10",
+      "severity": "ALTA",
+      "title": "Resposta tardia restaura casos privados após revogação",
+      "observation": "Resposta listCases fica pendente; cases.read é removido; view mostra restrição; resposta antiga chega e renderiza conteúdo privado.",
+      "source": "apps/web/components/cases/case-workspace.tsx:77",
+      "evidence": "web-reproduction-lead.log",
+      "confidence": "alta na observação descrita",
+      "limitation": "Componente real em Chromium offline, session-provider/fetch sintéticos; prova exibição client-side, não bypass de autorização do backend."
+    },
+    {
+      "id": "A11",
+      "severity": "ALTA",
+      "title": "FAST depende de arquivos ausentes em checkout novo",
+      "observation": "make validate passa no workspace com históricos locais, mas falha em clone limpo de HEAD e projeção limpa das fontes atuais: arquivos de .gauntlet*, .review-control-history e .agent/legacy-v1 são ignorados. FAST não os restaura.",
+      "source": "docs/ci/check_control_plane.py:279",
+      "evidence": "/tmp/rick-web-audit-94uzdj9s/current-clean-validate.log",
+      "confidence": "alta na observação descrita",
+      "limitation": "Defeito reproduzido em checkout local limpo; GitHub Actions remoto não executado."
+    },
+    {
+      "id": "A12",
+      "severity": "ALTA",
+      "title": "Lock de UNIT não cobre dependências das suítes",
+      "observation": "requirements/test.lock instala sem PyYAML e qdrant-client. Coleta de infrastructure/scripts/tests falha import yaml; Makefile api16-domain coleta diferenciais que importam qdrant_client.",
+      "source": "requirements/test.in:1",
+      "evidence": "tooling-locked-tests.log",
+      "confidence": "alta na observação descrita",
+      "limitation": "Ambiente novo instalado com hashes. Suítes adicionais só executaram após phase13.lock e PyYAML==6.0.2 suplementares fora do repositório."
+    },
+    {
+      "id": "A13",
+      "severity": "ALTA",
+      "title": "Teste desatualizado bloqueia workflow de qualidade",
+      "observation": "test_nightly_boundary_downloads_every_scheduled_runtime_artifact exige download-artifact@v4.3.0; workflow usa corretamente SHA. state-of-art-quality.yml executa a suíte que contém esse teste.",
+      "source": "scripts/state_of_art/tests/test_generate_release_evidence.py:381",
+      "evidence": "tooling-supplemented-tests.log",
+      "confidence": "alta na observação descrita",
+      "limitation": "Falha de teste/automação, não vulnerabilidade causada por usar SHA; não se recomenda reverter o pin de segurança."
+    },
+    {
+      "id": "A14",
+      "severity": "MÉDIA",
+      "title": "Snapshot moderno malformado recebe defaults",
+      "observation": "Snapshot AUTHORITATIVE v1 sem permissions é aceito como migrável; sessão de administrador ganha [*].",
+      "source": "packages/identity/src/rick_identity/provider.py:183",
+      "evidence": "security-reproduction-lead.log",
+      "confidence": "alta na observação descrita",
+      "limitation": "Requer estado persistido malformado; nenhum caminho HTTP capaz de corromper a snapshot foi demonstrado."
+    },
+    {
+      "id": "A15",
+      "severity": "MÉDIA",
+      "title": "Wildcard de administrador falha na publicação",
+      "observation": "Mesmo pacote de evidência falha com permissions=[*] e passa com [chat.query]. Validação testa inclusão literal.",
+      "source": "apps/api/src/services/professor_backend.py:644",
+      "evidence": "security-reproduction-lead.log",
+      "confidence": "alta na observação descrita",
+      "limitation": "Reprodução sintética local; comportamento em deployment real não executado."
+    },
+    {
+      "id": "A16",
+      "severity": "MÉDIA",
+      "title": "Memória permite ressuscitar tombstone",
+      "observation": "Upsert de documento publicado após delete é aceito em memória; SQLite rejeita ValueError.",
+      "source": "packages/knowledge/src/rick_knowledge/store.py:96",
+      "evidence": "domain-reproduction-lead.log",
+      "confidence": "alta na observação descrita",
+      "limitation": "Reprodução sintética local; comportamento em deployment real não executado."
+    },
+    {
+      "id": "A17",
+      "severity": "MÉDIA",
+      "title": "Escopo vazio ainda invoca embed/search",
+      "observation": "allowed_collection_ids=[] chama embed e search antes de devolver evidência vazia.",
+      "source": "packages/retrieval/src/rick_retrieval/pipeline.py:180",
+      "evidence": "boundary-reproduction-lead.log",
+      "confidence": "alta na observação descrita",
+      "limitation": "Não houve vazamento de documentos na resposta; há processamento/custo e possível encaminhamento de query ao embedding configurado."
+    },
+    {
+      "id": "A18",
+      "severity": "MÉDIA",
+      "title": "Parser SSE aceita substituição pós-terminal",
+      "observation": "completion, [DONE], nova completion retorna a segunda resposta. Evento de erro lança exception, mas não cancela o ReadableStream.",
+      "source": "apps/web/lib/api.ts:387",
+      "evidence": "web-reproduction-lead.log",
+      "confidence": "alta na observação descrita",
+      "limitation": "Fluxo sintético local; não se afirma que o servidor canônico emite eventos após terminal."
+    },
+    {
+      "id": "A19",
+      "severity": "MÉDIA",
+      "title": "Diálogo ocupado permite escape de foco",
+      "observation": "Quando todos os controles ficam disabled por busy=true, Tab move foco para botão externo apesar de aria-modal=true.",
+      "source": "apps/web/components/ui.tsx:78",
+      "evidence": "web-reproduction-lead.log",
+      "confidence": "alta na observação descrita",
+      "limitation": "Reprodução offline de teclado; auditoria assistiva completa e matriz integrada não executadas."
+    },
+    {
+      "id": "A20",
+      "severity": "MÉDIA",
+      "title": "SLI inválida vira healthy",
+      "observation": "evaluate_slo marca latency_p95=NaN, latência negativa ou threshold=NaN como healthy. Um valor válido acima do threshold resulta breach.",
+      "source": "packages/observability/src/rick_observability/slo.py:26",
+      "evidence": "slo-reproduction.log",
+      "confidence": "alta na observação descrita",
+      "limitation": "Falha do helper público. ApiTelemetry possui sanitização adicional; não se afirma que a rota HTTP permite injetar NaN nesse fluxo."
+    },
+    {
+      "id": "A21",
+      "severity": "MÉDIA",
+      "title": "Checkers deixam fixtures incorretas passarem",
+      "observation": "Boundary checker só varre Python e aceita import TypeScript direto do legado. Checker CI aceita comando obrigatório deixado apenas como comentário por busca substring.",
+      "source": "scripts/phase11/check_canonical_ci.py:249",
+      "evidence": "/tmp/rick-web-audit-94uzdj9s/clean-ci-requirements.json",
+      "confidence": "alta na observação descrita",
+      "limitation": "Mutações known-bad feitas somente em fixtures temporárias; ausência de enforcement, não prova de import proibido já existente em produção."
+    },
+    {
+      "id": "A22",
+      "severity": "MÉDIA",
+      "title": "Cobertura web não cobre interações críticas",
+      "observation": "Quatro testes e 100% apenas de navigation.ts, permissions.ts e presentation.ts. Parser API, sessões, páginas e componentes ficam fora do denominador.",
+      "source": "apps/web/vitest.config.ts:9",
+      "evidence": "/tmp/rick-web-audit-94uzdj9s",
+      "confidence": "alta na observação descrita",
+      "limitation": "Escopo é declarado pela documentação; percentual dos três helpers não é falso. A limitação é a garantia comportamental estreita."
+    },
+    {
+      "id": "A23",
+      "severity": "BAIXA",
+      "title": "Referências documentais inexistentes",
+      "observation": "460 links locais verificados, respeitando sufixo :linha: três destinos inexistentes. Planos e baseline ainda apontam relatórios/gate movidos ou ausentes.",
+      "source": "docs/plans/phase-3-runtime-evidence-production-promotion.md:62",
+      "evidence": "doc-links.json",
+      "confidence": "alta na observação descrita",
+      "limitation": "Verificação de destino local, sem crawling de links externos."
+    },
+    {
+      "id": "A24",
+      "severity": "CONDICIONAL",
+      "title": "Feedback clínico por outro proprietário",
+      "observation": "Com as duas flags habilitadas, outro veterinário recebe not_found ao ler o caso, mas consegue anexar feedback ao caso de terceiro no mesmo workspace.",
+      "source": "apps/api/src/routes/cases.py:290",
+      "evidence": "security-reproduction-lead.log",
+      "confidence": "alta na observação descrita",
+      "limitation": "Comportamento provado. A classificação como violação depende da política de peer feedback: owner scope está documentado, mas exceção intencional não foi confirmada. Não contado como vulnerabilidade incondicional."
+    }
+  ],
+  "source_file_count": 4005,
+  "documentation_inventory": {
+    "files": 3474,
+    "markdown": 236,
+    "json": 1374,
+    "images": 1197,
+    "logs": 593,
+    "bytes": 201187748,
+    "reading": "Documentação normativa, arquitetura/segurança, ADRs, contratos, operação e planos/relatórios atuais lidos de forma focada por integrador e três revisores. Históricos/evidências amostrados; logs/imagens/binários não foram todos inspecionados individualmente."
+  },
+  "test_counts": [
+    {
+      "file": "api-locked-tests.xml",
+      "counts": {
+        "failure": 0,
+        "error": 0,
+        "skipped": 0,
+        "passed": 759,
+        "total": 759
+      }
+    },
+    {
+      "file": "domain-supplemented-tests.xml",
+      "counts": {
+        "failure": 0,
+        "error": 0,
+        "skipped": 5,
+        "passed": 765,
+        "total": 770
+      }
+    },
+    {
+      "file": "tooling-supplemented-tests.xml",
+      "counts": {
+        "failure": 1,
+        "error": 0,
+        "skipped": 74,
+        "passed": 546,
+        "total": 621
+      }
+    }
+  ],
+  "not_run": [
+    "PostgreSQL/Redis/Qdrant/S3 integrados",
+    "IdP/provider reais",
+    "campanha RAG representativa/autorizada",
+    "restore/RPO/RTO",
+    "carga/chaos/soak",
+    "matriz Next/API completa após corte",
+    "scans online atuais e imagens assinadas",
+    "GitHub Actions mesmo candidato e promoção"
+  ]
+}

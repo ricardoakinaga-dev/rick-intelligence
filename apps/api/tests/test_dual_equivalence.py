@@ -23,13 +23,29 @@ def test_chat_and_compat_semantic_parity(client):
                           chat_backend=StubChatBackend(), health_checks={}, audit_sink=InMemoryAuditSink())
     c = TestClient(create_app(settings, providers), raise_server_exceptions=False)
     login_as(c, "vet@example.com")
-    platform = c.post("/api/v1/chat", json={"message": "parity probe"}).json()
-    compat = c.post("/v1/chat/completions", headers={"Authorization": "Bearer k"},
-                    json={"messages": [{"role": "user", "content": "parity probe"}]}).json()
-    # Same backend semantics; ignore nondeterministic ids/timestamps.
-    assert platform["answer"] in compat["choices"][0]["message"]["content"] or \
-        compat["choices"][0]["message"]["content"] in platform["answer"] or True
-    assert platform["citations"] == [] and compat["choices"]
+    platform_response = c.post("/api/v1/chat", json={"message": "parity probe"})
+    compat_response = c.post("/v1/chat/completions", headers={"Authorization": "Bearer k"},
+                             json={"messages": [{"role": "user", "content": "parity probe"}]})
+    assert platform_response.status_code == compat_response.status_code == 200
+    platform = platform_response.json()
+    compat = compat_response.json()
+    assert platform["answer"]
+    assert compat["choices"] == [{
+        "index": 0, "message": {"role": "assistant", "content": platform["answer"]},
+        "finish_reason": "stop",
+    }]
+    streamed = c.post("/v1/chat/completions", headers={"Authorization": "Bearer k"},
+                      json={"messages": [{"role": "user", "content": "parity probe"}], "stream": True})
+    assert streamed.status_code == 200
+    assert streamed.headers["content-type"].startswith("text/event-stream")
+    frames = [line.removeprefix("data: ") for line in streamed.text.splitlines() if line.startswith("data: ")]
+    assert frames[-1] == "[DONE]"
+    chunks = [json.loads(frame) for frame in frames[:-1]]
+    assert all("error" not in chunk for chunk in chunks)
+    assert chunks[-1]["choices"][0]["finish_reason"] == "stop"
+    answer = "".join(chunk["choices"][0]["delta"].get("content", "") for chunk in chunks)
+    assert answer == platform["answer"]
+    assert platform["citations"] == []
     assert platform["metadata"]["evidence_status"] == "NO_EVIDENCE"
     assert compat["metadata"]["evidence_status"] == "NO_EVIDENCE"
 

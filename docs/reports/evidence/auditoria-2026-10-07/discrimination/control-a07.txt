@@ -1,0 +1,3 @@
+# control-a07 - 2026-10-08T01:16:55Z
+# command: PYTHONPATH=<canonical> .runtime/venvs/cvg/bin/python -m pytest -q -p no:cacheprovider packages
+# exit=0  3295 passed, 119 skipped

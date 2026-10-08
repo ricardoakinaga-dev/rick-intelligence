@@ -33,6 +33,9 @@ from rick_jobs import (
     JobQueue,
     JobRepository,
     JobResult,
+    JobContinuation,
+    JobPublicationResult,
+    JobPublicationCancellation,
     JobScheduler,
     JobScope,
     JobState,
@@ -116,7 +119,7 @@ _SELECT_COLUMNS = """
     document_id, operation, status, contract_state, contract_version,
     payload, max_attempts, attempts, available_at, lease_until, lease_owner,
     lease_worker_id, lease_acquired_at, result, failure, version,
-    created_at, updated_at, last_error_code
+    created_at, updated_at, last_error_code, publication_recovery_at
 """
 
 
@@ -124,7 +127,13 @@ def _row_dict(cursor: object, row: object) -> dict[str, object]:
     if isinstance(row, Mapping):
         return {str(key): value for key, value in row.items()}
     description = getattr(cursor, "description", None) or ()
-    names = [item[0] for item in description if isinstance(item, (tuple, list)) and item]
+    names: list[str] = []
+    for item in description:
+        name = getattr(item, "name", None)
+        if not isinstance(name, str) and isinstance(item, (tuple, list)) and item:
+            name = item[0]
+        if isinstance(name, str):
+            names.append(name)
     values = row if isinstance(row, (tuple, list)) else ()
     return dict(zip(names, values))
 
@@ -140,6 +149,12 @@ def _epoch(value: object, *, field: str) -> float:
     if not math.isfinite(result) or result < 0:
         raise PostgresJobCorruptionError(f"{field} is not a finite timestamp")
     return result
+
+
+def _postgres_epoch(value: float | None) -> float | None:
+    """Floor epoch values to PostgreSQL's microsecond timestamp precision."""
+
+    return None if value is None else math.floor(value * 1_000_000) / 1_000_000
 
 
 def _time(value: object, *, field: str = "time") -> float:
@@ -206,7 +221,7 @@ def _failure_dict(failure: JobFailure | None) -> dict[str, object] | None:
         "message": failure.message,
         "retryable": failure.retryable,
         "attempt": failure.attempt,
-        "occurred_at": failure.occurred_at,
+        "occurred_at": _postgres_epoch(failure.occurred_at),
     }
 
 
@@ -216,7 +231,7 @@ def _result_dict(result: JobResult | None) -> dict[str, object] | None:
     return {
         "output_refs": dict(result.output_refs),
         "document_id": result.document_id,
-        "completed_at": result.completed_at,
+        "completed_at": _postgres_epoch(result.completed_at),
     }
 
 
@@ -290,8 +305,8 @@ def _attempt_dict(attempt: JobAttempt) -> dict[str, object]:
         "number": attempt.number,
         "worker_id": str(attempt.worker_id),
         "state": attempt.state.value,
-        "started_at": attempt.started_at,
-        "finished_at": attempt.finished_at,
+        "started_at": _postgres_epoch(attempt.started_at),
+        "finished_at": _postgres_epoch(attempt.finished_at),
         "failure": _failure_dict(attempt.failure),
     }
 
@@ -309,6 +324,7 @@ class PostgresJobQueue(JobRepository, JobQueue, JobScheduler):
         backoff_seconds: float = 1.0,
         close_connections: bool = True,
         fault_injector: FaultInjector | None = None,
+        publication_reconciler: Callable[[Job], JobResult | JobContinuation | None] | None = None,
     ) -> None:
         if not callable(connection_factory):
             raise PostgresJobError("invalid_input", "connection_factory must be callable")
@@ -323,6 +339,9 @@ class PostgresJobQueue(JobRepository, JobQueue, JobScheduler):
         if fault_injector is not None and not callable(fault_injector):
             raise PostgresJobError("invalid_input", "fault_injector must be callable")
         self._factory = connection_factory
+        if publication_reconciler is not None and not callable(publication_reconciler):
+            raise PostgresJobError("invalid_input", "publication_reconciler must be callable")
+        self.publication_reconciler = publication_reconciler
         self.max_pending = max_pending
         self.max_attempts = max_attempts
         self.lease_seconds = float(lease_seconds)
@@ -434,10 +453,12 @@ class PostgresJobQueue(JobRepository, JobQueue, JobScheduler):
         lock: bool = False,
         limit: int | None = None,
         skip_locked: bool = False,
+        recovery_order: bool = False,
     ) -> list[dict[str, object]]:
         query = cls._select_sql(where, lock=False)
         if limit is not None:
-            query += " ORDER BY created_at, job_id LIMIT %s"
+            query += (" ORDER BY publication_recovery_at NULLS FIRST, created_at, job_id LIMIT %s"
+                if recovery_order else " ORDER BY created_at, job_id LIMIT %s")
         if lock:
             query += " FOR UPDATE"
             if skip_locked:
@@ -629,8 +650,8 @@ class PostgresJobQueue(JobRepository, JobQueue, JobScheduler):
                     attempt.number,
                     str(attempt.worker_id),
                     attempt.state.value,
-                    attempt.started_at,
-                    attempt.finished_at,
+                    _postgres_epoch(attempt.started_at),
+                    _postgres_epoch(attempt.finished_at),
                     _dump(_failure_dict(attempt.failure)),
                 ),
             )
@@ -815,15 +836,21 @@ class PostgresJobQueue(JobRepository, JobQueue, JobScheduler):
             "jobs-contract-v1",
             job.max_attempts,
             job.attempt_count,
-            job.available_at,
+            _postgres_epoch(job.available_at),
             _dump(_result_dict(job.result)),
             _dump(_failure_dict(job.failure)),
             job.version,
-            job.updated_at,
+            _postgres_epoch(job.updated_at),
         ]
         if document_id is not _KEEP_LEASE:
             assignments.append("document_id=%s")
             params.append(document_id)
+        if event_type == 'checkpoint_resumed':
+            # Advancing the durable ordering is part of the fenced lease
+            # transfer, even when its new owner crashes immediately again.
+            assignments.append('publication_recovery_at=clock_timestamp()')
+        if event_type in {'publication_recovered', 'publication_cancelled'}:
+            assignments.append('last_error_code=NULL')
         if lease is not _KEEP_LEASE:
             if lease is None:
                 lease_worker, lease_token, acquired_at, expires_at = None, None, None, None
@@ -838,7 +865,7 @@ class PostgresJobQueue(JobRepository, JobQueue, JobScheduler):
                         "lease_until=to_timestamp(%s)",
                     )
                 )
-                params.extend((acquired_at, expires_at))
+                params.extend((_postgres_epoch(acquired_at), _postgres_epoch(expires_at)))
             else:
                 assignments.extend(
                     (
@@ -865,7 +892,7 @@ class PostgresJobQueue(JobRepository, JobQueue, JobScheduler):
             params.extend((str(lease_guard.worker_id), str(lease_guard.token)))
         if deadline is not None:
             where += " AND clock_timestamp() < to_timestamp(%s)"
-            params.append(deadline)
+            params.append(_postgres_epoch(deadline))
         cls._execute(
             cursor,
             f"""
@@ -919,12 +946,12 @@ class PostgresJobQueue(JobRepository, JobQueue, JobScheduler):
                 _dump(dict(job.payload)),
                 job.max_attempts,
                 job.attempt_count,
-                job.available_at,
+                _postgres_epoch(job.available_at),
                 _dump(_result_dict(job.result)),
                 _dump(_failure_dict(job.failure)),
                 job.version,
-                job.created_at,
-                job.updated_at,
+                _postgres_epoch(job.created_at),
+                _postgres_epoch(job.updated_at),
             ),
         )
         row = cls._one(cursor)
@@ -1191,17 +1218,136 @@ class PostgresJobQueue(JobRepository, JobQueue, JobScheduler):
             raise PostgresJobError("invalid_transition", "only retrying or queued jobs can be scheduled")
         return self.save(scheduled, expected_version=expected_version)
 
-    def _recover_expired(self, cursor: object, scope: JobScope, *, now: float) -> int:
+    def _defer_publication(self, cursor, job, reason):
+        """RUNNING is the explicit owner state; durable reason + bounded backoff.
+
+        This scheduling annotation never changes attempts, lease or version.
+        Historical lifecycle/audit events remain untouched.
+        """
+        self._execute(cursor, """UPDATE rick_ingestion_jobs
+            SET publication_recovery_at=clock_timestamp() + INTERVAL '1 second', last_error_code=%s
+            WHERE job_id=%s AND tenant_id=%s AND workspace_id=%s AND collection_id=%s
+            AND version=%s AND contract_state='RUNNING'""",
+            (reason, str(job.job_id), *self._scope_params(job.scope), job.version))
+        return True, job
+
+    @staticmethod
+    def _publication_completion(job, result, *, now):
+        """Validate business authority before separating finish/projection clocks.
+
+        Identity disagreement schedules explicit resolution; it never repairs
+        canonical starts, counts, workers or earlier attempt history.
+        """
+        if not isinstance(result, (JobPublicationResult, JobPublicationCancellation)):
+            # Generic recovery has the same validation and transition-clock
+            # finish as ordinary acknowledgment, without publication authority.
+            try:
+                return job.finish_attempt(JobState.SUCCEEDED, now=now, result=result), None
+            except JobContractError:
+                return None, 'publication_attempt_conflict'
+
+        from external_ingestion import _recovery_metadata
+
+        facts = result.facts
+        if (facts.job_id != job.job_id or facts.scope != job.scope
+                or facts.attempt != job.attempt_count
+                or facts.created_at != job.created_at
+                or facts.started_at != job.attempts[-1].started_at
+                or facts.attempt_id != _recovery_metadata(job).get('publication_attempt')):
+            return None, 'publication_attempt_conflict'
+        if result.completed_at is None:
+            return None, 'publication_finish_unknown'
+        cancellation = isinstance(result, JobPublicationCancellation)
+        try:
+            return job.finish_attempt(
+                JobState.CANCELLED if cancellation else JobState.SUCCEEDED,
+                now=max(now, job.updated_at, result.completed_at),
+                result=None if cancellation else result, finished_at=result.completed_at), None
+        except JobContractError:
+            return None, 'publication_attempt_conflict'
+
+    def _reconcile_publication(self, cursor, job, *, now, allow_continuation=False):
+        """Check durable publication authority before an attempt can fail.
+
+        The injected owner must return None only for an authoritative absent
+        or failed publication. Unavailable authority leaves RUNNING untouched;
+        the existing scheduled claim path revisits it without a new attempt.
+        """
+        reconcile = self.publication_reconciler
+        if reconcile is None:
+            return False, job
+        try:
+            result = reconcile(job)
+        except Exception as error:
+            if getattr(error, "code", None) == "cancelled":
+                result = getattr(error, 'publication_cancellation', None)
+                if not isinstance(result, JobPublicationCancellation):
+                    return self._defer_publication(cursor, job, 'publication_finish_unknown')
+            else:
+                reason = getattr(error, 'recovery_reason', None)
+                if reason not in {'publication_finish_unknown', 'publication_facts_unknown'}:
+                    reason = 'publication_authority_unavailable'
+                return self._defer_publication(cursor, job, reason)
+        if result is None:
+            return False, job
+        if isinstance(result, JobContinuation):
+            if (result.job_id != job.job_id or result.scope != job.scope
+                    or result.attempt != job.attempt_count
+                    or result.created_at != job.created_at
+                    or result.started_at != job.attempts[-1].started_at):
+                return True, job
+            return True, result if allow_continuation else job
+        cancellation = isinstance(result, JobPublicationCancellation)
+        if not cancellation and not isinstance(result, JobResult):
+            return self._defer_publication(cursor, job, 'publication_facts_unknown')
+        terminal, reason = self._publication_completion(job, result, now=now)
+        if reason is not None:
+            return self._defer_publication(cursor, job, reason)
+        terminal = self._persist(cursor, terminal, expected_version=job.version,
+            from_state=job.state, lease=None,
+            document_id=(result.document_id if not cancellation and result.document_id is not None else _KEEP_LEASE),
+            event_type='publication_cancelled' if cancellation else 'publication_recovered')
+        return True, terminal
+
+    def recover_publication(self, job_id, *, tenant_id, workspace_id, collection_id, now):
+        """Scoped owner polling seam; never starts or consumes an attempt."""
+        scope = JobScope(tenant_id, workspace_id, collection_id)
+        with self._session(write=True) as (_, cursor):
+            row = self._select_one(cursor,
+                "job_id=%s AND tenant_id=%s AND workspace_id=%s AND collection_id=%s",
+                (str(job_id), *self._scope_params(scope)), lock=True)
+            if row is None:
+                return None
+            job = self._decode(cursor, row)
+            if job.state is JobState.RUNNING:
+                _, recovered = self._reconcile_publication(cursor, job, now=_time(now))
+                if isinstance(recovered, Job):
+                    job = recovered
+            elif job.state is JobState.SUCCEEDED and callable(self.publication_reconciler):
+                # The receipt owns any deferred old-version cleanup. It can
+                # resume through the same scoped public polling path without
+                # reopening a completed queue attempt or changing its winner.
+                try:
+                    self.publication_reconciler(job)
+                except Exception:
+                    pass
+            return job
+
+    def _recover_expired(self, cursor: object, scope: JobScope, *, now: float,
+                         continuations=None, continuation_limit=0, continuation_order=None) -> int:
         rows = self._select_many(
             cursor,
             """
             tenant_id=%s AND workspace_id=%s AND collection_id=%s
             AND contract_state='RUNNING'
             AND lease_until IS NOT NULL AND lease_until <= clock_timestamp()
+            AND (publication_recovery_at IS NULL OR publication_recovery_at <= clock_timestamp())
             """,
             self._scope_params(scope),
             lock=True,
             skip_locked=True,
+            limit=100,
+            recovery_order=True,
         )
         recovered = 0
         for row in rows:
@@ -1209,6 +1355,27 @@ class PostgresJobQueue(JobRepository, JobQueue, JobScheduler):
             if not job.attempts or job.attempts[-1].state is not JobState.RUNNING:
                 raise PostgresJobCorruptionError("running job has no active attempt")
             recovery_now = max(now, job.updated_at)
+            handled, recovered_job = self._reconcile_publication(cursor, job, now=recovery_now, allow_continuation=True)
+            if handled:
+                if isinstance(recovered_job, JobContinuation):
+                    if continuations is not None and len(continuations) < continuation_limit:
+                        continuations.append(job)
+                        if continuation_order is not None:
+                            marker = row.get('publication_recovery_at')
+                            continuation_order[job.job_id] = (job.created_at if marker is None else
+                                _epoch(marker, field='publication_recovery_at'))
+                        continue
+                    recovered_job = job
+                recovered += int(recovered_job.state is JobState.SUCCEEDED)
+                if recovered_job.state is JobState.RUNNING:
+                    # Durable fair polling order and backoff are independent
+                    # of the expired owner's lease, version and attempt budget.
+                    self._execute(cursor, """UPDATE rick_ingestion_jobs
+                        SET publication_recovery_at=clock_timestamp() + INTERVAL '1 second'
+                        WHERE job_id=%s AND tenant_id=%s AND workspace_id=%s AND collection_id=%s
+                        AND version=%s AND contract_state='RUNNING'""",
+                        (str(job.job_id), *self._scope_params(scope), job.version))
+                continue
             failure = JobFailure(
                 code="lease_expired",
                 message="worker lease expired before completion",
@@ -1226,7 +1393,8 @@ class PostgresJobQueue(JobRepository, JobQueue, JobScheduler):
                 event_type="lease_expired",
             )
             if failed.retry_eligible:
-                retrying = failed.transition(JobState.RETRYING, now=recovery_now)
+                retry_now = max(recovery_now, failed.updated_at)
+                retrying = failed.transition(JobState.RETRYING, now=retry_now)
                 retrying = self._persist(
                     cursor,
                     retrying,
@@ -1235,10 +1403,11 @@ class PostgresJobQueue(JobRepository, JobQueue, JobScheduler):
                     lease=None,
                     event_type="retrying",
                 )
+                requeued_at = max(retry_now, retrying.updated_at)
                 queued = retrying.transition(
                     JobState.QUEUED,
-                    now=recovery_now,
-                    available_at=recovery_now + self._backoff(retrying.attempt_count),
+                    now=requeued_at,
+                    available_at=requeued_at + self._backoff(retrying.attempt_count),
                 )
                 self._persist(
                     cursor,
@@ -1249,7 +1418,11 @@ class PostgresJobQueue(JobRepository, JobQueue, JobScheduler):
                     event_type="requeued",
                 )
             else:
-                dead = failed.transition(JobState.DEAD_LETTER, now=recovery_now, failure=failed.failure)
+                dead = failed.transition(
+                    JobState.DEAD_LETTER,
+                    now=max(recovery_now, failed.updated_at),
+                    failure=failed.failure,
+                )
                 self._persist(
                     cursor,
                     dead,
@@ -1281,7 +1454,10 @@ class PostgresJobQueue(JobRepository, JobQueue, JobScheduler):
         now = _time(now, field="now")
         worker = WorkerId(str(worker_id))
         with self._session(write=True) as (_connection, cursor):
-            self._recover_expired(cursor, scope, now=now)
+            continuations = []
+            continuation_order = {}
+            self._recover_expired(cursor, scope, now=now, continuations=continuations,
+                continuation_limit=100, continuation_order=continuation_order)
             rows = self._select_many(
                 cursor,
                 """
@@ -1294,8 +1470,13 @@ class PostgresJobQueue(JobRepository, JobQueue, JobScheduler):
                 skip_locked=True,
             )
             claimed: list[tuple[Job, JobLease]] = []
-            for row in rows:
-                job = self._decode(cursor, row)
+            candidates = continuations + [self._decode(cursor, row) for row in rows]
+            # Both lanes compete on durable age. Once a continuation transfers,
+            # its new marker places untouched ready work ahead of another crash.
+            candidates.sort(key=lambda candidate: (
+                continuation_order.get(candidate.job_id, candidate.created_at),
+                candidate.created_at, str(candidate.job_id)))
+            for job in candidates[:limit]:
                 # A worker polling a scope does not have a prior snapshot for
                 # every row. The row is already locked by this transaction, so
                 # its durable version is the safe default. Callers that hold a
@@ -1304,7 +1485,12 @@ class PostgresJobQueue(JobRepository, JobQueue, JobScheduler):
                 expected = expected_versions.get(job.job_id, job.version)
                 self._check_expected(expected, job.version)
                 try:
-                    running = job.start_attempt(worker_id=worker, now=now)
+                    # The historical worker/start identify the original
+                    # business attempt. Only its lease owner changes on resume;
+                    # old tokens and versions are fenced by the row predicate.
+                    running = (replace(job, updated_at=max(now, job.updated_at),
+                        version=job.version + 1) if job.state is JobState.RUNNING else
+                        job.start_attempt(worker_id=worker, now=now))
                 except JobContractError as exc:
                     raise PostgresJobError("invalid_transition", str(exc)) from exc
                 token = f"lease-{secrets.token_urlsafe(24)}"
@@ -1315,7 +1501,7 @@ class PostgresJobQueue(JobRepository, JobQueue, JobScheduler):
                     from_state=job.state,
                     lease=(str(worker), token, None, None),
                     lease_duration=self.lease_seconds,
-                    event_type="claimed",
+                    event_type="checkpoint_resumed" if job.state is JobState.RUNNING else "claimed",
                 )
                 lease_row = self._select_one(
                     cursor,
@@ -1461,10 +1647,31 @@ class PostgresJobQueue(JobRepository, JobQueue, JobScheduler):
             # The transaction has acquired the live lease row lock, but the
             # result mutation and its projections have not started yet.
             self._inject_fault("in_transaction")
-            try:
-                succeeded = job.finish_attempt(JobState.SUCCEEDED, now=now, result=result)
-            except JobContractError as exc:
-                raise PostgresJobError("invalid_transition", str(exc)) from exc
+            # The frozen normal composition translates ingestion to JobResult.
+            # Recover its typed authority only from the injected scoped owner;
+            # an ordinary result's timestamp alone never gains that authority.
+            if not isinstance(result, JobPublicationResult) and callable(self.publication_reconciler):
+                try:
+                    authority = self.publication_reconciler(job)
+                except Exception:
+                    return self._defer_publication(cursor, job, 'publication_authority_unavailable')[1]
+                if isinstance(authority, JobPublicationResult):
+                    if (authority.document_id != result.document_id
+                            or authority.completed_at != result.completed_at
+                            or authority.output_refs != result.output_refs):
+                        return self._defer_publication(cursor, job, 'publication_attempt_conflict')[1]
+                    result = authority
+                elif authority is not None and not isinstance(authority, JobResult):
+                    return self._defer_publication(cursor, job, 'publication_facts_unknown')[1]
+            if isinstance(result, JobPublicationResult):
+                succeeded, reason = self._publication_completion(job, result, now=now)
+                if reason is not None:
+                    return self._defer_publication(cursor, job, reason)[1]
+            else:
+                try:
+                    succeeded = job.finish_attempt(JobState.SUCCEEDED, now=now, result=result)
+                except JobContractError as exc:
+                    raise PostgresJobError("invalid_transition", str(exc)) from exc
             return self._persist(
                 cursor,
                 succeeded,
@@ -1490,6 +1697,9 @@ class PostgresJobQueue(JobRepository, JobQueue, JobScheduler):
         now = _time(now, field="now")
         with self._session(write=True) as (_connection, cursor):
             _row, job = self._lock_lease(cursor, lease, expected_version=expected_version, now=now)
+            handled, recovered = self._reconcile_publication(cursor, job, now=now)
+            if handled:
+                return recovered
             try:
                 failed = job.finish_attempt(JobState.FAILED, now=now, failure=failure)
             except JobContractError as exc:
@@ -1503,8 +1713,9 @@ class PostgresJobQueue(JobRepository, JobQueue, JobScheduler):
                 lease_guard=lease,
                 event_type="failed",
             )
+            transition_now = max(now, failed.updated_at)
             if failed.retry_eligible:
-                retrying = failed.transition(JobState.RETRYING, now=now)
+                retrying = failed.transition(JobState.RETRYING, now=transition_now)
                 retrying = self._persist(
                     cursor,
                     retrying,
@@ -1513,10 +1724,11 @@ class PostgresJobQueue(JobRepository, JobQueue, JobScheduler):
                     lease=None,
                     event_type="retrying",
                 )
+                requeued_at = max(transition_now, retrying.updated_at)
                 queued = retrying.transition(
                     JobState.QUEUED,
-                    now=now,
-                    available_at=now + self._backoff(retrying.attempt_count),
+                    now=requeued_at,
+                    available_at=requeued_at + self._backoff(retrying.attempt_count),
                 )
                 return self._persist(
                     cursor,
@@ -1526,7 +1738,11 @@ class PostgresJobQueue(JobRepository, JobQueue, JobScheduler):
                     lease=None,
                     event_type="requeued",
                 )
-            dead = failed.transition(JobState.DEAD_LETTER, now=now, failure=failed.failure)
+            dead = failed.transition(
+                JobState.DEAD_LETTER,
+                now=transition_now,
+                failure=failed.failure,
+            )
             return self._persist(
                 cursor,
                 dead,
@@ -1560,7 +1776,15 @@ class PostgresJobQueue(JobRepository, JobQueue, JobScheduler):
             self._require_canonical_row(row)
             self._check_expected(expected_version, job.version)
             if job.state is JobState.RUNNING:
-                raise PostgresJobLeaseError("running jobs require owner-bound cancellation")
+                owner = getattr(self.publication_reconciler, '__self__', self.publication_reconciler)
+                request = getattr(owner, 'request_publication_cancel', None)
+                if not callable(request):
+                    raise PostgresJobLeaseError('running publication cancellation owner unavailable')
+                request(job)
+                handled, recovered = self._reconcile_publication(cursor, job, now=_time(now))
+                # Public cancellation has request authority only. Absent or
+                # unavailable publication authority never grants lease power.
+                return recovered if handled else job
             try:
                 cancelled = job.transition(JobState.CANCELLED, now=_time(now))
             except JobContractError as exc:
@@ -1588,6 +1812,18 @@ class PostgresJobQueue(JobRepository, JobQueue, JobScheduler):
         now = _time(now, field="now")
         with self._session(write=True) as (_connection, cursor):
             _row, job = self._lock_lease(cursor, lease, expected_version=expected_version, now=now)
+            # A bound publication owner exposes the request-only cancellation
+            # port. This does not grant authority to erase a committed receipt.
+            owner = getattr(self.publication_reconciler, "__self__", self.publication_reconciler)
+            request = getattr(owner, "request_publication_cancel", None)
+            if callable(request):
+                try:
+                    request(job)
+                except Exception:
+                    return job
+            handled, recovered = self._reconcile_publication(cursor, job, now=now)
+            if handled:
+                return recovered
             try:
                 cancelled = job.finish_attempt(JobState.CANCELLED, now=now)
             except JobContractError as exc:
@@ -1751,7 +1987,7 @@ class PostgresJobQueue(JobRepository, JobQueue, JobScheduler):
                     """
                     SELECT version
                     FROM rick_schema_migrations
-                    WHERE version='0005' AND application='rick-intelligence'
+                    WHERE version='0010' AND application='rick-intelligence'
                     """,
                 )
                 return self._one(cursor) is not None

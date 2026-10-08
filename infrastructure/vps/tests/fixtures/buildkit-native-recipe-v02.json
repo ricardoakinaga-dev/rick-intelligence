@@ -1,0 +1,1441 @@
+{
+  "origin": "Actual local Buildx0.29 OCI max version=v0.2 diagnostic; not authenticated GitHub source or reviewed production policy",
+  "archive_sha256": "3be3c1624015e169bb4c3dd8a462f131ccc63d4679c0d26cd11b6ce3967a4d6c",
+  "provenance_sha256": "e3878b4a06d2b7a95388b43e9e065be1a2eb2e3bd0535208cbbbe57c3439558c",
+  "production_approved": false,
+  "buildConfig": {
+    "llbDefinition": [
+      {
+        "id": "step0",
+        "op": {
+          "Op": {
+            "source": {
+              "identifier": "docker-image://docker.io/library/python@sha256:8a001d79e5a57ae4de7faa57af12f3d589058ea06ac42ec850c1cb0ac325bd21"
+            }
+          },
+          "platform": {
+            "Architecture": "amd64",
+            "OS": "linux"
+          },
+          "constraints": {}
+        }
+      },
+      {
+        "id": "step1",
+        "op": {
+          "Op": {
+            "file": {
+              "actions": [
+                {
+                  "input": 0,
+                  "secondaryInput": -1,
+                  "output": 0,
+                  "Action": {
+                    "mkdir": {
+                      "path": "/opt/rick",
+                      "mode": 493,
+                      "makeParents": true,
+                      "timestamp": -1
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "constraints": {}
+        },
+        "inputs": [
+          "step0:0"
+        ]
+      },
+      {
+        "id": "step2",
+        "op": {
+          "Op": {
+            "source": {
+              "identifier": "local://context",
+              "attrs": {
+                "local.followpaths": "[\"apps/api/pyproject.toml\",\"apps/api/src\",\"apps/worker/*.py\",\"infrastructure/compose/bootstrap_qdrant.py\",\"infrastructure/migrations\",\"infrastructure/scripts/migrate.py\",\"packages/authorization/src\",\"packages/contracts/src\",\"packages/decision/src\",\"packages/evidence/src\",\"packages/identity/src\",\"packages/ingestion/src\",\"packages/jobs/src\",\"packages/knowledge/src\",\"packages/locking/src\",\"packages/observability/src\",\"packages/professor/src\",\"packages/providers/src\",\"packages/retrieval/src\",\"packages/storage/src\",\"requirements/runtime.lock\"]",
+                "local.sharedkeyhint": "context"
+              }
+            }
+          },
+          "constraints": {}
+        }
+      },
+      {
+        "id": "step3",
+        "op": {
+          "Op": {
+            "file": {
+              "actions": [
+                {
+                  "input": 0,
+                  "secondaryInput": 1,
+                  "output": 0,
+                  "Action": {
+                    "copy": {
+                      "src": "/requirements/runtime.lock",
+                      "dest": "/opt/rick/requirements/runtime.lock",
+                      "mode": -1,
+                      "followSymlink": true,
+                      "dirCopyContents": true,
+                      "createDestPath": true,
+                      "allowWildcard": true,
+                      "allowEmptyWildcard": true,
+                      "timestamp": -1
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "constraints": {}
+        },
+        "inputs": [
+          "step1:0",
+          "step2:0"
+        ]
+      },
+      {
+        "id": "step4",
+        "op": {
+          "Op": {
+            "exec": {
+              "meta": {
+                "args": [
+                  "/bin/sh",
+                  "-c",
+                  "if [ -f /etc/alpine-release ]; then       addgroup -S -g 10001 rick       && adduser -S -D -H -u 10001 -G rick -h /nonexistent -s /sbin/nologin rick;     else       addgroup --system --gid 10001 rick       && adduser --system --uid 10001 --ingroup rick --home /nonexistent          --shell /usr/sbin/nologin rick;     fi"
+                ],
+                "env": [
+                  "PATH=/usr/local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+                  "LANG=C.UTF-8",
+                  "GPG_KEY=7169605F62C751356D054A26A821E680E5FA6305",
+                  "PYTHON_VERSION=3.12.15",
+                  "PYTHON_SHA256=c2c4321961fab0fb999d66e0cecf521c2ab3994c7992873ea99e306c1094fd5a",
+                  "PYTHONDONTWRITEBYTECODE=1",
+                  "PYTHONUNBUFFERED=1",
+                  "PYTHONPATH=/opt/rick/apps/api/src:/opt/rick/apps/worker:/opt/rick/packages/jobs/src:/opt/rick/packages/contracts/src:/opt/rick/packages/authorization/src:/opt/rick/packages/identity/src:/opt/rick/packages/observability/src:/opt/rick/packages/knowledge/src:/opt/rick/packages/ingestion/src:/opt/rick/packages/retrieval/src:/opt/rick/packages/providers/src:/opt/rick/packages/locking/src:/opt/rick/packages/professor/src:/opt/rick/packages/evidence/src:/opt/rick/packages/decision/src:/opt/rick/packages/storage/src"
+                ],
+                "cwd": "/opt/rick",
+                "removeMountStubsRecursive": true
+              },
+              "mounts": [
+                {
+                  "dest": "/"
+                }
+              ]
+            }
+          },
+          "platform": {
+            "Architecture": "amd64",
+            "OS": "linux"
+          },
+          "constraints": {}
+        },
+        "inputs": [
+          "step3:0"
+        ]
+      },
+      {
+        "id": "step5",
+        "op": {
+          "Op": {
+            "file": {
+              "actions": [
+                {
+                  "input": 0,
+                  "secondaryInput": 1,
+                  "output": 0,
+                  "Action": {
+                    "copy": {
+                      "src": "/apps/api/pyproject.toml",
+                      "dest": "/opt/rick/apps/api/pyproject.toml",
+                      "mode": -1,
+                      "followSymlink": true,
+                      "dirCopyContents": true,
+                      "createDestPath": true,
+                      "allowWildcard": true,
+                      "allowEmptyWildcard": true,
+                      "timestamp": -1
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "constraints": {}
+        },
+        "inputs": [
+          "step4:0",
+          "step2:0"
+        ]
+      },
+      {
+        "id": "step6",
+        "op": {
+          "Op": {
+            "file": {
+              "actions": [
+                {
+                  "input": 0,
+                  "secondaryInput": 1,
+                  "output": 0,
+                  "Action": {
+                    "copy": {
+                      "src": "/apps/api/src",
+                      "dest": "/opt/rick/apps/api/src",
+                      "mode": -1,
+                      "followSymlink": true,
+                      "dirCopyContents": true,
+                      "createDestPath": true,
+                      "allowWildcard": true,
+                      "allowEmptyWildcard": true,
+                      "timestamp": -1
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "constraints": {}
+        },
+        "inputs": [
+          "step5:0",
+          "step2:0"
+        ]
+      },
+      {
+        "id": "step7",
+        "op": {
+          "Op": {
+            "file": {
+              "actions": [
+                {
+                  "input": 0,
+                  "secondaryInput": 1,
+                  "output": 0,
+                  "Action": {
+                    "copy": {
+                      "src": "/apps/worker/*.py",
+                      "dest": "/opt/rick/apps/worker/",
+                      "mode": -1,
+                      "followSymlink": true,
+                      "dirCopyContents": true,
+                      "createDestPath": true,
+                      "allowWildcard": true,
+                      "allowEmptyWildcard": true,
+                      "timestamp": -1
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "constraints": {}
+        },
+        "inputs": [
+          "step6:0",
+          "step2:0"
+        ]
+      },
+      {
+        "id": "step8",
+        "op": {
+          "Op": {
+            "file": {
+              "actions": [
+                {
+                  "input": 0,
+                  "secondaryInput": 1,
+                  "output": 0,
+                  "Action": {
+                    "copy": {
+                      "src": "/infrastructure/migrations",
+                      "dest": "/opt/rick/infrastructure/migrations",
+                      "mode": -1,
+                      "followSymlink": true,
+                      "dirCopyContents": true,
+                      "createDestPath": true,
+                      "allowWildcard": true,
+                      "allowEmptyWildcard": true,
+                      "timestamp": -1
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "constraints": {}
+        },
+        "inputs": [
+          "step7:0",
+          "step2:0"
+        ]
+      },
+      {
+        "id": "step9",
+        "op": {
+          "Op": {
+            "file": {
+              "actions": [
+                {
+                  "input": 0,
+                  "secondaryInput": 1,
+                  "output": 0,
+                  "Action": {
+                    "copy": {
+                      "src": "/infrastructure/scripts/migrate.py",
+                      "dest": "/opt/rick/infrastructure/scripts/migrate.py",
+                      "mode": -1,
+                      "followSymlink": true,
+                      "dirCopyContents": true,
+                      "createDestPath": true,
+                      "allowWildcard": true,
+                      "allowEmptyWildcard": true,
+                      "timestamp": -1
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "constraints": {}
+        },
+        "inputs": [
+          "step8:0",
+          "step2:0"
+        ]
+      },
+      {
+        "id": "step10",
+        "op": {
+          "Op": {
+            "file": {
+              "actions": [
+                {
+                  "input": 0,
+                  "secondaryInput": 1,
+                  "output": 0,
+                  "Action": {
+                    "copy": {
+                      "src": "/infrastructure/compose/bootstrap_qdrant.py",
+                      "dest": "/opt/rick/infrastructure/compose/bootstrap_qdrant.py",
+                      "mode": -1,
+                      "followSymlink": true,
+                      "dirCopyContents": true,
+                      "createDestPath": true,
+                      "allowWildcard": true,
+                      "allowEmptyWildcard": true,
+                      "timestamp": -1
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "constraints": {}
+        },
+        "inputs": [
+          "step9:0",
+          "step2:0"
+        ]
+      },
+      {
+        "id": "step11",
+        "op": {
+          "Op": {
+            "file": {
+              "actions": [
+                {
+                  "input": 0,
+                  "secondaryInput": 1,
+                  "output": 0,
+                  "Action": {
+                    "copy": {
+                      "src": "/packages/jobs/src",
+                      "dest": "/opt/rick/packages/jobs/src",
+                      "mode": -1,
+                      "followSymlink": true,
+                      "dirCopyContents": true,
+                      "createDestPath": true,
+                      "allowWildcard": true,
+                      "allowEmptyWildcard": true,
+                      "timestamp": -1
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "constraints": {}
+        },
+        "inputs": [
+          "step10:0",
+          "step2:0"
+        ]
+      },
+      {
+        "id": "step12",
+        "op": {
+          "Op": {
+            "file": {
+              "actions": [
+                {
+                  "input": 0,
+                  "secondaryInput": 1,
+                  "output": 0,
+                  "Action": {
+                    "copy": {
+                      "src": "/packages/authorization/src",
+                      "dest": "/opt/rick/packages/authorization/src",
+                      "mode": -1,
+                      "followSymlink": true,
+                      "dirCopyContents": true,
+                      "createDestPath": true,
+                      "allowWildcard": true,
+                      "allowEmptyWildcard": true,
+                      "timestamp": -1
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "constraints": {}
+        },
+        "inputs": [
+          "step11:0",
+          "step2:0"
+        ]
+      },
+      {
+        "id": "step13",
+        "op": {
+          "Op": {
+            "file": {
+              "actions": [
+                {
+                  "input": 0,
+                  "secondaryInput": 1,
+                  "output": 0,
+                  "Action": {
+                    "copy": {
+                      "src": "/packages/contracts/src",
+                      "dest": "/opt/rick/packages/contracts/src",
+                      "mode": -1,
+                      "followSymlink": true,
+                      "dirCopyContents": true,
+                      "createDestPath": true,
+                      "allowWildcard": true,
+                      "allowEmptyWildcard": true,
+                      "timestamp": -1
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "constraints": {}
+        },
+        "inputs": [
+          "step12:0",
+          "step2:0"
+        ]
+      },
+      {
+        "id": "step14",
+        "op": {
+          "Op": {
+            "file": {
+              "actions": [
+                {
+                  "input": 0,
+                  "secondaryInput": 1,
+                  "output": 0,
+                  "Action": {
+                    "copy": {
+                      "src": "/packages/identity/src",
+                      "dest": "/opt/rick/packages/identity/src",
+                      "mode": -1,
+                      "followSymlink": true,
+                      "dirCopyContents": true,
+                      "createDestPath": true,
+                      "allowWildcard": true,
+                      "allowEmptyWildcard": true,
+                      "timestamp": -1
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "constraints": {}
+        },
+        "inputs": [
+          "step13:0",
+          "step2:0"
+        ]
+      },
+      {
+        "id": "step15",
+        "op": {
+          "Op": {
+            "file": {
+              "actions": [
+                {
+                  "input": 0,
+                  "secondaryInput": 1,
+                  "output": 0,
+                  "Action": {
+                    "copy": {
+                      "src": "/packages/ingestion/src",
+                      "dest": "/opt/rick/packages/ingestion/src",
+                      "mode": -1,
+                      "followSymlink": true,
+                      "dirCopyContents": true,
+                      "createDestPath": true,
+                      "allowWildcard": true,
+                      "allowEmptyWildcard": true,
+                      "timestamp": -1
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "constraints": {}
+        },
+        "inputs": [
+          "step14:0",
+          "step2:0"
+        ]
+      },
+      {
+        "id": "step16",
+        "op": {
+          "Op": {
+            "file": {
+              "actions": [
+                {
+                  "input": 0,
+                  "secondaryInput": 1,
+                  "output": 0,
+                  "Action": {
+                    "copy": {
+                      "src": "/packages/knowledge/src",
+                      "dest": "/opt/rick/packages/knowledge/src",
+                      "mode": -1,
+                      "followSymlink": true,
+                      "dirCopyContents": true,
+                      "createDestPath": true,
+                      "allowWildcard": true,
+                      "allowEmptyWildcard": true,
+                      "timestamp": -1
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "constraints": {}
+        },
+        "inputs": [
+          "step15:0",
+          "step2:0"
+        ]
+      },
+      {
+        "id": "step17",
+        "op": {
+          "Op": {
+            "file": {
+              "actions": [
+                {
+                  "input": 0,
+                  "secondaryInput": 1,
+                  "output": 0,
+                  "Action": {
+                    "copy": {
+                      "src": "/packages/locking/src",
+                      "dest": "/opt/rick/packages/locking/src",
+                      "mode": -1,
+                      "followSymlink": true,
+                      "dirCopyContents": true,
+                      "createDestPath": true,
+                      "allowWildcard": true,
+                      "allowEmptyWildcard": true,
+                      "timestamp": -1
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "constraints": {}
+        },
+        "inputs": [
+          "step16:0",
+          "step2:0"
+        ]
+      },
+      {
+        "id": "step18",
+        "op": {
+          "Op": {
+            "file": {
+              "actions": [
+                {
+                  "input": 0,
+                  "secondaryInput": 1,
+                  "output": 0,
+                  "Action": {
+                    "copy": {
+                      "src": "/packages/observability/src",
+                      "dest": "/opt/rick/packages/observability/src",
+                      "mode": -1,
+                      "followSymlink": true,
+                      "dirCopyContents": true,
+                      "createDestPath": true,
+                      "allowWildcard": true,
+                      "allowEmptyWildcard": true,
+                      "timestamp": -1
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "constraints": {}
+        },
+        "inputs": [
+          "step17:0",
+          "step2:0"
+        ]
+      },
+      {
+        "id": "step19",
+        "op": {
+          "Op": {
+            "file": {
+              "actions": [
+                {
+                  "input": 0,
+                  "secondaryInput": 1,
+                  "output": 0,
+                  "Action": {
+                    "copy": {
+                      "src": "/packages/professor/src",
+                      "dest": "/opt/rick/packages/professor/src",
+                      "mode": -1,
+                      "followSymlink": true,
+                      "dirCopyContents": true,
+                      "createDestPath": true,
+                      "allowWildcard": true,
+                      "allowEmptyWildcard": true,
+                      "timestamp": -1
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "constraints": {}
+        },
+        "inputs": [
+          "step18:0",
+          "step2:0"
+        ]
+      },
+      {
+        "id": "step20",
+        "op": {
+          "Op": {
+            "file": {
+              "actions": [
+                {
+                  "input": 0,
+                  "secondaryInput": 1,
+                  "output": 0,
+                  "Action": {
+                    "copy": {
+                      "src": "/packages/evidence/src",
+                      "dest": "/opt/rick/packages/evidence/src",
+                      "mode": -1,
+                      "followSymlink": true,
+                      "dirCopyContents": true,
+                      "createDestPath": true,
+                      "allowWildcard": true,
+                      "allowEmptyWildcard": true,
+                      "timestamp": -1
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "constraints": {}
+        },
+        "inputs": [
+          "step19:0",
+          "step2:0"
+        ]
+      },
+      {
+        "id": "step21",
+        "op": {
+          "Op": {
+            "file": {
+              "actions": [
+                {
+                  "input": 0,
+                  "secondaryInput": 1,
+                  "output": 0,
+                  "Action": {
+                    "copy": {
+                      "src": "/packages/decision/src",
+                      "dest": "/opt/rick/packages/decision/src",
+                      "mode": -1,
+                      "followSymlink": true,
+                      "dirCopyContents": true,
+                      "createDestPath": true,
+                      "allowWildcard": true,
+                      "allowEmptyWildcard": true,
+                      "timestamp": -1
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "constraints": {}
+        },
+        "inputs": [
+          "step20:0",
+          "step2:0"
+        ]
+      },
+      {
+        "id": "step22",
+        "op": {
+          "Op": {
+            "file": {
+              "actions": [
+                {
+                  "input": 0,
+                  "secondaryInput": 1,
+                  "output": 0,
+                  "Action": {
+                    "copy": {
+                      "src": "/packages/providers/src",
+                      "dest": "/opt/rick/packages/providers/src",
+                      "mode": -1,
+                      "followSymlink": true,
+                      "dirCopyContents": true,
+                      "createDestPath": true,
+                      "allowWildcard": true,
+                      "allowEmptyWildcard": true,
+                      "timestamp": -1
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "constraints": {}
+        },
+        "inputs": [
+          "step21:0",
+          "step2:0"
+        ]
+      },
+      {
+        "id": "step23",
+        "op": {
+          "Op": {
+            "file": {
+              "actions": [
+                {
+                  "input": 0,
+                  "secondaryInput": 1,
+                  "output": 0,
+                  "Action": {
+                    "copy": {
+                      "src": "/packages/retrieval/src",
+                      "dest": "/opt/rick/packages/retrieval/src",
+                      "mode": -1,
+                      "followSymlink": true,
+                      "dirCopyContents": true,
+                      "createDestPath": true,
+                      "allowWildcard": true,
+                      "allowEmptyWildcard": true,
+                      "timestamp": -1
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "constraints": {}
+        },
+        "inputs": [
+          "step22:0",
+          "step2:0"
+        ]
+      },
+      {
+        "id": "step24",
+        "op": {
+          "Op": {
+            "file": {
+              "actions": [
+                {
+                  "input": 0,
+                  "secondaryInput": 1,
+                  "output": 0,
+                  "Action": {
+                    "copy": {
+                      "src": "/packages/storage/src",
+                      "dest": "/opt/rick/packages/storage/src",
+                      "mode": -1,
+                      "followSymlink": true,
+                      "dirCopyContents": true,
+                      "createDestPath": true,
+                      "allowWildcard": true,
+                      "allowEmptyWildcard": true,
+                      "timestamp": -1
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "constraints": {}
+        },
+        "inputs": [
+          "step23:0",
+          "step2:0"
+        ]
+      },
+      {
+        "id": "step25",
+        "op": {
+          "Op": {
+            "exec": {
+              "meta": {
+                "args": [
+                  "/bin/sh",
+                  "-c",
+                  "python -m pip install --no-cache-dir --disable-pip-version-check       --require-hashes --only-binary=:all: -r /opt/rick/requirements/runtime.lock     && python -m pip check     && python -m compileall -q /opt/rick/apps/api/src /opt/rick/apps/worker /opt/rick/packages     && find /opt/rick -type d -name __pycache__ -prune -exec rm -rf {} +     && chown -R 10001:10001 /opt/rick"
+                ],
+                "env": [
+                  "PATH=/usr/local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+                  "LANG=C.UTF-8",
+                  "GPG_KEY=7169605F62C751356D054A26A821E680E5FA6305",
+                  "PYTHON_VERSION=3.12.15",
+                  "PYTHON_SHA256=c2c4321961fab0fb999d66e0cecf521c2ab3994c7992873ea99e306c1094fd5a",
+                  "PYTHONDONTWRITEBYTECODE=1",
+                  "PYTHONUNBUFFERED=1",
+                  "PYTHONPATH=/opt/rick/apps/api/src:/opt/rick/apps/worker:/opt/rick/packages/jobs/src:/opt/rick/packages/contracts/src:/opt/rick/packages/authorization/src:/opt/rick/packages/identity/src:/opt/rick/packages/observability/src:/opt/rick/packages/knowledge/src:/opt/rick/packages/ingestion/src:/opt/rick/packages/retrieval/src:/opt/rick/packages/providers/src:/opt/rick/packages/locking/src:/opt/rick/packages/professor/src:/opt/rick/packages/evidence/src:/opt/rick/packages/decision/src:/opt/rick/packages/storage/src"
+                ],
+                "cwd": "/opt/rick",
+                "removeMountStubsRecursive": true
+              },
+              "mounts": [
+                {
+                  "dest": "/"
+                }
+              ]
+            }
+          },
+          "platform": {
+            "Architecture": "amd64",
+            "OS": "linux"
+          },
+          "constraints": {}
+        },
+        "inputs": [
+          "step24:0"
+        ]
+      },
+      {
+        "id": "step26",
+        "op": {
+          "Op": {}
+        },
+        "inputs": [
+          "step25:0"
+        ]
+      }
+    ],
+    "digestMapping": {
+      "sha256:0b486882ba916957b8fe707245ea70863bd8d6547eabdee5e52febaec8840ac7": "step15",
+      "sha256:1779267ba2e18452aa82c1763ba78ab119f5bde908f6555e9fa871c222da5f97": "step17",
+      "sha256:323cad81d2227a2fba730cb91a620123dbd47684faebe48a9abf57e175c03926": "step5",
+      "sha256:43dc0d3f5baa1b6dafcb79ff8bbfea4783b2e8ef8fe6cf847ff5ece16f623bd6": "step14",
+      "sha256:5d30f0d05d8f2deeade61702c55ec65d3a859c90ad41bb47a2abc174748a443b": "step19",
+      "sha256:615ad1bbadd92bfebe324fa1215111c3dc7f94cc6b479e9b69965c31e0bd4d4a": "step26",
+      "sha256:67386c7f0c20dfaaff7794fef1294b187f09e52d1e64e28407cf3eeabe60413d": "step20",
+      "sha256:6847a5a13b65d930cdad07f7c89a6b38dce79ce5592fdc1ab650816291a9d71a": "step21",
+      "sha256:6b06317b2c4ac98f5a51deef7ee8fef1d592013bedaa473a6c31b1a19c68b225": "step4",
+      "sha256:6e1ddef2ef9a7afc93431cea0511fb2d6a028db1627b3f76af8021432406a0f4": "step9",
+      "sha256:71d16307c7e411df557c2972a386f61ba6cdc1a5145102c90597d7a000b0d725": "step8",
+      "sha256:77d071c5889ad4e242b3a52ff08efddd76a9f342f985046aca863e17f6e30dd8": "step25",
+      "sha256:81c871fb589472cb7f3d30bfc5e2aa313a313de26e45c7b81f632c2ddad992d9": "step6",
+      "sha256:8f760844c8a43e38f0330a3bb0da69ef397cc54d8b7ad349083d3f59efb399f3": "step2",
+      "sha256:913ca7a98827ab5ef730fb9d533aa457a56fbd9b1a2ba44ec3d55fe76a44d4ce": "step12",
+      "sha256:a78f8bc9cdddc3bdf22b9cde68766acaaacc29b0be454f2fce513eef1b18482a": "step22",
+      "sha256:b5236f5eb8f6f83755ab3e7c13feace31aa6f8a84c813cc1f30094be9334522c": "step13",
+      "sha256:b94f4b3093ce874b541bb2ac006187ae15c6b00ca8f0449e73bcf68e1e59960a": "step7",
+      "sha256:bb398ce334edeab7e32947020a4ba784a5fdc11266f4939f8e470e19e73ad393": "step18",
+      "sha256:c44e1e41546e94bea6f0d7a13787f42e44f80b904b814f7c94a5ff45ffc6692d": "step24",
+      "sha256:d7e90841e6e5f496ad87eee9958b8832c0c3620afe4ad3ce1c36b0608b407015": "step16",
+      "sha256:da5389c13e5650c9b9b6b09c44fd3b9296dfe15f19015845702b80f0d03fea60": "step0",
+      "sha256:da63479df1e377fc27a1f7cf2be990764b5926b428ef5bbb516bca6b50824830": "step3",
+      "sha256:ddca8c2e784cd819d91d922d6950fa170974ae5bf5df0ddc64e5032631f4b575": "step11",
+      "sha256:e4195c10ca7e1ecad387fd12d7d31776608b7aed7f56322dcb3c569496b42ab7": "step10",
+      "sha256:e77d521f4716c77346a3830a9fe631e106efaafdbb9177133f3873c54583b55e": "step1",
+      "sha256:ebad3eee875b0dca08667db89bea6a0bc0f2908b20eabbbf0305ea28eadae728": "step23"
+    }
+  },
+  "source": {
+    "locations": {
+      "step0": {
+        "locations": [
+          {
+            "ranges": [
+              {
+                "start": {
+                  "line": 7
+                },
+                "end": {
+                  "line": 7
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "step1": {
+        "locations": [
+          {
+            "ranges": [
+              {
+                "start": {
+                  "line": 13
+                },
+                "end": {
+                  "line": 13
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "step10": {
+        "locations": [
+          {
+            "ranges": [
+              {
+                "start": {
+                  "line": 31
+                },
+                "end": {
+                  "line": 31
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "step11": {
+        "locations": [
+          {
+            "ranges": [
+              {
+                "start": {
+                  "line": 32
+                },
+                "end": {
+                  "line": 32
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "step12": {
+        "locations": [
+          {
+            "ranges": [
+              {
+                "start": {
+                  "line": 33
+                },
+                "end": {
+                  "line": 33
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "step13": {
+        "locations": [
+          {
+            "ranges": [
+              {
+                "start": {
+                  "line": 34
+                },
+                "end": {
+                  "line": 34
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "step14": {
+        "locations": [
+          {
+            "ranges": [
+              {
+                "start": {
+                  "line": 35
+                },
+                "end": {
+                  "line": 35
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "step15": {
+        "locations": [
+          {
+            "ranges": [
+              {
+                "start": {
+                  "line": 36
+                },
+                "end": {
+                  "line": 36
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "step16": {
+        "locations": [
+          {
+            "ranges": [
+              {
+                "start": {
+                  "line": 37
+                },
+                "end": {
+                  "line": 37
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "step17": {
+        "locations": [
+          {
+            "ranges": [
+              {
+                "start": {
+                  "line": 38
+                },
+                "end": {
+                  "line": 38
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "step18": {
+        "locations": [
+          {
+            "ranges": [
+              {
+                "start": {
+                  "line": 39
+                },
+                "end": {
+                  "line": 39
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "step19": {
+        "locations": [
+          {
+            "ranges": [
+              {
+                "start": {
+                  "line": 40
+                },
+                "end": {
+                  "line": 40
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "step2": {},
+      "step20": {
+        "locations": [
+          {
+            "ranges": [
+              {
+                "start": {
+                  "line": 41
+                },
+                "end": {
+                  "line": 41
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "step21": {
+        "locations": [
+          {
+            "ranges": [
+              {
+                "start": {
+                  "line": 42
+                },
+                "end": {
+                  "line": 42
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "step22": {
+        "locations": [
+          {
+            "ranges": [
+              {
+                "start": {
+                  "line": 43
+                },
+                "end": {
+                  "line": 43
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "step23": {
+        "locations": [
+          {
+            "ranges": [
+              {
+                "start": {
+                  "line": 44
+                },
+                "end": {
+                  "line": 44
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "step24": {
+        "locations": [
+          {
+            "ranges": [
+              {
+                "start": {
+                  "line": 45
+                },
+                "end": {
+                  "line": 45
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "step25": {
+        "locations": [
+          {
+            "ranges": [
+              {
+                "start": {
+                  "line": 49
+                },
+                "end": {
+                  "line": 49
+                }
+              },
+              {
+                "start": {
+                  "line": 50
+                },
+                "end": {
+                  "line": 50
+                }
+              },
+              {
+                "start": {
+                  "line": 51
+                },
+                "end": {
+                  "line": 51
+                }
+              },
+              {
+                "start": {
+                  "line": 52
+                },
+                "end": {
+                  "line": 52
+                }
+              },
+              {
+                "start": {
+                  "line": 53
+                },
+                "end": {
+                  "line": 53
+                }
+              },
+              {
+                "start": {
+                  "line": 54
+                },
+                "end": {
+                  "line": 54
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "step3": {
+        "locations": [
+          {
+            "ranges": [
+              {
+                "start": {
+                  "line": 15
+                },
+                "end": {
+                  "line": 15
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "step4": {
+        "locations": [
+          {
+            "ranges": [
+              {
+                "start": {
+                  "line": 17
+                },
+                "end": {
+                  "line": 17
+                }
+              },
+              {
+                "start": {
+                  "line": 18
+                },
+                "end": {
+                  "line": 18
+                }
+              },
+              {
+                "start": {
+                  "line": 19
+                },
+                "end": {
+                  "line": 19
+                }
+              },
+              {
+                "start": {
+                  "line": 20
+                },
+                "end": {
+                  "line": 20
+                }
+              },
+              {
+                "start": {
+                  "line": 21
+                },
+                "end": {
+                  "line": 21
+                }
+              },
+              {
+                "start": {
+                  "line": 22
+                },
+                "end": {
+                  "line": 22
+                }
+              },
+              {
+                "start": {
+                  "line": 23
+                },
+                "end": {
+                  "line": 23
+                }
+              },
+              {
+                "start": {
+                  "line": 24
+                },
+                "end": {
+                  "line": 24
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "step5": {
+        "locations": [
+          {
+            "ranges": [
+              {
+                "start": {
+                  "line": 26
+                },
+                "end": {
+                  "line": 26
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "step6": {
+        "locations": [
+          {
+            "ranges": [
+              {
+                "start": {
+                  "line": 27
+                },
+                "end": {
+                  "line": 27
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "step7": {
+        "locations": [
+          {
+            "ranges": [
+              {
+                "start": {
+                  "line": 28
+                },
+                "end": {
+                  "line": 28
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "step8": {
+        "locations": [
+          {
+            "ranges": [
+              {
+                "start": {
+                  "line": 29
+                },
+                "end": {
+                  "line": 29
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "step9": {
+        "locations": [
+          {
+            "ranges": [
+              {
+                "start": {
+                  "line": 30
+                },
+                "end": {
+                  "line": 30
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "infos": [
+      {
+        "filename": "api.Dockerfile",
+        "language": "Dockerfile",
+        "data": "IyBzeW50YXg9ZG9ja2VyL2RvY2tlcmZpbGU6MS43QHNoYTI1NjphNTdkZjY5ZDBlYTgyN2ZiNzI2NjQ5MWYyODEzNjM1ZGU2ZjE3MjY5YmU4ODFmNjk2ZmJmZGYyZDgzZGRhMzNlCiMKIyBCdWlsZCBmcm9tIHRoZSByZXBvc2l0b3J5IHJvb3QuIFBZVEhPTl9JTUFHRSBpcyBpbnRlbnRpb25hbGx5IHJlcXVpcmVkIGFuZAojIG11c3QgYmUgc3VwcGxpZWQgYXMgYW4gaW1tdXRhYmxlIGltYWdlIHJlZmVyZW5jZSB3aXRoIEBzaGEyNTYgZGlnZXN0LgoKQVJHIFBZVEhPTl9JTUFHRQpGUk9NICR7UFlUSE9OX0lNQUdFfSBBUyBydW50aW1lCgpFTlYgUFlUSE9ORE9OVFdSSVRFQllURUNPREU9MSBcCiAgICBQWVRIT05VTkJVRkZFUkVEPTEgXAogICAgUFlUSE9OUEFUSD0vb3B0L3JpY2svYXBwcy9hcGkvc3JjOi9vcHQvcmljay9hcHBzL3dvcmtlcjovb3B0L3JpY2svcGFja2FnZXMvam9icy9zcmM6L29wdC9yaWNrL3BhY2thZ2VzL2NvbnRyYWN0cy9zcmM6L29wdC9yaWNrL3BhY2thZ2VzL2F1dGhvcml6YXRpb24vc3JjOi9vcHQvcmljay9wYWNrYWdlcy9pZGVudGl0eS9zcmM6L29wdC9yaWNrL3BhY2thZ2VzL29ic2VydmFiaWxpdHkvc3JjOi9vcHQvcmljay9wYWNrYWdlcy9rbm93bGVkZ2Uvc3JjOi9vcHQvcmljay9wYWNrYWdlcy9pbmdlc3Rpb24vc3JjOi9vcHQvcmljay9wYWNrYWdlcy9yZXRyaWV2YWwvc3JjOi9vcHQvcmljay9wYWNrYWdlcy9wcm92aWRlcnMvc3JjOi9vcHQvcmljay9wYWNrYWdlcy9sb2NraW5nL3NyYzovb3B0L3JpY2svcGFja2FnZXMvcHJvZmVzc29yL3NyYzovb3B0L3JpY2svcGFja2FnZXMvZXZpZGVuY2Uvc3JjOi9vcHQvcmljay9wYWNrYWdlcy9kZWNpc2lvbi9zcmM6L29wdC9yaWNrL3BhY2thZ2VzL3N0b3JhZ2Uvc3JjCgpXT1JLRElSIC9vcHQvcmljawoKQ09QWSByZXF1aXJlbWVudHMvcnVudGltZS5sb2NrIC9vcHQvcmljay9yZXF1aXJlbWVudHMvcnVudGltZS5sb2NrCgpSVU4gaWYgWyAtZiAvZXRjL2FscGluZS1yZWxlYXNlIF07IHRoZW4gXAogICAgICBhZGRncm91cCAtUyAtZyAxMDAwMSByaWNrIFwKICAgICAgJiYgYWRkdXNlciAtUyAtRCAtSCAtdSAxMDAwMSAtRyByaWNrIC1oIC9ub25leGlzdGVudCAtcyAvc2Jpbi9ub2xvZ2luIHJpY2s7IFwKICAgIGVsc2UgXAogICAgICBhZGRncm91cCAtLXN5c3RlbSAtLWdpZCAxMDAwMSByaWNrIFwKICAgICAgJiYgYWRkdXNlciAtLXN5c3RlbSAtLXVpZCAxMDAwMSAtLWluZ3JvdXAgcmljayAtLWhvbWUgL25vbmV4aXN0ZW50IFwKICAgICAgICAgLS1zaGVsbCAvdXNyL3NiaW4vbm9sb2dpbiByaWNrOyBcCiAgICBmaQoKQ09QWSBhcHBzL2FwaS9weXByb2plY3QudG9tbCAvb3B0L3JpY2svYXBwcy9hcGkvcHlwcm9qZWN0LnRvbWwKQ09QWSBhcHBzL2FwaS9zcmMgL29wdC9yaWNrL2FwcHMvYXBpL3NyYwpDT1BZIGFwcHMvd29ya2VyLyoucHkgL29wdC9yaWNrL2FwcHMvd29ya2VyLwpDT1BZIGluZnJhc3RydWN0dXJlL21pZ3JhdGlvbnMgL29wdC9yaWNrL2luZnJhc3RydWN0dXJlL21pZ3JhdGlvbnMKQ09QWSBpbmZyYXN0cnVjdHVyZS9zY3JpcHRzL21pZ3JhdGUucHkgL29wdC9yaWNrL2luZnJhc3RydWN0dXJlL3NjcmlwdHMvbWlncmF0ZS5weQpDT1BZIGluZnJhc3RydWN0dXJlL2NvbXBvc2UvYm9vdHN0cmFwX3FkcmFudC5weSAvb3B0L3JpY2svaW5mcmFzdHJ1Y3R1cmUvY29tcG9zZS9ib290c3RyYXBfcWRyYW50LnB5CkNPUFkgcGFja2FnZXMvam9icy9zcmMgL29wdC9yaWNrL3BhY2thZ2VzL2pvYnMvc3JjCkNPUFkgcGFja2FnZXMvYXV0aG9yaXphdGlvbi9zcmMgL29wdC9yaWNrL3BhY2thZ2VzL2F1dGhvcml6YXRpb24vc3JjCkNPUFkgcGFja2FnZXMvY29udHJhY3RzL3NyYyAvb3B0L3JpY2svcGFja2FnZXMvY29udHJhY3RzL3NyYwpDT1BZIHBhY2thZ2VzL2lkZW50aXR5L3NyYyAvb3B0L3JpY2svcGFja2FnZXMvaWRlbnRpdHkvc3JjCkNPUFkgcGFja2FnZXMvaW5nZXN0aW9uL3NyYyAvb3B0L3JpY2svcGFja2FnZXMvaW5nZXN0aW9uL3NyYwpDT1BZIHBhY2thZ2VzL2tub3dsZWRnZS9zcmMgL29wdC9yaWNrL3BhY2thZ2VzL2tub3dsZWRnZS9zcmMKQ09QWSBwYWNrYWdlcy9sb2NraW5nL3NyYyAvb3B0L3JpY2svcGFja2FnZXMvbG9ja2luZy9zcmMKQ09QWSBwYWNrYWdlcy9vYnNlcnZhYmlsaXR5L3NyYyAvb3B0L3JpY2svcGFja2FnZXMvb2JzZXJ2YWJpbGl0eS9zcmMKQ09QWSBwYWNrYWdlcy9wcm9mZXNzb3Ivc3JjIC9vcHQvcmljay9wYWNrYWdlcy9wcm9mZXNzb3Ivc3JjCkNPUFkgcGFja2FnZXMvZXZpZGVuY2Uvc3JjIC9vcHQvcmljay9wYWNrYWdlcy9ldmlkZW5jZS9zcmMKQ09QWSBwYWNrYWdlcy9kZWNpc2lvbi9zcmMgL29wdC9yaWNrL3BhY2thZ2VzL2RlY2lzaW9uL3NyYwpDT1BZIHBhY2thZ2VzL3Byb3ZpZGVycy9zcmMgL29wdC9yaWNrL3BhY2thZ2VzL3Byb3ZpZGVycy9zcmMKQ09QWSBwYWNrYWdlcy9yZXRyaWV2YWwvc3JjIC9vcHQvcmljay9wYWNrYWdlcy9yZXRyaWV2YWwvc3JjCkNPUFkgcGFja2FnZXMvc3RvcmFnZS9zcmMgL29wdC9yaWNrL3BhY2thZ2VzL3N0b3JhZ2Uvc3JjCgojIEFQSSwgd29ya2VyIGFuZCBDSSBjb25zdW1lIHRoZSBzYW1lIHJlc29sdmVkLCBoYXNoLWNoZWNrZWQgZGVwZW5kZW5jeSBzZXQuCiMgTG9jYWwgcGFja2FnZXMgc3RheSBvbiBQWVRIT05QQVRIIGJlY2F1c2UgdGhlIHJlcG9zaXRvcnkgaGFzIG5vIHJvb3Qgd2hlZWwuClJVTiBweXRob24gLW0gcGlwIGluc3RhbGwgLS1uby1jYWNoZS1kaXIgLS1kaXNhYmxlLXBpcC12ZXJzaW9uLWNoZWNrIFwKICAgICAgLS1yZXF1aXJlLWhhc2hlcyAtLW9ubHktYmluYXJ5PTphbGw6IC1yIC9vcHQvcmljay9yZXF1aXJlbWVudHMvcnVudGltZS5sb2NrIFwKICAgICYmIHB5dGhvbiAtbSBwaXAgY2hlY2sgXAogICAgJiYgcHl0aG9uIC1tIGNvbXBpbGVhbGwgLXEgL29wdC9yaWNrL2FwcHMvYXBpL3NyYyAvb3B0L3JpY2svYXBwcy93b3JrZXIgL29wdC9yaWNrL3BhY2thZ2VzIFwKICAgICYmIGZpbmQgL29wdC9yaWNrIC10eXBlIGQgLW5hbWUgX19weWNhY2hlX18gLXBydW5lIC1leGVjIHJtIC1yZiB7fSArIFwKICAgICYmIGNob3duIC1SIDEwMDAxOjEwMDAxIC9vcHQvcmljawoKVVNFUiAxMDAwMToxMDAwMQoKIyBQcm9kdWN0aW9uIG11c3QgaW5qZWN0IGEgZGVwbG95bWVudC1vd25lZCBtb2R1bGU6ZmFjdG9yeSB0aGF0IHJldHVybnMKIyBFeHRlcm5hbENvbXBvc2l0aW9uSW5wdXRzOyB0aGUgZW1wdHkgZGVmYXVsdCBpcyBpbnRlbnRpb25hbGx5IGZhaWwtY2xvc2VkLgpFTlYgUklDS19BUElfQ09NUE9TSVRJT049IiIKCkVYUE9TRSA4MDAwCgpIRUFMVEhDSEVDSyAtLWludGVydmFsPTMwcyAtLXRpbWVvdXQ9NXMgLS1zdGFydC1wZXJpb2Q9MjBzIC0tcmV0cmllcz0zIFwKICBDTUQgcHl0aG9uIC1jICJpbXBvcnQgdXJsbGliLnJlcXVlc3Q7IHVybGxpYi5yZXF1ZXN0LnVybG9wZW4oJ2h0dHA6Ly8xMjcuMC4wLjE6ODAwMC9oZWFsdGgvbGl2ZScsIHRpbWVvdXQ9NCkucmVhZCgpIiBcCiAgfHwgZXhpdCAxCgpFTlRSWVBPSU5UIFsicHl0aG9uIiwgIi1tIiwgInV2aWNvcm4iLCAibWFpbjphcHAiLCAiLS1hcHAtZGlyIiwgIi9vcHQvcmljay9hcHBzL2FwaS9zcmMiLCAiLS1ob3N0IiwgIjAuMC4wLjAiLCAiLS1wb3J0IiwgIjgwMDAiXQo=",
+        "llbDefinition": [
+          {
+            "id": "step0",
+            "op": {
+              "Op": {
+                "source": {
+                  "identifier": "local://dockerfile",
+                  "attrs": {
+                    "local.differ": "none",
+                    "local.followpaths": "[\"api.Dockerfile\",\"api.Dockerfile.dockerignore\"]",
+                    "local.sharedkeyhint": "dockerfile"
+                  }
+                }
+              },
+              "constraints": {}
+            }
+          },
+          {
+            "id": "step1",
+            "op": {
+              "Op": {}
+            },
+            "inputs": [
+              "step0:0"
+            ]
+          }
+        ],
+        "digestMapping": {
+          "sha256:31109a0eef540549a4b9d1c2c420acd8b1810285c7ea3b97cebce58acae0dc43": "step1",
+          "sha256:8a6b2b1fbc1bb90b0a10eac66abfe2fcd0b8f8789e0d27a0eb941aba25fa71f0": "step0"
+        }
+      }
+    ]
+  }
+}

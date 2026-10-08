@@ -1,6 +1,6 @@
 # Phase 3 runtime evidence and production promotion — living ExecPlan
 
-<!-- engineering-framework: active_action_id=PH3-2-LAB-READINESS:WAIT_RUNTIME -->
+<!-- engineering-framework: active_action_id=Q17-01.A:VERIFY-Q17-19A-DEPLOYED-INVENTORY -->
 
 ## Purpose / Big Picture
 
@@ -56,7 +56,7 @@ preserving the frozen Gauntlet bar, Phase 2 history and legacy repositories.
 - [x] (2026-09-10) Bound SQLite/PostgreSQL knowledge metadata JSON at source candidate 134ec271097c32caa33b774be1b5f3e3974ffb08 (tree aa93b2f1bc7ebd59355dfdfcc74b28c558857fbf): metadata writes cap canonical JSON at 256 KiB and reject non-finite values, reads omit corrupt collection/document/chunk rows; knowledge tests pass 22, the API matrix 443 and State-of-Art 295, while live durable-store evidence remains blocked.
 - [x] (2026-09-10) Bound cleanup-lease marker JSON at source candidate 5b3a652fbfae2aa4d9e839d1dfacb156dbd6dae9 (tree 37359cb1cec80c40776d0d40e92d1df71719b708): private fallback markers cap finite JSON at 8 KiB, validate version/job/scope and leave sources untouched for corrupt markers; the job-journal suite passes 15, the API matrix 444 and State-of-Art 295, while live runtime evidence remains blocked.
 - [x] (2026-09-10) Harden release, control-plane and recovery JSON boundaries at source candidate c179acc196ffa19ccdbae6a91ab5c05233af1314 (tree e02f74de83dd6d6f5bfff5d38a0e0e5831d386d6): preflight, review-control, quality-bar, backup/restore, release-manifest and Gauntlet state/history readers now reject duplicate keys, non-finite values, invalid UTF-8 and bounded-overflow inputs before projection; focused boundary checks pass 34 and the complete State-of-Art suite passes 314, with make validate, ops-static and compose-static green. The clean integrated packet reports 17 PASS, 24 BLOCKED_EXTERNAL, STATE_OF_ART_CANDIDATE and exit 2; Docker, runtime/provider/corpus, independent-review, sealing and human Go-No-Go remain external blockers.
-- [ ] (2026-09-09) Execute the disposable runtime; currently blocked by Docker daemon access and unresolved external authority.
+- [ ] (2026-09-17 recovery) Execute the disposable runtime after explicit configuration/authority and readiness proof; Lead's Docker 29.1.3 report contradicts historical daemon denial but does not close the lab gate.
 - [ ] (2026-09-09) Complete independent runtime/design/security reviews and the human Go/No-Go.
 
 ## Surprises & Discoveries
@@ -168,7 +168,7 @@ closed.
 
 ## Concrete Steps
 
-1. [PH3-2-LAB-READINESS:WAIT_RUNTIME] Await an approved disposable Docker daemon and private runtime configuration before executing live Compose readiness and teardown evidence.
+1. [Q17-01.A:VERIFY-Q17-19A-DEPLOYED-INVENTORY] C13 is ACCEPTED for its exact local scope. Q17-17.A local outbox/restart evidence and Q17-19.B live canonical PostgresJobQueue lifecycle evidence pass; Q17-01.B maps to approved REC-M0 V15 and Q17-03.B to verified tenant-security V11. Compare D02-authorized deployed migration histories/checksums with the already-tested local 0004/0005 compatibility matrix; do not mutate an installation or rewrite applied history.
 2. [PH3-2-LAB-READINESS:VERIFY] Validate the readiness-aware Compose lifecycle and, with approved disposable daemon access, execute `make up/down` while retaining bounded health/log observations.
 3. [PH3-3-POSTGRES:RUN] With approved disposable runtime access, execute migrations, queue claims, locking, fencing, retention and crash/replay evidence against real PostgreSQL.
 4. [PH3-4-WORKERS:RUN] Exercise Worker A/B, SIGTERM/crash/restart, stale leases, duplicate delivery, timeout and optional process-isolation evidence.
@@ -206,7 +206,200 @@ made.
 
 ## Current candidate closure
 
-The current source implementation candidate is
+### Recovery observation — 2026-09-17
+
+The current HEAD is `b52f32c141916a2ea3af1a6b913bd91f380606e0`, tree
+`b205d9cbd1dcb719b4a8c2f5dcd8ac68009f326f`; the working tree is dirty.
+The four Q17 documents and `.opencode/` were pre-existing untracked work and
+remain untouched. The initial 13-file product patch covers migration 0005
+(portable JSON key count and regex), Compose/Prometheus/worker shutdown and
+SSE metadata/parser changes. Concurrent product workers continue changing
+files (including Professor tests); this is not a frozen acceptance candidate.
+The controller writer owns only the five requested canonical artifacts and
+existing generator outputs; product workers do not write controller state.
+
+RECOVERY, not completion: these patches preceded Q17 prerequisite
+reconciliation. They do not satisfy Q17-01.B, Q17-02.A, Q17-06.A/B or Q17-26.A
+by implication. Lead reports Docker 29.1.3 access, contradicting the old
+session's daemon denial, but not proving full lab readiness or D02 authority.
+Lead also reports PostgreSQL 16.4: empty migration succeeded, invalid 33-key
+payload rejected the exact contract, valid four rows became two QUEUED and
+two SUCCEEDED with zero residual legacy rows, and owned container
+`rick-migverify-pg16` was removed. Earlier agent reports cite 480 API,
+12 contract and 39 Docker tests plus Compose; Lead reports ops-static, lint
+and typecheck exit 0. These are attributed reports, not independent checks
+by this writer, not fresh integrated product acceptance and not a T4 gate.
+Migration repair for installations that already applied 0005 is NOT proven;
+inventory/checksums, corrective migration or approved pre-application repair,
+rollback/restart and failure/concurrency evidence remain required. Never
+rewrite applied checksums or treat an empty/disposable DB as that proof.
+
+D06 is confirmed by the user's explicit request to implement all PE17 and
+this controller delegation. It activates reconciliation only within the
+stated permissions. D01 (data/tenants/retention), D02 (runtime/secrets/TLS/trust),
+D03 (provider/endpoints/cost), D04 (corpus/domain/policy), D05 (SLO/DR/load/
+windows) and D07 (promotion/signing/deployment) remain unresolved; no broad
+implementation request or Docker observation supplies these decisions.
+PH3 runtime remains blocked on explicit disposable configuration/authority
+and current integrated evidence. Preserve all historical gates; the old
+PH3 implementation gate is not an entry gate for Q17 recovery. BUILD/RECOVER
+with PARTIAL verification does not authorize IMPLEMENT or promotion.
+
+The next action is bounded reconciliation of the combined patch, ownership,
+prerequisite contracts and migration-repair gap before integrated acceptance.
+Then Q17-02.A and Q17-26.A establish the full requirements matrix and
+failure-first harnesses; Q17-01.B/Q17-06.A establish affected contracts before
+accepting early product patches. No Q17 product task is declared DONE here.
+
+### Q17 ownership crosswalk (61 subtasks; references, not duplicate statuses)
+
+Each row gives the single canonical backlog owner and functional responsibility.
+Grouped IDs are explicitly enumerated. Existing local closures remain scoped
+historical evidence; mapping to a DONE owner does not complete new Q17 scope.
+The lead must explicitly reopen that owner with fresh scoped evidence when
+selecting new work. Catalog dependencies and external decisions still apply.
+Q17-01.A is the sole new reconciliation item; all remaining IDs are scope
+references to existing owners, never a parallel mutable execution backlog.
+
+| Q17 subtask IDs | Canonical backlog owner | Functional responsibility |
+|---|---|---|
+| Q17-01.A | Q17-01.A | Sole delegated controller writer; Lead integration |
+| Q17-01.B, Q17-01.C | REC-M0 | Architecture/contracts and final equivalence |
+| Q17-02.A, Q17-02.B, Q17-02.C | REC-M0 | Requirements traceability and current documentation |
+| Q17-03.A, Q17-03.B | SA-SECURITY-TENANT-LOCAL | Identity/session policy and migration |
+| Q17-04.A, Q17-04.B | SA-SECURITY-TENANT-LOCAL | Authorization and tenant isolation |
+| Q17-05.A, Q17-05.B | SA-SECURITY-TENANT-LOCAL | HTTP security and lifecycle boundary |
+| Q17-06.A, Q17-06.B | REC-M0 | Versioned API/SSE/client contracts |
+| Q17-07.A, Q17-07.B | REC-M0 | Knowledge store parity and provenance |
+| Q17-08.A, Q17-08.B, Q17-08.C | SA-INGESTION-APP-LIFECYCLE | Ingestion/publication and failure recovery |
+| Q17-09.A, Q17-09.B | REC-M0 | Retrieval and scoped fallback |
+| Q17-10.A, Q17-10.B | REC-M0 | Evidence consistency and citations |
+| Q17-11.A, Q17-11.B | REC-M0 | Domain decision policy and outcomes |
+| Q17-12.A, Q17-12.B | REC-M0 | Professor grounding and budgets |
+| Q17-13.A, Q17-13.B | REC-M0 | Provider transport and approved live matrix |
+| Q17-14.A, Q17-14.B | REC-M0 | Evaluation harness and domain-approved corpus |
+| Q17-15.A, Q17-15.B | REC-25 | Chat metadata/history and frontend integration |
+| Q17-16.A, Q17-16.B | SA-VISUAL | Documents/upload/jobs interface |
+| Q17-17.A, Q17-17.B, Q17-17.C | REC-M0 | Admin/audit/cases consistency and interface |
+| Q17-18.A, Q17-18.B | PH3-2-LAB-READINESS | Platform composition and authorized readiness |
+| Q17-19.A, Q17-19.B | PH2-P0-02-POSTGRES-ADAPTER | Jobs database/checksum-safe migration repair |
+| Q17-20.A, Q17-20.B | PH2-P0-03-REAL-WORKER-RUNTIME | Worker health/shutdown/fencing/crash matrix |
+| Q17-21.A, Q17-21.B | PH3-2-LAB-READINESS | Redis topology and distributed coordination |
+| Q17-22.A, Q17-22.B | PH3-2-LAB-READINESS | Storage integrity and persistent bootstrap |
+| Q17-23.A, Q17-23.B | SA-OBSERVABILITY | Bounded sink/export/metrics/alerts |
+| Q17-24.A, Q17-24.B, Q17-24.C | SA-EXTERNAL | Authorized DR/capacity/chaos/soak evidence |
+| Q17-25.A, Q17-25.B, Q17-25.C, Q17-25.D | PH3-1-CI-RELEASE-CLOSURE | Release integrity, CI and promotion authority |
+| Q17-26.A, Q17-26.B, Q17-26.D | REC-M0 | Failure-first QA, CI coverage and independent review |
+| Q17-26.C | SA-VISUAL | API-backed browser/visual/accessibility matrix |
+
+This crosswalk is not the 64-section/26-dimension/gate/case matrix required by
+Q17-02.A. No current gate or historical verification is broadened by it.
+
+### Implementation-wave reconciliation — 2026-09-17
+
+This addendum supersedes the earlier ownership-only recovery for the 16 explicitly
+reported implementation subtasks. The handoff says “12” but enumerates 16 IDs:
+Q17-08.A, Q17-09.A, Q17-12.A, Q17-13.A, Q17-15.A, Q17-16.A (partial),
+Q17-17.A, Q17-18.A, Q17-19.A, Q17-20.A (partial), Q17-22.A, Q17-23.A,
+Q17-26.A, Q17-11.A, Q17-14.A (partial), Q17-06.B (partial). All 16 receive
+canonical entries in `.agent/backlog.json`; the crosswalk above remains historical
+for those IDs and continues to resolve the other 44 scope references plus
+Q17-01.A. Existing legacy owners retain their historical scope/evidence, not
+parallel authority over these newly activated slices. No planning catalog or
+preserved audit copy is changed.
+
+The Lead integrator imports reported red/green evidence as EXTERNAL_RECORD /
+PARTIAL / freshness UNKNOWN, not independent review or a replay of the red phase.
+Recovery transitions record import steps now, not invented historical execution
+or satisfied implementation prerequisites. Original catalog dependencies remain
+unproven and are explicit acceptance blockers; no new implementation is selected.
+All 16 slices await integrated independent review; none is DONE. Q17-01.A remains
+in progress for verification and the acceptance snapshot. D06 authorizes this
+bounded reconciliation; D01-D05 and D07 remain unresolved.
+
+Observed local runs by this integrator on dirty HEAD b52f32c: `make validate`,
+`make lint`, `make typecheck`, `make api16-root` (599 tests), `make api16-domain`
+(204), `make api16-worker` (89), `make api15-professor` (60),
+`make api15-provider` (76), `make jobs-test` (44), `make compose-static`
+(two topologies, 14 services each) and `make ops-static` (six migration files)
+all exited 0. Counts overlap and must not be added as unique tests. Root lint
+and typecheck cover preserved components; Python compilation is not full typing,
+and canonical web/browser verification was not executed. Static migration checks
+are not database execution. Exact per-command records are appended to the ledger.
+`make eval-retrieval-pack` failed (make exit 2, evaluator exit 1): alpha
+Recall@1 = 0.5 < 0.75, beta = 1.0, aggregate = 0.75; two positive and three
+negative cases, all three negatives PASS. The new per-group rigor exposes a
+fixture violation; thresholds and fixtures remain unchanged.
+
+Touched areas: ingestion embedding/vector batching and source-size admission;
+retrieval sparse/scoped SDK search; Professor citation enforcement; provider
+bounded SSE/retry behavior; API/SSE metadata, shared client parser and contract
+validation; documents UI recovery; admin/audit pending completion; Compose,
+Prometheus and worker shutdown; jobs/migration 0005; bounded observability sink;
+route-policy/equivalence regression harnesses; conservative domain decision;
+evaluation per-group thresholds and RAG evaluation documentation. Tests in the
+corresponding packages/apps changed in the implementation wave, not by this writer.
+
+Open acceptance defects and gaps (NO-GO):
+
+1. Canonical HTTP retrieval remains dense-only; HTTP-store sparse schema migration
+   and scoped end-to-end proof are required (Q17-09.A).
+2. Admin durable pending-completion registration exists, but no reconciliation
+   worker replays it (Q17-17.A).
+3. Every query escalates to ESCALATE / risk_unknown until D04 domain policy exists;
+   the product answer path is disabled by design (Q17-11.A).
+4. Migration 0005 changed after baseline; checksum-safe repair for installations
+   that already applied it remains unproven (Q17-19.A stays open).
+5. Visual/e2e/live runtime/provider/corpus acceptance is NOT_RUN or
+   BLOCKED_EXTERNAL; local tests and attributed reports do not close it.
+
+The historical controller fixture failure (6 passed, 2 failed on directory-copy
+prerequisites) is retained, not replayed or repaired here. Current structural
+checker success is a separate claim. Next owners must resolve D01-D05/D07,
+implement replay, migrate HTTP sparse schema, have the pack owner repair fixtures
+without weakening frozen thresholds, establish applied-migration repair, then
+run the authorized visual/AA and runtime campaigns plus independent review.
+No gate, approval, deployment or promotion is created by this reconciliation.
+
+### Post-import extension checkpoint — 2026-09-17 (revision 306 to 307)
+
+Bounded CHECKPOINT appended by the sole delegated control-plane writer for this
+interval. Two already-registered implementation-wave slices received
+post-revision-306 extensions; both were reproduced with fresh commands by this
+writer (not an attributed replay), and neither changes a status, gate or DONE.
+
+1. Q17-08.A / Q17-09.A batching extension: `plan_upsert_batches`
+   (`packages/retrieval/src/rick_retrieval/qdrant.py:712`) partitions upserts by
+   serialized UTF-8 bytes and the configured `max_points`, rejects an oversized
+   single point before I/O, and the ingestion seam
+   (`packages/ingestion/src/rick_ingestion/pipeline.py:714-725`) consumes the
+   planner with per-batch cancellation. `make api16-domain` exits 0 with 232
+   passed (11.73s). The planner is store-side only; canonical HTTP retrieval
+   remains dense-only and Q17-09.A stays blocked on the HTTP sparse schema.
+2. Q17-13.A provider extension: `finish_reason="tool_calls"` is accepted by the
+   provider allowlist (`packages/providers/src/rick_providers/client.py:60`) and
+   by the contract Literals
+   (`packages/contracts/src/rick_contracts/providers.py:202,226`), with the
+   end-to-end regression in `packages/providers/tests/test_provider.py`.
+   `make api15-provider` 76, `make api15-contracts` 12, `make api15-professor`
+   60, `make api16-root` 599 and `make lint` exit 0.
+3. Snapshot update: `docs/reports/estado-implementacao-2026-09-17.md` (EST17-v1)
+   records the `finish_reason=tool_calls` defect as closed and six open defects:
+   canonical HTTP retrieval dense-only; admin pending-completion has no replay
+   worker; decision gate escalates all queries until D04; migration 0005
+   applied-installation repair unproven; visual/e2e/live runtime/provider/corpus
+   NOT_RUN; observability `timeout=None` synchronous path.
+
+Registered as CHECKPOINT/TEST events and verification records tied to the
+existing Q17-08.A, Q17-09.A, Q17-13.A and Q17-01.A items; no backlog item was
+created, none is DONE, and no gate or promotion is created. These are local
+hermetic reproductions on the dirty `b52f32c` checkout, not independent review,
+live-provider or runtime acceptance; the NO-GO decision and the D01-D05/D07
+blockers stand.
+
+### Historical closure snapshot — 2026-09-10 (not current acceptance)
+
+The then-current source implementation candidate was
 c179acc196ffa19ccdbae6a91ab5c05233af1314 with tree
 e02f74de83dd6d6f5bfff5d38a0e0e5831d386d6. It contains the corrected
 PostgreSQL worker gate, canonical two-process Redis/API HTTP gate, strict
@@ -294,3 +487,130 @@ future slices add raw runtime logs/traces/metrics, signed manifests,
 backlog and append-only ledgers remain the canonical execution pointers.
 - [x] (2026-09-10) Make provider readiness truthful at source candidate 2238b99ec797b0b2416208dd0e0b02c74897f7d9 (tree 6dad82375d875faf0521e7f012c839889e5cc040): the OpenAI-compatible client performs a bounded authenticated `/models` probe, ResilientProvider delegates live health separately from local circuit state, composition selects that live check, and the provider runtime gate requires it before chat/embedding PASS; provider/API/State-of-Art matrices pass 54/437/295 tests, while approved live provider evidence remains external.
 - 2026-09-10: Treat provider readiness as a live dependency check in the canonical production composition. The local circuit-state signal remains available for cheap callers, but `/health/ready` must use the bounded authenticated provider probe; hermetic tests cannot close the approved external provider/corpus gate.
+
+## Q24 implementation checkpoint — 2026-09-25T02:54:44Z
+
+The 33 Q24 outcomes are now linked to existing canonical owners in `docs/reports/matriz-rastreabilidade-q24-2026-09-24.md`. The user authorized local implementation of all three Q24 plans. This supersedes the old statement that no new local implementation is selected; it does not invent clinical or promotion authority.
+
+Observed local results and preserved red/green artifacts are in `docs/reports/estado-implementacao-q24-2026-09-24.md` and `docs/reports/evidence/implementation-q24-2026-09-24/resume-PMUl45/manifest.json`. Dependency installation and current scoped tests do not replace integrated runtime or independent acceptance. The six previously errored agents were closed; three bounded builders now own migration, Decision/publication and HTTP hybrid retrieval. Their work is pending inspection and is not imported as accepted evidence.
+
+The next executable boundary is the isolated full-runtime API regression. Keep all historical Q17 scope and unresolved Q24 criteria active, preserve the frozen bars and prior ledgers, and integrate each returned artifact against its exact tests. No item becomes DONE in this checkpoint.
+
+### Q24 local entry reconciliation
+
+The first controller validation correctly rejected BUILD/VERIFY without a current IMPLEMENTATION_READY record and detected stale derived pointers. The scoped entry record `.agent/gates/q24-local-integration-implementation-ready.json` now binds the already specified, user-authorized reversible local integration to Q17-01.A. It is recorded at the present time and does not retrospectively approve earlier execution, claim a VERIFIED product, or remove later domain/runtime/release gates. Derived views are regenerated from canonical state.
+
+## Q24 integrated verification checkpoint — 2026-09-25T04:36:48Z
+
+The isolated integrated API regression now passes with 686 tests and two dependency deprecation warnings. The domain lane passes 278 with five opt-in live-Qdrant tests skipped there; the separate disposable Qdrant v1.12.5 run passes all five, including scoped hybrid retrieval, schema rejection, batching, alias transition/rollback, and a lost-delete-ack compensation that restores four previous points and their published status. Authorization passes 10 tests. The disposable PostgreSQL 16.15 migration lane passes 107, including applied-history validation and backup/restore. `make validate lint typecheck` and `git diff --check` pass.
+
+The real Qdrant rollback case exposed a sparse-weight float32 JSON round-trip mismatch. The adapter now compares the returned and recomputed weights by their float32 encoding, while requiring identical sparse indices; the focused contract test rejects a changed weight and the real rollback scenario passes. Both the original failing trace and final passing report remain in the evidence tree. Full run logs, runtime metadata, PostgreSQL backup/recovery evidence and checksums are under `docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0427Z/`; the current implementation checkpoint is `docs/reports/estado-implementacao-q24-2026-09-24.md`.
+
+Independent read-only reviews of the API/authorization and retrieval/ingestion/migration diffs are in progress. Keep Q17-01.A `IN_PROGRESS` until their findings are reconciled. This local verification does not close any product/runtime/promotion criterion; in particular Q17-17.A still lacks its durable administrative reconciliation consumer, and provider/corpus, distributed service flow, operational recovery/capacity/stability, visual/accessibility and approval evidence remain outstanding. No backlog item is DONE and the entry-readiness gate is not a release gate.
+
+## Q24 integrated verification follow-up — 2026-09-25T05:08:27Z
+
+The final API/idempotency correction now has 28 focused streaming/history tests and the complete root API suite passes **694 tests** (387 dependency deprecation warnings). Idempotency keys are stripped, bounded, and reject whitespace-only or ASCII C0/DEL controls before deterministic IDs, replay lookups, or history writes; independent API review confirmed parity with the PostgreSQL history adapter. The retrieval/ingestion/migration review also passed after the rollback batching and float32 snapshot fixes.
+
+The domain suite remains 281 passed/5 opt-in skips; the separate disposable Qdrant HTTP 1.12.5 run passed 5, PostgreSQL 16.15 migration run passed 107, and authorization passed 10. Fresh `make validate lint typecheck`, the quality-bar/controller checks, derived views and `git diff --check` pass after state reconciliation; the final post-ledger `make validate` also passes. The Qdrant and PostgreSQL resources were removed with teardown evidence. Fresh API, static and control logs are under `docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0427Z/`, and the manifest binds current logs and source/document hashes. The initial control metadata failure remains separately marked as superseded evidence.
+
+Q17-01.A remains `IN_PROGRESS`. These independent reviews cover bounded code slices and do not constitute acceptance of the full product. Continue with Q24-19/Q24-20: durable mutation/audit consistency and the administrative reconciliation consumer. Full API/worker service flow, approved provider/corpus, operational restore/capacity/chaos/soak, visual/accessibility, release and promotion evidence remain open. The local implementation-entry gate is not a release gate; no historical task is marked DONE by this checkpoint.
+
+## Initial Q24-19/Q24-20 implementation checkpoint — 2026-09-25 (superseded by the review disposition below)
+
+The local PostgreSQL administration path now writes user/membership/session changes and a stable completion event in one transaction. A separate worker projects due events with `FOR UPDATE SKIP LOCKED`, idempotent audit insertion, bounded retries, dead-letter state and capped manual replay. Membership disablement is tenant-scoped while password reset invalidates sessions globally; legacy local-sink fallback reports `manual_review_required` when no automated reconciler owns its marker. Migration 0007 adds reconciliation fields/indexes and rejects blank event IDs.
+
+Verification on the shared dirty checkout: API 702 passed, worker 115 passed, PostgreSQL 16 migration suite 108 passed, `make lint`, `make typecheck`, `make ops-static` and `git diff --check` passed. `make validate` and derived-view validation will run after this checkpoint is recorded. A fresh independent review of Q24-19/Q24-20 is in progress. Keep Q17-01.A `IN_PROGRESS`; no Q24 task is marked DONE, and this evidence does not prove the full API/worker runtime, operational acceptance or promotion.
+
+## Q24-19/Q24-20 review disposition and current verification — 2026-09-25
+
+C1 rejected its package because it did not establish process-level runtime recovery, PostgreSQL update rollback, concurrent consumers or clear handling of the legacy fallback. Those gaps received regressions and are documented in `docs/reports/review-q24-19-20-critic-c1-2026-09-25.md`. C2 rejected its package for non-atomic fallback on durable providers and cross-tenant global credential changes; C3 then identified shared `role_version` effects and a partial atomic-capability fallback. The package-specific findings and dispositions are preserved in `docs/reports/review-q24-19-20-critic-c2-2026-09-25.md` and `docs/reports/review-q24-19-20-critic-c3-2026-09-25.md`.
+
+The route now checks that the exact requested operation has its atomic method when the provider declares atomic support. Providers that are durable, unknown or in production cannot proceed without that method; only the explicitly volatile development provider can use manual fallback. PostgreSQL account and authorization-version edits lock the account and reject changes that could update global identity/version fields when it has a membership in another tenant. Live tests confirm a denied request leaves account fields, memberships, sessions and completion outbox unchanged; a single-tenant reset continues to pass.
+
+Current local verification passes `make api16-root` (721), `make api16-worker` (116), and the complete opt-in PostgreSQL migration suite (108). Worker tests confirm that `build_worker()` injects the reconciler into `DeploymentRuntime`; PostgreSQL covers all four rollback paths, process restart recovery, concurrent consumers, retry/dead-letter behavior, and cross-tenant rejection for credentials, profile fields and authorization-version changes. `make lint`, `make typecheck` and `make ops-static` pass. Evidence logs are under `docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0757Z/`.
+
+C5 rejected the reviewed snapshot because deactivation selected an arbitrary workspace membership and revoked tenant-wide sessions, while concurrent password recovery could save stale membership status and reactivate a disabled row. C6 found the global-disabled/active-membership state; C7 found tenant-wide administrator-demotion scope and password-recovery revocation limited to the token tenant. C8 rejected its exact snapshot because a volatile admin fallback treated an absent `production_safe` attribute as explicit `False`; the gate now requires `production_safe is False`. C9 rejected its exact snapshot for volatile mutations that crossed workspace scope and a recovery/deactivation race. C10 corrected those paths but was rejected because session validation resolved membership by tenant without workspace and its packet omitted frozen-bar source files. C11 corrected session validation and bar provenance but was rejected because durable password reset remained tenant-only; its reviewer also hashed three unlisted files. C12 remains rejected only for its exact snapshot. C13 is ACCEPTED by fresh path-bounded review: all eleven local criteria pass and the sparse admin PATCH/password recovery race fails before and passes after the account-lock correction. Q17-17.A/Q24-19-20 still needs durable outbox consumer restart/idempotence and integrated worker/runtime reconciliation; broader domain, operations, release and promotion criteria remain open. Q17-01.A stays `IN_PROGRESS/PARTIAL` and Q17-17.A stays `VERIFY`; full API/worker integration with external services, approved domain/provider/corpus criteria, operational recovery/capacity/chaos/soak, visual/accessibility, release and promotion evidence remain open.
+
+## Q24-19/Q24-20 outbox consumer re-verification — 2026-09-25T14:32:52Z
+
+The current worker suite passes 116 tests. A fresh run of the focused live PostgreSQL 16.15 integration passes 1 test and exercises atomic admin mutation/outbox projection, stable event IDs, pending-to-published API status, two consumers using `SKIP LOCKED`, interruption during projection, persisted retry state, recovery by a new `DeploymentRuntime` process, dead-letter and capped manual retry authorization. The fixture records the image digest and confirms teardown left zero owned containers. The initial run under global Python stopped before fixture setup because `psycopg` was absent; the retry under the declared API project environment passed. Logs and Docker resource/teardown evidence are under `docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T1430Z-outbox/`.
+
+This is current local evidence, not full production integration: the restart process used the real PostgreSQL reconciler and `DeploymentRuntime`, while `build_worker()` composition is covered by the worker suite. The complete API/worker graph with approved external services and D02 topology, deployed authentication, distributed identity/session isolation, operational recovery and promotion remain unproven. Q17-17.A stays `VERIFY`; Q17-01.A stays `IN_PROGRESS/PARTIAL`. The next active action is canonical reconciliation of Q17-01.B, Q17-19.B and Q17-03.B prerequisite evidence.
+
+## Q17 prerequisite reconciliation — 2026-09-25T14:43:17Z
+
+Q17-01.B resolves to REC-M0, whose bounded local V15 review is independently APPROVED; external REC criteria remain open. Q17-03.B resolves to SA-SECURITY-TENANT-LOCAL, whose V11 local tenant-security gate is VERIFIED; external identity/storage and full-product acceptance remain open. Q17-19.B resolves to PH2-P0-02-POSTGRES-ADAPTER, still BLOCKED because current migration tests do not invoke `PostgresJobQueue`; adapter unit tests use a fake connection. The owned disposable PostgreSQL fixture and project-scoped psycopg environment are available. Add a focused live adapter integration test without changing migration history or touching persistent databases.
+
+
+## Q17-19.B live PostgreSQL queue verification — 2026-09-25T14:57:16Z
+
+The opt-in live PostgresJobQueue integration passes against disposable PostgreSQL 16.15. It covers scoped idempotency and conflict handling, two consumers with a locked row (SKIP LOCKED), lease expiry and stale-owner fencing, retries/dead-letter attempt history, authorized replay/cancellation, transaction rollback before audit/outbox projection, and terminal retention that preserves durable audit/outbox projections. The integration exposed a state timestamp moving backward after PostgreSQL rounded persisted timestamps to microseconds; the adapter now uses monotonic transition times and PostgreSQL precision for persisted epoch values.
+
+Validation passed: focused queue integration 1; complete PostgreSQL migration/integration suite 110; make api16-worker 116; make jobs-test 44; make lint; make typecheck. The owned PostgreSQL fixtures record image digest/server version and teardown with zero remaining containers. Logs and fixture evidence are under docs/reports/evidence/implementation-q24-2026-09-24/verification-q17-19b-live-20260925T1447Z/.
+
+This closes only the local Q17-19.B adapter evidence. PH2-P0-02-POSTGRES-ADAPTER remains BLOCKED because no approved inventory of installations that applied 0005 or D02-authorized database access is available for Q17-19.A. Full D01/D02 runtime, Redis coordination, worker process health/shutdown, operations, domain, release and promotion criteria remain open. The next active action is a read-only inventory of migration histories/checksums and a safe corrective-path assessment; no already-applied migration is rewritten.
+
+
+## PostgreSQL owner status reconciliation — 2026-09-25T15:12:41Z
+
+The control-plane check showed that the PH2 adapter owner's latest declared transition was still BLOCKED. The live Q17-19.B queue proof is now current, but the owner's broader acceptance includes Q17-19.A repair safety for databases that may already have applied migration 0005. Since no approved installation/checksum inventory or D02-authorized database access is available, retain PH2-P0-02 as BLOCKED with that precise reason. Q17-01.A remains IN_PROGRESS/PARTIAL; its next local step is read-only migration-history inventory and safe-path analysis.
+
+
+## Q17-19.A local migration compatibility inventory — 2026-09-25T15:17:41Z
+
+Read-only inspection found that the exact historical 0005 Git bytes have SHA-256 d577b70fb1af2790851c0f42d50d2269e80da412405cff2dfde53d63bb873a03 and the corrected local source is 58878320223f9f30d42aea840c7e58795eb5c448daf90a0877adedc781cc9774. The migration runner pins this exact pair, preserves recorded checksum/applied_at, checks the persisted canonical jobs/attempt/trigger boundary, and applies a separately checksummed 0004 operation-guard repair. The live PostgreSQL suite (110 passed) exercises populated pre-0005 upgrades, actual execution/retention of historical 0005 bytes, rollback, repeatability and historical 0004 repair. Offline migration checksum validation passes; detail is in docs/reports/evidence/implementation-q24-2026-09-24/verification-q17-19b-live-20260925T1447Z/migration-source-inventory.log and docs/operations/migration-upgrade-2026-09-24.md.
+
+This proves the repository's compatibility path and synthetic installation states only. No deployed database was inspected. Q17-19.A remains VERIFY for a D02-authorized read-only inventory of installed history/checksums, and PH2-P0-02 remains BLOCKED until that inventory, maintenance bounds and fresh exact-snapshot review are available. Q17-01.A stays IN_PROGRESS/PARTIAL.
+
+
+## Q17-20.A worker launcher process verification — 2026-09-25T15:25:15Z
+
+Added a subprocess regression that launches the actual worker-entrypoint with a temporary fake composition, waits until the worker loop is active, sends SIGTERM, and asserts the injected stop method runs, the process exits successfully, and shutdown receives its fixed 30-second timeout. The launcher module passes 8 tests; make lint passes. This closes only the local launcher signal/cleanup boundary. Canonical PostgreSQL/Redis composition, worker fencing/crash/restart, container health and D02-approved runtime remain open.
+
+## Q24 local continuation — 2026-09-25
+
+Additional reversible local slices advanced Q24 without changing the ordered active Q17 action above. Q24-06 retains its synthetic v2 pack and now has an offline campaign manifest/harness: fixture checks pass, while the real campaign stays `NOT_RUN` and `BLOCKED` for corpus rights/representativeness, provider, domain approval, sample size and split. Q24-21 has a passing PostgreSQL regression for sparse admin PATCH/password-recovery serialization (4 focused cases; API/identity 773), scoped to that race only. Q24-25 has a document-collection error/retry UX correction; final focused browser tests pass 27/27 after layout fixes, and a fresh independent visual review reports zero P0–P3 findings. The full 321-test matrix passed before the final visual-only refinements. Q24-26 has a 36-test local harness covering configuration identity, path/split guards, strata, fixture source/citation/ACL metrics and descriptive uncertainty; no real provider or generated-answer abstention was observed.
+
+Manifests, raw logs, screenshots and limitations are in `docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-06-evaluation-20260925/`, `verification-q24-21-tenant-race-20260925/`, `verification-q24-25-web-collection-error-review-resolved-20260925/` and `verification-q24-26-campaign-harness-20260925/`. These are local slices, not completion of their Q24 tasks or runtime/promotion gates. Preserve the active Q17-01.A action: obtain D02-authorized read-only inventory of actually deployed migration histories/checksums; leave Q17-01.A `IN_PROGRESS/PARTIAL`.
+
+## Q24-05 retry bytes and Q24-26 evaluation strata — 2026-09-25
+
+Q24-05 adds a regression through the HTTP upload/retry routes and local ingestion service. The same synthetic DOCX container is staged on both attempts; a one-shot vector-store failure makes the original job terminal `failed`, and the explicit multipart retry publishes a distinct job. The test compares bytes and SHA-256 at the ingestion boundary and checks filename, tenant/workspace/collection, authorized collection scope and immutable original attempt state. It validates the DOCX ZIP container but injects a deterministic parser adapter because `python-docx` is not installed in the Python environment used by the root API target. The focused route suite passes 13 and `make api16-root` passes 749. D01 source-retention/reload decisions and parser runtime validation remain open.
+
+Q24-26 advances the offline campaign harness to result schema v4. Campaign manifests can declare dimensions; every fixture case must provide exactly those labels, and product readiness requires both `risk` and `ambiguity`. Positive cases inherit absent `model_id`/`corpus_id` from pack-manifest metadata. Quality metrics and Hit@1 intervals remain separate by exact positive model/corpus pair and labels, or negative expectation and labels; `uncertainty.overall` is explicitly pooled. Every non-empty identity string, including whitespace-only strings, is preserved exactly; identity components are percent-encoded, while canonical dimension JSON uses reversible unpadded URL-safe base64. Regressions cover separator collisions, whitespace-distinct IDs and labels, metadata defaults, ID joins across strata/quality/uncertainty, and exact dimension decoding. The synthetic latency contrast still reports distinct 11 ms and 15 ms p95 rows; observed answer abstention remains `NOT_MEASURED`. No D04 labels, domain categories or thresholds were invented. The checked-in campaign has no labels and remains `campaign_status=NOT_RUN` / `eligibility_status=BLOCKED`. The 20 campaign and 15 pack tests, `make eval-retrieval-pack`, lint and typecheck pass. Valid reviews successively found and fixed separator/pin coverage, whitespace/hash, pack-default, whitespace-only and pooled-interval documentation gaps; a fresh review of the current snapshot is pending. These results do not close Q24-05/Q24-26 or authorize the representative campaign.
+
+Q24-03 aligns `apps/api/pyproject.toml` and `uv.lock`, `requirements/runtime.in`/`runtime.lock`, and standalone CI pins at FastAPI 0.141.1, Starlette 1.7.0 and Uvicorn 0.54.0. The five direct-install workflows now all pin the five checked packages, including `python-multipart==0.0.32` in phase-1.5. A clean Python 3.12 environment resolves 45 hash-pinned runtime packages; PyPI/OSV audits, `pip check`, `uv lock --check`, and `make api16-root` (749 tests) pass. The TestClient emits one upstream HTTPX deprecation warning, documented as a test-dependency follow-up. No immutable image was built or inventoried; Q24-03 stays partial pending the D02-authorized image/base and inventory boundary.
+
+The active pointer is unchanged: Q17-01.A remains `IN_PROGRESS/PARTIAL` with `Q17-01.A:VERIFY-Q17-19A-DEPLOYED-INVENTORY` as the D02-authorized read-only deployed migration-history action. No task status or promotion gate is advanced here. Detailed logs and hashes are in `docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/`.
+
+## Q24-08 worker process shutdown — 2026-09-25 local continuation
+
+Recovery confirmed revision 378 and the unchanged global deployed-inventory
+pointer. The pending authorized outside-sandbox regression settled with exit 0:
+129 worker/API health/telemetry tests passed with one TestClient deprecation
+warning. Earlier sandbox timeouts remain diagnostic failures with unproven
+precise cause, not passing evidence.
+
+The actual worker script owns a finally drain of its already-loaded diagnostic
+lane with a two-second budget. Imported main() retains shared-process ownership;
+unused package shutdown allocates no threads. Seven original subprocess cases
+failed before the hook. The final Docker/observability package suite passes 46
+tests, including SIGTERM/SIGINT, cleanup events, health/normal/failure exits and
+bounded behavior for permanently blocked callbacks. An exact-budget/outcome
+regression rejects a 3.0-second in-memory mutation in nine combinations. Lint,
+typecheck/compilation, pre-checkpoint validation and diff check pass.
+
+Sartre's initial independent scoped review passed with one LOW timing-tolerance
+finding, addressed by the exact-budget test. The updated six-file candidate is
+frozen at fingerprint a6ded820e0ba2a3c54399154a8917d2186c951b90c17d7bcfa3b5e11efe54d05.
+Gibbs independently reviewed C1–C6 with PASS and no findings, recomputing all
+six file hashes. Tests were not independently rerun by that reviewer. Canonical
+reconciliation and validation are recorded separately from this scoped review.
+Evidence is
+under `docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-08-worker-shutdown-20260925/`.
+
+Q17-23.A remains VERIFY for API process-owner and external/distributed runtime
+evidence; Q17-01.A remains IN_PROGRESS/PARTIAL. The global active task/action,
+frozen bar, all historical gates and deployed database histories are unchanged.
+No production change, paid provider call, deployment or promotion was performed.

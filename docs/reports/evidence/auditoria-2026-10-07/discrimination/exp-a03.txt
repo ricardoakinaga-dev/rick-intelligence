@@ -1,0 +1,11 @@
+# exp-a03 - 2026-10-07T15:36:43Z
+# command: PYTHONPATH=<canonical> .runtime/venvs/cvg/bin/python -m pytest -q -p no:cacheprovider apps/api/tests
+FAILED apps/api/tests/test_idempotency_scope.py::test_json_chat_replays_an_identical_turn_but_refuses_another_conversation[memory]
+FAILED apps/api/tests/test_idempotency_scope.py::test_json_chat_replays_an_identical_turn_but_refuses_another_conversation[sqlite]
+FAILED apps/api/tests/test_idempotency_scope.py::test_json_chat_refuses_the_same_key_for_another_message_or_collection[memory]
+FAILED apps/api/tests/test_idempotency_scope.py::test_json_chat_refuses_the_same_key_for_another_message_or_collection[sqlite]
+FAILED apps/api/tests/test_idempotency_scope.py::test_stream_chat_reports_conflict_instead_of_replaying[memory]
+FAILED apps/api/tests/test_idempotency_scope.py::test_stream_chat_reports_conflict_instead_of_replaying[sqlite]
+FAILED apps/api/tests/test_idempotency_scope.py::test_http_chat_returns_409_for_a_key_reused_in_another_conversation
+FAILED apps/api/tests/test_idempotency_scope.py::test_http_stream_reports_conflict_for_a_key_reused_in_another_conversation
+8 failed, 1589 passed, 18 skipped, 1 warning in 54.51s

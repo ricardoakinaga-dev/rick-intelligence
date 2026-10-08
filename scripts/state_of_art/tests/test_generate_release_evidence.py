@@ -4,6 +4,8 @@ import json
 from pathlib import Path
 import re
 
+import pytest
+
 from scripts.state_of_art import generate_release_evidence
 from scripts.state_of_art.release_manifest import REQUIRED_GATES, ReviewerRef
 
@@ -376,15 +378,45 @@ def test_nightly_boundary_downloads_every_scheduled_runtime_artifact() -> None:
     workflow = Path(__file__).parents[3] / ".github/workflows/quality.yml"
     nightly = workflow.read_text(encoding="utf-8").split("  nightly:\n", 1)[1]
 
+    _assert_nightly_download_contract(nightly)
+
+
+def _assert_nightly_download_contract(nightly: str) -> None:
+    import textwrap
+    import yaml
+
+    steps = yaml.safe_load(textwrap.dedent(nightly))["steps"]
+    downloads = {
+        step.get("with", {}).get("name"): step
+        for step in steps
+        if str(step.get("uses", "")).startswith("actions/download-artifact@")
+    }
+
     for artifact in ("runtime", "frontend-runtime", "performance", "chaos", "soak"):
-        assert f"name: phase3-{artifact}-${{{{ github.run_id }}}}" in nightly
-        assert "uses: actions/download-artifact@v4.3.0" in nightly
-    assert "path: .runtime/phase-3" in nightly
-    for lane in ("frontend-runtime", "performance", "chaos", "soak"):
-        assert f"path: .runtime/phase-3/supplemental/{lane}" in nightly
+        name = f"phase3-{artifact}-${{{{ github.run_id }}}}"
+        assert name in downloads
+        step = downloads[name]
+        assert step["uses"] == "actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093"
+        assert step["with"]["path"] == (
+            ".runtime/phase-3" if artifact == "runtime" else f".runtime/phase-3/supplemental/{artifact}"
+        )
 
     assert "Download the exact scheduled runtime artifacts" in nightly
     assert "Download the exact scheduled soak artifacts" in nightly
+
+
+@pytest.mark.parametrize("mutation", ["mutable_pin", "missing_download", "wrong_artifact"])
+def test_nightly_download_contract_rejects_invalid_fixtures(mutation: str) -> None:
+    workflow = Path(__file__).parents[3] / ".github/workflows/quality.yml"
+    nightly = workflow.read_text(encoding="utf-8").split("  nightly:\n", 1)[1]
+    if mutation == "mutable_pin":
+        nightly = nightly.replace("actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093", "actions/download-artifact@v4.3.0", 1)
+    elif mutation == "missing_download":
+        nightly = nightly.replace("actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093", "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02", 1)
+    else:
+        nightly = nightly.replace("name: phase3-soak-${{ github.run_id }}", "name: wrong-artifact-${{ github.run_id }}", 1)
+    with pytest.raises(AssertionError):
+        _assert_nightly_download_contract(nightly)
 
 
 def test_runtime_and_release_workflows_bind_the_current_prompt_matrix() -> None:

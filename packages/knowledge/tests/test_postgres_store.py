@@ -75,7 +75,7 @@ def test_upsert_uses_one_transaction_and_deleted_documents_cannot_resurrect() ->
     with pytest.raises(PostgresKnowledgeError) as error:
         store.upsert_document(document)
     assert error.value.code == "conflict"
-    assert connection.rollbacks == 1
+    assert connection.rollbacks == 3  # write rollback plus guard session cleanup
     assert connection.commits == 0
 
 
@@ -98,7 +98,8 @@ def test_upsert_writes_scoped_document_lineage_columns() -> None:
 
     store.upsert_document(document)
 
-    query, params = connection.cursor_instance.calls[1]
+    query, params = next((query, params) for query, params in connection.cursor_instance.calls
+                         if "INSERT INTO rick_documents" in query)
     assert "object_ref" in query
     assert "ingestion_version" in query
     assert "created_at" in query and "published_at" in query
@@ -121,7 +122,7 @@ def test_chunk_replacement_is_transactional_and_requires_stable_order() -> None:
     with pytest.raises(PostgresKnowledgeError) as error:
         store.replace_document_chunks("doc-1", [chunk])
     assert error.value.code == "invalid_input"
-    assert connection.rollbacks == 1
+    assert connection.rollbacks == 3
     assert connection.commits == 0
 
 

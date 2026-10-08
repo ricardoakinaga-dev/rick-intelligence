@@ -1,0 +1,13 @@
+............................                                             [100%]
+=============================== warnings summary ===============================
+../.local/lib/python3.12/site-packages/starlette/testclient.py:41
+  /home/ricardo/.local/lib/python3.12/site-packages/starlette/testclient.py:41: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    [], typing.ContextManager[anyio.abc.BlockingPortal]
+
+tests/test_streaming.py: 10 warnings
+tests/test_chat_history.py: 3 warnings
+  /home/ricardo/.local/lib/python3.12/site-packages/httpx/_client.py:680: DeprecationWarning: The 'app' shortcut is now deprecated. Use the explicit style 'transport=WSGITransport(app=...)' instead.
+    warnings.warn(message, DeprecationWarning)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+28 passed, 14 warnings in 1.14s

@@ -1,0 +1,19 @@
+=== AUD07-18 discriminação (2026-10-08) ===
+
+--- A1: material bruto reinserido na árvore (espera FAIL) ---
+AVISO: 771 citação(ões) em forma relativa sem arquivo na árvore (consulte docs/reports/evidence/README.md)
+FAIL: arquivo fora da política em docs/reports/evidence: docs/reports/evidence/production-2026-10-04/probe-a1/x.bin
+exit=1
+--- A2: removido (espera PASS) ---
+AVISO: 771 citação(ões) em forma relativa sem arquivo na árvore (consulte docs/reports/evidence/README.md)
+PASS: evidência citada presente e layout conforme a política AUD07-18
+exit=0
+
+--- B1: manifesto alterado (espera FAIL) ---
+AVISO: 771 citação(ões) em forma relativa sem arquivo na árvore (consulte docs/reports/evidence/README.md)
+FAIL: MANIFEST.tsv não corresponde a manifest_sha256 do STORE-SUMMARY.json
+exit=1
+--- B2: manifesto reposto (espera PASS) ---
+AVISO: 771 citação(ões) em forma relativa sem arquivo na árvore (consulte docs/reports/evidence/README.md)
+PASS: evidência citada presente e layout conforme a política AUD07-18
+exit=0

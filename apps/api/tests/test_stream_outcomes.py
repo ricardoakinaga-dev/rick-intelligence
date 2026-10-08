@@ -29,10 +29,16 @@ class FailingStreamBackend:
 class BlockingStreamBackend:
     def __init__(self):
         self.released = asyncio.Event()
+        self.started = asyncio.Event()
+        self.closed = asyncio.Event()
 
     async def generate_stream(self, **_kwargs):
-        yield {"type": "delta", "delta": "antes do cancelamento"}
-        await self.released.wait()
+        try:
+            yield {"type": "delta", "delta": "antes do cancelamento"}
+            self.started.set()
+            await self.released.wait()
+        finally:
+            self.closed.set()
 
 
 class CompletingStreamBackend:
@@ -53,7 +59,7 @@ async def _collect(events):
 
 
 @pytest.mark.asyncio
-async def test_stream_error_after_delta_persists_partial_and_records_live_metrics():
+async def test_stream_error_before_publication_never_leaks_delta_and_records_live_metrics():
     history = InMemoryChatHistoryStore()
     telemetry = ApiTelemetry()
     service = ChatApplicationService(FailingStreamBackend(), history, telemetry=telemetry)
@@ -63,18 +69,17 @@ async def test_stream_error_after_delta_persists_partial_and_records_live_metric
         collection_id=None, workspace_id=None, mode="grounded",
     ))
 
-    assert [event["type"] for event in events] == ["start", "delta", "error"]
+    assert [event["type"] for event in events] == ["start", "error"]
     assert events[0]["provisional"] is True
-    assert events[1]["provisional"] is True
-    assert events[2]["provisional"] is False
+    assert events[-1]["provisional"] is False
     assert events[-1]["code"] == "generation_failed"
     stored = history.list_history(session=SESSION)[0]
-    assert stored["metadata"]["stream_status"] == "partial"
+    assert stored["metadata"]["stream_status"] == "error"
     assert stored["metadata"]["error_code"] == "generation_failed"
     assert history.get_context(session=SESSION, conversation_id="conv-error") == []
     stream = telemetry.snapshot()["stream"]
-    assert any(item["labels"].get("status") == "partial" for item in stream["outcomes"])
-    assert stream["ttft"]["count"] == 1
+    assert any(item["labels"].get("status") == "error" for item in stream["outcomes"])
+    assert stream["ttft"]["count"] == 0
     assert stream["duration"]["count"] == 1
 
 
@@ -90,12 +95,16 @@ async def test_closing_live_stream_persists_cancelled_outcome_without_leaking_pa
     )
 
     assert (await anext(events))["type"] == "start"
-    assert (await anext(events))["type"] == "delta"
-    await events.aclose()
+    pending = asyncio.create_task(anext(events))
+    await asyncio.wait_for(backend.started.wait(), 1)
+    pending.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await pending
 
     stored = history.list_history(session=SESSION)[0]
     assert stored["metadata"]["stream_status"] == "cancelled"
-    assert stored["answer"] == "antes do cancelamento"
+    assert stored["answer"] == ""
+    assert backend.closed.is_set()
     assert history.get_context(session=SESSION, conversation_id="conv-cancel") == []
     assert any(
         item["labels"].get("status") == "cancelled"
@@ -145,6 +154,6 @@ async def test_stream_outcome_persistence_failure_is_explicit_and_metrics_are_ke
         ))
 
     assert any(
-        item["labels"].get("status") == "partial"
+        item["labels"].get("status") == "error"
         for item in telemetry.snapshot()["stream"]["outcomes"]
     )

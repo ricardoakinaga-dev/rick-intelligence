@@ -106,9 +106,9 @@ Run `make help` for the complete list.
 | `make api14-benchmark` | Legacy-vs-root perf budget check. |
 | `make api15-boundaries` | Current root boundary and preservation validator. |
 | `make api15-full` | Phase 1.5 boundaries, contracts, provider, locking, Professor, and root API suites. |
-| `make api16-full` | Phase 1.6 boundaries, domain lifecycle, worker seam, readiness, root API, and hermetic benchmark. |
+| `make api16-full` | Phase 1.6 boundaries, domain lifecycle, worker and API suites with coverage floors, and hermetic benchmark. |
 | `make api16-verify` | Sanitized Phase 1.6 matrix plus Phase 1.5/1.4 regression, security, OpenAPI, and whitespace checks. |
-| `make web-validate` | Lints, typechecks, builds, and runs the canonical browser matrix at 375/768/1440 against the root API loopback. |
+| `make web-validate` | Lints, typechecks, enforces the web unit coverage floor, builds, and runs the canonical browser matrix at 375/768/1440 against the root API loopback. |
 | `make web-e2e` | Runs the canonical browser smoke and writes visual evidence under `artifacts/visual/state-of-art/`. |
 | `make dev` | Runs the canonical development Compose lifecycle in the foreground; it fails closed when Docker, required environment or reviewed composition inputs are unavailable. |
 | `make up`, `make down`, `make logs` | Operate the selected canonical root Compose file (`RICK_COMPOSE_FILE` may select staging); static configuration is not runtime proof. |
@@ -136,7 +136,9 @@ and [`docs/operations/release-readiness.md`](docs/operations/release-readiness.m
 ## Toolchain
 
 The root contract records Python `3.12.3`, Node.js `22.19.0`, npm `10.9.3`,
-Qdrant `1.7.4`, and Redis `7.0.15`. See [`toolchain.json`](toolchain.json) and
+Qdrant `1.12.5`, and Redis `7.4` for current development/staging services.
+Qdrant `1.7.4` and Redis `7.0.15` remain the separate historical Phase 0.6 CI
+images. See [`toolchain.json`](toolchain.json) and
 [`docs/architecture/toolchain.md`](docs/architecture/toolchain.md). Runtime
 secrets are never committed; start from `.env.example` and keep `.env` local.
 

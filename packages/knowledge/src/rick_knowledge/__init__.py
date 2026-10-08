@@ -6,6 +6,7 @@ from rick_knowledge.identity import (
     chunk_id_for_document,
     content_checksum,
     document_id_for_content,
+    legacy_document_id_for_content,
     document_version,
     normalize_collection_id,
     normalize_tenant_id,
@@ -29,6 +30,7 @@ __all__ = [
     "PostgresKnowledgeError", "PostgresKnowledgeStore",
     "build_point_payload", "chunk_id_for_document", "content_checksum",
     "document_id_for_content", "document_version", "normalize_collection_id",
+    "legacy_document_id_for_content",
     "normalize_tenant_id",
     "point_id_for_chunk", "validate_payload",
 ]

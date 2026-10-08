@@ -419,9 +419,9 @@ class _MetricState:
         self._lock = RLock()
         self._values: dict[str, int] = {}
 
-    def increment(self, name: str) -> None:
+    def increment(self, name: str, count: int = 1) -> None:
         with self._lock:
-            self._values[name] = self._values.get(name, 0) + 1
+            self._values[name] = self._values.get(name, 0) + count
 
     def snapshot(self, *, active: int, max_active: int) -> RuntimeMetrics:
         with self._lock:
@@ -458,11 +458,14 @@ class _Execution:
     result: object = None
     error: BaseException | None = None
     outcome: str | None = None
+    launched: bool = False
+    launch_failed: bool = False
     failure_code: str | None = None
     cancel_requested: bool = False
     lease_lost: bool = False
     finalizing: bool = False
     timed_out: bool = False
+    queue_error_detected: bool = False
     thread: Thread | None = None
 
 
@@ -591,6 +594,9 @@ class RealWorkerRuntime:
         self.fault_injector = fault_injector
 
         self._lock = RLock()
+        self._drive_lock = RLock()
+        self._daemon_owner: Thread | None = None
+        self._cycle_owner: Thread | None = None
         self._active: dict[str, _Execution] = {}
         self._started = False
         self._closing = False
@@ -924,12 +930,12 @@ class RealWorkerRuntime:
         with execution.lock:
             if execution.outcome is not None:
                 return
+            self._metrics.increment(outcome)
+            if execution.timed_out:
+                self._metrics.increment("timed_out")
             execution.outcome = outcome
             execution.failure_code = code
             execution.logical_done.set()
-        self._metrics.increment(outcome)
-        if code == "handler_timeout":
-            self._metrics.increment("timed_out")
         if outcome == "succeeded":
             self._emit("worker.job.succeeded", execution=execution)
         elif outcome == "failed":
@@ -950,23 +956,38 @@ class RealWorkerRuntime:
 
     def _end_finalization(self, execution: _Execution, outcome: str, *, code: str | None = None) -> None:
         with execution.lock:
+            self._record_outcome(execution, outcome, code=code)
             execution.finalizing = False
-        self._record_outcome(execution, outcome, code=code)
 
     def _release_cancelled_lease(self, execution: _Execution) -> str:
         release = getattr(self.queue, "cancel_lease", None)
         if not callable(release):
             return "cancelled"
         try:
-            release(
+            recovered = release(
                 execution.lease,
                 now=self._now(),
                 expected_version=execution.job.version,
             )
+            if (
+                not isinstance(recovered, Job)
+                or recovered.job_id != execution.job.job_id
+                or recovered.scope != execution.job.scope
+                or recovered.state is JobState.PENDING
+            ):
+                self._metrics.increment("queue_errors")
+                return "queue_error"
+            if isinstance(recovered, Job) and recovered.state is JobState.SUCCEEDED:
+                return "succeeded"
+            if isinstance(recovered, Job) and recovered.state is JobState.RUNNING:
+                return "lease_lost"
         except Exception as exc:
             if self._is_lease_error(exc):
                 return "lease_lost"
+            with execution.lock:
+                execution.queue_error_detected = True
             self._metrics.increment("queue_errors")
+            self._emit("worker.queue.error", execution=execution, reason="mutation_failed")
             return "cancelled"
         return "cancelled"
 
@@ -991,7 +1012,7 @@ class RealWorkerRuntime:
                 retryable=retryable,
                 now=self._now(),
             )
-            self.queue.fail(
+            recovered = self.queue.fail(
                 execution.lease,
                 failure,
                 now=self._now(),
@@ -1004,15 +1025,34 @@ class RealWorkerRuntime:
                 self._metrics.increment("queue_errors")
                 self._end_finalization(execution, "queue_error", code=code)
         else:
-            self._end_finalization(execution, "failed", code=code)
+            if (
+                not isinstance(recovered, Job)
+                or recovered.job_id != execution.job.job_id
+                or recovered.scope != execution.job.scope
+                or recovered.state is JobState.PENDING
+            ):
+                self._metrics.increment("queue_errors")
+                self._end_finalization(execution, "queue_error", code=code)
+            elif isinstance(recovered, Job) and recovered.state is JobState.SUCCEEDED:
+                self._end_finalization(execution, "succeeded")
+            elif isinstance(recovered, Job) and recovered.state is JobState.RUNNING:
+                self._end_finalization(execution, "lease_lost")
+            elif isinstance(recovered, Job) and recovered.state is JobState.CANCELLED:
+                self._end_finalization(execution, "cancelled")
+            else:
+                self._end_finalization(execution, "failed", code=code)
 
     def _finalize_handler(self, execution: _Execution) -> None:
         with execution.lock:
+            launch_failed = execution.launch_failed
             error = execution.error
             result = execution.result
             cancelled = execution.cancel_requested or execution.token.cancelled
             lease_lost = execution.lease_lost
             timed_out = execution.timed_out
+        if launch_failed:
+            self._finalize_failure(execution, "invalid_job", False)
+            return
         if lease_lost:
             self._finalize_lease_lost(execution)
             return
@@ -1028,6 +1068,12 @@ class RealWorkerRuntime:
             return
         if error is not None:
             code = _safe_code(getattr(error, "code", None), fallback="handler_failed")
+            if code == "recovery_required":
+                # A pending publication owns its effects across this runtime's
+                # lifetime. The scheduled queue recovery checks its durable
+                # receipt before finalizing, including on the final attempt.
+                self._finalize_lease_lost(execution)
+                return
             self._finalize_failure(execution, code, code in _RETRYABLE_HANDLER_CODES)
             return
         if not isinstance(result, JobResult):
@@ -1037,7 +1083,7 @@ class RealWorkerRuntime:
             return
         try:
             self._inject_fault("before_result", execution)
-            self.queue.acknowledge(
+            acknowledged = self.queue.acknowledge(
                 execution.lease,
                 result,
                 now=now,
@@ -1051,7 +1097,23 @@ class RealWorkerRuntime:
                 self._metrics.increment("queue_errors")
                 self._end_finalization(execution, "queue_error")
         else:
-            self._end_finalization(execution, "succeeded")
+            if (
+                not isinstance(acknowledged, Job)
+                or acknowledged.job_id != execution.job.job_id
+                or acknowledged.scope != execution.job.scope
+            ):
+                self._metrics.increment("queue_errors")
+                self._end_finalization(execution, "queue_error")
+            elif acknowledged.state is JobState.RUNNING:
+                # Publication authority can defer acknowledgement while the
+                # durable lease remains open. Expiry recovery owns completion;
+                # a successful handler alone must never count as success.
+                self._end_finalization(execution, "lease_lost")
+            elif acknowledged.state is JobState.SUCCEEDED:
+                self._end_finalization(execution, "succeeded")
+            else:
+                self._metrics.increment("queue_errors")
+                self._end_finalization(execution, "queue_error")
 
     def _heartbeat(self, execution: _Execution, now: float) -> None:
         try:
@@ -1132,12 +1194,21 @@ class RealWorkerRuntime:
                 job_id
                 for job_id, execution in self._active.items()
                 if execution.handler_done.is_set() and execution.logical_done.is_set()
+                and (execution.thread is None or not execution.thread.is_alive())
             ]
             for job_id in finished:
                 execution = self._active.pop(job_id)
                 thread = execution.thread
-                if thread is not None and thread is not current_thread():
+                if thread is not None and thread.ident is not None and thread is not current_thread():
                     thread.join(timeout=0)
+
+    def _confirm_launch(self, execution: _Execution) -> None:
+        with execution.lock:
+            if execution.launched:
+                return
+            self._metrics.increment("started")
+            execution.launched = True
+        self._emit("worker.job.started", execution=execution)
 
     def _start_execution(self, job: Job, lease: JobLease) -> _Execution:
         handler = self.registry.get(job.operation)
@@ -1162,24 +1233,42 @@ class RealWorkerRuntime:
                 for key in ("traceparent", "tracestate")
                 if isinstance(payload.get(key), str)
             }
-            with attach_trace_context(trace_context or None):
-                with stage_span(
-                    "worker.ingestion",
-                    attributes={"worker.operation": str(job.operation)},
-                ) as span:
-                    try:
-                        self._inject_fault("during_handler", execution)
-                        execution.result = callable_handler(
-                            job,
-                            lease,
-                            cancelled=execution.token,
-                        )
-                    except BaseException as error:  # worker isolation boundary
-                        record_safe_exception(span, error)
-                        execution.error = error
-                    finally:
-                        execution.handler_done.set()
-                        self._reap()
+            handler_entered = False
+            try:
+                self._confirm_launch(execution)
+                with attach_trace_context(trace_context or None):
+                    with stage_span(
+                        "worker.ingestion",
+                        attributes={"worker.operation": str(job.operation)},
+                    ) as span:
+                        try:
+                            handler_entered = True
+                            execution.token.checkpoint()
+                            self._inject_fault("during_handler", execution)
+                            execution.result = callable_handler(
+                                job,
+                                lease,
+                                cancelled=execution.token,
+                            )
+                        except BaseException as error:  # worker isolation boundary
+                            execution.error = error
+                            try:
+                                record_safe_exception(span, error)
+                            except BaseException:
+                                # Telemetry failures cannot escape the thread
+                                # or overwrite the handler's actual result.
+                                pass
+                        finally:
+                            execution.handler_done.set()
+                            self._reap()
+            except BaseException as error:
+                if not handler_entered:
+                    execution.error = error
+                # Context exit failures preserve the completed handler result.
+            finally:
+                # Context entry can fail before the inner handler boundary.
+                execution.handler_done.set()
+                self._reap()
 
         thread = Thread(
             target=invoke,
@@ -1190,16 +1279,41 @@ class RealWorkerRuntime:
         with self._lock:
             self._active[str(job.job_id)] = execution
             self._max_active = max(self._max_active, len(self._active))
-        self._metrics.increment("started")
-        self._emit("worker.job.started", execution=execution)
-        thread.start()
+        try:
+            thread.start()
+        except BaseException as error:
+            if execution.launched or thread.ident is not None or thread.is_alive():
+                self._confirm_launch(execution)
+                if not isinstance(error, Exception):
+                    raise
+            elif isinstance(error, Exception):
+                # Retain the same finalization owner. A concurrent timeout or
+                # shutdown may already have finalized this reserved claim.
+                with execution.lock:
+                    execution.launch_failed = True
+                    execution.error = error
+                    execution.handler_done.set()
+            else:
+                with self._lock:
+                    if self._active.get(str(job.job_id)) is execution:
+                        self._active.pop(str(job.job_id))
+                raise
+        else:
+            if execution.launched or thread.ident is not None or thread.is_alive():
+                self._confirm_launch(execution)
+            else:
+                with execution.lock:
+                    execution.launch_failed = True
+                    execution.error = RuntimeConfigurationError("worker thread did not start")
+                    execution.handler_done.set()
         return execution
 
     def _poison_claim(self, job: Job, lease: JobLease, *, code: str) -> tuple[str, bool]:
         self._metrics.increment("poisoned")
+        self._emit("worker.job.poisoned", code=code, reason="non_retryable")
         try:
             failure = self._failure(job, code=code, retryable=False, now=self._now())
-            self.queue.fail(lease, failure, now=self._now(), expected_version=job.version)
+            recovered = self.queue.fail(lease, failure, now=self._now(), expected_version=job.version)
         except Exception as exc:
             if self._is_lease_error(exc):
                 self._metrics.increment("lease_lost")
@@ -1208,8 +1322,29 @@ class RealWorkerRuntime:
             self._metrics.increment("queue_errors")
             self._emit("worker.queue.error", code=code, reason="poison_mutation")
             return "queue_error", True
+        if not isinstance(recovered, Job):
+            self._metrics.increment("queue_errors")
+            self._emit("worker.queue.error", code=code, reason="poison_mutation")
+            return "queue_error", True
+        if isinstance(recovered, Job):
+            if (recovered.job_id != job.job_id or recovered.scope != job.scope
+                    or recovered.state is JobState.PENDING):
+                self._metrics.increment("queue_errors")
+                self._emit("worker.queue.error", code=code, reason="poison_mutation")
+                return "queue_error", True
+            if recovered.state is JobState.RUNNING:
+                self._metrics.increment("lease_lost")
+                self._emit("worker.job.lease_lost", code=code, reason="poison_ack")
+                return "lease_lost", True
+            if recovered.state is JobState.SUCCEEDED:
+                self._metrics.increment("succeeded")
+                self._emit("worker.job.succeeded")
+                return "succeeded", True
+            if recovered.state is JobState.CANCELLED:
+                self._metrics.increment("cancelled")
+                self._emit("worker.job.cancelled", reason="cooperative_cancel")
+                return "cancelled", True
         self._metrics.increment("failed")
-        self._emit("worker.job.poisoned", code=code, reason="non_retryable")
         return "failed", True
 
     def _validate_claim(self, item: object, now: float) -> tuple[Job, JobLease] | None:
@@ -1280,6 +1415,25 @@ class RealWorkerRuntime:
 
         if not isinstance(wait, bool):
             raise RuntimeConfigurationError("wait must be a boolean")
+        # Serialize drivers across capacity observation, claiming and admission.
+        # Cancellation and health remain independently callable.
+        with self._drive_lock:
+            with self._lock:
+                if self._daemon_owner is not None and self._daemon_owner is not current_thread():
+                    raise RuntimeConfigurationError("runtime polling belongs to the daemon")
+                if self._cycle_owner is not None:
+                    raise RuntimeConfigurationError("runtime polling cycle is already running")
+                self._cycle_owner = current_thread()
+            try:
+                return self._run_cycle(wait=wait)
+            finally:
+                with self._lock:
+                    self._cycle_owner = None
+
+    def _run_cycle(self, *, wait: bool) -> RunResult:
+
+        if not isinstance(wait, bool):
+            raise RuntimeConfigurationError("wait must be a boolean")
         self._ensure_started()
         with self._lock:
             if self._closing or self._closed or self._stop_requested:
@@ -1292,7 +1446,9 @@ class RealWorkerRuntime:
         backpressured = capacity <= 0
         claimed_count = 0
         started: list[_Execution] = []
+        admitted = {str(execution.job.job_id) for execution in existing}
         immediate_failed = immediate_poisoned = immediate_lease_lost = 0
+        immediate_succeeded = immediate_cancelled = 0
         queue_errors = 0
         if capacity > 0:
             claimed = self._claim(capacity)
@@ -1300,17 +1456,27 @@ class RealWorkerRuntime:
                 queue_errors = 1
                 claimed = ()
             claimed_count = len(claimed)
-            self._metrics.increment("claimed") if claimed_count else None
+            self._metrics.increment("claimed", claimed_count) if claimed_count else None
             now = self._now()
             for item in claimed:
                 observed = self._validate_claim(item, now)
                 if observed is None:
                     self._metrics.increment("poisoned")
+                    immediate_poisoned += 1
                     self._metrics.increment("queue_errors")
                     self._emit("worker.queue.error", reason="invalid_claim")
                     queue_errors += 1
                     continue
                 job, lease = observed
+                identity = str(job.job_id)
+                if identity in admitted:
+                    immediate_poisoned += 1
+                    queue_errors += 1
+                    self._metrics.increment("poisoned")
+                    self._metrics.increment("queue_errors")
+                    self._emit("worker.queue.error", reason="invalid_claim")
+                    continue
+                admitted.add(identity)
                 try:
                     payload_size = self._payload_size(job)
                 except (TypeError, ValueError, OverflowError):
@@ -1321,6 +1487,10 @@ class RealWorkerRuntime:
                         immediate_failed += 1
                     elif outcome == "lease_lost":
                         immediate_lease_lost += 1
+                    elif outcome == "succeeded":
+                        immediate_succeeded += 1
+                    elif outcome == "cancelled":
+                        immediate_cancelled += 1
                     else:
                         queue_errors += 1
                     immediate_poisoned += 1
@@ -1331,18 +1501,30 @@ class RealWorkerRuntime:
                         immediate_failed += 1
                     elif outcome == "lease_lost":
                         immediate_lease_lost += 1
+                    elif outcome == "succeeded":
+                        immediate_succeeded += 1
+                    elif outcome == "cancelled":
+                        immediate_cancelled += 1
                     else:
                         queue_errors += 1
                     immediate_poisoned += 1
                     continue
                 try:
-                    started.append(self._start_execution(job, lease))
+                    execution = self._start_execution(job, lease)
+                    started.append(execution)
+                    if execution.launch_failed:
+                        self._metrics.increment("poisoned")
+                        self._emit("worker.job.poisoned", code="invalid_job", reason="non_retryable")
                 except Exception:
                     outcome, _ = self._poison_claim(job, lease, code="invalid_job")
                     if outcome == "failed":
                         immediate_failed += 1
                     elif outcome == "lease_lost":
                         immediate_lease_lost += 1
+                    elif outcome == "succeeded":
+                        immediate_succeeded += 1
+                    elif outcome == "cancelled":
+                        immediate_cancelled += 1
                     else:
                         queue_errors += 1
                     immediate_poisoned += 1
@@ -1355,17 +1537,20 @@ class RealWorkerRuntime:
                 self._wait_for(existing)
         self._monitor_active()
         outcomes = [execution.outcome for execution in started]
-        succeeded = outcomes.count("succeeded")
+        succeeded = immediate_succeeded + outcomes.count("succeeded")
         failed = immediate_failed + outcomes.count("failed")
-        cancelled = outcomes.count("cancelled")
+        cancelled = immediate_cancelled + outcomes.count("cancelled")
         lease_lost = immediate_lease_lost + outcomes.count("lease_lost")
         timed_out = sum(1 for execution in started if execution.timed_out)
-        poisoned = immediate_poisoned
-        queue_errors += outcomes.count("queue_error")
+        poisoned = immediate_poisoned + sum(execution.launch_failed for execution in started)
+        queue_errors += sum(
+            execution.outcome == "queue_error" or execution.queue_error_detected
+            for execution in started
+        )
         self._reap()
         return RunResult(
             claimed=claimed_count,
-            started=len(started),
+            started=sum(execution.launched for execution in started),
             succeeded=succeeded,
             failed=failed,
             cancelled=cancelled,
@@ -1378,6 +1563,18 @@ class RealWorkerRuntime:
         )
 
     def run_forever(self, *, max_runtime_seconds: float | None = None) -> RunResult:
+        with self._drive_lock:
+            with self._lock:
+                if self._daemon_owner is not None or self._cycle_owner is not None:
+                    raise RuntimeConfigurationError("runtime polling is already running")
+                self._daemon_owner = current_thread()
+        try:
+            return self._run_daemon(max_runtime_seconds=max_runtime_seconds)
+        finally:
+            with self._lock:
+                self._daemon_owner = None
+
+    def _run_daemon(self, *, max_runtime_seconds: float | None) -> RunResult:
         self._ensure_started()
         if max_runtime_seconds is not None:
             max_runtime = _finite_number(
@@ -1390,34 +1587,50 @@ class RealWorkerRuntime:
         else:
             deadline = None
         totals = RunResult()
+        previous = self.metrics()
+
+        def consume(batch: RunResult, *, final: bool = False) -> None:
+            nonlocal totals, previous
+            # run_once retains per-new-execution results. Daemon outcomes use
+            # monotonic counters so earlier asynchronous completions survive
+            # reaping and contribute once, without retaining finished jobs.
+            current = self.metrics()
+            changes = {
+                name: getattr(current, name) - getattr(previous, name)
+                for name in ("succeeded", "failed", "cancelled", "lease_lost",
+                             "queue_errors", "timed_out")
+            }
+            previous = current
+            errors = changes["queue_errors"]
+            if errors:
+                self._consecutive_queue_errors += errors
+                if self._consecutive_queue_errors >= self.max_consecutive_queue_errors:
+                    with self._lock:
+                        self._fatal_reason = "queue_unavailable"
+                        self._stop_requested = True
+            elif not final:
+                self._consecutive_queue_errors = 0
+            totals = RunResult(
+                claimed=totals.claimed + batch.claimed,
+                started=totals.started + batch.started,
+                succeeded=totals.succeeded + changes["succeeded"],
+                failed=totals.failed + changes["failed"],
+                cancelled=totals.cancelled + changes["cancelled"],
+                lease_lost=totals.lease_lost + changes["lease_lost"],
+                poisoned=totals.poisoned + batch.poisoned,
+                queue_errors=totals.queue_errors + errors,
+                timed_out=totals.timed_out + changes["timed_out"],
+                backpressured=totals.backpressured or batch.backpressured,
+                active=batch.active,
+            )
+
         while True:
             with self._lock:
                 if self._stop_requested or self._closing or self._closed:
                     break
             if deadline is not None and self._now() >= deadline:
                 break
-            batch = self.run_once(wait=False)
-            if batch.queue_errors:
-                self._consecutive_queue_errors += batch.queue_errors
-                if self._consecutive_queue_errors >= self.max_consecutive_queue_errors:
-                    with self._lock:
-                        self._fatal_reason = "queue_unavailable"
-                        self._stop_requested = True
-            else:
-                self._consecutive_queue_errors = 0
-            totals = RunResult(
-                claimed=totals.claimed + batch.claimed,
-                started=totals.started + batch.started,
-                succeeded=totals.succeeded + batch.succeeded,
-                failed=totals.failed + batch.failed,
-                cancelled=totals.cancelled + batch.cancelled,
-                lease_lost=totals.lease_lost + batch.lease_lost,
-                poisoned=totals.poisoned + batch.poisoned,
-                queue_errors=totals.queue_errors + batch.queue_errors,
-                timed_out=totals.timed_out + batch.timed_out,
-                backpressured=totals.backpressured or batch.backpressured,
-                active=batch.active,
-            )
+            consume(self.run_once(wait=False))
             remaining = self.poll_interval_seconds
             if deadline is not None:
                 remaining = min(remaining, max(0.0, deadline - self._now()))
@@ -1425,6 +1638,7 @@ class RealWorkerRuntime:
                 break
             self._sleep(remaining)
         self._monitor_active()
+        consume(RunResult(active=self.active_count), final=True)
         return totals
 
     def shutdown(

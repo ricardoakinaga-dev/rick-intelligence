@@ -1,0 +1,6 @@
+C7 packet SHA-256: 3aba2b16be254b6f5765ae11719cfc0b141664c5e6cc3d10ec84cf790ed97bcd
+Manifest SHA-256: 65a6fcba9fefb13592176bc473425d9b15e7dd5503df5ae92a5fc47a7b17e9ed
+Frozen bar SHA-256: f1ea9aa44d0d66e00bb47e75e30ad616ff575897de7d2a40bb5bc8e1f4936310
+Packet-listed files verified: 30
+Manifest-listed artifacts verified: 29
+Result: PASS

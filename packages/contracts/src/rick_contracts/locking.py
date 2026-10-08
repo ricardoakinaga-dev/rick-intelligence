@@ -2,19 +2,19 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Final, Literal
 
 from pydantic import ConfigDict, Field, model_validator
 
 from rick_contracts.base import StrictContractModel
 
-LOCKING_CONTRACT_VERSION = "locking-contract-v1"
+LOCKING_CONTRACT_VERSION: Final = "locking-contract-v1"
 
 
 class LeaseRequest(StrictContractModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
-    contract_version: Literal[LOCKING_CONTRACT_VERSION] = LOCKING_CONTRACT_VERSION
+    contract_version: Literal["locking-contract-v1"] = LOCKING_CONTRACT_VERSION
     key: str = Field(min_length=1, max_length=512)
     owner: str = Field(min_length=1, max_length=256)
     ttl_ms: int = Field(gt=0, le=3_600_000)
@@ -23,7 +23,7 @@ class LeaseRequest(StrictContractModel):
 class LeaseResult(StrictContractModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
-    contract_version: Literal[LOCKING_CONTRACT_VERSION] = LOCKING_CONTRACT_VERSION
+    contract_version: Literal["locking-contract-v1"] = LOCKING_CONTRACT_VERSION
     operation: Literal["acquire", "renew", "release"]
     key: str = Field(min_length=1, max_length=512)
     acquired: bool | None = None
@@ -49,7 +49,7 @@ class LeaseResult(StrictContractModel):
 class LeaseErrorDto(StrictContractModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
-    contract_version: Literal[LOCKING_CONTRACT_VERSION] = LOCKING_CONTRACT_VERSION
+    contract_version: Literal["locking-contract-v1"] = LOCKING_CONTRACT_VERSION
     code: Literal["unavailable", "timeout", "not_owner", "invalid_request", "cancelled", "internal_error"]
     operation: Literal["acquire", "renew", "release"]
     correlation_id: str = Field(min_length=1, max_length=128)

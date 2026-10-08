@@ -63,6 +63,7 @@ class FakeConnection:
         self.trace: list[tuple[str, tuple[object, ...]]] = []
         self.database_now = 104.0
         self.migration_ready = True
+        self.migration_version = '0010'
         self.commits = 0
         self.rollbacks = 0
         self.closed = 0
@@ -96,7 +97,8 @@ class FakeCursor:
             self.rows = [{"one": 1}]
             return
         if compact.startswith("select version from rick_schema_migrations"):
-            self.rows = [{"version": "0005"}] if self.connection.migration_ready else []
+            required = '0010' if "version='0010'" in compact else '0005'
+            self.rows = [{"version": required}] if self.connection.migration_ready and self.connection.migration_version == required else []
             return
         if compact.startswith("select pg_advisory_xact_lock"):
             return
@@ -191,12 +193,12 @@ class FakeCursor:
                 ]
             if "contract_state='running'" in compact:
                 rows = [row for row in rows if row["contract_state"] == "RUNNING"]
-                cutoff = float("inf")
-                rows = [row for row in rows if row["lease_until"] is not None and row["lease_until"] <= cutoff]
+                if "lease_until <= clock_timestamp()" in compact:
+                    rows = [row for row in rows if row["lease_until"] is not None and row["lease_until"] <= self.connection.database_now]
             elif "contract_state='queued'" in compact:
                 rows = [row for row in rows if row["contract_state"] == "QUEUED"]
-                now = float("inf")
-                rows = [row for row in rows if float(row["available_at"]) <= now]
+                if "available_at <= clock_timestamp()" in compact:
+                    rows = [row for row in rows if float(row["available_at"]) <= self.connection.database_now]
             elif "contract_state='dead_letter'" in compact:
                 scope = tuple(params[:3])
                 rows = [
@@ -215,7 +217,14 @@ class FakeCursor:
                     and row["contract_state"] in {"SUCCEEDED", "CANCELLED", "DEAD_LETTER"}
                     and float(row["updated_at"]) < float(cutoff)
                 ]
-        rows.sort(key=lambda row: (float(row["created_at"]), str(row["job_id"])))
+        if "lease_until > clock_timestamp()" in compact:
+            rows = [row for row in rows if row["lease_until"] is not None and row["lease_until"] > self.connection.database_now]
+        if 'publication_recovery_at <= clock_timestamp()' in compact:
+            rows = [row for row in rows if row.get('publication_recovery_at') is None or row['publication_recovery_at'] <= self.connection.database_now]
+        if 'order by publication_recovery_at nulls first' in compact:
+            rows.sort(key=lambda row: (row.get('publication_recovery_at') is not None, row.get('publication_recovery_at') or 0, float(row['created_at']), str(row['job_id'])))
+        else:
+            rows.sort(key=lambda row: (float(row["created_at"]), str(row["job_id"])))
         if "limit %s" in compact:
             rows = rows[: int(params[-1])]
         self.rows = [dict(row) for row in rows]
@@ -283,6 +292,15 @@ class FakeCursor:
         }
 
     def _update_job(self, compact: str, params: tuple[object, ...]) -> None:
+        if 'set publication_recovery_at=clock_timestamp()' in compact:
+            reason, job_id, tenant, workspace, collection, version = params if 'last_error_code=%s' in compact else (None, *params)
+            row = self.connection.jobs.get(str(job_id))
+            if row and (row['tenant_id'], row['workspace_id'], row['collection_id'], row['version'], row['contract_state']) == (tenant, workspace, collection, version, 'RUNNING'):
+                row['publication_recovery_at'] = self.connection.database_now + 1
+                if 'last_error_code=%s' in compact:
+                    row['last_error_code'] = reason
+                self.rowcount = 1
+            return
         if "set lease_until=clock_timestamp() +" in compact and "returning lease_acquired_at" in compact:
             duration = float(params[0])
             job_id = str(params[1])
@@ -459,10 +477,13 @@ def test_claim_can_derive_locked_version_and_running_cancel_is_owner_bound() -> 
         queue.cancel_lease(lease, now=105.0, expected_version=running.version)
 
 
-def test_readiness_requires_the_phase_2_3_schema_marker() -> None:
+def test_readiness_requires_the_publication_recovery_schema_marker() -> None:
     queue, connection = make_queue()
 
     assert queue.readiness_check() is True
+    connection.migration_version = '0005'
+    assert queue.readiness_check() is False
+    connection.migration_version = '0010'
     connection.migration_ready = False
     assert queue.readiness_check() is False
 
@@ -486,6 +507,7 @@ def test_failure_retry_exhaustion_and_authorized_replay_preserve_scope() -> None
     assert retrying.state is JobState.QUEUED
     assert retrying.attempt_count == 1
 
+    connection.database_now = 106.0
     running_again, lease_again = queue.claim(
         worker_id="worker-b",
         scope=scope,
@@ -515,6 +537,108 @@ def test_failure_retry_exhaustion_and_authorized_replay_preserve_scope() -> None
     assert replay.job_id == "job-replay-1"
     assert replay.attempt_count == 0
     assert connection.jobs[str(dead.job_id)]["contract_state"] == "DEAD_LETTER"
+
+
+@pytest.mark.parametrize("max_attempts", [1, 2])
+def test_claim_recovers_only_expired_leases_without_consuming_an_extra_attempt(max_attempts) -> None:
+    queue, connection = make_queue()
+    queued = queue.enqueue(make_job(max_attempts=max_attempts), expected_version=0)
+    running, lease = queue.claim(worker_id="worker-a", scope=queued.scope, expected_versions={}, now=104.0)[0]
+    assert (lease.acquired_at, lease.expires_at) == (104.0, 114.0)
+    assert running.attempt_count == 1
+
+    connection.database_now = 113.0
+    assert queue.claim(worker_id="worker-b", scope=queued.scope, expected_versions={}, now=113.0) == ()
+    assert connection.jobs[str(queued.job_id)]["contract_state"] == "RUNNING"
+    assert connection.attempts[(str(queued.job_id), 1)]["state"] == "RUNNING"
+
+    connection.database_now = 114.0
+    commits = connection.commits
+    assert queue.claim(worker_id="worker-b", scope=queued.scope, expected_versions={}, now=114.0) == ()
+    assert connection.commits == commits + 1
+    row = connection.jobs[str(queued.job_id)]
+    assert row["attempts"] == 1
+    assert row["lease_owner"] is None
+    assert row["contract_state"] == ("QUEUED" if max_attempts == 2 else "DEAD_LETTER")
+    attempt = connection.attempts[(str(queued.job_id), 1)]
+    assert attempt["state"] == "FAILED"
+    assert attempt["finished_at"] == 114.0
+    assert attempt["failure"]["code"] == "lease_expired"
+    assert len(connection.attempts) == 1
+
+    connection.database_now = 115.0
+    recovered = queue.claim(worker_id="worker-b", scope=queued.scope, expected_versions={}, now=115.0)
+    if max_attempts == 1:
+        assert recovered == ()
+    else:
+        retried, next_lease = recovered[0]
+        assert retried.attempt_count == 2
+        assert [attempt.number for attempt in retried.attempts] == [1, 2]
+        assert next_lease.token != lease.token
+        assert next_lease.worker_id == "worker-b"
+        with pytest.raises(PostgresJobLeaseError):
+            queue.heartbeat(lease, now=115.0, expected_version=retried.version)
+
+
+@pytest.mark.parametrize("operation", ["heartbeat", "acknowledge", "fail"])
+def test_expired_lease_rejects_owner_mutations_even_with_a_stale_client_clock(operation) -> None:
+    queue, connection = make_queue()
+    queued = queue.enqueue(make_job(), expected_version=0)
+    running, lease = queue.claim(worker_id="worker-a", scope=queued.scope, expected_versions={}, now=104.0)[0]
+    connection.database_now = lease.expires_at
+    commits = connection.commits
+    kwargs = {"now": 105.0, "expected_version": running.version}
+    if operation == "acknowledge":
+        kwargs["result"] = JobResult(output_refs={}, completed_at=105.0)
+    elif operation == "fail":
+        kwargs["failure"] = JobFailure("provider_timeout", "timed out", True, 1, 105.0)
+    with pytest.raises(PostgresJobLeaseError):
+        getattr(queue, operation)(lease, **kwargs)
+    assert connection.commits == commits
+    assert connection.rollbacks == 1
+    assert connection.jobs[str(queued.job_id)]["contract_state"] == "RUNNING"
+    assert connection.attempts[(str(queued.job_id), 1)]["state"] == "RUNNING"
+
+
+def test_retry_backoff_and_exhaustion_count_only_successful_claims() -> None:
+    queue, connection = make_queue()
+    queued = queue.enqueue(make_job(max_attempts=2), expected_version=0)
+    for number, claimed_at in [(1, 104.0), (2, 106.0)]:
+        connection.database_now = claimed_at
+        running, lease = queue.claim(worker_id="worker-a", scope=queued.scope, expected_versions={}, now=claimed_at)[0]
+        assert running.attempt_count == number
+        commits = connection.commits
+        connection.database_now = claimed_at + 1
+        failed = queue.fail(
+            lease, JobFailure("provider_timeout", "timed out", True, number, claimed_at + 1),
+            now=claimed_at + 1, expected_version=running.version,
+        )
+        assert connection.commits == commits + 1
+        assert failed.attempt_count == number
+        assert failed.attempts[-1].state is JobState.FAILED
+        assert failed.state is (JobState.QUEUED if number == 1 else JobState.DEAD_LETTER)
+        assert queue.claim(worker_id="worker-b", scope=queued.scope, expected_versions={}, now=claimed_at + 1) == ()
+        if number == 1:
+            assert failed.available_at == 106.0
+    assert len(connection.attempts) == 2
+
+
+def test_claim_attempt_write_failure_rolls_back_without_committing(monkeypatch) -> None:
+    queue, connection = make_queue()
+    queued = queue.enqueue(make_job(), expected_version=0)
+    commits = connection.commits
+    closed = connection.closed
+
+    def fail_attempt(_cursor, _params):
+        raise TimeoutError("synthetic attempt write timeout")
+
+    monkeypatch.setattr(FakeCursor, "_insert_attempt", fail_attempt)
+    with pytest.raises(PostgresJobError, match="queue_unavailable"):
+        queue.claim(worker_id="worker-a", scope=queued.scope, expected_versions={}, now=104.0)
+    assert connection.commits == commits
+    assert connection.rollbacks == 1
+    assert connection.closed == closed + 1
+    assert connection.attempts == {}
 
 
 def test_idempotency_is_complete_scope_and_conflicts_are_rejected() -> None:

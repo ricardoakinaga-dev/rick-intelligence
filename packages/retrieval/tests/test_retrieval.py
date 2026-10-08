@@ -2,6 +2,9 @@
 
 import sys
 from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 
@@ -160,3 +163,116 @@ def test_provenance_non_leak_on_denial():
     result = engine.retrieve(query="UNIQUE-SECRETPHRASE", context=ctx, options=RetrievalOptions(top_k=5))
     assert result.evidence == []
     assert "UNIQUE-SECRETPHRASE" not in str(result.evidence)
+
+
+class ScopedQdrantClient:
+    def __init__(self, *, hybrid=True):
+        self.hybrid = hybrid
+        self.calls = []
+        self.reverse = False
+
+    def get_collection(self, *, collection_name):
+        assert collection_name == "rag_phase0"
+        return SimpleNamespace(config=SimpleNamespace(params=SimpleNamespace(
+            sparse_vectors={"sparse": {}} if self.hybrid else None)))
+
+    def search(self, **kwargs):
+        from qdrant_client.models import NamedSparseVector
+        from rick_retrieval.sparse import sparse_vector
+
+        self.calls.append(kwargs)
+        scope = {condition.key: condition.match.value for condition in kwargs["query_filter"].must}
+        assert scope["tenant_id"] == "default"
+        assert scope["workspace_id"] == "w"
+        vector = kwargs["query_vector"]
+        sparse = isinstance(vector, NamedSparseVector)
+        if sparse:
+            assert self.hybrid
+            assert vector.name == "sparse"
+            expected = sparse_vector("mastite bovina")
+            assert vector.vector.indices == sorted(expected)
+            assert vector.vector.values == [expected[index] for index in sorted(expected)]
+        else:
+            assert vector == ("dense", [1.0, 0.0])
+        coll = scope.get("collection_id", "rag_phase0")
+        ids = ["shared", "sparse-only"] if sparse else ["shared", "dense-only"]
+        hits = [SimpleNamespace(payload=_cand(cid, coll=coll), score=0.8) for cid in ids]
+        hits.extend([
+            SimpleNamespace(payload={**_cand("foreign-tenant"), "tenant_id": "foreign"}, score=9.0),
+            SimpleNamespace(payload=_cand("foreign-workspace", ws="foreign"), score=9.0),
+            SimpleNamespace(payload=_cand("foreign-collection", coll="secret"), score=9.0),
+            SimpleNamespace(payload=_cand("invalid"), score=float("nan")),
+        ])
+        return list(reversed(hits)) if self.reverse else hits
+
+
+def _qdrant_search(client, *, allowed=None, query="mastite bovina"):
+    from rick_retrieval import QdrantBackend
+
+    store = SimpleNamespace(_client=client, collection="rag_phase0")
+    return QdrantBackend(store).search(
+        query=query, query_vector=[1.0, 0.0], workspace_id="w", tenant_id="default",
+        allowed_collection_ids=["rag_phase0"] if allowed is None else allowed,
+        chunks=[], limit=2)
+
+
+def test_qdrant_dense_only_collection_falls_back_without_sparse_query():
+    client = ScopedQdrantClient(hybrid=False)
+    dense, sparse = _qdrant_search(client)
+    assert {item["chunk_id"] for item in dense} == {"shared", "dense-only"}
+    assert sparse == []
+    assert len(client.calls) == 1
+
+
+def test_qdrant_hybrid_scopes_both_legs_before_deterministic_fusion():
+    client = ScopedQdrantClient()
+    dense, sparse = _qdrant_search(client, allowed=["rag_phase0", "public"])
+    assert {item["chunk_id"] for item in dense} == {"shared", "dense-only"}
+    assert {item["chunk_id"] for item in sparse} == {"shared", "sparse-only"}
+    assert all(item["sparse_score"] == item["score"] for item in sparse)
+    assert len(client.calls) == 4
+    for first, second in zip(client.calls[::2], client.calls[1::2]):
+        assert first["query_filter"] == second["query_filter"]
+        assert first["limit"] == second["limit"] == 2
+    fused = rrf_fusion(dense, sparse)
+    assert fused[0]["chunk_id"] == "shared"
+    client.reverse = True
+    assert rrf_fusion(*_qdrant_search(client, allowed=["public", "rag_phase0"])) == fused
+
+
+def test_qdrant_empty_grants_do_not_probe_collection():
+    assert _qdrant_search(object(), allowed=[]) == ([], [])
+
+
+def test_qdrant_empty_sparse_terms_skip_sparse_leg():
+    client = ScopedQdrantClient()
+    _qdrant_search(client, query="de e")
+    assert len(client.calls) == 1
+
+
+def test_qdrant_sparse_failure_is_not_silently_treated_as_missing_index():
+    client = ScopedQdrantClient()
+    search = client.search
+
+    def fail_sparse(**kwargs):
+        if not isinstance(kwargs["query_vector"], tuple):
+            raise TimeoutError("unavailable")
+        return search(**kwargs)
+
+    client.search = fail_sparse
+    with pytest.raises(TimeoutError):
+        _qdrant_search(client)
+
+
+def test_qdrant_direct_store_revalidates_scope_before_limit():
+    from rick_retrieval import QdrantBackend
+
+    store = SimpleNamespace(search=lambda *args, **kwargs: [
+        {"payload": _cand("foreign", ws="other"), "score": 9.0},
+        {"payload": _cand("allowed"), "score": 0.8},
+    ])
+    dense, sparse = QdrantBackend(store).search(
+        query="mastite", query_vector=[1.0], workspace_id="w", tenant_id="default",
+        allowed_collection_ids=["rag_phase0"], chunks=[], limit=1)
+    assert [item["chunk_id"] for item in dense] == ["allowed"]
+    assert sparse == []

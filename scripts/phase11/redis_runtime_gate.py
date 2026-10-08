@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+from contextlib import contextmanager
 from dataclasses import dataclass
 import inspect
 import json
@@ -26,6 +27,45 @@ import uuid
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_OUTPUT = ".runtime/phase-2/redis-runtime-gate.json"
 REDIS_FAULT_CASES = ("circuit-breaker-recovery",)
+
+
+@contextmanager
+def _reserve_output(root: Path, path_value: str):
+    """Hold an exclusive file descriptor before work; never follow output links.
+
+    Directory descriptors keep ancestry stable across rename/symlink races.
+    A failed run retains its reservation; the caller must choose a fresh name.
+    """
+    if not path_value or not path_value.strip():
+        raise ValueError("output destination is required")
+    root = root.resolve()
+    requested = Path(path_value)
+    if ".." in requested.parts:
+        raise ValueError("output traversal is forbidden")
+    relative = requested.relative_to(root) if requested.is_absolute() else requested
+    if not relative.parts:
+        raise ValueError("output filename is required")
+    directory = os.open(root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    try:
+        for part in relative.parts[:-1]:
+            try:
+                os.mkdir(part, mode=0o700, dir_fd=directory)
+            except FileExistsError:
+                pass
+            child = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=directory)
+            os.close(directory)
+            directory = child
+        fd = os.open(relative.name, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+                     mode=0o600, dir_fd=directory)
+    finally:
+        os.close(directory)
+    try:
+        stream = os.fdopen(fd, "w", encoding="utf-8")
+    except BaseException:
+        os.close(fd)
+        raise
+    with stream:
+        yield stream, root / relative
 
 
 @dataclass(frozen=True)
@@ -295,6 +335,15 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
 
 def main(argv: list[str] | None = None) -> int:
     args = _parse_args(sys.argv[1:] if argv is None else argv)
+    try:
+        with _reserve_output(ROOT, args.output) as (stream, output):
+            return _execute(args, stream, output)
+    except Exception:
+        print(json.dumps({"status": "FAIL", "report": "output_or_runtime_failed"}, sort_keys=True))
+        return 1
+
+
+def _execute(args: argparse.Namespace, stream, output: Path) -> int:
     if not args.redis_url.strip():
         status = "BLOCKED_EXTERNAL"
         results = [GateResult("redis", status, "RICK_TEST_REDIS_URL or --redis-url is required")]
@@ -308,9 +357,9 @@ def main(argv: list[str] | None = None) -> int:
                     allow_nonlocal=args.allow_nonlocal,
                 )
             )
-        except ValueError as exc:
+        except ValueError:
             status = "FAIL"
-            results = [GateResult("configuration", status, str(exc))]
+            results = [GateResult("configuration", status, "Redis URL configuration was rejected")]
             production_safe = False
     payload = {
         "schema_version": "phase-2-redis-runtime-gate.v1",
@@ -319,11 +368,9 @@ def main(argv: list[str] | None = None) -> int:
         "runtime_claim": status == "PASS",
         "production_safe": production_safe,
     }
-    output = (ROOT / args.output).resolve()
-    output.relative_to(ROOT.resolve())
-    output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(json.dumps(payload, ensure_ascii=False, sort_keys=True, indent=2) + "\n", encoding="utf-8")
-    print(json.dumps({"output": args.output, "status": status, "production_safe": production_safe}, sort_keys=True))
+    stream.write(json.dumps(payload, ensure_ascii=False, sort_keys=True, indent=2) + "\n")
+    stream.flush()
+    print(json.dumps({"output": str(output.relative_to(ROOT.resolve())), "status": status, "production_safe": production_safe}, sort_keys=True))
     return 0 if status == "PASS" else (2 if status == "BLOCKED_EXTERNAL" else 1)
 
 

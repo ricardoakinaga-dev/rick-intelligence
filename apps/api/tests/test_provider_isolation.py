@@ -180,7 +180,7 @@ def test_mounted_apps_resolve_the_effective_child_application():
                 "email": "vet@example.com", "password": "password123", "tenant_id": "default",
             })
             assert response.status_code == 200
-            assert set(response.cookies.keys()) == {cookie_name}
+            assert set(response.cookies.keys()) == {cookie_name, "rick_csrf"}
             assert client.get(prefix + "/api/v1/auth/me").status_code == 200
         assert client.get("/a/health/ready").status_code == 503
         assert client.get("/b/health/ready").status_code == 200

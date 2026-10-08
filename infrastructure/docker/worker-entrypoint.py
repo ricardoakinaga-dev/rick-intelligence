@@ -17,7 +17,6 @@ import os
 import re
 import signal
 import sys
-import time
 from typing import NoReturn
 
 
@@ -99,7 +98,7 @@ def _shutdown_worker(worker: object, *, timeout: float = 30.0) -> bool:
         kwargs["timeout"] = timeout
     result = shutdown(**kwargs)
     if inspect.isawaitable(result):
-        asyncio.run(result)
+        result = asyncio.run(result)
     return result is not False and getattr(result, "timed_out", False) is not True
 
 
@@ -184,7 +183,6 @@ def main(argv: list[str] | None = None) -> int:
     except Exception as exc:
         _fail(f"configured worker startup failed with {type(exc).__name__}")
     previous_handlers = _install_stop_handlers(worker)
-    started_at = time.monotonic()
     exit_code = 0
     try:
         worker.run_forever()
@@ -195,10 +193,30 @@ def main(argv: list[str] | None = None) -> int:
         exit_code = 1
     finally:
         _restore_stop_handlers(previous_handlers)
-        if not _shutdown_worker(worker, timeout=max(1.0, 30.0 - (time.monotonic() - started_at))):
+        if not _shutdown_worker(worker, timeout=30.0):
             exit_code = 1
     return exit_code
 
 
+def _run_process() -> int:
+    """Own process-wide diagnostics without closing an embedded caller's lane."""
+
+    try:
+        return main()
+    finally:
+        # Composition may never import this optional package. Do not load new
+        # dependencies while exiting, or close the lane from reusable main().
+        observability = sys.modules.get("rick_observability")
+        if observability is not None:
+            try:
+                drained = observability.shutdown_sink_delivery(timeout=2.0)
+                if not drained:
+                    print("worker telemetry drain incomplete", file=sys.stderr)
+            except Exception:
+                # Diagnostics must preserve the worker's result and must not
+                # expose callback/collector errors that may contain secrets.
+                print("worker telemetry drain failed", file=sys.stderr)
+
+
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(_run_process())

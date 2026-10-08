@@ -157,8 +157,23 @@ class PostgresIngestionWorker:
         value = result.get("document_id") if isinstance(result, Mapping) else getattr(result, "document_id", None)
         return value if isinstance(value, str) and value.strip() else None
 
-    def _invoke_handler(self, prepared: object, lease_lost: Event) -> object:
-        """Run one handler with a wall-clock bound independent of its runtime."""
+    def _invoke_handler(
+        self,
+        prepared: object,
+        lease_lost: Event,
+        deadline_expired: Event,
+    ) -> object:
+        """Run one handler with a wall-clock bound independent of its runtime.
+
+        Python cannot safely stop a running thread.  The signal exposed to
+        compatible handlers therefore includes both lease loss and timeout;
+        handlers must check it before durable publication.  Legacy handlers
+        still get the same one-argument call and are prevented from acking by
+        the caller after the deadline.
+        """
+
+        def invalidated() -> bool:
+            return lease_lost.is_set() or deadline_expired.is_set()
 
         try:
             parameters = inspect.signature(self.handler).parameters.values()
@@ -174,7 +189,7 @@ class PostgresIngestionWorker:
         def invoke() -> None:
             try:
                 result_box["result"] = (
-                    self.handler(prepared, lease_lost_check=lease_lost.is_set)
+                    self.handler(prepared, lease_lost_check=invalidated)
                     if accepts_lease_signal
                     else self.handler(prepared)
                 )
@@ -185,6 +200,9 @@ class PostgresIngestionWorker:
 
         Thread(target=invoke, name="rick-ingestion-handler", daemon=True).start()
         if not completed.wait(self.handler_timeout_seconds):
+            # Invalidate the handler before returning so a late continuation
+            # cannot pass its publication guard after the worker timed out.
+            deadline_expired.set()
             raise _WorkerTimeout()
         error = result_box.get("error")
         if isinstance(error, BaseException):
@@ -201,6 +219,7 @@ class PostgresIngestionWorker:
         prepared = record
         heartbeat_stop = Event()
         lease_lost = Event()
+        deadline_expired = Event()
         heartbeat_thread: Thread | None = None
         job_id = self._field(record, "job_id")
         token = self._field(record, "lease_token")
@@ -223,16 +242,20 @@ class PostgresIngestionWorker:
 
                 heartbeat_thread = Thread(target=keep_lease, name="rick-ingestion-heartbeat", daemon=True)
                 heartbeat_thread.start()
-            result = self._invoke_handler(prepared, lease_lost)
-            if lease_lost.is_set():
-                raise _LeaseLost()
+            result = self._invoke_handler(prepared, lease_lost, deadline_expired)
+            if deadline_expired.is_set() or lease_lost.is_set():
+                raise _WorkerTimeout() if deadline_expired.is_set() else _LeaseLost()
             document_id = self._document_id(result)
             bind = getattr(self.queue, "bind_document", None)
             if callable(bind) and document_id and isinstance(job_id, str) and isinstance(token, str):
+                if deadline_expired.is_set() or lease_lost.is_set():
+                    raise _WorkerTimeout() if deadline_expired.is_set() else _LeaseLost()
                 bind(job_id, document_id, lease_token=token)
             ack = getattr(self.queue, "ack", None)
             if not callable(ack) or not isinstance(job_id, str) or not isinstance(token, str):
                 raise RuntimeError("queue acknowledgement is unavailable")
+            if deadline_expired.is_set() or lease_lost.is_set():
+                raise _WorkerTimeout() if deadline_expired.is_set() else _LeaseLost()
             ack(job_id, lease_token=token)
             return "published"
         except PostgresQueueLeaseError:

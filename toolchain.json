@@ -6,29 +6,37 @@
     "npm": "10.9.3"
   },
   "services": {
-    "qdrant": "1.7.4",
-    "redis": "7.0.15"
+    "qdrant": "1.12.5",
+    "redis": "7.4"
+  },
+  "canonical_lab_services": {
+    "qdrant": "v1.12.5",
+    "redis": "7.4",
+    "postgres": "16.4",
+    "minio": "RELEASE.2025-02-28T09-55-16Z",
+    "jaeger": "1.68.0",
+    "otel_collector": "0.123.0",
+    "prometheus": "2.55.1"
   },
   "client_compatibility": {
     "qdrant_python_client": "1.7.3"
   },
   "installation": {
-    "python_requirements": "cvg-master-rag-v2/src/requirements.txt",
+    "python_requirements": "requirements/test.lock",
     "node_lockfiles": [
-      "cvg-master-rag-v2/frontend/package-lock.json",
-      "rick-professor/package-lock.json",
-      "modulo-redis-locker/package-lock.json"
+      "apps/web/package-lock.json"
     ],
     "node_command": "npm ci --ignore-scripts --no-audit --no-fund"
   },
   "provenance": [
     "docs/baselines/environment-2026-08-31.json",
     "docs/ci/README.md",
-    ".github/workflows/phase-0.6.yml",
+    ".github/workflows/quality.yml",
     ".github/workflows/phase-1.1.yml"
   ],
   "notes": [
-    "The Locker Dockerfile remains on its preserved Node 20 base until that component is migrated through a verified contract.",
-    "The root contract records the Phase 0.6 reproducibility baseline; it does not claim that every external service is available locally."
+    "The retired components (cvg-master-rag-v2, rick-professor, modulo-redis-locker) and their Phase 0.6 CI lane are gone from the tree (AUD07-02/AUD07-04); their original Qdrant/Redis CI pins remain readable in git history only.",
+    "The root contract records the canonical disposable integration-lab service versions; it does not claim that every external service is available locally.",
+    "The `services` values govern the current dev and staging Compose images. The root toolchain check rejects drift in both groups."
   ]
 }

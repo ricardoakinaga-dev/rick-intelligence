@@ -96,6 +96,33 @@ def test_worker_fails_with_a_safe_code_and_does_not_retry_ack():
     assert "secret" not in repr(fail)
 
 
+def test_heartbeat_failure_signals_handler_and_prevents_publication():
+    class LostLeaseQueue(Queue):
+        def heartbeat(self, job_id, *, lease_token):
+            super().heartbeat(job_id, lease_token=lease_token)
+            raise RuntimeError("synthetic lease loss")
+
+    queue = LostLeaseQueue([record()])
+    signalled = threading.Event()
+
+    def handler(_record, *, lease_lost_check):
+        deadline = time.monotonic() + 2
+        while time.monotonic() < deadline:
+            if lease_lost_check():
+                signalled.set()
+                return {"document_id": "document-1"}
+            time.sleep(0.005)
+        raise AssertionError("handler never received lease loss")
+
+    worker = PostgresIngestionWorker(queue, handler, worker_id="worker-a", handler_timeout_seconds=3)
+    result = worker.run_once()
+
+    assert signalled.is_set()
+    assert (result.claimed, result.failed, result.published) == (1, 1, 0)
+    assert not any(name in {"bind", "ack"} for name, _ in queue.calls)
+    assert ("fail", ("job-1", "worker:token", "lock_unavailable")) in queue.calls
+
+
 def test_stopped_worker_cancels_claimed_record_with_its_lease():
     queue = Queue([record()])
     worker = PostgresIngestionWorker(queue, lambda _record: None, worker_id="worker-a")
@@ -129,3 +156,43 @@ def test_handler_timeout_fails_the_lease_without_blocking_the_worker():
     assert result.failed == 1
     assert elapsed < 0.5
     assert ("fail", ("job-1", "worker:token", "provider_timeout")) in queue.calls
+    assert not any(name in {"bind", "ack"} for name, _ in queue.calls)
+
+
+def test_timed_out_handler_cannot_apply_late_side_effect():
+    queue = Queue([record()])
+    started = threading.Event()
+    release = threading.Event()
+    finished = threading.Event()
+    late_side_effect = threading.Event()
+
+    def handler(_record, *, lease_lost_check):
+        started.set()
+        release.wait(1)
+        if not lease_lost_check():
+            late_side_effect.set()
+        finished.set()
+        return {"document_id": "document-1"}
+
+    worker = PostgresIngestionWorker(
+        queue, handler, worker_id="worker-a", handler_timeout_seconds=0.01,
+    )
+    result_box = {}
+    runner_done = threading.Event()
+
+    def run_worker():
+        result_box["result"] = worker.run_once()
+        runner_done.set()
+
+    runner_thread = threading.Thread(target=run_worker)
+    runner_thread.start()
+    assert started.wait(1)
+    assert runner_done.wait(1)
+    release.set()
+    assert finished.wait(1)
+    runner_thread.join(timeout=1)
+    result = result_box["result"]
+
+    assert result.failed == 1
+    assert not late_side_effect.is_set()
+    assert not any(name in {"bind", "ack"} for name, _ in queue.calls)

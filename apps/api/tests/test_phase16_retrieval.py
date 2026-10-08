@@ -3,14 +3,29 @@
 from __future__ import annotations
 
 from rick_retrieval import DeterministicHashEmbedding, InMemoryVectorStore
-from rick_knowledge import Document, InMemoryKnowledgeStore
+from rick_knowledge import Collection, Document, InMemoryKnowledgeStore
 from services.retrieval_service import RetrievalApplicationService
+
+
+def _active_store(*documents: Document) -> InMemoryKnowledgeStore:
+    store = InMemoryKnowledgeStore()
+    store.upsert_collection(Collection(
+        tenant_id="default", workspace_id="default", collection_id="rag_phase0",
+        status="active",
+    ))
+    for document in documents:
+        store.upsert_document(document)
+    return store
 
 
 def test_attach_points_refreshes_provenance_and_removes_stale_index_state() -> None:
     embeddings = DeterministicHashEmbedding()
     vectors = InMemoryVectorStore()
-    retrieval = RetrievalApplicationService(knowledge=None, vectors=vectors, embeddings=embeddings)
+    knowledge = _active_store(Document(
+        tenant_id="default", workspace_id="default", collection_id="rag_phase0",
+        document_id="doc-phase16-beta", status="published", title="beta.txt",
+    ))
+    retrieval = RetrievalApplicationService(knowledge=knowledge, vectors=vectors, embeddings=embeddings)
     text = "Protocolo de higiene beta para manejo seguro."
     point = {
         "point_id": "point-phase16-beta",
@@ -67,6 +82,10 @@ def test_attach_points_refreshes_provenance_and_removes_stale_index_state() -> N
 def test_refresh_excludes_points_for_unpublished_or_deleted_metadata() -> None:
     embeddings = DeterministicHashEmbedding()
     knowledge = InMemoryKnowledgeStore()
+    knowledge.upsert_collection(Collection(
+        tenant_id="default", workspace_id="default", collection_id="rag_phase0",
+        status="active",
+    ))
     knowledge.upsert_document(
         Document(
             document_id="doc-live",
@@ -127,4 +146,5 @@ def test_refresh_excludes_points_for_unpublished_or_deleted_metadata() -> None:
         top_k=3,
     )
 
+    assert "doc-live" in {item.document_id for item in result.evidence}
     assert "doc-failed" not in {item.document_id for item in result.evidence}

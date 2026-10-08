@@ -6,31 +6,41 @@
   "work_mode": "REFACTOR",
   "work_mode_overlays": [],
   "lifecycle_stage": "BUILD",
-  "active_activity": "RUN",
+  "active_activity": "VERIFY",
   "engineering_tier": "T4_CRITICAL",
   "risk_level": "MEDIUM",
   "blast_radius": "CROSS_SYSTEM",
-  "status": "BLOCKED",
+  "status": "IN_PROGRESS",
   "active_execplan": ".agent/plans/phase-3-runtime-evidence-production-promotion.md",
-  "active_task": "PH3-2-LAB-READINESS",
+  "active_task": "Q17-01.A",
   "verification_state": "PARTIAL",
-  "repository_state": "Current source candidate is c179acc196ffa19ccdbae6a91ab5c05233af1314 (tree e02f74de83dd6d6f5bfff5d38a0e0e5831d386d6); it hardens strict bounded JSON decoding across Phase 3 evidence/release, Phase 11 gates, API/provider/adapters, root preflight/review-control/quality-bar/backup/restore/release readers and vendored Gauntlet state/history, rejecting duplicate keys, non-finite values, invalid UTF-8 and oversized inputs before projection. Local evidence passes 314 State-of-Art tests, 34 focused boundary tests, make validate, make ops-static and make compose-static. The clean integrated packet records 17 PASS, 24 BLOCKED_EXTERNAL, STATE_OF_ART_CANDIDATE, exit 2 and promotion_allowed=false. Docker/runtime/provider/corpus, image proof, independent review, sealing and human Go-No-Go remain unavailable. No promotion claim is made.",
+  "repository_state": "Dirty shared worktree at b52f32c141916a2ea3af1a6b913bd91f380606e0. C13 exact local scope accepted. Q17-17.A outbox consumer/restart local proof passes (worker 116; live PostgreSQL 1). Q17-19.B canonical PostgresJobQueue lifecycle passes (focused 1; full PostgreSQL 110; worker 116; jobs 44; lint/typecheck pass). Q17-19.A checksum-safe local compatibility and synthetic historical repair states pass live tests; actual deployed history and D02 inventory remain open. Q17-20.A launcher subprocess SIGTERM/cleanup passes (8 tests); full composed runtime remains open. PH2-P0-02 stays BLOCKED for actual installed inventory and independent exact-snapshot review; Q17-01.A is IN_PROGRESS/PARTIAL, not a release candidate. Q24 local continuation (2026-09-25): Q24-06 synthetic pack/harness is locally verified; Q24-21 sparse PATCH/recovery lock race passes scoped PostgreSQL/API tests; Q24-25 collection-error upload UX passes final focused 27/27 production browser tests and independent visual review with zero P0-P3; Q24-26 earlier harness evidence (36 tests) remains historical; schema v2 now requires risk/ambiguity labels and reports grouped metrics/uncertainty, with 17 campaign and 15 pack tests passing while campaign stays NOT_RUN/BLOCKED. These are local slices only; the full 321 browser matrix predates final visual refinements. Q17-01.A remains IN_PROGRESS/PARTIAL with the D02-authorized read-only deployed migration inventory as its unchanged active action. Q24-08 local bounded telemetry sink delivery is verified across the package and API fallback (package 17; focused API 13; API 748; worker 116; lint/typecheck pass), with fixed queue metrics exposed through API JSON/Prometheus. Q17-23.A remains VERIFY for independent review, process-level shutdown integration and external/distributed evidence; Q17-01.A active action is unchanged. Q24-05 exact synthetic DOCX API/ingestion retry now passes 13 focused tests and contributes to make api16-root 749; the deterministic parser adapter isolates the byte-retry contract, while D01 reload/retention remains open. Q24-26 stratified harness checks, eval pack, lint/typecheck/validate/diff pass; campaign remains NOT_RUN/BLOCKED pending D04 and real corpus/provider. Q24-03 locally aligns the runtime pins/locks/CI at FastAPI 0.141.1, Starlette 1.7.0 and Uvicorn 0.54.0; 45 hash-pinned packages pass PyPI/OSV audits and 749 API tests, but image/base audit remains D02-gated. Q24-26 result v3 separates positive model/corpus and negative expectation strata; campaign remains NOT_RUN/BLOCKED. Both are local partial slices; no task closes and Q17-01.A active action remains unchanged. Current Q24-03 transport/API rerun (2026-09-25): focused transport 15/15 and make api16-root 749/749 passed, one upstream TestClient deprecation warning; no server disconnect traceback. Q24-03 stays partial and D02-gated; active Q17-01.A inventory action is unchanged. Q24-26 slash-safe stratum IDs are now covered by 18 campaign tests plus 15 pack tests; rows join across strata, quality and uncertainty. Q24-03 explicit direct pin parity now includes python-multipart in phase-1.5. Both are local partial proofs only; final independent post-fix review remains pending. Active Q17-01.A D02 inventory action is unchanged. Q24-26 local result v4 now preserves exact model/corpus and dimension strings; canonical dimension JSON is losslessly URL-safe encoded. Campaign/pack suites pass 19/15, offline checks pass, and campaign remains NOT_RUN/BLOCKED with abstention NOT_MEASURED. A valid independent pre-fix FAIL was corrected; fresh review of v4 is pending. Q17-14.A remains VERIFY; global Q17-01.A D02 inventory action is unchanged. Canonical tail reconciliation preserves global Q17-01.A task/action; final control validation follows. Q24-26 post-critic corrections now pass 20 campaign and 15 pack tests; campaign grouping inherits positive model/corpus defaults from manifest metadata and preserves every non-empty identity/dimension string including whitespace-only values. Documentation distinguishes pooled uncertainty.overall from grouped projections. Valid Halley findings were corrected; a fresh independent read-only review of the corrected snapshot is pending. Synthetic campaign remains NOT_RUN/BLOCKED with abstention NOT_MEASURED; no task or gate advanced. Q24-26 final audit hardening rejects unpaired Unicode surrogates in both identity validators while preserving valid Unicode exactly; campaign evaluator 23/23, pack 15/15, retrieval pack, lint and typecheck pass. The prior scoped independent PASS is bound to its earlier fingerprint; Aquinas independently reviewed this updated candidate with scoped PASS and unchanged fingerprints. Synthetic campaign remains NOT_RUN/BLOCKED and observed abstention NOT_MEASURED; no task or gate advanced. This is a Q24-26 slice review only; campaign stays NOT_RUN/BLOCKED with observed abstention NOT_MEASURED. The 14-criterion bar, runtime gates and D02 deployed inventory remain open; no task or gate advanced. Q24-08 worker process shutdown now has final local evidence: 46 Docker/package tests, 129 worker/API health/telemetry tests, exact-budget negative mutation, and independent C1-C6 PASS with unchanged hashes. Q17-23.A stays VERIFY for API process-owner and external/distributed proof; global Q17-01.A D02 inventory action and IN_PROGRESS/PARTIAL state remain unchanged.",
   "instruction_scope_refs": [
     ".agent/PLANS.md",
     "cvg-master-rag-v2/AGENTS.md",
-    ".agent/RECOVERY-CURRENT.md",
-    "docs/reports/phase-3-runtime-evidence-current-audit.md",
-    "docs/plans/phase-3-runtime-evidence-production-promotion.md"
+    "scripts/control_plane/vendor/engineering_framework/references/contracts.json",
+    "docs/ci/check_control_plane.py",
+    "docs/plans/plano-executivo-qualidade-2026-09-17.md",
+    "docs/plans/backlog-qualidade-2026-09-17.md"
   ],
-  "last_gate_record": ".agent/gates/phase-3-2-lab-readiness-implementation-ready.json",
-  "last_event_id": "EVT-PH3-2-CONTROL-RECOVERY-JSON-BOUNDARY-20260910",
-  "state_revision": 302,
-  "next_gate": "VERIFIED",
-  "active_action_id": "PH3-2-LAB-READINESS:WAIT_RUNTIME",
+  "last_gate_record": ".agent/gates/q24-local-integration-implementation-ready.json",
+  "last_event_id": "EVT-Q17-01A-WORKER-SHUTDOWN-METADATA-REPAIR-20260926T021900Z",
+  "state_revision": 380,
+  "next_gate": "IMPLEMENTATION_READY",
+  "active_action_id": "Q17-01.A:VERIFY-Q17-19A-DEPLOYED-INVENTORY",
   "blocked_by": [
-    "Docker daemon access to /var/run/docker.sock is denied in the current session",
-    "Disposable runtime secrets and endpoint authority are unavailable"
+    "Q17-19.A local checksum-safe compatibility is live-tested; actual installed history/checksums and D02-authorized read-only database inventory remain unavailable",
+    "Complete API/worker composition with approved external services, deployed identity/session behavior and distributed tenant isolation remain unproven",
+    "Approved provider/model/corpus, representative RAG evaluation and domain thresholds require D03/D04 decisions",
+    "Restore/RPO/RTO, capacity/chaos/soak, live telemetry, visual/accessibility and release/promotion require evidence and D05/D07 authority"
   ],
-  "human_approval_required": [],
-  "updated_at": "2026-09-10T17:39:52Z"
+  "human_approval_required": [
+    "D01: synthetic data, tenants, isolation and retention",
+    "D02: disposable runtime, secrets, bootstrap identity, TLS/topology and trust store",
+    "D03: provider, model, endpoints, cost and interruption limits",
+    "D04: corpus, licenses, domain risk, labels and thresholds",
+    "D05: SLO/DR, workloads, samples, windows and freshness",
+    "D07: separate promotion, signing and deployment authority"
+  ],
+  "updated_at": "2026-09-26T02:19:00.940165Z"
 }

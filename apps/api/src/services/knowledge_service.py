@@ -19,6 +19,7 @@ from rick_knowledge import (
     build_point_payload,
     content_checksum,
     normalize_tenant_id,
+    normalize_collection_id,
     point_id_for_chunk,
 )
 
@@ -74,6 +75,67 @@ def _required_tenant_id(value: object) -> str:
     return normalize_tenant_id(value)
 
 
+class LifecycleAuthorityError(RuntimeError):
+    """The lifecycle authority could not answer; callers must deny."""
+
+
+def _same_collection(left: object, right: object) -> bool:
+    try:
+        return normalize_collection_id(left) == normalize_collection_id(right)
+    except Exception:
+        return left == right
+
+
+def resolve_collection_state(store, *, tenant_id: str, workspace_id: str,
+                             collection_id: str) -> str:
+    """Canonical collection lifecycle verdict for catalog, retrieval and chat.
+
+    Returns ``"active"`` when the collection may be read and ``"inactive"`` for
+    an authoritative no (archived, missing or resolved outside the scope). The
+    authority itself failing raises :class:`LifecycleAuthorityError`, which the
+    callers turn into a denial rather than a permissive fallback.
+    """
+
+    reader = getattr(store, "get_collection", None)
+    if not callable(reader):
+        raise LifecycleAuthorityError("collection lifecycle authority is unavailable")
+    try:
+        collection = reader(workspace_id, collection_id, tenant_id=tenant_id)
+    except Exception:
+        raise LifecycleAuthorityError("collection lifecycle authority failed") from None
+    if collection is None:
+        return "inactive"
+    if (
+        _field(collection, "tenant_id") != tenant_id
+        or _field(collection, "workspace_id") != workspace_id
+        or not _same_collection(_field(collection, "collection_id"), collection_id)
+    ):
+        return "inactive"
+    return "active" if (_field(collection, "status") or "active") == "active" else "inactive"
+
+
+def resolve_document_state(store, *, tenant_id: str, workspace_id: str,
+                           document_id: str) -> str:
+    """Canonical document lifecycle verdict: ``"published"`` or ``"inactive"``."""
+
+    reader = getattr(store, "get_document", None)
+    if not callable(reader):
+        raise LifecycleAuthorityError("document lifecycle authority is unavailable")
+    try:
+        document = reader(document_id, tenant_id=tenant_id, workspace_id=workspace_id)
+    except Exception:
+        raise LifecycleAuthorityError("document lifecycle authority failed") from None
+    if document is None:
+        return "inactive"
+    if (
+        _field(document, "tenant_id") != tenant_id
+        or _field(document, "workspace_id") != workspace_id
+        or _field(document, "document_id") != document_id
+    ):
+        return "inactive"
+    return "published" if _field(document, "status") == "published" else "inactive"
+
+
 _COLLECTION_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$")
 
 
@@ -121,8 +183,8 @@ class KnowledgeApplicationService:
     def list_collections(self, *, workspace_id: str, allowed: list[str], tenant_id: str) -> list[dict]:
         tenant = _required_tenant_id(tenant_id)
         items = []
-        for collection in self.store.list_collections(workspace_id, tenant_id=tenant):
-            collection_id = _field(collection, "collection_id")
+        for collection in self._logical_collections(workspace_id=workspace_id, tenant_id=tenant):
+            collection_id = normalize_collection_id(_field(collection, "collection_id"))
             if (
                 _field(collection, "tenant_id") != tenant
                 or _field(collection, "workspace_id") != workspace_id
@@ -146,16 +208,28 @@ class KnowledgeApplicationService:
         """Return the tenant/workspace catalog for a manager, including archives."""
         tenant = _required_tenant_id(tenant_id)
         result = []
-        for collection in self.store.list_collections(workspace_id, tenant_id=tenant):
+        for collection in self._logical_collections(workspace_id=workspace_id, tenant_id=tenant):
             if _field(collection, "tenant_id") != tenant or _field(collection, "workspace_id") != workspace_id:
                 continue
             result.append(self._public_collection(collection))
         return result
 
+    def _logical_collections(self, *, workspace_id: str, tenant_id: str):
+        # Stores retain installed alias keys for historical references. Public
+        # catalog views expose one logical key and honor any archived member.
+        keys = set()
+        for collection in self.store.list_collections(workspace_id, tenant_id=tenant_id):
+            if _field(collection, "tenant_id") == tenant_id and _field(collection, "workspace_id") == workspace_id:
+                keys.add(normalize_collection_id(_field(collection, "collection_id")))
+        for key in sorted(keys):
+            collection = self.store.get_collection(workspace_id, key, tenant_id=tenant_id)
+            if collection is not None:
+                yield collection
+
     @staticmethod
     def _public_collection(collection: object) -> dict:
         return {
-            "collection_id": _field(collection, "collection_id"),
+            "collection_id": normalize_collection_id(_field(collection, "collection_id")),
             "title": _field(collection, "title") or "",
             "description": _field(collection, "description") or "",
             "workspace_id": _field(collection, "workspace_id"),
@@ -171,44 +245,54 @@ class KnowledgeApplicationService:
         title = (title or "").strip()
         if not _COLLECTION_ID.fullmatch(collection_id) or not title or len(title) > 256:
             raise ValueError("collection is invalid")
-        existing = self.store.get_collection(workspace_id, collection_id, tenant_id=tenant)
-        if existing is not None:
-            raise KeyError(collection_id)
-        collection = Collection(
-            workspace_id=workspace_id, collection_id=collection_id, tenant_id=tenant,
-            title=title, description=(description or "").strip()[:2_000], status="active", version=1,
-        )
-        self.store.upsert_collection(collection)
-        return self._public_collection(collection)
+        collection_id = normalize_collection_id(collection_id)
+        with self.store.collection_guard(tenant_id=tenant, workspace_id=workspace_id,
+                                         collection_id=collection_id):
+            existing = self.store.get_collection(workspace_id, collection_id, tenant_id=tenant)
+            if existing is not None:
+                raise KeyError(collection_id)
+            collection = Collection(
+                workspace_id=workspace_id, collection_id=collection_id, tenant_id=tenant,
+                title=title, description=(description or "").strip()[:2_000], status="active", version=1,
+            )
+            self.store.upsert_collection(collection)
+            return self._public_collection(collection)
 
     def update_collection(self, *, workspace_id: str, tenant_id: str, collection_id: str,
                           title: str | None = None, description: str | None = None) -> dict:
         tenant = _required_tenant_id(tenant_id)
-        collection = self.store.get_collection(workspace_id, collection_id, tenant_id=tenant)
-        if collection is None:
-            raise KeyError(collection_id)
-        if getattr(collection, "status", "active") == "archived":
-            raise ValueError("archived collection cannot be edited")
-        if title is not None:
-            title = title.strip()
-            if not title or len(title) > 256:
-                raise ValueError("collection title is invalid")
-            collection.title = title
-        if description is not None:
-            collection.description = description.strip()[:2_000]
-        collection.version = int(getattr(collection, "version", 1)) + 1
-        self.store.upsert_collection(collection)
-        return self._public_collection(collection)
+        collection_id = normalize_collection_id(collection_id)
+        # Acquire before reading, through the shared canonical alias fence.
+        with self.store.collection_guard(tenant_id=tenant, workspace_id=workspace_id,
+                                         collection_id=collection_id):
+            collection = self.store.get_collection(workspace_id, collection_id, tenant_id=tenant)
+            if collection is None:
+                raise KeyError(collection_id)
+            if getattr(collection, "status", "active") == "archived":
+                raise ValueError("archived collection cannot be edited")
+            if title is not None:
+                title = title.strip()
+                if not title or len(title) > 256:
+                    raise ValueError("collection title is invalid")
+                collection.title = title
+            if description is not None:
+                collection.description = description.strip()[:2_000]
+            collection.version = int(getattr(collection, "version", 1)) + 1
+            self.store.upsert_collection(collection)
+            return self._public_collection(collection)
 
     def archive_collection(self, *, workspace_id: str, tenant_id: str, collection_id: str) -> dict:
         tenant = _required_tenant_id(tenant_id)
-        collection = self.store.get_collection(workspace_id, collection_id, tenant_id=tenant)
-        if collection is None:
-            raise KeyError(collection_id)
-        collection.status = "archived"
-        collection.version = int(getattr(collection, "version", 1)) + 1
-        self.store.upsert_collection(collection)
-        return self._public_collection(collection)
+        collection_id = normalize_collection_id(collection_id)
+        with self.store.collection_guard(tenant_id=tenant, workspace_id=workspace_id,
+                                         collection_id=collection_id):
+            collection = self.store.get_collection(workspace_id, collection_id, tenant_id=tenant)
+            if collection is None:
+                raise KeyError(collection_id)
+            collection.status = "archived"
+            collection.version = int(getattr(collection, "version", 1)) + 1
+            self.store.upsert_collection(collection)
+            return self._public_collection(collection)
 
     def get_document(
         self, *, document_id: str, workspace_id: str, allowed: list[str], tenant_id: str

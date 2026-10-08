@@ -11,9 +11,9 @@ def test_recent_errors_are_not_diluted_by_expired_successes():
     telemetry = ApiTelemetry()
     assert telemetry.snapshot()["slo"]["status"] == "no_data"
     for _ in range(MAX_HISTOGRAM_SAMPLES):
-        telemetry.record_request(method="GET", path="/health/live", status=200, duration_ms=1)
+        telemetry.record_request(method="GET", path="/api/v1/chat", status=200, duration_ms=1)
     for _ in range(600):
-        telemetry.record_request(method="GET", path="/health/ready", status=503, duration_ms=2)
+        telemetry.record_request(method="GET", path="/api/v1/chat", status=503, duration_ms=2)
     snapshot = telemetry.snapshot()
     assert snapshot["slo"]["observations"] == snapshot["latency"]["count"] == MAX_HISTOGRAM_SAMPLES
     assert snapshot["slo"]["error_rate"] == 0.06
@@ -184,6 +184,27 @@ def test_operational_metrics_are_bounded_and_export_their_real_names():
     assert "rick_api_retrieval_latency_ms_count 2" in exposition
     assert "provider-with-secret" not in exposition
     assert "secret-detail" not in exposition
+
+
+def test_sink_delivery_saturation_metrics_are_in_api_json_and_prometheus():
+    telemetry = ApiTelemetry()
+    snapshot = telemetry.snapshot()
+    lane = snapshot["sink_delivery"]
+    assert lane["queued"] == lane["active"] == 0
+    assert lane["capacity"] == 1_024
+    counters = {item["name"]: item["total"] for item in lane["counters"]}
+    assert set(counters) == {
+        "sink.delivery.emitted", "sink.delivery.failed", "sink.delivery.dropped",
+        "sink.delivery.timeout", "sink.delivery.shutdown_timeout",
+    }
+
+    exposition = telemetry.prometheus_text()
+    assert "rick_api_telemetry_sink_queue_depth 0" in exposition
+    for outcome in ("failed", "timeout"):
+        assert (
+            f'rick_api_telemetry_sink_delivery_total{{outcome="{outcome}"}} '
+            f'{counters[f"sink.delivery.{outcome}"]:g}'
+        ) in exposition
 
 
 def test_worker_event_schema_rejects_cross_event_fields_and_invalid_states():

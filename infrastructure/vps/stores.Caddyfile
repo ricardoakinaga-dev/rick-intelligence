@@ -1,0 +1,12 @@
+{
+    admin off
+    auto_https disable_redirects
+}
+https://objects.internal {
+    tls /tls/store.crt /tls/store.key
+    reverse_proxy object-store:9000
+}
+https://vectors.internal {
+    tls /tls/store.crt /tls/store.key
+    reverse_proxy qdrant:6333
+}

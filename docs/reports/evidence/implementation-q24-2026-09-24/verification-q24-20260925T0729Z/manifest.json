@@ -1,0 +1,379 @@
+{
+  "schema_version": 1,
+  "observed_at": "2026-09-25T07:43:48Z",
+  "source_head": "b52f32c141916a2ea3af1a6b913bd91f380606e0",
+  "worktree_state": "DIRTY shared checkout; the exact file inventory is dynamic as evidence is added. HEAD is the baseline only. Hashes bind listed source, documentation, control and command artifacts, not a clean release candidate.",
+  "scope": "Current local Q24-19/Q24-20 verification after C2 findings: fail-closed audit for durable/unknown/production providers, tenant-bound global account changes, atomic outbox, reconciler lifecycle, retry/dead-letter, and PostgreSQL recovery/concurrency. Historical repository score remains 72/100.",
+  "checks": [
+    {
+      "artifact": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0729Z/api16-root.log",
+      "command": "PYTHONDONTWRITEBYTECODE=1 make api16-root",
+      "exit_status": 0,
+      "summary": "714 passed; 399 dependency deprecation warnings",
+      "freshness": "CURRENT",
+      "sha256": "5cc87c92b0dc102d68d20dab7ff21070b421facbd5ca7ac27d671e1512893d0a"
+    },
+    {
+      "artifact": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0653Z/api16-worker-final.log",
+      "command": "PYTHONDONTWRITEBYTECODE=1 make api16-worker",
+      "exit_status": 0,
+      "summary": "116 passed, including reconciler wiring into DeploymentRuntime",
+      "freshness": "CURRENT",
+      "sha256": "d3fb2f2ff41556a8dbc47542286332b4a4d45b527566c855a2cd8f81f1b5462a"
+    },
+    {
+      "artifact": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0729Z/postgres-migrations.log",
+      "command": "RICK_MIGRATION_POSTGRES_TESTS=1 PYTHONPATH=/tmp/rick-intelligence-q24-psycopg PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -q -p no:cacheprovider infrastructure/scripts/tests/test_migrate.py",
+      "exit_status": 0,
+      "summary": "108 passed against disposable PostgreSQL 16.15, including cross-tenant global account denial",
+      "freshness": "CURRENT",
+      "sha256": "0cdfb2a24f10cb6d920a669f27c9d5f1306b05a5fa40938382df86cb11bc44af"
+    },
+    {
+      "artifact": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0729Z/identity-postgres.log",
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=apps/api/src:packages/identity/src:packages/authorization/src:packages/contracts/src python3 -m pytest -q -p no:cacheprovider packages/identity/tests/test_postgres.py",
+      "exit_status": 0,
+      "summary": "11 passed",
+      "freshness": "CURRENT",
+      "sha256": "42790f1f4cee88a8b8ad8e0d2cc06fa49ed803c84fc349d16722dc1aa029fe77"
+    },
+    {
+      "artifact": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0729Z/lint.log",
+      "command": "PYTHONDONTWRITEBYTECODE=1 make lint",
+      "exit_status": 0,
+      "summary": "Configured boundary, syntax and frontend lint checks passed",
+      "freshness": "CURRENT",
+      "sha256": "a7a5650dee62a2a315b1b3413dc05105661cd0c4bd71ec25608e7101f4d1dd63"
+    },
+    {
+      "artifact": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0729Z/typecheck.log",
+      "command": "PYTHONDONTWRITEBYTECODE=1 make typecheck",
+      "exit_status": 0,
+      "summary": "Configured TypeScript and Python compilation passed; no Python type checker is configured",
+      "freshness": "CURRENT",
+      "sha256": "f4e2482bfa89fd0a34aa7a5fab375fdbb03747d3941dd8fecfa8bdb1bc77c92d"
+    },
+    {
+      "artifact": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0729Z/ops-static.log",
+      "command": "PYTHONDONTWRITEBYTECODE=1 make ops-static",
+      "exit_status": 0,
+      "summary": "Migration checksum/order and operational static checks passed; migration execution recorded separately",
+      "freshness": "CURRENT",
+      "sha256": "fe2e5b2d7c8fc442d97df5d04bb70b2ac92fc920fa45ded651e2162606088dce"
+    },
+    {
+      "artifact": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0729Z/review-views-ledger-final.log",
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 scripts/state_of_art/review_control_views.py --write",
+      "exit_status": 0,
+      "summary": "Derived views passed and 11 historical files were preserved",
+      "freshness": "CURRENT",
+      "sha256": "df270bed12e28fcfea0d301ac95cf995b7bb454b6047284bff50ce0f7ab08914"
+    },
+    {
+      "artifact": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0729Z/control-plane-ledger-final.log",
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 docs/ci/check_control_plane.py",
+      "exit_status": 0,
+      "summary": "10/10 controller checks passed; 35 backlog items, 342 events, 344 verification records and 28 gates",
+      "freshness": "CURRENT",
+      "sha256": "12e5803b62c7a165261e8398128c6278d871d2f287d48c6ee114fc11f57aca4f"
+    },
+    {
+      "artifact": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0729Z/make-validate-ledger-final.log",
+      "command": "PYTHONDONTWRITEBYTECODE=1 make validate",
+      "exit_status": 0,
+      "summary": "Canonical controller, derived views, boundary and frozen quality bar validation passed",
+      "freshness": "CURRENT",
+      "sha256": "03a4f01ea1d0375967cdf1a3d75cd331715a9ca96e86213e69e4e8d6a835a2cb"
+    },
+    {
+      "artifact": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0729Z/diff-check-ledger-final.log",
+      "command": "git diff --check",
+      "exit_status": 0,
+      "summary": "No whitespace or patch-format errors",
+      "freshness": "CURRENT",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "artifact": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0729Z/gauntlet-validate-pre-review.log",
+      "command": "python3 scripts/control_plane/vendor/gauntlet_loop/gauntlet_state.py validate --repo /home/ricardo/rick-intelligence",
+      "exit_status": 0,
+      "summary": "Gauntlet run validates after C2 rebaseline; current run remains active",
+      "freshness": "CURRENT",
+      "sha256": "655823ac7f996b259837b1279f4757264aac1ab82808d9b562c06a9f640f36af"
+    },
+    {
+      "artifact": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0729Z/control-plane-final.log",
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 docs/ci/check_control_plane.py",
+      "exit_status": 0,
+      "summary": "Pre-ledger canonical validation passed; superseded by post-ledger validation",
+      "freshness": "SUPERSEDED",
+      "sha256": "36ae110b10420c4bed1eede96d7740dac93b75ea282d61cb6d9e2f15400bf865"
+    },
+    {
+      "artifact": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0729Z/make-validate-final.log",
+      "command": "PYTHONDONTWRITEBYTECODE=1 make validate",
+      "exit_status": 0,
+      "summary": "Pre-ledger canonical validation passed; superseded by post-ledger validation",
+      "freshness": "SUPERSEDED",
+      "sha256": "90f99d688d390fe7df3cbd20fba02e9bae65f60bcb08ec87fdaf8fa44bedec24"
+    },
+    {
+      "artifact": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0729Z/diff-check-final.log",
+      "command": "git diff --check",
+      "exit_status": 0,
+      "summary": "Pre-ledger diff check passed; superseded by post-ledger diff check",
+      "freshness": "SUPERSEDED",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "artifact": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0729Z/control-plane-sealed-final.log",
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 docs/ci/check_control_plane.py",
+      "exit_status": 0,
+      "summary": "Final pre-review controller check passed 10/10; 35 backlog items, 342 events, 344 verifications and 28 gates.",
+      "freshness": "CURRENT",
+      "sha256": "0ab0739b1a4504a0f4ac73f00892f5fed9a082fd359a768b48f67bf0d3524c1d"
+    },
+    {
+      "artifact": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0729Z/make-validate-sealed-final.log",
+      "command": "PYTHONDONTWRITEBYTECODE=1 make validate",
+      "exit_status": 0,
+      "summary": "Final pre-review canonical controller, derived-view, boundary and frozen-bar validation passed.",
+      "freshness": "CURRENT",
+      "sha256": "55dbe29010f4443373048d27adc81c946b98eaf85d0520ae02022def68abb0dd"
+    },
+    {
+      "artifact": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0729Z/diff-check-sealed-final.log",
+      "command": "git diff --check",
+      "exit_status": 0,
+      "summary": "Final pre-review diff check passed.",
+      "freshness": "CURRENT",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "runtime_resources": [
+    {
+      "service": "PostgreSQL",
+      "image": "postgres:16-alpine",
+      "server_version": "16.15",
+      "disposable": true,
+      "scope": "Complete migration integration suite with atomic admin mutations, cross-tenant account guards, runtime restart, consumer concurrency and outbox reconciliation.",
+      "teardown": "Disposable fixture verified ownership and removed the container and volume at suite teardown."
+    }
+  ],
+  "independent_reviews": {
+    "C1": {
+      "result": "REJECT acceptance not established for its earlier packet",
+      "report": "docs/reports/review-q24-19-20-critic-c1-2026-09-25.md",
+      "disposition": "Runtime restart, mutation rollback, two-consumer concurrency and manual-review behavior received regressions."
+    },
+    "C2": {
+      "result": "REJECT acceptance not established for its pre-correction packet",
+      "report": "docs/reports/review-q24-19-20-critic-c2-2026-09-25.md",
+      "packet_fingerprint": "65fba79897d239c8aa4b3c834606669ef481ec176c83e79dea564e71ad148b77",
+      "disposition": "The two findings received local corrections and live regression coverage; C2 did not review those corrections."
+    },
+    "C3": {
+      "result": "PENDING",
+      "packet": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0729Z/c3-review-packet.json",
+      "packet_sha256": "c52cadb9c5e6333a854032a6385c27689496775128035c7df7b0c6525d38e677",
+      "disposition": "Fresh isolated read-only review not yet run."
+    }
+  },
+  "source_hashes": {
+    "apps/api/src/routes/admin.py": "b20fbb4fefc2445cb349bf1d1a7c34e71b6cbd824cd55ac96f4cea8baca1ab35",
+    "apps/api/src/services/identity_service.py": "d8d085c30661fdbef6a5f88b32891d2c1eaec4eea7a5d2d54b59b2ab9d6b8c4f",
+    "apps/api/src/services/postgres_identity.py": "840fb4769821491595e9dbfc8e40160b997d551fa12d06f3a4debb4929089f42",
+    "packages/identity/src/rick_identity/postgres.py": "cb8e2bca5d73412c3f41815fc342591c87675396bc3719583ab40e28f2d278bb",
+    "apps/api/tests/test_audit_factory.py": "cf839d5e380fd4acada45e1e203aebeb8fb761d3c5b30b476e110fe62703723d",
+    "apps/api/tests/test_postgres_admin_mutations.py": "ccaa41ede88db399c156bf9cfa43ba5e541431f46b4a7440e94c179b9c60d09b",
+    "apps/worker/admin_audit_outbox.py": "046595f9da759a3fc3f08eff1233cb5d53665d444301c053932124b51d76ee3a",
+    "apps/worker/deployment_composition.py": "09b8ebae1d2f869226789b013050b2ffb2cf9e7c96f5b2a7556e1a46189cf818",
+    "apps/worker/tests/test_admin_audit_outbox.py": "a6d47c7ba1172a701ac012a8652287da05aba74814ca75bcb1b9259dc6317de2",
+    "apps/worker/tests/test_deployment_composition.py": "e390ff5f01232a233ec803daf2cceb1c85e58c2f97cd0e60e11401b50a5afc12",
+    "infrastructure/migrations/0007_admin_audit_reconciliation.sql": "4af11b3250c3b5f3d2ea1e3a1042883ccf3cb703370daa6011cd4c2c748ae6e2",
+    "infrastructure/scripts/tests/test_migrate.py": "7cb397ea9783a234a3ced939db28dcc7455f891b0263d569aa71608e6495b1d9"
+  },
+  "artifacts": [
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0729Z/api16-root.log",
+      "sha256": "5cc87c92b0dc102d68d20dab7ff21070b421facbd5ca7ac27d671e1512893d0a",
+      "bytes": 3720
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0653Z/api16-worker-final.log",
+      "sha256": "d3fb2f2ff41556a8dbc47542286332b4a4d45b527566c855a2cd8f81f1b5462a",
+      "bytes": 2504
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0729Z/postgres-migrations.log",
+      "sha256": "0cdfb2a24f10cb6d920a669f27c9d5f1306b05a5fa40938382df86cb11bc44af",
+      "bytes": 181
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0729Z/identity-postgres.log",
+      "sha256": "42790f1f4cee88a8b8ad8e0d2cc06fa49ed803c84fc349d16722dc1aa029fe77",
+      "bytes": 99
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0729Z/lint.log",
+      "sha256": "a7a5650dee62a2a315b1b3413dc05105661cd0c4bd71ec25608e7101f4d1dd63",
+      "bytes": 879
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0729Z/typecheck.log",
+      "sha256": "f4e2482bfa89fd0a34aa7a5fab375fdbb03747d3941dd8fecfa8bdb1bc77c92d",
+      "bytes": 607
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0729Z/ops-static.log",
+      "sha256": "fe2e5b2d7c8fc442d97df5d04bb70b2ac92fc920fa45ded651e2162606088dce",
+      "bytes": 1375
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0729Z/review-views-ledger-final.log",
+      "sha256": "df270bed12e28fcfea0d301ac95cf995b7bb454b6047284bff50ce0f7ab08914",
+      "bytes": 108
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0729Z/control-plane-ledger-final.log",
+      "sha256": "12e5803b62c7a165261e8398128c6278d871d2f287d48c6ee114fc11f57aca4f",
+      "bytes": 1193
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0729Z/make-validate-ledger-final.log",
+      "sha256": "03a4f01ea1d0375967cdf1a3d75cd331715a9ca96e86213e69e4e8d6a835a2cb",
+      "bytes": 1730
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0729Z/diff-check-ledger-final.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0729Z/gauntlet-validate-pre-review.log",
+      "sha256": "655823ac7f996b259837b1279f4757264aac1ab82808d9b562c06a9f640f36af",
+      "bytes": 36
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0729Z/control-plane-final.log",
+      "sha256": "36ae110b10420c4bed1eede96d7740dac93b75ea282d61cb6d9e2f15400bf865",
+      "bytes": 1193
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0729Z/make-validate-final.log",
+      "sha256": "90f99d688d390fe7df3cbd20fba02e9bae65f60bcb08ec87fdaf8fa44bedec24",
+      "bytes": 1730
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0729Z/diff-check-final.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0729Z/c3-review-packet.json",
+      "sha256": "c52cadb9c5e6333a854032a6385c27689496775128035c7df7b0c6525d38e677",
+      "bytes": 4309
+    },
+    {
+      "path": "docs/reports/review-q24-19-20-critic-c1-2026-09-25.md",
+      "sha256": "9d372779a2e8bd7c627435f88c93a171b15c28c8a87ce93c0946d4e688e463d3",
+      "bytes": 2710
+    },
+    {
+      "path": "docs/reports/review-q24-19-20-critic-c2-2026-09-25.md",
+      "sha256": "adce4ffb58957030673e2445dc9483b586f94a28cc4b490be93a48fdfe97a5b0",
+      "bytes": 2787
+    },
+    {
+      "path": "apps/api/src/routes/admin.py",
+      "sha256": "b20fbb4fefc2445cb349bf1d1a7c34e71b6cbd824cd55ac96f4cea8baca1ab35",
+      "bytes": 19212
+    },
+    {
+      "path": "apps/api/src/services/identity_service.py",
+      "sha256": "d8d085c30661fdbef6a5f88b32891d2c1eaec4eea7a5d2d54b59b2ab9d6b8c4f",
+      "bytes": 17851
+    },
+    {
+      "path": "apps/api/src/services/postgres_identity.py",
+      "sha256": "840fb4769821491595e9dbfc8e40160b997d551fa12d06f3a4debb4929089f42",
+      "bytes": 40373
+    },
+    {
+      "path": "packages/identity/src/rick_identity/postgres.py",
+      "sha256": "cb8e2bca5d73412c3f41815fc342591c87675396bc3719583ab40e28f2d278bb",
+      "bytes": 32222
+    },
+    {
+      "path": "apps/api/tests/test_audit_factory.py",
+      "sha256": "cf839d5e380fd4acada45e1e203aebeb8fb761d3c5b30b476e110fe62703723d",
+      "bytes": 23470
+    },
+    {
+      "path": "apps/api/tests/test_postgres_admin_mutations.py",
+      "sha256": "ccaa41ede88db399c156bf9cfa43ba5e541431f46b4a7440e94c179b9c60d09b",
+      "bytes": 12469
+    },
+    {
+      "path": "infrastructure/scripts/tests/test_migrate.py",
+      "sha256": "7cb397ea9783a234a3ced939db28dcc7455f891b0263d569aa71608e6495b1d9",
+      "bytes": 75567
+    },
+    {
+      "path": "apps/worker/admin_audit_outbox.py",
+      "sha256": "046595f9da759a3fc3f08eff1233cb5d53665d444301c053932124b51d76ee3a",
+      "bytes": 16456
+    },
+    {
+      "path": "apps/worker/deployment_composition.py",
+      "sha256": "09b8ebae1d2f869226789b013050b2ffb2cf9e7c96f5b2a7556e1a46189cf818",
+      "bytes": 12362
+    },
+    {
+      "path": "infrastructure/migrations/0007_admin_audit_reconciliation.sql",
+      "sha256": "4af11b3250c3b5f3d2ea1e3a1042883ccf3cb703370daa6011cd4c2c748ae6e2",
+      "bytes": 857
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0729Z/control-plane-sealed-final.log",
+      "sha256": "0ab0739b1a4504a0f4ac73f00892f5fed9a082fd359a768b48f67bf0d3524c1d",
+      "bytes": 1193
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0729Z/make-validate-sealed-final.log",
+      "sha256": "55dbe29010f4443373048d27adc81c946b98eaf85d0520ae02022def68abb0dd",
+      "bytes": 1730
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0729Z/diff-check-sealed-final.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    }
+  ],
+  "limitations": [
+    "The worktree is dirty and shared; this is scoped local evidence, not a clean or releasable candidate.",
+    "PostgreSQL tests use a disposable real database; the external API/worker provider graph remains unproven.",
+    "Approved provider/model/corpus, representative domain/RAG acceptance, restore/RPO/RTO, capacity/chaos/soak, production telemetry, visual/accessibility, release and promotion remain open.",
+    "C1 and C2 rejected earlier packets. C3 has not reviewed the current corrections; D01-D05 and D07 decisions remain with their human owners."
+  ],
+  "documentation_hashes": {
+    "docs/reports/estado-implementacao-q24-2026-09-24.md": "4fad2596abeb4997bd686ae107c8b28f776c6ae2096897a585609342e6eecd06",
+    "docs/reports/review-q24-19-20-critic-c1-2026-09-25.md": "9d372779a2e8bd7c627435f88c93a171b15c28c8a87ce93c0946d4e688e463d3",
+    "docs/reports/review-q24-19-20-critic-c2-2026-09-25.md": "adce4ffb58957030673e2445dc9483b586f94a28cc4b490be93a48fdfe97a5b0",
+    "docs/reports/review-q24-19-20-critic-c3-2026-09-25.md": "bc69045aea773e9530c3215456ea8ea0ec59bf5d99b4fdd8efdc0e3ebc56cdb6",
+    "docs/reports/matriz-rastreabilidade-q24-2026-09-24.md": "c8df553eea67cd6ac25210cf0ded8300c6ec7445534494f5ce76a4e517a1b324",
+    "docs/plano-executivo-qualidade-2026-09-24.md": "c2344ef0a325e52a623ab1394cad21d1cac0a0dcf28ec117e6d3cd36ffd0b782",
+    "docs/roadmap-qualidade-2026-09-24.md": "75c6e4e96fdb34eecf7dbb476dab0eb0c4ca8c925603fb16a657d512522bc76e",
+    "docs/backlog-qualidade-2026-09-24.md": "e573678b1ed00612174646fabc6789f2e67a994f667e6d92e8390c6ba0f828d7",
+    ".agent/plans/phase-3-runtime-evidence-production-promotion.md": "26fbbef44ec4d888702ac96b634ef5cce0d421c69027a6048aa9c75330514f15"
+  },
+  "control_hashes": {
+    ".agent/state.json": "c26f13a40d9d5fff7045302e8fcae33812fff2b630a8abe340501f93e7db98f5",
+    ".agent/backlog.json": "53683cf7a7236251dd0a33677433386e932dc928ddce5ff50ba5d86f4392577c",
+    ".agent/execution-log.jsonl": "45b93313501671bf20b55979faf866129a42da4fe54729e794adbeb034871f97",
+    ".agent/verification.jsonl": "ce948970b47596cbabe22495a093ad4908bd3644571e377fb636d2651d7e62f9",
+    ".gauntlet/state.json": "d95c4d44a78b85f49a12e4382cf5cb1c9d30256986f6406e188267ed85319869",
+    ".gauntlet/bar.json": "f1ea9aa44d0d66e00bb47e75e30ad616ff575897de7d2a40bb5bc8e1f4936310"
+  },
+  "prior_evidence_manifest": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0653Z/manifest.json"
+}

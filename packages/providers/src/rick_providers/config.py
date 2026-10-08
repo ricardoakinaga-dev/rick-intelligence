@@ -17,6 +17,7 @@ import httpx
 
 
 DEFAULT_BASE_URL = "https://api.openai.com/v1"
+DEFAULT_ANTHROPIC_BASE_URL = "https://api.anthropic.com/v1"
 DEFAULT_CHAT_MODEL = "gpt-4o-mini"
 DEFAULT_EMBEDDING_MODEL = "text-embedding-3-small"
 DEFAULT_EMBEDDING_DIMENSIONS = 1_536
@@ -69,13 +70,18 @@ class ProviderConfig:
     max_backoff_delay: float = DEFAULT_MAX_BACKOFF_SECONDS
     environment: str = "production"
     provider_kind: str = "openai"
+    embedding_provider_kind: str | None = None
+    embedding_base_url: str | None = field(default=None, repr=False)
+    embedding_api_key: str | None = field(default=None, repr=False)
+    anthropic_version: str = "2023-06-01"
+    max_output_tokens: int = 4096
 
     def __init__(
         self,
         *,
-        base_url: str = DEFAULT_BASE_URL,
+        base_url: str | None = None,
         api_key: str | None = None,
-        chat_model: str = DEFAULT_CHAT_MODEL,
+        chat_model: str | None = None,
         embedding_model: str = DEFAULT_EMBEDDING_MODEL,
         embedding_dimensions: int = DEFAULT_EMBEDDING_DIMENSIONS,
         timeout: float | httpx.Timeout = DEFAULT_TIMEOUT_SECONDS,
@@ -84,6 +90,11 @@ class ProviderConfig:
         max_backoff_delay: float = DEFAULT_MAX_BACKOFF_SECONDS,
         environment: str = "production",
         provider_kind: str = "openai",
+        embedding_provider_kind: str | None = None,
+        embedding_base_url: str | None = None,
+        embedding_api_key: str | None = None,
+        anthropic_version: str = "2023-06-01",
+        max_output_tokens: int = 4096,
         # Friendly aliases make configuration from existing runtimes less
         # surprising without creating a second configuration model.
         timeout_ms: float | None = None,
@@ -94,6 +105,8 @@ class ProviderConfig:
         backoff_base_seconds: float | None = None,
         backoff_factor: float | None = None,
         max_backoff_seconds: float | None = None,
+        retry_delay_ms: float | None = None,
+        max_backoff_ms: float | None = None,
         embedding_dimension: int | None = None,
     ) -> None:
         if timeout_seconds is not None:
@@ -109,9 +122,22 @@ class ProviderConfig:
             retry_base_delay = aliases[0]
         if max_backoff_seconds is not None:
             max_backoff_delay = max_backoff_seconds
+        if retry_delay_ms is not None:
+            if _finite_float(retry_delay_ms) is None:
+                raise ProviderConfigurationError()
+            retry_base_delay = retry_delay_ms / 1_000
+        if max_backoff_ms is not None:
+            if _finite_float(max_backoff_ms) is None:
+                raise ProviderConfigurationError()
+            max_backoff_delay = max_backoff_ms / 1_000
         if embedding_dimension is not None:
             embedding_dimensions = embedding_dimension
 
+        kind = provider_kind.strip().lower() if isinstance(provider_kind, str) else provider_kind
+        if base_url is None:
+            base_url = DEFAULT_ANTHROPIC_BASE_URL if kind == "anthropic" else DEFAULT_BASE_URL
+        if chat_model is None:
+            chat_model = "" if kind == "anthropic" else DEFAULT_CHAT_MODEL
         object.__setattr__(self, "base_url", base_url.strip() if isinstance(base_url, str) else base_url)
         if api_key is None:
             normalized_api_key: object = None
@@ -129,6 +155,11 @@ class ProviderConfig:
         object.__setattr__(self, "max_backoff_delay", max_backoff_delay)
         object.__setattr__(self, "environment", environment.strip().lower() if isinstance(environment, str) else environment)
         object.__setattr__(self, "provider_kind", provider_kind.strip().lower() if isinstance(provider_kind, str) else provider_kind)
+        object.__setattr__(self, "embedding_provider_kind", embedding_provider_kind.strip().lower() if isinstance(embedding_provider_kind, str) else embedding_provider_kind)
+        object.__setattr__(self, "embedding_base_url", embedding_base_url.strip() if isinstance(embedding_base_url, str) else embedding_base_url)
+        object.__setattr__(self, "embedding_api_key", embedding_api_key.strip() or None if isinstance(embedding_api_key, str) else embedding_api_key)
+        object.__setattr__(self, "anthropic_version", anthropic_version)
+        object.__setattr__(self, "max_output_tokens", max_output_tokens)
 
     @property
     def timeout_seconds(self) -> float | httpx.Timeout:
@@ -194,12 +225,34 @@ class ProviderConfig:
         except (ValueError, ProviderConfigurationError):
             raise ProviderConfigurationError() from None
 
-        if self.api_key is not None and not isinstance(self.api_key, str):
+        if self.api_key is not None and (not isinstance(self.api_key, str) or not _header_value(self.api_key)):
             raise ProviderConfigurationError()
         if not isinstance(self.environment, str) or not self.environment:
             raise ProviderConfigurationError()
-        if self.provider_kind not in {"openai", "openai_compatible", "deterministic"}:
+        if self.provider_kind not in {"openai", "openai_compatible", "anthropic", "deterministic"}:
             raise ProviderConfigurationError()
+        if self.provider_kind == "deterministic" and not self.is_test_or_dev:
+            raise ProviderConfigurationError()
+        if not self.is_test_or_dev and parsed.scheme != "https":
+            raise ProviderConfigurationError()
+        if type(self.max_output_tokens) is not int or not 1 <= self.max_output_tokens <= 128_000:
+            raise ProviderConfigurationError()
+        if not isinstance(self.anthropic_version, str) or not _header_value(self.anthropic_version):
+            raise ProviderConfigurationError()
+        explicit_embeddings = any(value is not None for value in (
+            self.embedding_provider_kind, self.embedding_base_url, self.embedding_api_key,
+        ))
+        if explicit_embeddings:
+            if self.embedding_provider_kind not in {"openai", "openai_compatible"} or not self.embedding_base_url:
+                raise ProviderConfigurationError()
+            ProviderConfig(base_url=self.embedding_base_url, api_key=self.embedding_api_key,
+                           provider_kind=self.embedding_provider_kind,
+                           environment=self.environment).validate()
+        if self.provider_kind == "anthropic":
+            if not isinstance(self.chat_model, str) or not self.chat_model.strip():
+                raise ProviderConfigurationError()
+            if self.is_production and (not self.api_key or not explicit_embeddings or not self.embedding_api_key):
+                raise ProviderConfigurationError()
         if isinstance(self.timeout, bool):
             raise ProviderConfigurationError()
         if isinstance(self.timeout, httpx.Timeout):
@@ -210,9 +263,9 @@ class ProviderConfig:
             raise ProviderConfigurationError()
         if type(self.max_attempts) is not int or not 1 <= self.max_attempts <= 10:
             raise ProviderConfigurationError()
-        if not _nonnegative_finite(self.retry_base_delay):
+        if not _nonnegative_finite(self.retry_base_delay) or self.retry_base_delay > 120:
             raise ProviderConfigurationError()
-        if not _nonnegative_finite(self.max_backoff_delay):
+        if not _nonnegative_finite(self.max_backoff_delay) or self.max_backoff_delay > 120:
             raise ProviderConfigurationError()
         if type(self.embedding_dimensions) is not int or not 1 <= self.embedding_dimensions <= 16_384:
             raise ProviderConfigurationError()
@@ -237,18 +290,24 @@ class ProviderConfig:
             _read_int(values, "EMBEDDING_DIMENSION", DEFAULT_EMBEDDING_DIMENSIONS),
         )
         environment = _first_value(values, "RICK_ENV", "NODE_ENV", "ENV", default="production")
-        provider_kind = _first_value(
+        provider_kind = _read_alias(values, "LLM_PROVIDER", "RICK_PROVIDER", default=_first_value(
             values,
             "RICK_PROVIDER",
             "RICK_PROVIDER_KIND",
             "RICK_PROVIDER_MODE",
             default="openai",
-        )
+        ), provider=True)
+        anthropic = provider_kind.lower() == "anthropic"
+        vendor_key_name = "ANTHROPIC_API_KEY" if anthropic else "OPENAI_API_KEY"
+        api_key = _read_alias(values, "LLM_API_KEY", "EXTERNAL_CHAT_API_KEY", default="")
+        vendor_key = values.get(vendor_key_name, "")
+        if api_key.strip() and vendor_key.strip() and api_key != vendor_key:
+            raise ProviderConfigurationError()
         return cls(
-            base_url=_first_value(values, "OPENAI_BASE_URL", default=DEFAULT_BASE_URL),
-            api_key=values.get("OPENAI_API_KEY"),
-            chat_model=_first_value(values, "OPENAI_CHAT_MODEL", default=DEFAULT_CHAT_MODEL),
-            embedding_model=_first_value(values, "OPENAI_EMBEDDING_MODEL", default=DEFAULT_EMBEDDING_MODEL),
+            base_url=_read_alias(values, "LLM_BASE_URL", "ANTHROPIC_BASE_URL" if anthropic else "OPENAI_BASE_URL", default=DEFAULT_ANTHROPIC_BASE_URL if anthropic else DEFAULT_BASE_URL),
+            api_key=api_key if api_key.strip() else vendor_key,
+            chat_model=_read_alias(values, "LLM_MODEL", "ANTHROPIC_CHAT_MODEL" if anthropic else "OPENAI_CHAT_MODEL", default="" if anthropic else DEFAULT_CHAT_MODEL),
+            embedding_model=_read_alias(values, "EMBEDDING_MODEL", "OPENAI_EMBEDDING_MODEL", default=DEFAULT_EMBEDDING_MODEL),
             embedding_dimensions=dimensions,
             timeout_ms=timeout_ms,
             max_attempts=max_attempts,
@@ -256,7 +315,24 @@ class ProviderConfig:
             max_backoff_delay=max_backoff_ms / 1_000,
             environment=environment,
             provider_kind=provider_kind,
+            embedding_provider_kind=values.get("RICK_EMBEDDING_PROVIDER") or None,
+            embedding_base_url=values.get("EMBEDDING_BASE_URL") or None,
+            embedding_api_key=values.get("EMBEDDING_API_KEY") or None,
+            anthropic_version=_first_value(values, "ANTHROPIC_VERSION", default="2023-06-01"),
+            max_output_tokens=_read_int(values, "ANTHROPIC_MAX_TOKENS", 4096),
         )
+
+
+def _header_value(value: str) -> bool:
+    return bool(value) and len(value) <= 4096 and all(0x21 <= ord(char) <= 0x7e for char in value)
+
+
+def _read_alias(values: Mapping[str, str], current: str, legacy: str, *, default: str, provider: bool = False) -> str:
+    first, second = values.get(current, ""), values.get(legacy, "")
+    normalize = (lambda value: value.strip().lower().replace("-", "_")) if provider else (lambda value: value)
+    if first.strip() and second.strip() and normalize(first) != normalize(second):
+        raise ProviderConfigurationError()
+    return normalize(first if first.strip() else second if second.strip() else default)
 
 
 def _positive_finite(value: object) -> bool:
@@ -313,6 +389,7 @@ def _read_int(values: Mapping[str, str], name: str, default: int) -> int:
 
 __all__ = [
     "DEFAULT_BASE_URL",
+    "DEFAULT_ANTHROPIC_BASE_URL",
     "DEFAULT_CHAT_MODEL",
     "DEFAULT_EMBEDDING_MODEL",
     "DEFAULT_EMBEDDING_DIMENSIONS",

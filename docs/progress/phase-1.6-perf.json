@@ -5,31 +5,31 @@
   "samples": 30,
   "runtime": {
     "python": "3.12.3",
-    "platform": "Linux-7.0.0-31-generic-x86_64-with-glibc2.39"
+    "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.39"
   },
   "upload_ms": {
     "n": 30,
-    "p50": 1.907,
-    "p95": 2.658,
-    "p99": 3.542,
-    "min": 1.537,
-    "max": 3.542
+    "p50": 11.723,
+    "p95": 13.771,
+    "p99": 14.091,
+    "min": 11.065,
+    "max": 14.091
   },
   "enqueue_ms": {
     "n": 30,
-    "p50": 0.22,
-    "p95": 0.292,
-    "p99": 0.478,
-    "min": 0.163,
-    "max": 0.478
+    "p50": 0.289,
+    "p95": 0.39,
+    "p99": 0.416,
+    "min": 0.24,
+    "max": 0.416
   },
   "retrieval_ms": {
     "n": 30,
-    "p50": 10.497,
-    "p95": 13.075,
-    "p99": 24.464,
-    "min": 9.32,
-    "max": 24.464
+    "p50": 10.218,
+    "p95": 11.244,
+    "p99": 24.144,
+    "min": 9.888,
+    "max": 24.144
   },
   "ttft_ms": {
     "status": "NOT_APPLICABLE",
@@ -43,10 +43,10 @@
     "status": "OBSERVED",
     "unit": "bytes",
     "method": "procfs_rss_and_vmhwm_or_resource_maxrss",
-    "rss_before_bytes": 38641664,
-    "rss_after_bytes": 41443328,
-    "rss_delta_bytes": 2801664,
-    "peak_rss_bytes": 41971712,
+    "rss_before_bytes": 39305216,
+    "rss_after_bytes": 42983424,
+    "rss_delta_bytes": 3678208,
+    "peak_rss_bytes": 42983424,
     "scope": "entire benchmark process; not an isolated request allocation"
   },
   "cost": {

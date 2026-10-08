@@ -13,41 +13,36 @@ ROOT = Path(__file__).resolve().parents[2]
 API_SRC = ROOT / "apps" / "api" / "src"
 API_TESTS = ROOT / "apps" / "api" / "tests"
 CONTRACTS_SRC = ROOT / "packages" / "contracts" / "src"
-ROOT_PACKAGE_SOURCES = tuple(
-    ROOT / "packages" / name / "src"
-    for name in ("contracts", "authorization", "identity", "observability", "knowledge", "ingestion", "retrieval", "providers", "locking", "professor")
-)
+
+sys.path.insert(0, str(ROOT / "scripts" / "phase13"))
+from pyenv import interpreter, test_environment  # noqa: E402
+
+PYTHON = interpreter()
 
 
-def _env():
-    import os
-
-    env = os.environ.copy()
-    env["PYTHONPATH"] = os.pathsep.join([str(API_SRC), *(str(path) for path in ROOT_PACKAGE_SOURCES), env.get("PYTHONPATH", "")])
-    env.setdefault("RAG_SKIP_QDRANT_BOOTSTRAP", "1")
-    env.setdefault("SESSION_COOKIE_SECURE", "false")
-    return env
+def _env(**overrides: str):
+    return test_environment(**overrides)
 
 
 def _run(cmd, **kwargs):
-    print(f"==> {' '.join(cmd)}", flush=True)
+    print(f"==> {' '.join(str(part) for part in cmd)}", flush=True)
     completed = subprocess.run(cmd, cwd=ROOT, env=_env(), **kwargs)
     print(f"<== exit {completed.returncode}", flush=True)
     return completed.returncode
 
 
 def mode_test() -> int:
-    return _run([sys.executable, "-m", "pytest", "-q", str(API_TESTS)])
+    return _run([PYTHON, "-m", "pytest", "-q", str(API_TESTS)])
 
 
 def mode_security() -> int:
-    return _run([sys.executable, "-m", "pytest", "-q",
+    return _run([PYTHON, "-m", "pytest", "-q",
                  str(API_TESTS / "test_route_policy.py"), str(API_TESTS / "test_negative_security.py"),
                  str(API_TESTS / "test_import_boundary.py"), str(API_TESTS / "test_http_contract.py")])
 
 
 def mode_contract() -> int:
-    code = _run([sys.executable, "scripts/phase13/generate_openapi.py"])
+    code = _run([PYTHON, "scripts/phase13/generate_openapi.py"])
     if code != 0:
         return code
     schema = ROOT / "apps" / "api" / "openapi.json"
@@ -68,7 +63,7 @@ def mode_contract() -> int:
 def mode_dev() -> int:
     print("RICK API dev: PYTHONPATH=apps/api/src:packages/contracts/src", flush=True)
     print("Hermetic default; legacy mode: RICK_API_USE_LEGACY=1 (needs Qdrant/Redis/provider).", flush=True)
-    return _run([sys.executable, "-m", "uvicorn", "main:app", "--app-dir", str(API_SRC), "--port", "8000"])
+    return _run([PYTHON, "-m", "uvicorn", "main:app", "--app-dir", str(API_SRC), "--port", "8000"])
 
 
 def mode_benchmark() -> int:
@@ -94,7 +89,16 @@ def mode_benchmark() -> int:
                           health_checks={}, audit_sink=InMemoryAuditSink())
     app = create_app(settings, providers)
     client = TestClient(app, raise_server_exceptions=False)
-    client.post("/api/v1/auth/login", json={"email": "vet@example.com", "password": "password123", "tenant_id": "default"})
+    login = client.post("/api/v1/auth/login",
+                        json={"email": "vet@example.com", "password": "password123",
+                              "tenant_id": "default"})
+    if login.status_code not in (200, 201, 204):
+        print(f"benchmark login failed: HTTP {login.status_code} {login.text[:200]}", flush=True)
+        return 1
+    session_token = client.cookies.get(settings.session_cookie_name)
+    if not session_token:
+        print("benchmark login returned no session cookie", flush=True)
+        return 1
 
     service = ChatApplicationService(StubChatBackend())
     # Warm up through HTTP to resolve session cookie path.
@@ -106,9 +110,7 @@ def mode_benchmark() -> int:
         lat_http.append((time.perf_counter() - start) * 1000)
 
     async def direct_once():
-        identity = providers.identity
-        token = next(iter(identity._sessions))
-        sess = identity.validate_token(token)
+        sess = providers.identity.validate_token(session_token)
         t0 = time.perf_counter()
         await service.chat(session=sess, message="benchmark probe", conversation_id=None,
                            collection_id=None, workspace_id="default", mode="grounded")

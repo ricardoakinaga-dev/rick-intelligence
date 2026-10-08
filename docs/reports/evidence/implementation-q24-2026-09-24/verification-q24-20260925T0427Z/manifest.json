@@ -1,0 +1,358 @@
+{
+  "schema_version": 1,
+  "observed_at": "2026-09-25T05:17:53Z",
+  "source_head": "b52f32c141916a2ea3af1a6b913bd91f380606e0",
+  "worktree_state": "DIRTY shared checkout; this evidence binds the listed selected source hashes, not a clean release candidate or an exact whole-tree commit.",
+  "scope": "Q24 local implementation checkpoint, current API/control validation and retained disposable runtime evidence; partial, with product/runtime/operational/promotion acceptance still open.",
+  "checks": [
+    {
+      "artifact": "api16-domain.log",
+      "command": "PYTHON=<isolated runtime venv>/bin/python make api16-domain",
+      "exit_status": 0,
+      "summary": "278 passed, 5 skipped (opt-in Qdrant runtime cases executed separately)",
+      "freshness": "CURRENT",
+      "sha256": "642ab1e3839423be21320496a672a13e950c1323af65683c6ec45825bbc8c426"
+    },
+    {
+      "artifact": "authorization-tests.log",
+      "command": "PYTHONPATH=packages/authorization/src:packages/identity/src:packages/contracts/src python -m pytest -q packages/authorization/tests",
+      "exit_status": 0,
+      "summary": "10 passed",
+      "freshness": "CURRENT",
+      "sha256": "a837324a2f5c0d804ee26513e45c3e17425242b25aba8e53fe57a7379e8a79a5"
+    },
+    {
+      "artifact": "real-qdrant-runtime.log",
+      "command": "RICK_Q24_QDRANT_URL=<disposable loopback> RICK_Q24_QDRANT_DISPOSABLE=1 python -m pytest -q packages/retrieval/tests/test_http_hybrid_runtime.py",
+      "exit_status": 0,
+      "summary": "5 passed against disposable Qdrant v1.12.5; deterministic embeddings, knowledge and object-store doubles",
+      "freshness": "CURRENT",
+      "sha256": "f6b14f07468cefbc589bff08e81dc17cc400856be37dc83c2efd22cc1a74a318"
+    },
+    {
+      "artifact": "migration-live.log",
+      "command": "RICK_MIGRATION_POSTGRES_TESTS=1 python -m pytest -q infrastructure/scripts/tests/test_migrate.py",
+      "exit_status": 0,
+      "summary": "107 passed against disposable PostgreSQL 16.15; migration, applied-history, failure and backup/restore cases",
+      "freshness": "CURRENT",
+      "sha256": "bc71d35029580b91bd99f53a8f75bdf8757ebb64f7197cadcd92bf5050bedd2e"
+    },
+    {
+      "artifact": "real-same-index-delete-rollback.json",
+      "command": "Included in real-qdrant-runtime.log",
+      "exit_status": 0,
+      "summary": "Lost delete acknowledgement after server mutation; previous 4 points restored and published, failed replacement has 0 points",
+      "freshness": "CURRENT",
+      "sha256": "8f5e241870cf26eb087d9b182d955ab62b8606db4602beb5ab2a74e22747cbd3"
+    },
+    {
+      "artifact": "api16-root-final-controls.log",
+      "command": "make api16-root",
+      "exit_status": 0,
+      "summary": "694 passed; pytest reported 387 dependency deprecation warnings",
+      "freshness": "CURRENT",
+      "sha256": "5962b39c8fe0bc8ba19944824c4cfc432342b8155857bec190093c0d194c5c12"
+    },
+    {
+      "artifact": "api16-idempotency-controls-focused.log",
+      "command": "PYTHONPATH=<API and package sources> python3 -m pytest -q apps/api/tests/test_streaming.py apps/api/tests/test_chat_history.py",
+      "exit_status": 0,
+      "summary": "28 passed; streaming, SQLite history and invalid-key normalization regressions",
+      "freshness": "CURRENT",
+      "sha256": "f93ee5d2a87f2c60b5b24411a71a2f61053e4e077847d2d6ed0da6dddf5e0a51"
+    },
+    {
+      "artifact": "static-checks-final.log",
+      "command": "python3 docs/ci/check_control_plane.py; python3 scripts/state_of_art/review_control_views.py; make validate lint typecheck; git diff --check",
+      "exit_status": 0,
+      "summary": "Canonical controller, derived views, boundaries, quality bar, lint, configured type/syntax checks and diff check passed",
+      "freshness": "CURRENT",
+      "sha256": "eb475c5e51b9f3f87caa7c33e2739ae120da1754b91199c62c80de87732538ef"
+    },
+    {
+      "artifact": "control-revalidation-after-ledger.log",
+      "command": "python3 docs/ci/check_control_plane.py; python3 scripts/state_of_art/review_control_views.py; make validate; git diff --check",
+      "exit_status": 0,
+      "summary": "Post-ledger state revision 312 revalidated; controller 10/10 checks and make validate passed",
+      "freshness": "CURRENT",
+      "sha256": "1f2ef6a48c6cec23a3a0e81adc7708abbf2038c0cd9ccef53210ef4af5e763d5"
+    },
+    {
+      "artifact": "control-check-initial-failure.log",
+      "command": "Initial python3 docs/ci/check_control_plane.py and make validate lint typecheck before control metadata repair",
+      "exit_status": 1,
+      "summary": "Superseded: detected invalid active activity, stale current-action marker and unsupported evidence-kind values; corrected and rerun successfully",
+      "freshness": "SUPERSEDED",
+      "sha256": "fc409c22704d7abce9acfab882106500778d6da70e7f0fb5827acc6d8cda69e6"
+    },
+    {
+      "artifact": "control-final-deliverable.log",
+      "command": "python3 docs/ci/check_control_plane.py; python3 scripts/state_of_art/review_control_views.py; make validate; git diff --check",
+      "exit_status": 0,
+      "summary": "Final post-document and manifest controller revalidation passed: controller 10/10, derived views, boundary and quality-bar checks, make validate and diff check",
+      "freshness": "CURRENT",
+      "sha256": "1f2ef6a48c6cec23a3a0e81adc7708abbf2038c0cd9ccef53210ef4af5e763d5"
+    }
+  ],
+  "runtime_resources": [
+    {
+      "service": "PostgreSQL",
+      "image": "postgres:16-alpine",
+      "server_version": "16.15",
+      "disposable": true,
+      "teardown": "migration-live/teardown.json reports 0 remaining containers"
+    },
+    {
+      "service": "Qdrant",
+      "version": "1.12.5",
+      "disposable": true,
+      "network_scope": "127.0.0.1 dynamic port",
+      "teardown": "Qdrant container label inspection succeeded before removal; post-removal label query returned no containers"
+    }
+  ],
+  "independent_reviews": "Two read-only scoped reviews passed after findings were fixed: API/authorization/chat/idempotency and retrieval/ingestion/migration. API review confirmed canonical key trimming and rejection of empty/C0/DEL inputs before history access; retrieval review confirmed bounded rollback restoration and supported metric behavior. The reviews do not constitute full-product, domain, production or release acceptance.",
+  "source_hashes": {
+    "apps/api/pyproject.toml": "369fd28dee93a765d7aac3dba24482decac4f65f2d933c06d9fb2a21fa1d973f",
+    "apps/api/src/app.py": "cdf165a8fa36d901058bac0e0d41abf9f8cb5498b77eca9ec15c9562a46fc75a",
+    "apps/api/src/routes/admin.py": "07d5125afff4ec63e91319af270bfadf721d6cd0e669ab3bad1eb39033059c5a",
+    "apps/api/src/routes/chat.py": "2ddf86206f45b64ba3d9b0e1f6dd82315bc61b4d44e20f6fb752c5fbfe56f80a",
+    "apps/api/src/routes/compatibility_openai.py": "37172a44da60746ca35f88eafba291c860234f862ae2d92cbbdf01782710b68c",
+    "apps/api/src/routes/knowledge.py": "f7c6ea5eb13692a5e2893163036be766aaee1dc8ca2fb7e3a59919bba28c7e09",
+    "apps/api/src/services/authorization_service.py": "ed4600a9a4bd963c27313342cbefa84d800799c03aa5f8a930aa6192b88f22f9",
+    "apps/api/src/services/chat_history.py": "f1b2e2f431323818bea21fc1c05acac8ad34824f08e747eaf190d94943b29595",
+    "apps/api/src/services/chat_service.py": "c21ff10852d81eb86fcc8fa76a8bce916c13f54269e2f2bdca7ec22572b23c20",
+    "apps/api/src/services/external_composition.py": "8432841cca5203e232045cd8cd11521b4b9fba1a644d0e93691bdeec5d1291f4",
+    "apps/api/src/services/identity_service.py": "9b4a32ad24295648013aa465f732f8ddacb4e3b5163b6ec146fd1f5f5e94890c",
+    "apps/api/src/services/postgres_chat_history.py": "37846301969dcc2bfe511f21b6d05088f19c87ac9f287c30067a954716e02218",
+    "apps/api/src/services/postgres_identity.py": "4d5a153cfb5a4a5258597eab22af7a585764560bfa228652576249dff720833f",
+    "apps/api/src/services/professor_backend.py": "e158c1e9480ed25424e78da17846fc41c3b0d87032300e31eba48b582c4647e3",
+    "apps/api/src/services/sqlite_audit.py": "8a82e971f3e5a56131a80a78762437b44b8142af09bfed7baa9f5d147918246e",
+    "apps/api/tests/test_audit_factory.py": "fef9afb74af32a2307ac7cfb1c73f84efc968d94008a22ceb0eda4be6b2fc6ab",
+    "apps/api/tests/test_auth.py": "54d5ba2750bc46a27ada4f06f924ff456d7ba55a0fc7c4d2ca6c7b644fb8ead0",
+    "apps/api/tests/test_chat_history.py": "09ac5bc4fd2c940d2e357675cb75c4b60057a7a0587963a15315ec933ddc6dbe",
+    "apps/api/tests/test_decision_policy_publication.py": "f5a5031fd04b2c4982afc9080105958a31dd1cc0a05aa7de998a406fa15242fe",
+    "apps/api/tests/test_dual_equivalence.py": "a665aedab340b4c4cad80542c94d56bb014eb71138aee906011ebbd3c06bb34e",
+    "apps/api/tests/test_evidence_decision_gate.py": "c2d61fb6dd06d783e9cd1a36f33bb9952173231eade7a5c5e8db21228bf1dded",
+    "apps/api/tests/test_external_composition.py": "dfcc4b23329dd7d5b55a3e762e55d0735a3229e69afc84fe609d710ae9c5862a",
+    "apps/api/tests/test_phase15_root.py": "8a2c02cb5143ea490e8e0b24bb746bd1593ff05a31a10df1d9b997ada79d3b5e",
+    "apps/api/tests/test_phase16_root.py": "964508fba0446a0d1fcd05da757c5258fddf87c40cd908f6aeed17d3353eee8f",
+    "apps/api/tests/test_postgres_chat_history.py": "53161b544c17338e27bceba83d398806e0c4fb522c1fd5b6e4c12220852417be",
+    "apps/api/tests/test_retry_multipart_contract.py": "aae7decedad4815fc99a4657b7a81e2e4701d9ae63a7452b6341983cec1d6780",
+    "apps/api/tests/test_route_policy.py": "6c594f945d8cd280bf8ab50326f03ce3e25a9099c2e94800583d7d044d56b789",
+    "apps/api/tests/test_stream_cleanup.py": "eacbf3b12f94f853b690175a929c63fef730f8808ed1b62b21bf1c8faf1761d3",
+    "apps/api/tests/test_stream_outcomes.py": "1b696ac53234e633a1759e15400178420d1edae4d5ce387b0a1df6703ff170b0",
+    "apps/api/tests/test_streaming.py": "814eec474b688366f1f823a7e87b2b74eb4d2ce9e6312c375373c9667f8bfda8",
+    "apps/api/tests/test_transport_observation.py": "a9bedc4bb614783fc02a9af0a650dade1d1fde5c6713f67f1f71bcdf050c2f64",
+    "apps/web/app/app/documents/page.tsx": "f3492c3914f8049d5df4cb1dcc14bcb5284e9d762cf44a5871666f838bedb314",
+    "apps/web/components/chat/chat-adapter.ts": "4b7c12602095e62dc6e8753c78bb064433f44fda28ee78cd6a9714fc98a78f89",
+    "apps/web/lib/api.ts": "1e5ad54eaaa22749e2d6c73a51d16203804bb0f18e4e9671304c9b6669322dd1",
+    "apps/web/tests/document-state.spec.ts": "54e18737459859c7e7e475333faa926b65889af4e322eace8c10f439440834ad",
+    "apps/worker/external_ingestion.py": "0daf2a9a2426341eb14962364159aa1038d9645b51f479b7a59fd823bfbac148",
+    "apps/worker/tests/test_external_ingestion.py": "5c9e424b23a7bfdd0a23e2b4e85f199288e233448ad80fec76d416fbe7527d34",
+    "apps/worker/tests/test_postgres_jobs.py": "c8df8207922c226c2c75a62e9cf83d39860127ce10f735c21e1d85db89a70c21",
+    "apps/worker/tests/test_postgres_runner.py": "6baa3e50845acac704a94599f246fb0a5bd5f263bd16020d8046c08dcab5c353",
+    "infrastructure/migrations/0004_operation_guard.sql.inc": "9691a200e4746e0cc69b035c7a81ac1ede8cab3053ab24b354294d9725afa1e2",
+    "infrastructure/migrations/0005_rewrite_legacy_jobs.sql": "58878320223f9f30d42aea840c7e58795eb5c448daf90a0877adedc781cc9774",
+    "infrastructure/migrations/README.md": "707ab28b2a046012c0bde2a4779b7fca383a6773cf0de7ccd09bf21f5082b60f",
+    "infrastructure/scripts/check-migration-order.py": "d814ddd2601b334eaec4cde4d9763d72afeb4c67fb712943d4a5ebe62006dd70",
+    "infrastructure/scripts/migrate.py": "a76c5a53889234c889422e0796709e5804765b6fe19f3e70472cdfcc43a0efcb",
+    "infrastructure/scripts/tests/test_legacy_jobs_migration_static.py": "9b658f51d9625200f609631e6dd94ca62ff7ea077fe0415ee4bacafcf013495d",
+    "infrastructure/scripts/tests/test_migrate.py": "ff13f2190b2adee7d88b1b6bb3da77ef2b50976970f93b2cfe0754d0de3c318a",
+    "infrastructure/scripts/tests/test_postgres_jobs_migration_static.py": "aba538ebd01c8a319549c9be7221d01a8f28f3506d46a0dd42bc2d12c1cbe75c",
+    "packages/authorization/src/rick_authorization/__init__.py": "0bcf82a28183c5ad7fd5311a4f02f37dd8b745cf9612c2526fa1d3d7d81777d6",
+    "packages/authorization/src/rick_authorization/policy.py": "c45cbc31eea3ad165ecd420548c232bcfd6b06fc05f4ea9a0b88b7a7cd48442d",
+    "packages/contracts/pyproject.toml": "16d4b4665ff115476678ad05955e3e39d3314c9abb82fd7d9356ac0a914cb2f8",
+    "packages/contracts/src/rick_contracts/chat.py": "4f1c3123e68c21ea1081da5ee56d44f042da7b12d23be95874be5d6e2ba4e183",
+    "packages/contracts/src/rick_contracts/providers.py": "9f657447046c00d1c3712478b3773bbc6b7754b07904fa7c3bf77a9d01af2828",
+    "packages/contracts/tests/test_phase15_contracts.py": "3c633862f097f0baaf46e2645b477c33c04e95b1ff643bb72a06a18817a8f846",
+    "packages/decision/README.md": "725aab2e38afd343e01d09e9a1f036f5dfd4e3988c181c770d8291f31d3f3f7b",
+    "packages/decision/pyproject.toml": "bce43410cdfba83406497337d7b0897041b483c25733746bc1b7489e20cd84f2",
+    "packages/decision/src/rick_decision/__init__.py": "41174a1eb938ddaa71acc4e8bee1c14d7093af810c8b37c12f0bb22f680fe3b7",
+    "packages/decision/src/rick_decision/request_policy.py": "98c40e9be227c3cc532da8e1b33bd1f450e54b4cf0ec5e7ef7d41ea0a44a8d49",
+    "packages/decision/tests/test_request_policy.py": "7d9c130b708bedcdfea9b2aece3e33f0253597bcf5dd68747e05f7781275dc4f",
+    "packages/ingestion/pyproject.toml": "abb4a7689b32451183a6169b4ab45d488936cfc3bf7916d19e92c8f58fe1543c",
+    "packages/ingestion/src/rick_ingestion/pipeline.py": "963f7cb0bd54375384d7cf4e09b03bad53a62725e571354a64ec54bcad8263db",
+    "packages/ingestion/tests/test_ingestion.py": "27617f77e376a15d720c317e879fe34364ff6b88913391bdfe7b2125a892bf7d",
+    "packages/professor/src/rick_professor/orchestration.py": "e32d3b635009fffa4811e1e194a1dfc7b6c8e6b7e2e4f9e548b8e933e6d494a8",
+    "packages/professor/tests/test_orchestration.py": "27d52667510898b8a64b89363ac132e543f57c2abbe9344ad3ed7e91630df4ce",
+    "packages/providers/src/rick_providers/client.py": "98264d4cab1d92569d3c7d56297d66aaaac9f2d18f47607492d7f18f4c3393aa",
+    "packages/providers/tests/test_provider.py": "ca07ebfc37be47c703e84a77d44d20ec78ded065acc6b499dc47fc9976e2177b",
+    "packages/retrieval/src/rick_retrieval/__init__.py": "7e9a2782b2e5448aecdd76f22b85d4939b248d75cfb026ebf564e295801d076b",
+    "packages/retrieval/src/rick_retrieval/backends.py": "cd6b73165d3b0a36ffe749238f1b3c07d5990c2b968de73dbf68dd5a702ed34d",
+    "packages/retrieval/src/rick_retrieval/pipeline.py": "7f3c5f7493196d30da5d9b9a4171bb3e1919a4dfc9ce5369b168b3cca62c8a40",
+    "packages/retrieval/src/rick_retrieval/qdrant.py": "f5b3ff7e5e4ac5ef16358363c1efa8c447debc3b3e3fbf2bda020514c96bd527",
+    "packages/retrieval/src/rick_retrieval/rerank.py": "20ed4bdb0f594a6df1309c475a1102c9b9216ebea65c8ae4a5635bb7cc23a746",
+    "packages/retrieval/tests/test_http_hybrid.py": "4ca59ab4bb2aad2ea5b4a553c05676cf47a6e3bf62142a3d397101f87e100c9a",
+    "packages/retrieval/tests/test_http_hybrid_runtime.py": "3c6c255a1a33ecea2d912b7df4832355ae1af4a590140842e3eb10790937068c",
+    "packages/retrieval/tests/test_qdrant.py": "ef842f071d24968841b663de9f393b901c81f0fe8002fc195c8fd1abdcc331e3",
+    "packages/retrieval/tests/test_retrieval.py": "71ac932d24a33d969d92d0d665aebc63921b3ec8c5f803fbd54e89ab4ff85f36"
+  },
+  "artifacts": [
+    {
+      "path": "api16-domain.log",
+      "sha256": "3fb06339dac3cfddb5c354996a3b6f655787cc37d7e5ad6ec041f982497207b1",
+      "bytes": 915
+    },
+    {
+      "path": "api16-idempotency-controls-focused.log",
+      "sha256": "f93ee5d2a87f2c60b5b24411a71a2f61053e4e077847d2d6ed0da6dddf5e0a51",
+      "bytes": 907
+    },
+    {
+      "path": "api16-idempotency-focused.log",
+      "sha256": "797800c2fabcda9e0c13fd69f515e699a142dd357dfd69042319c5bdde67c7d6",
+      "bytes": 907
+    },
+    {
+      "path": "api16-root-final-controls.log",
+      "sha256": "5962b39c8fe0bc8ba19944824c4cfc432342b8155857bec190093c0d194c5c12",
+      "bytes": 3595
+    },
+    {
+      "path": "api16-root-final.log",
+      "sha256": "49ef682f55ead586cd0d442f7ca329038a4bcfac18f44444f6a4f53e550c24f1",
+      "bytes": 3710
+    },
+    {
+      "path": "api16-root.log",
+      "sha256": "2515a8629db84e182ef25dfff6b88086debba9411ae3fec5a7310b23be864509",
+      "bytes": 2827
+    },
+    {
+      "path": "authorization-tests.log",
+      "sha256": "a837324a2f5c0d804ee26513e45c3e17425242b25aba8e53fe57a7379e8a79a5",
+      "bytes": 99
+    },
+    {
+      "path": "control-check-initial-failure.log",
+      "sha256": "fc409c22704d7abce9acfab882106500778d6da70e7f0fb5827acc6d8cda69e6",
+      "bytes": 5483
+    },
+    {
+      "path": "control-final-deliverable.log",
+      "sha256": "1f2ef6a48c6cec23a3a0e81adc7708abbf2038c0cd9ccef53210ef4af5e763d5",
+      "bytes": 3014
+    },
+    {
+      "path": "control-revalidation-after-ledger.log",
+      "sha256": "1f2ef6a48c6cec23a3a0e81adc7708abbf2038c0cd9ccef53210ef4af5e763d5",
+      "bytes": 3014
+    },
+    {
+      "path": "migration-live/backup-sha256.txt",
+      "sha256": "cf0741a857f9f94c19863d15073ffabbb7b8ed9bd6bfb583bfef089f40ade80f",
+      "bytes": 65
+    },
+    {
+      "path": "migration-live/docker-commands.jsonl",
+      "sha256": "b3b685dc69d5edd5045f6d4b25a48f3f67d4cd9636c3e795ca9713bd7cadadc8",
+      "bytes": 1916
+    },
+    {
+      "path": "migration-live/interrupted-cli.log",
+      "sha256": "dfd865bbdff290de922a36f0d609e0664a669b9bdeb5ab59de0782e700f02c04",
+      "bytes": 112
+    },
+    {
+      "path": "migration-live/postgres.log",
+      "sha256": "bc16df83db473ea507f56a1c04a0737ce8c3557b96b02463d9e9cc34c5a1ad86",
+      "bytes": 351228
+    },
+    {
+      "path": "migration-live/pre0005-synthetic.dump",
+      "sha256": "a77c5ed2fc54629b7c906490ee335ad419cd6c473e586f617d16ca39993678b8",
+      "bytes": 55633
+    },
+    {
+      "path": "migration-live/recovery.json",
+      "sha256": "76eed228f092e895d0fe0fda4314f1c924de3cffaa944a232406a668e58f5e44",
+      "bytes": 221
+    },
+    {
+      "path": "migration-live/resource.json",
+      "sha256": "07cdced581180ae42b353bd3863db46be4801b056dbe9ccb45d7e4e5d78a215b",
+      "bytes": 467
+    },
+    {
+      "path": "migration-live/teardown.json",
+      "sha256": "12fd49aefe34b179d9de9712a1e2989f82c13dc351b3618b9b0c884e61f341c5",
+      "bytes": 93
+    },
+    {
+      "path": "migration-live.log",
+      "sha256": "bc71d35029580b91bd99f53a8f75bdf8757ebb64f7197cadcd92bf5050bedd2e",
+      "bytes": 181
+    },
+    {
+      "path": "qdrant-container.log",
+      "sha256": "915b44a7e11942ec31d6730af51d000323095776b01fc2d1f916eead0d9177d8",
+      "bytes": 43572
+    },
+    {
+      "path": "real-exact-ablation.json",
+      "sha256": "bf0cfe805358e64f896f3e9fdc152bcb0748c60f3ec1c213412c72dac4fa7cf5",
+      "bytes": 1322
+    },
+    {
+      "path": "real-incomplete-schema.json",
+      "sha256": "28efd2691b74a97340bf697dcf0fde050d88595a451a3017fb1a545fe659b03f",
+      "bytes": 118
+    },
+    {
+      "path": "real-qdrant-rerun-20260925/real-same-index-delete-rollback.json",
+      "sha256": "0a80d117bb8f8e318fcf764eaee9ca7d80d354d3b337f3a20fc63b614f8fe350",
+      "bytes": 3252
+    },
+    {
+      "path": "real-qdrant-runtime.log",
+      "sha256": "4ad5fe75ad7c89b41e09727f48da6ca30d1129f25c6c61f8b31c0e3a28aaccd6",
+      "bytes": 98
+    },
+    {
+      "path": "real-same-index-delete-rollback.json",
+      "sha256": "e68641aa619b3f4d5ae3c21eed081476c8990470139b727413f40defd158dce9",
+      "bytes": 3252
+    },
+    {
+      "path": "real-transition.json",
+      "sha256": "60fd24dc0b7016b22cb5c024e673b9c691415ae26c806195c63379fbef72341a",
+      "bytes": 1443
+    },
+    {
+      "path": "real-worker-batches.json",
+      "sha256": "666fbe0ab444ecd5c8e88006ca05f687f3126abf8d17ed2576859d340495cf02",
+      "bytes": 573
+    },
+    {
+      "path": "static-checks-final.log",
+      "sha256": "eb475c5e51b9f3f87caa7c33e2739ae120da1754b91199c62c80de87732538ef",
+      "bytes": 4500
+    },
+    {
+      "path": "static-checks.log",
+      "sha256": "34ae8c5aaa3f6382a67f814a93016e453a012e451d62dd46f78572fb4e142f1e",
+      "bytes": 3436
+    }
+  ],
+  "limitations": [
+    "The checkout is dirty and shared; HEAD is the baseline only. These tests do not establish a release candidate or promotion eligibility.",
+    "The Qdrant run uses real Qdrant HTTP but deterministic embeddings, knowledge and object-storage test doubles; sparse ablation is a synthetic ranking discriminator, not a semantic-quality campaign.",
+    "No authorized live provider/model/corpus, full distributed API-worker acceptance, administrative outbox replay worker, visual/accessibility acceptance, or production restore/capacity/chaos/soak campaign is included.",
+    "D06 authorizes local implementation only; external decisions D01-D05 and D07 remain with their human owners."
+  ],
+  "documentation_hashes": {
+    "docs/reports/estado-implementacao-q24-2026-09-24.md": "8604480715c136bce98d14c286ebb76ef5da2bbd436beb03fd88b64de183ff7b",
+    "docs/reports/matriz-rastreabilidade-q24-2026-09-24.md": "6152a504956d267ea2083bd6ad091c6053fc7697afc703ef0168f2f826bf0f3a",
+    "docs/plano-executivo-qualidade-2026-09-24.md": "ff0862f43df68bc6012519a7e5c8d6082d95c04c8ace8ae00374d02b9d51d59c",
+    "docs/roadmap-qualidade-2026-09-24.md": "67783dcd4b63c33483b0ba8f5ffd72b57a6f2d85c09d7c231a1d67c6f1cc2063",
+    "docs/backlog-qualidade-2026-09-24.md": "78424601ce5020ceab3e46e34bd7ab3fbd7a252c1655ee9da2d281a6e6135be9",
+    ".agent/plans/phase-3-runtime-evidence-production-promotion.md": "8b25d76c1b02e8254e922fe896ca57f637db590ae994ab7458a7797c0a313f99"
+  },
+  "control_hashes": {
+    ".agent/state.json": "0e5a81d1a1d6289554f11585a727380da8c24f7ab8b53ec8b906edb5e8006ef0",
+    ".agent/backlog.json": "ad00681584cc2759c2ab8d96f5dda95034feab7e44d25fafc5f0f6fef866a404",
+    ".agent/execution-log.jsonl": "2a5536b59f307ea5ba66d4a73cb19e4c427461221a46e97c2b6737c8b2b5e091",
+    ".agent/verification.jsonl": "c199cf0f7a8b0b0c91739e0602da3bd77575a9a7008726d845c6b6f20ab45dca",
+    ".agent/gates/q24-local-integration-implementation-ready.json": "342b67151ea9c21aeb758754101a80f21e19aa9c8e3b6df8a2308b9e83ba7a87"
+  }
+}

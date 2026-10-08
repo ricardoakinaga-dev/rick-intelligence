@@ -1,0 +1,8 @@
+{"command": ["docker", "image", "inspect", "postgres:16-alpine", "--format", "{{.Id}}"], "exit": 0}
+{"command": ["docker", "run", "--detach", "--rm", "--name", "rick-q24-migration-12e770699c3c40ab91f6bd32935f2a85", "--label", "rick.q24.migration=rick-q24-migration-12e770699c3c40ab91f6bd32935f2a85", "--cpus", "1", "--memory", "512m", "--pids-limit", "256", "--tmpfs", "/var/lib/postgresql/data:rw,size=256m", "--publish", "127.0.0.1::5432", "--env", "POSTGRES_HOST_AUTH_METHOD=trust", "postgres:16-alpine", "-c", "cluster_name=rick-q24-migration-12e770699c3c40ab91f6bd32935f2a85", "-c", "shared_buffers=32MB", "-c", "max_connections=32"], "exit": 0}
+{"command": ["docker", "port", "98d16491780fc979a3a00d4dff87423b22ed5882a125fc03c1e60eb768e8ecaa", "5432/tcp"], "exit": 0}
+{"command": ["docker", "inspect", "98d16491780fc979a3a00d4dff87423b22ed5882a125fc03c1e60eb768e8ecaa", "--format", "{{.Image}}"], "exit": 0}
+{"command": ["docker", "inspect", "rick-q24-migration-12e770699c3c40ab91f6bd32935f2a85", "--format", "{{index .Config.Labels \"rick.q24.migration\"}}"], "exit": 0}
+{"command": ["docker", "logs", "rick-q24-migration-12e770699c3c40ab91f6bd32935f2a85"], "exit": 0}
+{"command": ["docker", "rm", "--force", "--volumes", "rick-q24-migration-12e770699c3c40ab91f6bd32935f2a85"], "exit": 0}
+{"command": ["docker", "ps", "--all", "--quiet", "--filter", "label=rick.q24.migration=rick-q24-migration-12e770699c3c40ab91f6bd32935f2a85"], "exit": 0}

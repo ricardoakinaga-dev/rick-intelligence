@@ -1,0 +1,20 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-8.0.2, pluggy-1.6.0 -- /usr/bin/python3
+rootdir: /home/ricardo/rick-intelligence
+plugins: asyncio-0.23.5, anyio-4.15.0
+asyncio: mode=Mode.STRICT
+collecting ... collected 11 items
+
+packages/identity/tests/test_postgres.py::test_persisted_identity_json_fails_closed_for_oversized_and_nonfinite_snapshots PASSED [  9%]
+packages/identity/tests/test_postgres.py::test_persisted_user_acl_json_fails_closed_instead_of_widening_scope PASSED [ 18%]
+packages/identity/tests/test_postgres.py::test_identity_json_writes_reject_nonfinite_and_oversized_values_before_db PASSED [ 27%]
+packages/identity/tests/test_postgres.py::test_user_store_persists_membership_status_independently_of_global_user_status PASSED [ 36%]
+packages/identity/tests/test_postgres.py::test_user_lookup_carries_tenant_scope_and_redacts_nothing_into_query PASSED [ 45%]
+packages/identity/tests/test_postgres.py::test_identity_stores_join_caller_transaction_without_committing_or_closing_it PASSED [ 54%]
+packages/identity/tests/test_postgres.py::test_identity_row_decoder_accepts_psycopg_column_descriptors PASSED [ 63%]
+packages/identity/tests/test_postgres.py::test_session_revoke_by_opaque_id_is_tenant_bound PASSED [ 72%]
+packages/identity/tests/test_postgres.py::test_recovery_store_hashes_and_consumes_a_token_once PASSED [ 81%]
+packages/identity/tests/test_postgres.py::test_persistent_provider_uses_authoritative_session_snapshot_and_stays_opt_in_for_production PASSED [ 90%]
+packages/identity/tests/test_postgres.py::test_session_ttl_is_bounded PASSED [100%]
+
+============================== 11 passed in 0.33s ==============================

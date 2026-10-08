@@ -25,8 +25,9 @@ try:  # package import for tests and module callers
         INCONCLUSIVE,
         NOT_RUN,
         PASS,
+        _identifiers,
+        _ordered_results,
         evaluate_fixture,
-        load_fixture,
         parse_k_values,
     )
 except ImportError:  # direct script execution with PYTHONPATH=scripts/state_of_art
@@ -36,8 +37,9 @@ except ImportError:  # direct script execution with PYTHONPATH=scripts/state_of_
         INCONCLUSIVE,
         NOT_RUN,
         PASS,
+        _identifiers,
+        _ordered_results,
         evaluate_fixture,
-        load_fixture,
         parse_k_values,
     )
 
@@ -69,6 +71,15 @@ def _text(value: Any, *, field: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise PackError(f"{field} must be a non-empty string")
     return value.strip()
+
+
+def _identity_text(value: Any, *, field: str) -> str:
+    """Validate a Unicode identity without trimming meaningful whitespace."""
+    if not isinstance(value, str) or not value:
+        raise PackError(f"{field} must be a non-empty string")
+    if any(0xD800 <= ord(character) <= 0xDFFF for character in value):
+        raise PackError(f"{field} must contain valid Unicode scalar values")
+    return value
 
 
 def _finite_number(value: Any, *, field: str) -> float:
@@ -113,7 +124,7 @@ def _case_pack_metadata(case: Mapping[str, Any], index: int) -> Mapping[str, Any
     if role not in {"positive", "negative"}:
         raise PackError(f"cases[{index}].pack.role must be positive or negative")
     if role == "negative":
-        expectation = _text(value.get("expectation"), field=f"cases[{index}].pack.expectation")
+        expectation = _identity_text(value.get("expectation"), field=f"cases[{index}].pack.expectation")
         if expectation not in {"no_evidence", "weak_evidence", "unsupported_assertion"}:
             raise PackError(f"cases[{index}].pack.expectation is unsupported")
     return value
@@ -140,8 +151,10 @@ def _validate_manifest(manifest: Mapping[str, Any], pack_dir: Path) -> tuple[Pat
     metadata = manifest.get("metadata")
     if not isinstance(metadata, Mapping):
         raise PackError("metadata must be an object")
-    for field in ("corpus_id", "corpus_version", "model_id", "provenance"):
+    for field in ("corpus_version", "provenance"):
         _text(metadata.get(field), field=f"metadata.{field}")
+    for field in ("corpus_id", "model_id"):
+        _identity_text(metadata.get(field), field=f"metadata.{field}")
 
     thresholds = manifest.get("thresholds")
     if not isinstance(thresholds, list) or not thresholds:
@@ -193,8 +206,8 @@ def _normalise_cases(payload: Any) -> list[dict[str, Any]]:
 
 def _group_key(case: Mapping[str, Any], *, defaults: Mapping[str, Any]) -> tuple[str, str]:
     pack = case["pack"]
-    model_id = _text(pack.get("model_id", defaults.get("model_id")), field="case model_id")
-    corpus_id = _text(pack.get("corpus_id", defaults.get("corpus_id")), field="case corpus_id")
+    model_id = _identity_text(pack.get("model_id", defaults.get("model_id")), field="case model_id")
+    corpus_id = _identity_text(pack.get("corpus_id", defaults.get("corpus_id")), field="case corpus_id")
     return model_id, corpus_id
 
 
@@ -246,6 +259,69 @@ def _check_negative(case: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
+def reciprocal_rank(retrieved: Sequence[str], relevant: Sequence[str]) -> float | None:
+    expected = set(relevant)
+    if not expected:
+        return None
+    return next((1.0 / rank for rank, item in enumerate(retrieved, 1) if item in expected), 0.0)
+
+
+def ndcg(retrieved: Sequence[str], relevant: Sequence[str], k: int) -> float | None:
+    if k <= 0:
+        raise ValueError("k must be positive")
+    expected = set(relevant)
+    if not expected:
+        return None
+    seen: set[str] = set()
+    gain = 0.0
+    for rank, item in enumerate(retrieved[:k], 1):
+        if item in expected and item not in seen:
+            gain += 1.0 / math.log2(rank + 1)
+        seen.add(item)
+    ideal = sum(1.0 / math.log2(rank + 1) for rank in range(1, min(k, len(expected)) + 1))
+    return gain / ideal
+
+
+def _evaluate_cases(
+    cases: Sequence[dict[str, Any]],
+    k_values: tuple[int, ...],
+    *,
+    metadata: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    result = evaluate_fixture({**(metadata or {}), "cases": list(cases), "k_values": list(k_values)}, k_values=k_values)
+    ranking = result["metrics"]["ranking"]
+    ranks: list[float] = []
+    gains: dict[int, list[float]] = {k: [] for k in k_values}
+    for case in cases:
+        relevant = case.get("relevant_ids", case.get("expected_relevant_ids", case.get("gold_ids")))
+        if isinstance(relevant, str):
+            relevant = [relevant]
+        if not isinstance(relevant, list) or not relevant or not all(isinstance(item, str) for item in relevant):
+            continue
+        raw = case.get("results", case.get("retrieved", case.get("items", case.get("evidence", []))))
+        if not isinstance(raw, list) or not all(isinstance(item, dict) for item in raw):
+            continue
+        expected = set(relevant)
+        ordered = []
+        for item in _ordered_results(raw):
+            matches = sorted(_identifiers(item) & expected)
+            ordered.append(matches[0] if matches else "")
+        rank = reciprocal_rank(ordered, relevant)
+        if rank is not None:
+            ranks.append(rank)
+        for k in k_values:
+            value = ndcg(ordered, relevant, k)
+            if value is not None:
+                gains[k].append(value)
+    status = PASS if len(ranks) == len(cases) and ranks else INCONCLUSIVE
+    ranking["mrr"] = {"status": status, "value": sum(ranks) / len(ranks) if ranks else None}
+    ranking["ndcg_at_k"] = {
+        str(k): {"status": status, "value": sum(values) / len(values) if values else None}
+        for k, values in gains.items()
+    }
+    return result
+
+
 def _check_threshold(result: Mapping[str, Any], threshold: Mapping[str, Any]) -> dict[str, Any]:
     threshold_id = str(threshold["id"])
     path = str(threshold["metric_path"])
@@ -254,10 +330,18 @@ def _check_threshold(result: Mapping[str, Any], threshold: Mapping[str, Any]) ->
     try:
         observed = _path_get(result, path)
         observed_number = _finite_number(observed, field=f"metric {path}")
+        parts = path.split(".")
+        for end in range(len(parts) - 1, 0, -1):
+            parent = _path_get(result, ".".join(parts[:end]))
+            if isinstance(parent, Mapping) and "status" in parent:
+                if parent["status"] in {NOT_RUN, INCONCLUSIVE, "no_data"}:
+                    raise PackError(f"metric status is {parent['status']}")
+                break
     except (KeyError, PackError) as exc:
         return {
             "id": threshold_id,
-            "status": INCONCLUSIVE,
+            "status": FAIL,
+            "data_status": "no_data",
             "metric_path": path,
             "operator": comparison,
             "target": target,
@@ -299,13 +383,7 @@ def evaluate_pack(pack_path: str | Path) -> dict[str, Any]:
         if not positive_cases:
             raise PackError("pack must contain at least one positive case")
 
-        fixture_payload = {
-            "schema_version": fixture.get("schema_version") if isinstance(fixture, Mapping) else None,
-            "provider": fixture.get("provider", "offline-pack") if isinstance(fixture, Mapping) else "offline-pack",
-            "cases": positive_cases,
-            "k_values": list(k_values),
-        }
-        aggregate = evaluate_fixture(fixture_payload, k_values=k_values)
+        aggregate = _evaluate_cases(positive_cases, k_values, metadata=fixture)
         threshold_results = [_check_threshold(aggregate, threshold) for threshold in thresholds]
         negative_results = [_check_negative(case) for case in negative_cases]
 
@@ -314,17 +392,16 @@ def evaluate_pack(pack_path: str | Path) -> dict[str, Any]:
             grouped[_group_key(case, defaults=defaults)].append(case)
         per_group: list[dict[str, Any]] = []
         for (model_id, corpus_id), group_cases in sorted(grouped.items()):
-            group_result = evaluate_fixture(
-                {"schema_version": fixture_payload["schema_version"], "cases": group_cases, "k_values": list(k_values)},
-                k_values=k_values,
-            )
+            group_result = _evaluate_cases(group_cases, k_values)
+            group_thresholds = [_check_threshold(group_result, threshold) for threshold in thresholds]
             per_group.append(
                 {
                     "model_id": model_id,
                     "corpus_id": corpus_id,
                     "case_count": len(group_cases),
-                    "status": group_result["status"],
+                    "status": _status_join([group_result["status"], *[row["status"] for row in group_thresholds]]),
                     "metrics": group_result["metrics"],
+                    "thresholds": group_thresholds,
                 }
             )
 

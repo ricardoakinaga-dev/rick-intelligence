@@ -1,0 +1,6 @@
+# exp-a07 - 2026-10-08T01:16:55Z
+# command: pytest -q -p no:cacheprovider --collect-only packages  (com os basenames duplicados restaurados)
+ERROR packages/knowledge/tests/test_aud03_postgres_live.py
+ERROR packages/providers/tests/test_provider.py
+3280 tests collected, 2 errors in 2.29s
+# exit=2

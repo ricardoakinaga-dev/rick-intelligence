@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-09-25T17:49:18Z",
+  "scope": "Recovery validation for the Q24/Q17 local continuation after restoring a missing evidence manifest and regenerating non-authoritative derived control views from canonical state.",
+  "checkout": {
+    "head": "b52f32c141916a2ea3af1a6b913bd91f380606e0",
+    "worktree": "shared dirty checkout; 2397 status entries at manifest creation"
+  },
+  "result": "PASS",
+  "results": {
+    "make_validate": "PASS; boundary check, control-plane validation (10/10), controller integrity and frozen quality-bar validation all passed (make-validate-recovery-pass.log).",
+    "control_counts": "35 backlog items, 388 append-oriented events, 391 verification records, 28 gate records; active pointers reconcile.",
+    "derived_views": "PASS; regenerated using PYTHONDONTWRITEBYTECODE=1 python3 scripts/state_of_art/review_control_views.py --write.",
+    "artifact_integrity": "PASS; Q17-19.B evidence manifest has 52 SHA256 entries with no missing or mismatched files; both disposable PostgreSQL teardowns report zero remaining containers.",
+    "diff_check": "PASS (git-diff-check-recovery.log).",
+    "quality_bar": "PASS; frozen quality-bar file digest matches the controller validator."
+  },
+  "recovery": [
+    {
+      "issue": "VER-Q17-01A-BLOCKER-RECONCILIATION-20260925 referenced a missing Q17-19.B manifest.",
+      "resolution": "Created the manifest from the actual run artifacts and source files, including hashes and scope limitations."
+    },
+    {
+      "issue": ".orchestrate derived task views reflected revision 362 while canonical state had advanced.",
+      "resolution": "Regenerated the derived views through the repository-supported review_control_views.py --write command; canonical active task/action were preserved."
+    }
+  ],
+  "limitations": "This verifies repository control-plane consistency and local evidence integrity only. It does not grant external runtime access, inspect deployed databases, approve a corpus/provider/domain decision, or authorize release/production promotion.",
+  "files": {
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-continuation-control-20260925/git-diff-check-recovery.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-continuation-control-20260925/git-diff-check.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-continuation-control-20260925/make-validate-recovery-pass.log": "486ee39bcb84c54d9dfc5a49e0fad731eaffba824f6624d552ddf284d8028a58",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-continuation-control-20260925/make-validate.log": "32f5303fba2aa61d09a76f3d3bc0d24c76ea1bb5dee8d54a864f9bf42297efad",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q17-19b-live-20260925T1447Z/manifest.json": "9ec4fa6a7fbc3bdcae6c41c97657188337039470d494c92bf23e725eb52d96ce",
+    "docs/reports/estado-implementacao-q24-2026-09-24.md": "930b77666cccaa85f03d8cc37cb64cfd427fde41a741d89739b39fedd555f014",
+    ".agent/state.json": "1544c6551af88cce717c52f4f29c4dae0bd85b3fc27371d0ce101302813cd721",
+    ".agent/backlog.json": "025ca45a4752a488dc50abca430cd9341ecd69f7275f47411d77814e02b40f1d",
+    ".agent/execution-log.jsonl": "0a3186bd553fcc1049fd1eb66c4c6f5683fe139092ca6ff4fcb89d464c76bd3f",
+    ".agent/verification.jsonl": "a861c7a7340c0de39fc91a5719c40dd2cf4d1bd1e9831c46bddddf4f6503e33d",
+    ".orchestrate/state.json": "30ab2a22d7f3ae84560eaf9f9850946d3fdf8633b39161ec5c92d708006a35ee",
+    ".orchestrate-state-of-art/state.json": "30ab2a22d7f3ae84560eaf9f9850946d3fdf8633b39161ec5c92d708006a35ee",
+    "docs/ci/check_control_plane.py": "50b916e263446ba7788bcca8586922a9d8747c218cc174a0b6d40e03c2ef1c09",
+    "scripts/state_of_art/review_control_views.py": "e4db952d45a7578dbb70d116ab417900344c6235a6fb510a11226fae7d8caa79"
+  }
+}

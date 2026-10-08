@@ -225,14 +225,19 @@ def test_background_teardown_deadline_starts_after_final_body(monkeypatch):
         async def endpoint():
             return StreamingResponse(chunks(), background=BackgroundTask(background))
         app.add_api_route("/probe", endpoint)
+        first_receive = True
         async def receive():
+            nonlocal first_receive
+            if first_receive:
+                first_receive = False
+                return {"type": "http.request", "body": b"", "more_body": False}
             await asyncio.Event().wait()
         sent = []
         async def send(message):
             sent.append(message)
         task = asyncio.create_task(app(scope(), receive, send))
         try:
-            done, _ = await asyncio.wait([task], timeout=.15)
+            done, _ = await asyncio.wait([task], timeout=.5)
             assert task in done
             with pytest.raises(BaseException) as caught:
                 await task

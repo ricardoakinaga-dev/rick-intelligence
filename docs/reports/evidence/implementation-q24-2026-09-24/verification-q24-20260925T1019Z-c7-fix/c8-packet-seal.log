@@ -1,0 +1,6 @@
+C8 packet SHA-256: aff40f1e9ac61980022a611e6380a3fe539e7f8d8b63ba672e155c00c077c8c3
+Manifest SHA-256: 252d4807af4f97d30581aaebee4dc1acebcd6b71397d0782101439df9949ed96
+Frozen bar SHA-256: f1ea9aa44d0d66e00bb47e75e30ad616ff575897de7d2a40bb5bc8e1f4936310
+Packet-listed files verified: 30
+Manifest-listed artifacts verified: 29
+Result: PASS

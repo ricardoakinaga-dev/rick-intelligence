@@ -1,0 +1,153 @@
+[
+  {
+    "target": "validate",
+    "exit": 0,
+    "seconds": 2.32,
+    "summary": [
+      "[PASS] LOG_CONTRACT: validated 330 append-oriented event(s)",
+      "[PASS] VERIFY_CONTRACT: validated 332 verification record(s)",
+      "[PASS] GATE_HISTORY: validated 27 append-only gate record(s)",
+      "[PASS] RECONCILE: state, backlog, log, and active pointers agree",
+      "RESULT PASS (pass=10 warn=0 fail=0)",
+      "PASS: derived review views and 11 historical files verified; original acceptance preserved",
+      "{",
+      "  \"valid\": true,",
+      "  \"errors\": []",
+      "}",
+      "Git: head=b52f32c141916a2ea3af1a6b913bd91f380606e0 branch=main worktree=DIRTY (111 entries) remote_main=b52f32c141916a2ea3af1a6b913bd91f380606e0 sync=HEAD_EQ_ORIGIN_MAIN",
+      "Control-plane check OK: required pointers and current Git observations are structurally consistent.",
+      "PYTHONDONTWRITEBYTECODE=1 python3 \"/home/ricardo/rick-intelligence/scripts/state_of_art/validate_quality_bar.py\"",
+      "{\"path\": \"docs/reports/current-triple-aaa-quality-bar-v1.json\", \"sha256\": \"fe0f58eb84bea4d16a138391b1afd85a9312d81fdb2ac7a383c2dbaf767f9633\", \"status\": \"PASS\"}"
+    ],
+    "log": "/tmp/rick-audit-20260924/validate.log"
+  },
+  {
+    "target": "lint",
+    "exit": 0,
+    "seconds": 2.72,
+    "summary": [
+      "  \"checked\": \"/home/ricardo/rick-intelligence\",",
+      "  \"errors\": []",
+      "}",
+      "<== current root boundary validator: exit 0",
+      "==> Phase 1.1 Python syntax: /home/ricardo/rick-intelligence/.runtime/venvs/cvg/bin/python -m py_compile scripts/phase11/check_skeleton.py scripts/phase11/runner.py scripts/phase11/test_check_skeleton.py scripts/phase15/check_boundaries.py scripts/phase15/test_check_boundaries.py",
+      "<== Phase 1.1 Python syntax: exit 0",
+      "==> Locker JavaScript syntax: node --check server.js",
+      "<== Locker JavaScript syntax: exit 0",
+      "==> CVG frontend lint: npm run lint",
+      "",
+      "> rag-frontend-premium@0.1.0 lint",
+      "> ./node_modules/.bin/eslint .",
+      "",
+      "<== CVG frontend lint: exit 0"
+    ],
+    "log": "/tmp/rick-audit-20260924/lint.log"
+  },
+  {
+    "target": "typecheck",
+    "exit": 0,
+    "seconds": 3.32,
+    "summary": [
+      "python3 \"/home/ricardo/rick-intelligence/scripts/phase11/runner.py\" typecheck",
+      "==> Professor TypeScript compiler: npm run build",
+      "",
+      "> rick-professor@1.0.0 build",
+      "> tsc",
+      "",
+      "<== Professor TypeScript compiler: exit 0",
+      "==> CVG frontend TypeScript compiler (compatibility override): npm exec -- tsc --noEmit --ignoreDeprecations 5.0",
+      "<== CVG frontend TypeScript compiler (compatibility override): exit 0",
+      "==> CVG Python compilation (no Python type checker configured): /home/ricardo/rick-intelligence/.runtime/venvs/cvg/bin/python -m compileall -q src",
+      "<== CVG Python compilation (no Python type checker configured): exit 0"
+    ],
+    "log": "/tmp/rick-audit-20260924/typecheck.log"
+  },
+  {
+    "target": "web-lint",
+    "exit": 0,
+    "seconds": 2.57,
+    "summary": [
+      "cd \"/home/ricardo/rick-intelligence/apps/web\" && npm run lint",
+      "",
+      "> rick-intelligence-web@0.1.0 lint",
+      "> eslint .",
+      ""
+    ],
+    "log": "/tmp/rick-audit-20260924/web-lint.log"
+  },
+  {
+    "target": "web-typecheck",
+    "exit": 0,
+    "seconds": 1.22,
+    "summary": [
+      "cd \"/home/ricardo/rick-intelligence/apps/web\" && npm run typecheck",
+      "",
+      "> rick-intelligence-web@0.1.0 typecheck",
+      "> tsc --noEmit",
+      ""
+    ],
+    "log": "/tmp/rick-audit-20260924/web-typecheck.log"
+  },
+  {
+    "target": "compose-static",
+    "exit": 0,
+    "seconds": 0.36,
+    "summary": [
+      "PYTHONDONTWRITEBYTECODE=1 python3 \"/home/ricardo/rick-intelligence/scripts/phase11/check_compose.py\"",
+      "PASS docker-compose.dev.yml: 14 services rendered",
+      "PASS docker-compose.staging.yml: 14 services rendered",
+      "PASS: canonical Compose topology is statically complete; runtime was not started"
+    ],
+    "log": "/tmp/rick-audit-20260924/compose-static.log"
+  },
+  {
+    "target": "ops-static",
+    "exit": 0,
+    "seconds": 0.11,
+    "summary": [
+      "PYTHONDONTWRITEBYTECODE=1 python3 \"/home/ricardo/rick-intelligence/infrastructure/scripts/migrate.py\" \"/home/ricardo/rick-intelligence/infrastructure/migrations\" --check",
+      "0001 0001_control_plane.sql sha256:07113ff4a5e00e9986b1584864eb097e67a6daa66285895b9d6993f6bf116195",
+      "0002 0002_product_schema.sql sha256:0bd4a31e3a821de3efcdaad621674aafc9215b0acb84a55fb681fc9fd6054312",
+      "0003 0003_product_contract_extensions.sql sha256:d6d6413a45f93a5a65146d20221721bc60d5131f86ec29c0fd848cac351ae14a",
+      "0004 0004_durable_jobs_contract.sql sha256:0621c726c6eaae17fba0a72a209452964eb6320c38f2ebc60966b1d562731274",
+      "0005 0005_rewrite_legacy_jobs.sql sha256:58878320223f9f30d42aea840c7e58795eb5c448daf90a0877adedc781cc9774",
+      "0006 0006_document_lineage_contract.sql sha256:2d35f6e5a784258150baf68c0e88cbdb1f7b733034af662d694a45956eb8ffdd",
+      "migration checksums: PASS (6 file(s)); execution: NOT_RUN",
+      "bash -n \"/home/ricardo/rick-intelligence/infrastructure/scripts/validate-env.sh\"",
+      "PYTHONDONTWRITEBYTECODE=1 python3 -m py_compile \"/home/ricardo/rick-intelligence/infrastructure/scripts/backup-restore-check.py\" \"/home/ricardo/rick-intelligence/infrastructure/scripts/backup_restore.py\""
+    ],
+    "log": "/tmp/rick-audit-20260924/ops-static.log"
+  },
+  {
+    "target": "eval-retrieval-pack",
+    "exit": 2,
+    "seconds": 0.06,
+    "summary": [
+      "      \"target\": 1.0",
+      "    },",
+      "    {",
+      "      \"id\": \"fixture-p95-latency\",",
+      "      \"metric_path\": \"metrics.latency.p95\",",
+      "      \"observed\": 15.0,",
+      "      \"operator\": \"<=\",",
+      "      \"reason\": \"threshold satisfied\",",
+      "      \"status\": \"PASS\",",
+      "      \"target\": 100.0",
+      "    }",
+      "  ]",
+      "}",
+      "make: *** [Makefile:132: eval-retrieval-pack] Error 1"
+    ],
+    "log": "/tmp/rick-audit-20260924/eval-retrieval-pack.log"
+  },
+  {
+    "target": "security-adversarial",
+    "exit": 0,
+    "seconds": 0.03,
+    "summary": [
+      "PYTHONDONTWRITEBYTECODE=1 python3 \"/home/ricardo/rick-intelligence/scripts/phase11/check_adversarial_corpus.py\"",
+      "PASS: 8 bounded adversarial records across 8 categories"
+    ],
+    "log": "/tmp/rick-audit-20260924/security-adversarial.log"
+  }
+]

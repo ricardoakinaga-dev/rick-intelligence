@@ -7,15 +7,15 @@ clinical conclusion contract.
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Final, Literal
 
 from pydantic import ConfigDict, Field, field_validator, model_validator
 
 from rick_contracts.base import StrictContractModel
 
 
-CASE_CONTRACT_VERSION = "clinical-case-contract-v1"
-CASE_SCOPE_STATUS = "record_review_feedback_only"
+CASE_CONTRACT_VERSION: Final = "clinical-case-contract-v1"
+CASE_SCOPE_STATUS: Final = "record_review_feedback_only"
 
 CaseStatus = Literal["open", "reviewed"]
 ReviewDecision = Literal["recorded", "needs_revision", "declined"]
@@ -189,8 +189,8 @@ class CaseFeedbackRequest(StrictContractModel):
 
 
 class CaseRecord(StrictContractModel):
-    contract_version: Literal[CASE_CONTRACT_VERSION] = CASE_CONTRACT_VERSION
-    clinical_scope_status: Literal[CASE_SCOPE_STATUS] = CASE_SCOPE_STATUS
+    contract_version: Literal["clinical-case-contract-v1"] = CASE_CONTRACT_VERSION
+    clinical_scope_status: Literal["record_review_feedback_only"] = CASE_SCOPE_STATUS
     case_id: str = Field(min_length=1, max_length=128)
     tenant_id: str = Field(min_length=1, max_length=128)
     workspace_id: str = Field(min_length=1, max_length=128)
@@ -215,7 +215,7 @@ class CaseRecord(StrictContractModel):
 
 
 class CaseReview(StrictContractModel):
-    contract_version: Literal[CASE_CONTRACT_VERSION] = CASE_CONTRACT_VERSION
+    contract_version: Literal["clinical-case-contract-v1"] = CASE_CONTRACT_VERSION
     review_id: str = Field(min_length=1, max_length=128)
     case_id: str = Field(min_length=1, max_length=128)
     tenant_id: str = Field(min_length=1, max_length=128)
@@ -228,7 +228,7 @@ class CaseReview(StrictContractModel):
 
 
 class CaseFeedback(StrictContractModel):
-    contract_version: Literal[CASE_CONTRACT_VERSION] = CASE_CONTRACT_VERSION
+    contract_version: Literal["clinical-case-contract-v1"] = CASE_CONTRACT_VERSION
     feedback_id: str = Field(min_length=1, max_length=128)
     case_id: str = Field(min_length=1, max_length=128)
     tenant_id: str = Field(min_length=1, max_length=128)

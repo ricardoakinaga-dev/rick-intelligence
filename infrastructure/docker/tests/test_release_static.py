@@ -6,6 +6,8 @@ from pathlib import Path
 import tempfile
 import unittest
 
+import yaml
+
 
 DOCKER_ROOT = Path(__file__).resolve().parents[1]
 MANIFEST_PATH = DOCKER_ROOT / "release-manifest.json"
@@ -136,6 +138,38 @@ class ReleaseStaticTests(unittest.TestCase):
             text = (DOCKER_ROOT / name).read_text(encoding="utf-8")
             self.assertIn("/opt/rick/packages/storage/src", text)
             self.assertIn("COPY packages/storage/src /opt/rick/packages/storage/src", text)
+
+    def test_compose_api_supplies_required_factory_worker_identity(self) -> None:
+        for name in ("docker-compose.dev.yml", "docker-compose.staging.yml"):
+            with self.subTest(compose=name):
+                compose = yaml.safe_load((DOCKER_ROOT.parents[1] / name).read_text(encoding="utf-8"))
+                environment = compose["services"]["api"]["environment"]
+                self.assertRegex(environment.get("RICK_WORKER_ID", ""), r"^\$\{RICK_WORKER_ID:\?[^}]+\}$")
+
+    def test_compose_prometheus_does_not_use_rule_file_flag(self) -> None:
+        for name in ("docker-compose.dev.yml", "docker-compose.staging.yml"):
+            with self.subTest(compose=name):
+                compose = yaml.safe_load((DOCKER_ROOT.parents[1] / name).read_text(encoding="utf-8"))
+                command = compose["services"]["metrics"]["command"]
+                self.assertIn("--config.file=/etc/prometheus/prometheus.yml", command)
+                self.assertFalse(any(argument.split("=", 1)[0] == "--rule.file" for argument in command))
+
+    def test_prometheus_loads_mounted_alert_rules_from_configuration(self) -> None:
+        root = DOCKER_ROOT.parents[1]
+        config_path = root / "infrastructure/compose/prometheus.yml"
+        config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+        self.assertEqual(config.get("rule_files"), ["/etc/prometheus/alerts.yml", "/etc/prometheus/prometheus.rules.yml"])
+        for name in ("docker-compose.dev.yml", "docker-compose.staging.yml"):
+            with self.subTest(compose=name):
+                compose = yaml.safe_load((root / name).read_text(encoding="utf-8"))
+                volumes = compose["services"]["metrics"]["volumes"]
+                self.assertIn("./infrastructure/compose/prometheus.yml:/etc/prometheus/prometheus.yml:ro", volumes)
+                self.assertIn("./infrastructure/compose/alerts.yml:/etc/prometheus/alerts.yml:ro", volumes)
+                self.assertIn("./infrastructure/monitoring/prometheus.rules.yml:/etc/prometheus/prometheus.rules.yml:ro", volumes)
+                rules = yaml.safe_load((root / "infrastructure/compose/alerts.yml").read_text(encoding="utf-8"))
+                self.assertTrue(rules["groups"])
+                monitoring_rules = yaml.safe_load((root / "infrastructure/monitoring/prometheus.rules.yml").read_text(encoding="utf-8"))
+                self.assertTrue(monitoring_rules["groups"])
 
     def test_manifest_marks_external_claims_as_not_run(self) -> None:
         manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))

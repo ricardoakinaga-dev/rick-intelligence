@@ -17,6 +17,7 @@ import hashlib
 import json
 from pathlib import Path
 import re
+import subprocess
 import unicodedata
 from typing import Any, Mapping
 
@@ -58,6 +59,27 @@ except ImportError:
         safe_relative_path,
         unique_duplicates,
     )
+
+
+# AUD07-02 retired these components from the checkout. Records written while
+# they were present keep pointing at them; the pointer stays valid only as long
+# as the path is provably reachable in git history, never by restoring a copy.
+RETIRED_COMPONENT_PREFIXES = ("cvg-master-rag-v2/", "rick-professor/", "modulo-redis-locker/")
+
+
+def resolves_from_retired_history(root: Path, reference: str) -> bool:
+    """True when a retired-component path is absent from the tree but present in history."""
+
+    if not reference.startswith(RETIRED_COMPONENT_PREFIXES):
+        return False
+    try:
+        completed = subprocess.run(
+            ["git", "rev-list", "-1", "--all", "--", reference],
+            cwd=root, capture_output=True, text=True, check=False, timeout=20,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return completed.returncode == 0 and bool(completed.stdout.strip())
 
 
 STATE_ENUM_FIELDS = {
@@ -102,6 +124,9 @@ def _check_evidence_ref(
         return
     exists = target.exists() if allow_directory else target.is_file()
     if not exists:
+        if resolves_from_retired_history(root, target_text):
+            report.pass_(code, f"{field} resolves from git history (retired component): {value}")
+            return
         expected = "path" if allow_directory else "file"
         report.fail(code, f"{field} does not resolve to an existing {expected}: {value}")
         return
@@ -580,7 +605,7 @@ def _check_state(root: Path, state: Mapping[str, Any], contracts: Mapping[str, A
             except ValueError as exc:
                 report.fail("STATE_REFERENCE", str(exc))
             else:
-                if not target.is_file():
+                if not target.is_file() and not resolves_from_retired_history(root, value):
                     report.fail("STATE_REFERENCE", f"{field} target does not exist: {value}")
     if state.get("status") == "BLOCKED" and not state.get("blocked_by"):
         report.fail(
@@ -800,7 +825,7 @@ def _check_state(root: Path, state: Mapping[str, Any], contracts: Mapping[str, A
             except ValueError as exc:
                 report.fail("STATE_REFERENCE", str(exc))
                 continue
-            if not target.is_file():
+            if not target.is_file() and not resolves_from_retired_history(root, value):
                 report.fail("STATE_REFERENCE", f"instruction scope target does not exist: {value}")
 
 

@@ -23,6 +23,83 @@ RAW_STACK = "Error: synthetic provider stack"
 CORRELATION = "contract-correlation-001"
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("terminal", ["missing", None, "", "not-a-finish-reason", False])
+async def test_chat_completion_requires_explicit_valid_termination(terminal) -> None:
+    payload = _chat_payload()
+    if terminal == "missing":
+        payload["choices"][0].pop("finish_reason")
+    else:
+        payload["choices"][0]["finish_reason"] = terminal
+    provider = OpenAICompatibleClient(
+        _config(), transport=httpx.MockTransport(lambda request: _response(request, 200, payload)),
+    )
+    try:
+        with pytest.raises(ProviderError):
+            await provider.chat_completion(
+                messages=[{"role": "user", "content": "hello"}], correlation_id=CORRELATION,
+            )
+    finally:
+        await provider.aclose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("terminal", [None, "missing"])
+async def test_stream_done_requires_a_terminal_reason(terminal) -> None:
+    choice = {"delta": {"content": "incomplete"}}
+    if terminal != "missing":
+        choice["finish_reason"] = terminal
+    await _assert_invalid_stream([choice])
+
+
+@pytest.mark.asyncio
+async def test_stream_rejects_content_after_terminal() -> None:
+    await _assert_invalid_stream([
+        {"delta": {"content": "complete"}, "finish_reason": "stop"},
+        {"delta": {"content": "extra"}, "finish_reason": None},
+    ])
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("content", ["not-json", "[]", '{"x":NaN}', '{"x":1,"x":2}'])
+async def test_stream_json_object_validates_semantic_content(content) -> None:
+    await _assert_invalid_stream([
+        {"delta": {"content": content}, "finish_reason": "stop"},
+    ], response_format={"type": "json_object"})
+
+
+def _native_stream_wire(choices):
+    events = [{"id": "chatcmpl_fixture", "object": "chat.completion.chunk", "created": 123,
+               "model": "chat-test-model", "usage": None,
+               "choices": [{"index": 0, "logprobs": None, **choice}]} for choice in choices]
+    events.append({"id": "chatcmpl_fixture", "object": "chat.completion.chunk", "created": 123,
+                   "model": "chat-test-model", "choices": [],
+                   "usage": {"prompt_tokens": 2, "completion_tokens": 3, "total_tokens": 5}})
+    return "".join("data: " + json.dumps(event) + "\n\n" for event in events).encode() + b"data: [DONE]\n\n"
+
+
+async def _assert_invalid_stream(choices, **kwargs) -> None:
+    raw = _native_stream_wire(choices)
+
+    calls = 0
+
+    def handler(request):
+        nonlocal calls
+        calls += 1
+        return httpx.Response(200, content=raw, headers={"content-type": "text/event-stream"}, request=request)
+
+    provider = OpenAICompatibleClient(_config(max_attempts=3), transport=httpx.MockTransport(handler))
+    try:
+        with pytest.raises(ProviderError) as caught:
+            [chunk async for chunk in provider.chat_completion_stream(
+                messages=[{"role": "user", "content": "hello"}], **kwargs,
+            )]
+        assert caught.value.retryable is False
+        assert calls == 1
+    finally:
+        await provider.aclose()
+
+
 def _config(**overrides: object) -> ProviderConfig:
     values: dict[str, object] = {
         "base_url": "https://provider.example/v1",
@@ -41,11 +118,11 @@ def _config(**overrides: object) -> ProviderConfig:
 
 
 def _chat_payload(model: str = "chat-test-model", content: str = "provider success") -> dict[str, object]:
-    return {
+    return {'object': 'chat.completion', 'created': 123,
         "id": "chat-contract",
         "model": model,
         "choices": [
-            {
+            {'logprobs': None,
                 "index": 0,
                 "message": {"role": "assistant", "content": content},
                 "finish_reason": "stop",
@@ -134,7 +211,7 @@ async def test_provider_http_boundaries_project_only_w3c_trace_identity(monkeypa
     async def handler(request: httpx.Request) -> httpx.Response:
         requests.append(request)
         if request.method == "GET":
-            return _response(request, 200, {"object": "list", "data": [{"id": "chat-test-model"}]})
+            return _response(request, 200, {"object": "list", "data": [{"id": "chat-test-model", "object": "model", "created": 0, "owned_by": "fixture"}]})
         if request.url.path.endswith("/embeddings"):
             return _response(request, 200, _embedding_payload())
         return _response(request, 200, _chat_payload())
@@ -164,7 +241,7 @@ async def test_health_check_probes_models_with_auth_and_validates_configured_mod
         return _response(
             request,
             200,
-            {"object": "list", "data": [{"id": "chat-test-model"}]},
+            {"object": "list", "data": [{"id": "chat-test-model", "object": "model", "created": 0, "owned_by": "fixture"}]},
         )
 
     provider = OpenAICompatibleClient(_config(), transport=httpx.MockTransport(handler))
@@ -183,7 +260,7 @@ async def test_health_check_probes_models_with_auth_and_validates_configured_mod
     ("status", "body"),
     [
         (401, {"error": {"code": "unauthorized"}}),
-        (200, {"object": "list", "data": [{"id": "other-model"}]}),
+        (200, {"object": "list", "data": [{"id": "other-model", "object": "model", "created": 0, "owned_by": "fixture"}]}),
         (200, []),
     ],
 )
@@ -210,7 +287,7 @@ async def test_health_check_fails_closed_for_unhealthy_or_wrong_model_responses(
 async def test_health_check_has_an_explicit_timeout_for_an_unresponsive_transport() -> None:
     async def handler(request: httpx.Request) -> httpx.Response:
         await asyncio.sleep(10)
-        return _response(request, 200, {"data": [{"id": "chat-test-model"}]})
+        return _response(request, 200, {"object": "list", "data": [{"id": "chat-test-model", "object": "model", "created": 0, "owned_by": "fixture"}]})
 
     provider = OpenAICompatibleClient(
         _config(timeout=0.01),
@@ -225,12 +302,11 @@ async def test_health_check_has_an_explicit_timeout_for_an_unresponsive_transpor
 @pytest.mark.asyncio
 async def test_streaming_contract_emits_typed_deltas_and_terminal_finish_reason() -> None:
     requests: list[httpx.Request] = []
-    body = (
-        b'data: {"model":"chat-test-model","choices":[{"delta":{"content":"stream "},"finish_reason":null}]}\n\n'
-        b'data: {"model":"chat-test-model","choices":[{"delta":{"content":"ok"},"finish_reason":null}]}\n\n'
-        b'data: {"model":"chat-test-model","choices":[{"delta":{},"finish_reason":"stop"}]}\n\n'
-        b"data: [DONE]\n\n"
-    )
+    body = _native_stream_wire([
+        {"delta": {"content": "stream "}, "finish_reason": None},
+        {"delta": {"content": "ok"}, "finish_reason": None},
+        {"delta": {}, "finish_reason": "stop"},
+    ])
 
     async def handler(request: httpx.Request) -> httpx.Response:
         requests.append(request)
@@ -291,11 +367,10 @@ async def test_streaming_duplicate_response_keys_are_rejected_before_delta_extra
 
 @pytest.mark.asyncio
 async def test_streaming_json_content_can_be_reassembled_as_an_object() -> None:
-    body = (
-        b'data: {"model":"chat-test-model","choices":[{"delta":{"content":"{\\"status\\":"},"finish_reason":null}]}\n\n'
-        b'data: {"model":"chat-test-model","choices":[{"delta":{"content":"\\"ok\\"}"},"finish_reason":"stop"}]}\n\n'
-        b"data: [DONE]\n\n"
-    )
+    body = _native_stream_wire([
+        {"delta": {"content": '{"status":'}, "finish_reason": None},
+        {"delta": {"content": '"ok"}'}, "finish_reason": "stop"},
+    ])
 
     async def handler(request: httpx.Request) -> httpx.Response:
         payload = json.loads(request.content)
@@ -348,10 +423,10 @@ async def test_function_tools_are_serialized_and_typed_calls_are_returned() -> N
         return _response(
             request,
             200,
-            {
+            {'id': 'chatcmpl_fixture', 'object': 'chat.completion', 'created': 123,
                 "model": "chat-test-model",
                 "choices": [
-                    {
+                    {'index': 0, 'logprobs': None,
                         "message": {
                             "role": "assistant",
                             "content": None,
@@ -366,7 +441,7 @@ async def test_function_tools_are_serialized_and_typed_calls_are_returned() -> N
                                 }
                             ],
                         },
-                        "finish_reason": "stop",
+                        "finish_reason": "tool_calls",
                     }
                 ],
             },
@@ -388,15 +463,16 @@ async def test_function_tools_are_serialized_and_typed_calls_are_returned() -> N
     assert result.tool_calls[0].id == "call-status"
     assert result.tool_calls[0].function.name == "report_status"
     assert json.loads(result.tool_calls[0].function.arguments) == {"status": "ok"}
+    assert result.finish_reason == "tool_calls"
 
 
 @pytest.mark.asyncio
 async def test_streaming_tool_call_deltas_are_typed_without_parsing_partial_arguments() -> None:
     events = [
-        {
+        {'id': 'chatcmpl_fixture', 'object': 'chat.completion.chunk', 'created': 123, 'usage': None,
             "model": "chat-test-model",
             "choices": [
-                {
+                {'index': 0, 'logprobs': None,
                     "delta": {
                         "tool_calls": [
                             {
@@ -411,21 +487,21 @@ async def test_streaming_tool_call_deltas_are_typed_without_parsing_partial_argu
                 }
             ],
         },
-        {
+        {'id': 'chatcmpl_fixture', 'object': 'chat.completion.chunk', 'created': 123, 'usage': None,
             "model": "chat-test-model",
             "choices": [
-                {
+                {'index': 0, 'logprobs': None,
                     "delta": {
                         "tool_calls": [
                             {"index": 0, "function": {"arguments": 'tus":"ok"}'}}
                         ]
                     },
-                    "finish_reason": "stop",
+                    "finish_reason": "tool_calls",
                 }
             ],
         },
     ]
-    body = "".join(f"data: {json.dumps(event)}\n\n" for event in events).encode() + b"data: [DONE]\n\n"
+    body = _native_stream_wire([event["choices"][0] for event in events])
 
     async def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(
@@ -456,7 +532,106 @@ async def test_streaming_tool_call_deltas_are_typed_without_parsing_partial_argu
     assert chunks[0].tool_calls[0].function.arguments == '{"sta'
     assert chunks[1].tool_calls is not None
     assert chunks[1].tool_calls[0].function.arguments == 'tus":"ok"}'
-    assert chunks[1].finish_reason == "stop"
+    assert chunks[1].finish_reason == "tool_calls"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("delta", [
+    {"tool_calls": [{"index": 0, "function": {"arguments": '{"status":'}}]},
+    {"content": "status"},
+])
+async def test_streaming_partial_output_transport_failure_never_retries(delta) -> None:
+    calls = 0
+    closed = []
+    delays = []
+    emitted = []
+
+    class PartialStream(httpx.AsyncByteStream):
+        async def __aiter__(self):
+            yield ("data: " + json.dumps({"id": "chatcmpl_fixture", "object": "chat.completion.chunk", "created": 123, "model": "chat-test-model", "usage": None, "choices": [{"index": 0, "delta": delta, "finish_reason": None}]}) + "\n\n").encode()
+            raise httpx.ReadError("synthetic interrupted stream")
+
+        async def aclose(self):
+            closed.append(True)
+
+    async def handler(request):
+        nonlocal calls
+        calls += 1
+        return httpx.Response(200, stream=PartialStream(), request=request)
+
+    async with OpenAICompatibleClient(
+        _config(), transport=httpx.MockTransport(handler), sleep=delays.append,
+    ) as provider:
+        with pytest.raises(ProviderError) as caught:
+            async for chunk in provider.chat_completion_stream(
+                messages=[{"role": "user", "content": "status"}], correlation_id=CORRELATION,
+            ):
+                emitted.append(chunk)
+
+    assert caught.value.code == "unavailable"
+    assert caught.value.attempts == 1
+    assert calls == len(emitted) == len(closed) == 1
+    assert delays == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("fragment", [b"x" * 16, b":" + b"x" * 14 + b"\n", "é".encode() * 8])
+async def test_streaming_byte_budget_stops_before_reading_more_fragments(monkeypatch, fragment) -> None:
+    monkeypatch.setattr(provider_client_module, "MAX_RESPONSE_BYTES", 64)
+    reads = []
+    closed = []
+
+    class GrowingStream(httpx.AsyncByteStream):
+        async def __aiter__(self):
+            for index in range(20):
+                reads.append(index)
+                yield fragment
+            raise httpx.ReadError("synthetic end of fixture")
+
+        async def aclose(self):
+            closed.append(True)
+
+    async with OpenAICompatibleClient(
+        _config(), transport=httpx.MockTransport(
+            lambda request: httpx.Response(200, stream=GrowingStream(), request=request)
+        ), sleep=lambda _: None,
+    ) as provider:
+        with pytest.raises(ProviderError) as caught:
+            async for _ in provider.chat_completion_stream(messages=[{"role": "user", "content": "status"}]):
+                pytest.fail("oversized fixture must not emit output")
+
+    assert caught.value.code == "malformed_response"
+    assert caught.value.attempts == 1
+    assert len(reads) == 5
+    assert closed == [True]
+
+
+@pytest.mark.asyncio
+async def test_streaming_oversized_chunk_rejected_before_text_allocation(monkeypatch) -> None:
+    monkeypatch.setattr(provider_client_module, "MAX_RESPONSE_BYTES", 64)
+    decoded = []
+
+    class GuardedBytes(bytes):
+        def decode(self, *args, **kwargs):
+            decoded.append(True)
+            raise AssertionError("oversized chunk decoded before limit check")
+
+    class OversizedStream(httpx.AsyncByteStream):
+        async def __aiter__(self):
+            yield GuardedBytes(b"x" * 65)
+
+    async with OpenAICompatibleClient(
+        _config(), transport=httpx.MockTransport(
+            lambda request: httpx.Response(200, stream=OversizedStream(), request=request)
+        ),
+    ) as provider:
+        with pytest.raises(ProviderError) as caught:
+            async for _ in provider.chat_completion_stream(messages=[{"role": "user", "content": "status"}]):
+                pytest.fail("oversized fixture must not emit output")
+
+    assert caught.value.code == "malformed_response"
+    assert caught.value.attempts == 1
+    assert decoded == []
 
 
 @pytest.mark.asyncio
@@ -627,22 +802,22 @@ async def test_non_transient_http_error_is_not_retried() -> None:
     [
         ("not-json", "invalid_json"),
         ([], "malformed_response"),
-        ({"choices": "not-a-list", "model": "chat-test-model"}, "malformed_response"),
+        ({'id': 'chatcmpl_fixture', 'object': 'chat.completion', 'created': 123, "choices": "not-a-list", "model": "chat-test-model"}, "malformed_response"),
         ({"model": "chat-test-model"}, "missing_field"),
-        ({"model": "chat-test-model", "choices": []}, "missing_field"),
-        ({"model": "chat-test-model", "choices": [{"message": {}}]}, "missing_field"),
+        ({'id': 'chatcmpl_fixture', 'object': 'chat.completion', 'created': 123, "model": "chat-test-model", "choices": []}, "missing_field"),
+        ({'id': 'chatcmpl_fixture', 'object': 'chat.completion', 'created': 123, "model": "chat-test-model", "choices": [{'index': 0, 'logprobs': None, "message": {"role": "assistant"}}]}, "missing_field"),
         (
-            {"model": "chat-test-model", "choices": [{"message": {"content": 42}}]},
+            {'id': 'chatcmpl_fixture', 'object': 'chat.completion', 'created': 123, "model": "chat-test-model", "choices": [{'index': 0, 'logprobs': None, "message": {"role": "assistant", "content": 42}}]},
             "missing_field",
         ),
         (
-            {"model": "chat-test-model", "choices": [{"message": {"content": "ok"}}], "usage": {"total": "3"}},
+            {'id': 'chatcmpl_fixture', 'object': 'chat.completion', 'created': 123, "model": "chat-test-model", "choices": [{'index': 0, 'logprobs': None, "message": {"role": "assistant", "content": "ok"}, "finish_reason": "stop"}], "usage": {"total": "3"}},
             "malformed_response",
         ),
         (
-            {
+            {'id': 'chatcmpl_fixture', 'object': 'chat.completion', 'created': 123,
                 "model": "chat-test-model",
-                "choices": [{"message": {"content": "ok"}, "finish_reason": "bad"}],
+                "choices": [{'index': 0, 'logprobs': None, "message": {"role": "assistant", "content": "ok"}, "finish_reason": "bad"}],
             },
             "malformed_response",
         ),
@@ -721,11 +896,11 @@ async def test_json_object_response_format_is_validated_at_the_provider_boundary
         ({}, "missing_field"),
         ({"data": "not-a-list", "model": "embedding-test-model"}, "malformed_response"),
         ({"data": [], "model": "embedding-test-model"}, "missing_field"),
-        ({"data": [{}], "model": "embedding-test-model"}, "missing_field"),
-        ({"data": [{"embedding": "not-a-vector"}], "model": "embedding-test-model"}, "malformed_response"),
-        ({"data": [{"embedding": [0.1, "bad", 0.3]}], "model": "embedding-test-model"}, "malformed_response"),
-        ({"data": [{"embedding": [0.1, 0.2]}], "model": "embedding-test-model"}, "embedding_dimension_mismatch"),
-        ({"data": [{"embedding": [0.1, 0.2, 0.3]}]}, "missing_field"),
+        ({"data": [{"index": 0}], "model": "embedding-test-model"}, "missing_field"),
+        ({"data": [{"index": 0, "embedding": "not-a-vector"}], "model": "embedding-test-model"}, "malformed_response"),
+        ({"data": [{"index": 0, "embedding": [0.1, "bad", 0.3]}], "model": "embedding-test-model"}, "malformed_response"),
+        ({"data": [{"index": 0, "embedding": [0.1, 0.2]}], "model": "embedding-test-model"}, "embedding_dimension_mismatch"),
+        ({"data": [{"index": 0, "embedding": [0.1, 0.2, 0.3]}]}, "missing_field"),
     ],
 )
 async def test_embedding_response_validation_checks_finite_values_and_exact_dimensions(

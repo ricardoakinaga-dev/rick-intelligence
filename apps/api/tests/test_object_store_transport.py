@@ -34,7 +34,11 @@ def wire_server():
             self.wfile.flush()
             if self.path.endswith("stream"):
                 release_body.wait(2)
-            self.wfile.write(b"def")
+            try:
+                self.wfile.write(b"def")
+            except (BrokenPipeError, ConnectionResetError):
+                if not self.path.endswith("stream"):
+                    raise
 
         def do_PUT(self):
             body = self.rfile.read(int(self.headers["Content-Length"]))
@@ -110,6 +114,7 @@ def test_wire_transport_projects_w3c_trace_identity_without_baggage(wire_server,
     assert requests[0][2]["traceparent"].startswith("00-")
     assert "baggage" not in requests[0][2]
     assert "secret" not in repr(requests[0][2])
+    assert response.read(6) == b"abcdef"
     response.close()
     transport.close()
 

@@ -1,0 +1,105 @@
+{
+  "attempt_history": [
+    {
+      "artifact": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-25-web-collection-error-final-20260925/web-e2e.log",
+      "outcome": "321/321 full production matrix passed before final visual refinements; performance samples in that folder are superseded by the final CSS."
+    },
+    {
+      "artifact": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-25-web-collection-error-review-fixes-20260925/focused-e2e.log",
+      "outcome": "27 focused tests passed after the first P3 changes; independent review then found desktop label grouping P3."
+    },
+    {
+      "artifact": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-25-web-collection-error-closed-20260925/focused-e2e.log",
+      "outcome": "27 tests passed, but screenshot inspection found the native select style had been lost when its shared class was removed; the shared styling class was restored."
+    },
+    {
+      "artifact": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-25-web-collection-error-review-resolved-20260925/focused-e2e.log",
+      "outcome": "Final 27/27 focused production tests passed after preserving select styling and label association."
+    }
+  ],
+  "checkout": {
+    "head": "b52f32c141916a2ea3af1a6b913bd91f380606e0",
+    "worktree": "dirty shared checkout; no commit, push or deployment"
+  },
+  "created_at": "2026-09-25T17:37:27Z",
+  "files": {
+    "/home/ricardo/rick-intelligence/docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-25-web-collection-error-final-20260925/performance/admin-desktop.json": "77705d506519760e8066eb2c45bf5eb21bdea074fa7f5f2aa57f1f85f9c7a03c",
+    "/home/ricardo/rick-intelligence/docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-25-web-collection-error-final-20260925/performance/admin-mobile.json": "aea0a2a89044ff498ad4855343b588296518931ca153e949338a0cbd92b59d5e",
+    "/home/ricardo/rick-intelligence/docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-25-web-collection-error-final-20260925/performance/admin-tablet.json": "f45f695192cd1ab7c554e5184322fec7607d37edb4eadd041443a6fda4341f5c",
+    "/home/ricardo/rick-intelligence/docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-25-web-collection-error-final-20260925/performance/app-chat-desktop.json": "8713e4c28c13bfe1ba769d0e460c9bd2b602faa3b06047c36061c967291341fd",
+    "/home/ricardo/rick-intelligence/docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-25-web-collection-error-final-20260925/performance/app-chat-mobile.json": "bb7530ae09da2bbf0b672299d88c41c3663d20db7bf4132bb5daba25f78d8e72",
+    "/home/ricardo/rick-intelligence/docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-25-web-collection-error-final-20260925/performance/app-chat-tablet.json": "d9dbebc247c0e4248ca2ca62ffdec1e25b031870666cc1c7e6b264b75e02b2f1",
+    "/home/ricardo/rick-intelligence/docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-25-web-collection-error-final-20260925/performance/app-desktop.json": "3d688e64a696f24e12cff3878bb30d846c99ef6f63f86aaea933cd205efac74e",
+    "/home/ricardo/rick-intelligence/docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-25-web-collection-error-final-20260925/performance/app-documents-desktop.json": "0b9942d6e31964dc5562ac0c0fa6290de458e0d54be8f6d4a8dcbbb7c6ceebc2",
+    "/home/ricardo/rick-intelligence/docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-25-web-collection-error-final-20260925/performance/app-documents-mobile.json": "2f400cad03882347c0550b7b106668e78acf6875c8abdb23e5f433478fbf113b",
+    "/home/ricardo/rick-intelligence/docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-25-web-collection-error-final-20260925/performance/app-documents-tablet.json": "442a7e05241a7c724442cbf4cf9b513f3da201241cc6a03e2b6b1691dcebb413",
+    "/home/ricardo/rick-intelligence/docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-25-web-collection-error-final-20260925/performance/app-mobile.json": "355b77372fe9f6797ba23df5312e7a6e206b2becbc152de987b00fe78a9a555a",
+    "/home/ricardo/rick-intelligence/docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-25-web-collection-error-final-20260925/performance/app-search-desktop.json": "dde1fde5dd4baa0063098406b5c3e3405c12e2391fe37f28ca5cd6f713e40dec",
+    "/home/ricardo/rick-intelligence/docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-25-web-collection-error-final-20260925/performance/app-search-mobile.json": "def34416eea971618fbf0986480eece0f2ce78cccacbce08c20fdd65cbdf21f4",
+    "/home/ricardo/rick-intelligence/docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-25-web-collection-error-final-20260925/performance/app-search-tablet.json": "05d5e08f3406c11b97e4049176e1c0aa9d1a378accce617c8d6b57fd698cd9d7",
+    "/home/ricardo/rick-intelligence/docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-25-web-collection-error-final-20260925/performance/app-tablet.json": "ecb163a3c083d1001f8007946dfd920d407308dcc2260b75839dae254a3f611e",
+    "/home/ricardo/rick-intelligence/docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-25-web-collection-error-final-20260925/performance/login-desktop.json": "cc0a573eb61e86019722260968d266e7d47ebea4c38c8323c3d4d2ed292029a5",
+    "/home/ricardo/rick-intelligence/docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-25-web-collection-error-final-20260925/performance/login-mobile.json": "344e41f146b038fd6c77c85ae3ec077f23c5882e1a3687e50d32a0ba2cef91dc",
+    "/home/ricardo/rick-intelligence/docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-25-web-collection-error-final-20260925/performance/login-tablet.json": "d2c8be200d8827cf0756951f2df0b9c0e18e19e74bdc00c95166a821db631b3b",
+    "apps/web/app/app/documents/page.tsx": "693d963b7eb5d88e31a4a786e22b7e50a09eabf2157d53b5395f0d67b2cfb742",
+    "apps/web/app/globals.css": "dd998ba9d3ff2b25f041de3d165d521e9d7e8618e652a0dcb135b8109a8ae22b",
+    "apps/web/components/collections/collection-management.tsx": "c7c448a1e96bf70585b15c34a35441a1091bc188f79bf154ab069df3214a594b",
+    "apps/web/tests/document-state.spec.ts": "cecf919638746ee8773388c893b40bac13a211c7bd503fb3adb26aa1f41c7071",
+    "apps/web/tests/visual-matrix.spec.ts": "1131592213113811f1cf8f46cfe79f9c26e7924f3d475a685f41169597cc689f",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-25-web-collection-error-closed-20260925/focused-e2e.log": "42871f7b76c276dd698fe909fdd6227be083682a8ae58a7ee6fe2b1f008b7bd2",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-25-web-collection-error-final-20260925/web-e2e.log": "d3a68a8d08e180e7cb3031dc9238942888321e99b24824e8caec6feab60822ce",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-25-web-collection-error-review-fixes-20260925/focused-e2e.log": "8d62b4ae94f461142b0675e2cdeba59974255fb86c9605b7edbb243f00ce42b3",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-25-web-collection-error-review-resolved-20260925/focused-e2e.log": "141f31fbd52468c3ed89e5ec7f751fdf08b5418a442a8829d204fda7129df533",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-25-web-collection-error-review-resolved-20260925/visual-renders/upload-only-collection-error-desktop-viewport.png": "598763d543ae6c4149e868cf855cd422c83513f1866fc6528458e2fb4ae693f2",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-25-web-collection-error-review-resolved-20260925/visual-renders/upload-only-collection-error-mobile-viewport.png": "0372ab22c8c8a4db94d02aa60bc1fb112fddebd131cf5b02c8e30043745a7feb",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-25-web-collection-error-review-resolved-20260925/visual-renders/upload-only-collection-error-tablet-viewport.png": "c60c0e508808752824760d6e53dfe7ce86fbb25d6c25a14e81f224a4fe4ddf26",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-25-web-collection-error-review-resolved-20260925/web-build.log": "127b831669c589c5c887d77e837113dbf3755cb97774c15efcd2cea9389f8265",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-25-web-collection-error-review-resolved-20260925/web-lint.log": "8f9596f3e34443b9079584d502523f9a9b1b4c78e3b7bb1432b9387517cb502f",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-25-web-collection-error-review-resolved-20260925/web-typecheck.log": "b948d9c357fe1ebf6125fa2416acaf6a7fb9741f9fdf13d45371b7669b75ef2e",
+    "docs/reports/review-q24-25-document-collection-error-2026-09-25.md": "04a4a6e1fd795beb0335896b179cb9aa02468d60d419507b04a8791e1696e043"
+  },
+  "limitations": "The browser uses synthetic API route handlers. The final candidate has focused 27/27 production browser tests, but the 321-test full matrix and its 18 performance samples predate the final presentation-only CSS changes. No real API, screen-reader workflow, chat or administration review was performed; this is one local Q24-25 slice, not full task acceptance.",
+  "procedure": {
+    "build": "make web-build",
+    "environment": "Linux; Next.js production build; Playwright browser projects mobile/tablet/desktop; synthetic API routes; no live API or provider",
+    "focused_e2e": "RICK_WEB_E2E_PRODUCTION=1 RICK_VISUAL_EVIDENCE_DIR=<final>/visual-renders RICK_PERFORMANCE_EVIDENCE_DIR=<final>/performance npm run test:e2e -- tests/document-state.spec.ts --output=<final>/full-playwright-results",
+    "static": [
+      "make web-lint",
+      "make web-typecheck"
+    ]
+  },
+  "result": "PASS",
+  "review_disposition": [
+    {
+      "disposition": "Resolved by stacking retry at <=440 px and making the selector 220 px on desktop; covered by final focused tests.",
+      "finding": "Mobile alert text and retry competed for width; selector label clipped on desktop.",
+      "severity": "P3"
+    },
+    {
+      "disposition": "Resolved by a grid label/control group; the existing document-filter class was retained to preserve rounded select styling.",
+      "finding": "Desktop selector label was aligned beside the control rather than above it.",
+      "severity": "P3"
+    },
+    {
+      "disposition": "No P0-P3 findings.",
+      "finding": "Fresh final review of the three exact final renders and code.",
+      "severity": "NONE"
+    }
+  ],
+  "schema_version": 1,
+  "scope": "Q24-25 local web verification of collection loading/error/empty states and paused upload/retry for a non-manager uploader; does not close chat, administration, live-API or full Q24-25 acceptance.",
+  "verification": {
+    "final_candidate": {
+      "final_independent_visual_review": "PASS; zero P0-P3 findings",
+      "focused_production_e2e": "27 passed across mobile, tablet and desktop projects",
+      "make_web_build": "PASS",
+      "make_web_lint": "PASS",
+      "make_web_typecheck": "PASS",
+      "reviewer_contrast": "4.54:1 for 14 px alert text"
+    },
+    "prior_full_matrix": {
+      "performance_observations": "18 single lab samples; recorded as superseded observations, not re-run on final layout CSS",
+      "production_e2e": "321 passed in 4.1m on the preceding functional snapshot, before the final P3 layout refinements"
+    }
+  }
+}

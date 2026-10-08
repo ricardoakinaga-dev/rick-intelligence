@@ -1,0 +1,5 @@
+# exp-parity - 2026-10-07T16:09:19Z
+# command: PYTHONPATH=<canonical> .runtime/venvs/cvg/bin/python -m pytest -q -p no:cacheprovider apps/api/tests/test_route_policy.py
+FAILED apps/api/tests/test_route_policy.py::test_registry_covers_all_app_routes
+FAILED apps/api/tests/test_route_policy.py::test_protected_route_payloads_match_endpoint_contracts
+2 failed, 155 passed, 1 warning in 3.99s

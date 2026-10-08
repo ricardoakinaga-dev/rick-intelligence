@@ -142,7 +142,7 @@ test("supports user and session lifecycle with tenant-bound create and confirmat
     }
     if (path.endsWith("/deactivate")) {
       const target = users.find((item) => item.user_id === path.split("/").at(-2));
-      if (target) target.status = "disabled";
+      if (target) target.membership_status = "disabled";
       await route.fulfill({ json: { status: "disabled", user_id: target?.user_id, revoked_sessions: 1 } });
       return;
     }
@@ -206,6 +206,8 @@ test("supports user and session lifecycle with tenant-bound create and confirmat
   await expect(page.getByRole("heading", { name: "Desativar este usuário?", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Desativar usuário", exact: true }).click();
   await expect(page.getByText(/alice@example\.invalid foi desativado/)).toBeVisible();
+  await expect(page.locator(".document-row").filter({ hasText: "alice@example.invalid" }).getByText("Desativado")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Desativar alice@example.invalid", exact: true })).toHaveCount(0);
 
   await page.getByRole("button", { name: "Revogar sessão de alice@example.invalid", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Revogar esta sessão?", exact: true })).toBeVisible();

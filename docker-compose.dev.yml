@@ -123,6 +123,9 @@ services:
     deploy: *service-resources
     command: ["server", "/data", "--console-address", ":9001"]
     environment:
+      # Root credentials are required by MinIO itself. The init container
+      # receives only the pre-provisioned scoped application credential;
+      # application services never receive these root values.
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:?inject a disposable development access key}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?inject a disposable development secret}
     ports:
@@ -131,9 +134,10 @@ services:
     volumes:
       - object-data:/data
     healthcheck:
+      # Credential-free liveness probe; never uses the root secret.
       test:
         - CMD-SHELL
-        - mc alias set local http://127.0.0.1:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD" >/dev/null 2>&1 && mc ready local
+        - curl -fsS http://127.0.0.1:9000/minio/health/live >/dev/null
       interval: 5s
       timeout: 5s
       retries: 20
@@ -144,8 +148,8 @@ services:
     image: minio/mc:RELEASE.2025-02-28T09-55-16Z
     deploy: *service-resources
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?inject a disposable development access key}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?inject a disposable development secret}
+      # Bootstrap uses only the pre-provisioned scoped app credential; root
+      # credentials remain exclusively on object-store.
       RICK_OBJECT_STORE_BUCKET: ${RICK_OBJECT_STORE_BUCKET:?set the object-store bucket}
       OBJECT_STORE_ACCESS_KEY_ID: ${OBJECT_STORE_ACCESS_KEY_ID:?set the scoped object-store access key}
       OBJECT_STORE_SECRET_ACCESS_KEY: ${OBJECT_STORE_SECRET_ACCESS_KEY:?set the scoped object-store secret}
@@ -162,6 +166,8 @@ services:
     deploy: *service-resources
     environment:
       COLLECTOR_OTLP_ENABLED: "true"
+      # Disposable lab only: traces are intentionally ephemeral and are lost
+      # on restart; durable tracing storage is not claimed by this topology.
       SPAN_STORAGE_TYPE: memory
     ports:
       - 127.0.0.1:16686:16686
@@ -185,12 +191,50 @@ services:
       - 127.0.0.1:18889:8889
     depends_on:
       jaeger: {condition: service_healthy}
+    # The v0.123 scratch image has no shell or wget; readiness runs below.
+    networks: [private]
+
+  collector-ready:
+    <<: *service-hardening
+    image: ${RICK_API_IMAGE:?supply an immutable API image reference}
+    deploy:
+      resources:
+        limits: {cpus: "0.25", memory: 128M}
+    # Override the API image's uvicorn entrypoint. No application runs here.
+    entrypoint: ["python", "-c"]
+    command: ["import threading; threading.Event().wait()"]
+    depends_on:
+      otel-collector: {condition: service_started}
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:13133/ >/dev/null"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://otel-collector:13133/', timeout=4).read()"]
       interval: 10s
       timeout: 5s
       retries: 12
     networks: [private]
+
+  alertmanager:
+    <<: *service-hardening
+    image: prom/alertmanager:v0.28.1
+    user: "65534:65534"
+    deploy: *service-resources
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+      - --cluster.listen-address=
+    volumes:
+      - ./infrastructure/compose/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      # The image owns /alertmanager as nobody; fresh volume copy-up retains it.
+      - alertmanager-data:/alertmanager
+    secrets:
+      - source: rick-alert-webhook-url
+        target: rick-alert-webhook-url
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:9093/-/ready >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    # Internal data plane plus outbound-only delivery capability; no host ports.
+    networks: [private, alert-egress]
 
   metrics:
     <<: *service-hardening
@@ -198,18 +242,19 @@ services:
     deploy: *service-resources
     command:
       - --config.file=/etc/prometheus/prometheus.yml
-      - --rule.file=/etc/prometheus/alerts.yml
       - --storage.tsdb.path=/prometheus
       - --storage.tsdb.retention.time=7d
       - --web.enable-lifecycle
     volumes:
       - ./infrastructure/compose/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./infrastructure/compose/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - ./infrastructure/monitoring/prometheus.rules.yml:/etc/prometheus/prometheus.rules.yml:ro
       - metrics-data:/prometheus
     ports:
       - 127.0.0.1:19090:9090
     depends_on:
-      otel-collector: {condition: service_healthy}
+      collector-ready: {condition: service_healthy}
+      alertmanager: {condition: service_healthy}
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:9090/-/ready >/dev/null"]
       interval: 10s
@@ -228,6 +273,7 @@ services:
       RICK_IDENTITY_MODE: dev
       RICK_API_CHAT_BACKEND: professor
       RICK_API_COMPOSITION: ${RICK_API_COMPOSITION:?supply the reviewed module:factory composition}
+      RICK_WORKER_ID: ${RICK_WORKER_ID:?set a unique worker identity}
       RICK_EXTERNAL_DATABASE_DSN: ${RICK_EXTERNAL_DATABASE_DSN:?inject the development database DSN}
       RICK_REDIS_URL: ${RICK_REDIS_URL:?inject the development Redis URL}
       RICK_QDRANT_URL: http://qdrant:6333
@@ -267,7 +313,7 @@ services:
       qdrant-init: {condition: service_completed_successfully}
       object-store: {condition: service_healthy}
       object-store-init: {condition: service_completed_successfully}
-      otel-collector: {condition: service_healthy}
+      collector-ready: {condition: service_healthy}
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=4).read()\""]
       interval: 10s
@@ -317,13 +363,14 @@ services:
       qdrant-init: {condition: service_completed_successfully}
       object-store: {condition: service_healthy}
       object-store-init: {condition: service_completed_successfully}
-      otel-collector: {condition: service_healthy}
+      collector-ready: {condition: service_healthy}
     healthcheck:
       test: ["CMD", "python", "/opt/rick/docker/worker-entrypoint.py", "--health-check"]
       interval: 10s
       timeout: 5s
       retries: 12
-    networks: [private]
+    # Internal-only networking blocks embedding/provider endpoints.
+    networks: [private, worker-egress]
 
   worker-b:
     <<: *service-hardening
@@ -367,13 +414,14 @@ services:
       qdrant-init: {condition: service_completed_successfully}
       object-store: {condition: service_healthy}
       object-store-init: {condition: service_completed_successfully}
-      otel-collector: {condition: service_healthy}
+      collector-ready: {condition: service_healthy}
     healthcheck:
       test: ["CMD", "python", "/opt/rick/docker/worker-entrypoint.py", "--health-check"]
       interval: 10s
       timeout: 5s
       retries: 12
-    networks: [private]
+    # Same outbound provider access as the first worker, with no host ports.
+    networks: [private, worker-egress]
 
   web:
     <<: *service-hardening
@@ -399,8 +447,15 @@ volumes:
   qdrant-data: {}
   object-data: {}
   metrics-data: {}
+  alertmanager-data: {}
+
+secrets:
+  rick-alert-webhook-url:
+    file: ${RICK_ALERT_WEBHOOK_URL_FILE:?supply a reviewed webhook URL file readable by uid 65534}
 
 networks:
   private:
     internal: true
   edge: {}
+  worker-egress: {}
+  alert-egress: {}

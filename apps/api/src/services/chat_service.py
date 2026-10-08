@@ -7,6 +7,7 @@ calls the injected ChatBackend, and never exposes chain-of-thought.
 from __future__ import annotations
 
 import asyncio
+import json
 import time
 import uuid
 from collections.abc import Mapping
@@ -16,6 +17,37 @@ from typing import AsyncIterator, Protocol
 from core.errors import ApiError
 from models import SessionSnapshot
 from services.authorization_service import build_retrieval_context
+from services.chat_history import IdempotencyConflict, idempotency_fingerprint
+
+
+MAX_IDEMPOTENCY_KEY_CHARS = 128
+
+
+def _canonical_idempotency_key(value: object) -> str | None:
+    """Validate and normalize a retry key before it reaches IDs or history."""
+
+    if value is None:
+        return None
+    if not isinstance(value, str) or len(value) > MAX_IDEMPOTENCY_KEY_CHARS:
+        raise ApiError("validation_error")
+    key = value.strip()
+    if not key or any(ord(char) < 0x20 or ord(char) == 0x7F for char in key):
+        raise ApiError("validation_error")
+    return key
+
+
+def _turn_identifier(prefix: str, session: object, idempotency_key: str | None) -> str:
+    """Keep retry identifiers stable before a concurrent stream is persisted."""
+
+    if not isinstance(idempotency_key, str) or not idempotency_key:
+        return f"{prefix}-{uuid.uuid4().hex[:12]}"
+    identity = json.dumps(
+        [getattr(session, field, None) for field in ("tenant_id", "workspace_id", "user_id")]
+        + [idempotency_key],
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
+    return f"{prefix}-{uuid.uuid5(uuid.NAMESPACE_URL, identity).hex[:12]}"
 
 
 class ChatBackend(Protocol):
@@ -113,11 +145,93 @@ class StubChatBackend:
 
 class ChatApplicationService:
     def __init__(self, backend: ChatBackend, history=None, *, context_turns: int = 12,
-                 telemetry=None):
+                 telemetry=None, authorization_revalidator=None):
         self.backend = backend
         self.history = history
         self.context_turns = max(0, min(50, int(context_turns)))
         self.telemetry = telemetry
+        self.authorization_revalidator = authorization_revalidator
+
+    async def _refresh_context(self, context: Mapping[str, object]) -> dict[str, object]:
+        """Recheck live grants and make every refreshed scope narrowing-only."""
+        original = dict(context)
+        target = self.authorization_revalidator
+        if not callable(target):
+            return original
+        try:
+            if inspect.iscoroutinefunction(target) or inspect.iscoroutinefunction(getattr(target, "__call__", None)):
+                current = target(context=dict(original))
+            else:
+                current = await asyncio.to_thread(target, context=dict(original))
+            if inspect.isawaitable(current):
+                current = await current
+        except Exception:
+            raise ApiError("forbidden") from None
+        if not isinstance(current, Mapping) or any(
+            current.get(key) != original.get(key)
+            for key in ("tenant_id", "workspace_id", "user_id")
+        ):
+            raise ApiError("forbidden")
+        old_collections, new_collections = original.get("allowed_collection_ids"), current.get("allowed_collection_ids")
+        old_permissions, new_permissions = original.get("permissions"), current.get("permissions")
+        if (
+            not isinstance(old_collections, list) or not isinstance(new_collections, list)
+            or not all(isinstance(item, str) for item in [*old_collections, *new_collections])
+            or not isinstance(old_permissions, list) or not isinstance(new_permissions, list)
+            or not all(isinstance(item, str) for item in [*old_permissions, *new_permissions])
+        ):
+            raise ApiError("forbidden")
+
+        def narrow(previous: list[str], refreshed: list[str]) -> list[str]:
+            if "*" in previous:
+                return sorted(set(refreshed))
+            if "*" in refreshed:
+                return sorted(set(previous))
+            return sorted(set(previous).intersection(refreshed))
+
+        allowed = narrow(old_collections, new_collections)
+        permissions = narrow(old_permissions, new_permissions)
+        if (old_collections and not allowed) or not ({"chat.query", "*"} & set(permissions)):
+            raise ApiError("forbidden")
+        return {**original, "allowed_collection_ids": allowed, "permissions": permissions}
+
+    async def _cached_response(self, value: Mapping[str, object], context: Mapping[str, object]) -> dict:
+        from rick_contracts.chat import ChatResponse
+        from services.chat_history import _safe_chat_response
+
+        try:
+            response = _safe_chat_response(value)
+            response = ChatResponse.model_validate(response).model_dump(mode="json")
+        except Exception:
+            raise ApiError("forbidden") from None
+        allowed = context.get("allowed_collection_ids")
+        if not isinstance(allowed, list) or not all(isinstance(item, str) for item in allowed):
+            raise ApiError("forbidden")
+        if response["metadata"].get("evidence_status") == "APPROVED_EVIDENCE" and not response["citations"]:
+            raise ApiError("forbidden")
+        if "*" not in allowed and any(
+            not isinstance(item.get("collection_id"), str)
+            or item["collection_id"] not in allowed
+            for item in response["citations"]
+        ):
+            raise ApiError("forbidden")
+        await self._validate_current_sources(response, context)
+        return response
+
+    async def _validate_current_sources(
+        self, response: Mapping[str, object], context: Mapping[str, object],
+    ) -> None:
+        validator = getattr(self.backend, "validate_cached_response", None)
+        if not callable(validator):
+            return
+        try:
+            valid = validator(context=dict(context), response=response)
+            if inspect.isawaitable(valid):
+                valid = await valid
+        except Exception:
+            valid = False
+        if valid is not True:
+            raise ApiError("forbidden")
 
     async def _generate(self, *, message: str, context: dict, conversation_id: str,
                         history: list[dict[str, str]]) -> dict:
@@ -169,6 +283,55 @@ class ChatApplicationService:
         except (PermissionError, KeyError):
             raise ApiError("forbidden") from None
 
+    @staticmethod
+    def _turn_fingerprint(*, session: SessionSnapshot, message: str,
+                          collection_id: str | None) -> str:
+        """Fingerprint a retry key's turn so it cannot be replayed elsewhere."""
+
+        return idempotency_fingerprint(
+            session=session, message=message, collection_id=collection_id,
+        )
+
+    def _replayable_turn(self, *, session: SessionSnapshot, idempotency_key: str,
+                         conversation_id: str, fingerprint: str) -> dict | None:
+        """Return the stored turn only when it belongs to this exact turn.
+
+        A key reused for another conversation, message or collection is a
+        conflict, never a replay: the caller must see 409 instead of another
+        conversation's answer.
+        """
+        reader = getattr(self.history, "get_idempotent", None) if self.history is not None else None
+        if not callable(reader):
+            return None
+        try:
+            existing = reader(
+                session=session, idempotency_key=idempotency_key,
+                conversation_id=conversation_id, fingerprint=fingerprint,
+            )
+        except IdempotencyConflict:
+            raise ApiError("conflict") from None
+        if existing is None:
+            return None
+        if existing.get("conversation_id") != conversation_id:
+            raise ApiError("conflict")
+        return existing
+
+    def _persisted_turn(self, *, session: SessionSnapshot, message: str,
+                        response: Mapping[str, object], idempotency_key: str | None,
+                        fingerprint: str | None) -> Mapping | None:
+        """Append a durable turn, surfacing an idempotency clash as 409."""
+        append = getattr(self.history, "append", None) if self.history is not None else None
+        if not callable(append):
+            return None
+        try:
+            persisted = append(
+                session=session, message=message, response=response,
+                idempotency_key=idempotency_key, fingerprint=fingerprint,
+            )
+        except IdempotencyConflict:
+            raise ApiError("conflict") from None
+        return persisted if isinstance(persisted, Mapping) else None
+
     async def chat(self, *, session: SessionSnapshot, message: str, conversation_id: str | None,
                    collection_id: str | None, workspace_id: str | None, mode: str,
                    idempotency_key: str | None = None,
@@ -181,15 +344,22 @@ class ChatApplicationService:
             raise ApiError("forbidden")
         if len(message) > 20000 or len(message.strip()) == 0:
             raise ApiError("validation_error")
+        idempotency_key = _canonical_idempotency_key(idempotency_key)
         workspace = workspace_id or session.workspace_id or "default"
         context = build_retrieval_context(session, workspace_id=workspace, collection_id=collection_id)
-        conv_id = conversation_id or f"conv-{uuid.uuid4().hex[:12]}"
-        if idempotency_key:
-            existing = getattr(self.history, "get_idempotent", lambda **_: None)(
+        context = await self._refresh_context(context)
+        conv_id = conversation_id or _turn_identifier("conv", session, idempotency_key)
+        fingerprint = (
+            self._turn_fingerprint(session=session, message=message, collection_id=collection_id)
+            if idempotency_key else None
+        )
+        if idempotency_key and fingerprint is not None:
+            existing = self._replayable_turn(
                 session=session, idempotency_key=idempotency_key,
-            ) if self.history is not None else None
+                conversation_id=conv_id, fingerprint=fingerprint,
+            )
             if existing is not None:
-                return existing
+                return await self._cached_response(existing, context)
         self._prepare_conversation(session=session, conversation_id=conv_id, collection_id=collection_id)
         history = self._read_context(session=session, conversation_id=conv_id, context=context)
         try:
@@ -227,7 +397,7 @@ class ChatApplicationService:
             raise
         response = {
             "conversation_id": conv_id,
-            "message_id": f"msg-{uuid.uuid4().hex[:12]}",
+            "message_id": _turn_identifier("msg", session, idempotency_key),
             "answer": result.get("answer", ""),
             "citations": result.get("citations", []),
             "metadata": {
@@ -236,17 +406,20 @@ class ChatApplicationService:
             },
         }
         from rick_contracts.chat import ChatResponse
+        from services.chat_history import _safe_chat_response
 
-        serialized = ChatResponse.model_validate(response).model_dump(mode="json")
-        append = getattr(self.history, "append", None) if self.history is not None else None
-        if callable(append):
+        serialized = ChatResponse.model_validate(_safe_chat_response(response)).model_dump(mode="json")
+        await self._validate_current_sources(serialized, context)
+        if self.history is not None:
             try:
-                persisted = append(
+                persisted = self._persisted_turn(
                     session=session, message=message, response=serialized,
-                    idempotency_key=idempotency_key,
+                    idempotency_key=idempotency_key, fingerprint=fingerprint,
                 )
-                if isinstance(persisted, Mapping):
-                    return dict(persisted)
+                if persisted is not None:
+                    return await self._cached_response(persisted, context)
+            except ApiError:
+                raise
             except Exception:
                 # A grounded answer without its durable turn would make
                 # idempotency and the conversation read model diverge.
@@ -283,33 +456,34 @@ class ChatApplicationService:
     def _record_stream_outcome(self, *, session: SessionSnapshot, message: str,
                                conversation_id: str, message_id: str, status: str,
                                answer: str, error_code: str | None, metadata: Mapping[str, object],
-                               idempotency_key: str | None = None) -> None:
+                               idempotency_key: str | None = None,
+                               fingerprint: str | None = None) -> None:
         recorder = getattr(self.history, "record_stream_outcome", None) if self.history is not None else None
         if not callable(recorder):
             return
-        try:
-            recorder(
-                session=session, message=message, conversation_id=conversation_id,
-                message_id=message_id, status=status, answer=answer,
-                error_code=error_code, metadata=metadata,
-                idempotency_key=idempotency_key,
-            )
-        except TypeError as exc:
-            # Preserve compatibility with a legacy recorder that has not yet
-            # adopted the idempotency argument, while keeping write failures
-            # visible to the caller.
-            if "idempotency_key" not in str(exc):
-                raise RuntimeError("stream outcome persistence failed") from exc
+        # Preserve compatibility with a legacy recorder that has not yet
+        # adopted the idempotency/fingerprint arguments, while keeping write
+        # failures visible to the caller.
+        signature_error: TypeError | None = None
+        for extra in (
+            {"idempotency_key": idempotency_key, "fingerprint": fingerprint},
+            {"idempotency_key": idempotency_key},
+            {},
+        ):
             try:
                 recorder(
                     session=session, message=message, conversation_id=conversation_id,
                     message_id=message_id, status=status, answer=answer,
-                    error_code=error_code, metadata=metadata,
+                    error_code=error_code, metadata=metadata, **extra,
                 )
-            except Exception as retry_exc:
-                raise RuntimeError("stream outcome persistence failed") from retry_exc
-        except Exception as exc:
-            raise RuntimeError("stream outcome persistence failed") from exc
+                return
+            except TypeError as exc:
+                if not any(name in str(exc) for name in ("idempotency_key", "fingerprint")):
+                    raise RuntimeError("stream outcome persistence failed") from exc
+                signature_error = exc
+            except Exception as exc:
+                raise RuntimeError("stream outcome persistence failed") from exc
+        raise RuntimeError("stream outcome persistence failed") from signature_error
 
     def _record_stream_metrics(self, *, outcome: str, started: float,
                                first_delta_at: float | None) -> None:
@@ -336,16 +510,22 @@ class ChatApplicationService:
         answer_so_far = ""
         scope_ready = False
         replay = False
-        conv_id = conversation_id or f"conv-{uuid.uuid4().hex[:12]}"
-        msg_id = f"msg-{uuid.uuid4().hex[:12]}"
+        start_sent = False
+        key_error: ApiError | None = None
+        try:
+            idempotency_key = _canonical_idempotency_key(idempotency_key)
+        except ApiError as exc:
+            key_error = exc
+            idempotency_key = None
+        conv_id = conversation_id or _turn_identifier("conv", session, idempotency_key)
+        msg_id = _turn_identifier("msg", session, idempotency_key)
         workspace = workspace_id or session.workspace_id or "default"
+        fingerprint = (
+            self._turn_fingerprint(session=session, message=message, collection_id=collection_id)
+            if idempotency_key else None
+        )
 
         try:
-            yield {
-                "type": "start", "conversation_id": conv_id, "message_id": msg_id,
-                "provisional": True,
-            }
-
             stream_backend = getattr(self.backend, "generate_stream", None)
             if callable(stream_backend):
                 try:
@@ -357,33 +537,51 @@ class ChatApplicationService:
                         raise ApiError("forbidden")
                     if len(message) > 20000 or not message.strip():
                         raise ApiError("validation_error")
+                    if key_error is not None:
+                        raise key_error
                     context = build_retrieval_context(
                         session, workspace_id=workspace, collection_id=collection_id,
                     )
-                    if idempotency_key and self.history is not None:
-                        existing = getattr(self.history, "get_idempotent", lambda **_: None)(
+                    context = await self._refresh_context(context)
+                    if idempotency_key and fingerprint is not None:
+                        existing = self._replayable_turn(
                             session=session, idempotency_key=idempotency_key,
+                            conversation_id=conv_id, fingerprint=fingerprint,
                         )
                         if existing is not None:
-                            conv_id = str(existing.get("conversation_id") or conv_id)
-                            msg_id = str(existing.get("message_id") or msg_id)
+                            existing = await self._cached_response(existing, context)
+                            conv_id = existing["conversation_id"]
+                            msg_id = existing["message_id"]
                             replay = True
-                            answer = str(existing.get("answer") or "")
+                            yield {
+                                "type": "start", "conversation_id": conv_id,
+                                "message_id": msg_id, "provisional": True,
+                            }
+                            start_sent = True
+                            answer = existing["answer"]
                             for index in range(0, len(answer), 120):
                                 delta = answer[index:index + 120]
                                 if first_delta_at is None:
                                     first_delta_at = time.monotonic()
                                 yield {"type": "delta", "conversation_id": conv_id,
                                        "message_id": msg_id, "delta": delta, "provisional": True}
+                            for citation in existing["citations"]:
+                                yield {"type": "citation", "conversation_id": conv_id,
+                                       "message_id": msg_id, "citation": citation}
                             terminal_status = "complete"
                             yield {"type": "completion", "conversation_id": conv_id, "message_id": msg_id,
-                                   "answer": answer, "citations": existing.get("citations", []),
-                                   "provisional": False}
+                                   "answer": answer, "citations": existing["citations"],
+                                   "metadata": existing["metadata"], "provisional": False}
                             return
                     self._prepare_conversation(
                         session=session, conversation_id=conv_id, collection_id=collection_id,
                     )
                     scope_ready = True
+                    yield {
+                        "type": "start", "conversation_id": conv_id,
+                        "message_id": msg_id, "provisional": True,
+                    }
+                    start_sent = True
                     history = self._read_context(
                         session=session, conversation_id=conv_id, context=context,
                     )
@@ -393,23 +591,13 @@ class ChatApplicationService:
                     if inspect.isawaitable(stream):
                         stream = await stream
                     final: dict | None = None
-                    saw_delta = False
                     async for event in stream:
                         if not isinstance(event, Mapping):
                             continue
-                        if event.get("type") == "delta":
-                            delta = str(event.get("delta") or "")
-                            if delta:
-                                saw_delta = True
-                                answer_so_far = (answer_so_far + delta)[:8000]
-                                if first_delta_at is None:
-                                    first_delta_at = time.monotonic()
-                                yield {"type": "delta", "conversation_id": conv_id,
-                                       "message_id": msg_id, "delta": delta, "provisional": True}
-                        elif event.get("type") == "final" and isinstance(event.get("result"), Mapping):
+                        # Provider deltas remain private until the final
+                        # publication/grant checks accept the complete answer.
+                        if event.get("type") == "final" and isinstance(event.get("result"), Mapping):
                             final = dict(event["result"])
-                            if not saw_delta and final.get("answer"):
-                                answer_so_far = str(final.get("answer") or "")[:8000]
                     if final is None:
                         raise ApiError("generation_failed")
                     metadata = dict(final.get("metadata") or {}) if isinstance(final.get("metadata"), Mapping) else {}
@@ -418,46 +606,66 @@ class ChatApplicationService:
                         "stream_status": "complete", "stream_mode": "live",
                         "stream_duration_ms": round((time.monotonic() - started) * 1000, 3),
                     })
-                    if first_delta_at is not None:
-                        metadata["stream_ttft_ms"] = round((first_delta_at - started) * 1000, 3)
+                    answer = final.get("answer", "")
+                    if isinstance(answer, str) and answer:
+                        metadata["stream_ttft_ms"] = round((time.monotonic() - started) * 1000, 3)
                     response = {
                         "conversation_id": conv_id, "message_id": msg_id,
-                        "answer": final.get("answer", ""), "citations": final.get("citations", []),
+                        "answer": answer, "citations": final.get("citations", []),
                         "metadata": metadata,
                     }
                     from rick_contracts.chat import ChatResponse
+                    from services.chat_history import _safe_chat_response
 
-                    serialized = ChatResponse.model_validate(response).model_dump(mode="json")
-                    if not saw_delta and serialized["answer"]:
-                        answer_so_far = str(serialized["answer"])[:8000]
+                    serialized = ChatResponse.model_validate(_safe_chat_response(response)).model_dump(mode="json")
+                    await self._validate_current_sources(serialized, context)
+                    if self.history is not None:
+                        persisted = self._persisted_turn(
+                            session=session, message=message, response=serialized,
+                            idempotency_key=idempotency_key, fingerprint=fingerprint,
+                        )
+                        if persisted is not None:
+                            serialized = await self._cached_response(persisted, context)
+                            if (
+                                serialized["conversation_id"] != conv_id
+                                or serialized["message_id"] != msg_id
+                            ):
+                                raise ApiError("conflict")
+                    conv_id = serialized["conversation_id"]
+                    msg_id = serialized["message_id"]
+                    answer = serialized["answer"]
+                    answer_so_far = answer[:8000]
+                    for index in range(0, len(answer), 120):
+                        delta = answer[index:index + 120]
                         if first_delta_at is None:
                             first_delta_at = time.monotonic()
                         yield {"type": "delta", "conversation_id": conv_id,
-                               "message_id": msg_id, "delta": serialized["answer"], "provisional": True}
-                    if self.history is not None:
-                        persisted = self.history.append(
-                            session=session, message=message, response=serialized,
-                            idempotency_key=idempotency_key,
-                        )
-                        if isinstance(persisted, Mapping):
-                            serialized = dict(persisted)
+                               "message_id": msg_id, "delta": delta, "provisional": True}
                     terminal_status = "complete"
                     for citation in serialized["citations"]:
                         yield {"type": "citation", "conversation_id": conv_id,
                                "message_id": msg_id, "citation": citation}
                     yield {"type": "completion", "conversation_id": conv_id, "message_id": msg_id,
                            "answer": serialized["answer"], "citations": serialized["citations"],
-                           "provisional": False}
+                           "metadata": serialized["metadata"], "provisional": False}
                     return
                 except ApiError as exc:
                     terminal_status = "partial" if answer_so_far else "error"
                     terminal_error = exc.code
+                    if not start_sent:
+                        yield {"type": "start", "conversation_id": conv_id,
+                               "message_id": msg_id, "provisional": True}
+                        start_sent = True
                     yield {"type": "error", "code": exc.code, "message": exc.message,
                            "provisional": False}
                     return
                 except Exception as exc:
                     terminal_status = "partial" if answer_so_far else "error"
                     terminal_error = self._stream_error_code(exc)
+                    if not start_sent:
+                        yield {"type": "start", "conversation_id": conv_id,
+                               "message_id": msg_id, "provisional": True}
+                        start_sent = True
                     yield {"type": "error", "code": terminal_error, "message": "Generation failed.",
                            "provisional": False}
                     return
@@ -471,6 +679,8 @@ class ChatApplicationService:
                     raise ApiError("forbidden")
                 if len(message) > 20000 or not message.strip():
                     raise ApiError("validation_error")
+                if key_error is not None:
+                    raise key_error
                 self._prepare_conversation(
                     session=session, conversation_id=conv_id, collection_id=collection_id,
                 )
@@ -481,21 +691,37 @@ class ChatApplicationService:
                     idempotency_key=idempotency_key,
                     response_metadata={"stream_status": "complete", "stream_mode": "buffered"},
                 )
+                from rick_contracts.chat import ChatResponse
+
+                result = ChatResponse.model_validate(result).model_dump(mode="json")
+                conv_id = result["conversation_id"]
+                msg_id = result["message_id"]
                 scope_ready = True
             except ApiError as exc:
                 terminal_status = "error"
                 terminal_error = exc.code
+                if not start_sent:
+                    yield {"type": "start", "conversation_id": conv_id,
+                           "message_id": msg_id, "provisional": True}
+                    start_sent = True
                 yield {"type": "error", "code": exc.code, "message": exc.message,
                        "provisional": False}
                 return
             except Exception:
                 terminal_status = "error"
                 terminal_error = "generation_failed"
+                if not start_sent:
+                    yield {"type": "start", "conversation_id": conv_id,
+                           "message_id": msg_id, "provisional": True}
+                    start_sent = True
                 yield {"type": "error", "code": "generation_failed", "message": "Generation failed.",
                        "provisional": False}
                 return
             answer = str(result.get("answer") or "")
             answer_so_far = answer[:8000]
+            yield {"type": "start", "conversation_id": conv_id,
+                   "message_id": msg_id, "provisional": True}
+            start_sent = True
             # Compatibility backends are buffered, but the protocol still emits
             # real chunks and records the terminal status in the persisted turn.
             for i in range(0, len(answer), 120):
@@ -508,7 +734,8 @@ class ChatApplicationService:
                 yield {"type": "citation", "conversation_id": conv_id,
                        "message_id": msg_id, "citation": citation}
             yield {"type": "completion", "conversation_id": conv_id, "message_id": msg_id,
-                   "answer": answer, "citations": result["citations"], "provisional": False}
+                   "answer": answer, "citations": result["citations"],
+                   "metadata": result["metadata"], "provisional": False}
         except BaseException:
             if terminal_status is None:
                 terminal_status = "cancelled"
@@ -523,6 +750,7 @@ class ChatApplicationService:
                         status=terminal_status, answer=answer_so_far, error_code=terminal_error,
                         metadata={"mode": mode, "workspace_id": workspace, "stream_mode": "live"},
                         idempotency_key=idempotency_key,
+                        fingerprint=fingerprint,
                     )
             finally:
                 self._record_stream_metrics(

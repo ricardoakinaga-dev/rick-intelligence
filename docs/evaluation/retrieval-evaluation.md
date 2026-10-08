@@ -12,7 +12,7 @@ cases. The checked-in REC-22 local pack can be run with:
 
 ```bash
 PYTHONPATH=scripts/state_of_art python3 scripts/state_of_art/evaluate_pack.py \
-  --pack docs/evaluation/packs/rec22-local-v1 --pretty
+  --pack docs/evaluation/packs/rec22-local-v2 --pretty
 ```
 
 The pack includes positive ranking/ACL/provenance observations and synthetic
@@ -64,6 +64,48 @@ they do not constitute the D04 promotion pack. A real promotion decision still
 requires reviewed golden queries, corpus provenance/license, freshness and
 deletion cases, provider failure cases, threshold ownership, and a reproducible
 runtime artifact.
+
+## Stratified campaign harness
+
+`scripts/state_of_art/evaluate_campaign.py` emits
+`retrieval-campaign-result.v4`. The campaign manifest may declare
+`evaluation_design.strata_dimensions`, and each case must provide exactly those
+labels in `pack.strata`. Product-candidate eligibility requires the `risk` and
+`ambiguity` dimensions. The dimension names describe measurement groups; their
+labels, interpretation, and acceptance thresholds must come from the approved
+domain/corpus decision (D04), not from the harness author.
+
+The result reports ranking, source/citation, ACL, and latency metrics for each
+combination of declared labels and measurement identity. Positive cases remain
+separate by `model_id`/`corpus_id`; if a positive case omits either value, the
+campaign uses the corresponding pack-manifest metadata default. Negative cases
+remain separate by expected failure type. `uncertainty.overall` is pooled
+across all positive cases; the `by_model_corpus` projection keeps each exact
+pair separate, and `by_quality_stratum` adds the declared labels. Distinct
+pairs and negative expectations therefore cannot disappear inside either
+grouped projection.
+
+Every non-empty valid Unicode identity string is preserved exactly, including
+strings made only of whitespace; empty strings and strings containing an
+unpaired surrogate are invalid. Components are
+percent-encoded as path segments in `stratum_id`, so embedded separators and
+surrounding spaces cannot collapse distinct model/corpus pairs. Declared
+dimension JSON is canonicalized and encoded losslessly as unpadded URL-safe
+base64 in the `labels-` suffix; consumers can recover the exact dimension map
+without a truncated digest or collision assumption. Top-level offline fixture
+checks remain aggregate and must be read with the pack's `per_model_corpus`
+results. Grouped rows remain diagnostic: they do not
+get a PASS threshold until the domain owner approves one. Expected abstentions
+are listed separately, while observed response dispositions remain
+`NOT_MEASURED` because this offline harness does not run the product or
+generate answers. The top-level harness `PASS`, campaign `NOT_RUN`, and
+eligibility `BLOCKED` are independent states; synthetic labels and
+observations cannot make a product campaign eligible or complete.
+
+The checked-in campaign has no risk/ambiguity annotations, so its stratified
+quality array is empty and the readiness report names those missing dimensions.
+Tests use values prefixed `synthetic_` only to verify grouping and calculation;
+they do not define product categories.
 
 Live mode is deliberately declaration-only. It returns `NOT_RUN` whether or
 not provider environment markers exist until a separately reviewed live

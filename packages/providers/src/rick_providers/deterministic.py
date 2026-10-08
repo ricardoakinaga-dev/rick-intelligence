@@ -11,6 +11,8 @@ from collections.abc import AsyncIterator, Mapping, Sequence
 
 from pydantic import ValidationError
 
+from rick_providers.sampling import Temperature, USE_DEFAULT_TEMPERATURE
+
 from rick_contracts.providers import ChatCompletionChunk, ChatCompletionResult, EmbeddingResult
 
 from rick_providers.client import (
@@ -105,7 +107,7 @@ class DeterministicProvider:
         self,
         model_or_messages: str | Sequence[MessageInput] | None = None,
         messages: Sequence[MessageInput] | None = None,
-        temperature: int | float | None = 0.2,
+        temperature: Temperature = USE_DEFAULT_TEMPERATURE,
         response_format: Mapping[str, object] | None = None,
         tools: Sequence[Mapping[str, object]] | None = None,
         *,
@@ -132,7 +134,7 @@ class DeterministicProvider:
             correlation,
         )
         serialized_messages = _serialize_messages(messages, operation, correlation)
-        normalized_temperature = _validate_temperature(temperature, operation, correlation)
+        normalized_temperature = _validate_temperature(0.2 if temperature is USE_DEFAULT_TEMPERATURE else temperature, operation, correlation)
         normalized_format = _serialize_response_format(response_format, operation, correlation)
         normalized_tools = _serialize_tools(tools, operation, correlation)
         fingerprint = hashlib.sha256(
@@ -197,7 +199,7 @@ class DeterministicProvider:
         self,
         model_or_messages: str | Sequence[MessageInput] | None = None,
         messages: Sequence[MessageInput] | None = None,
-        temperature: int | float | None = 0.2,
+        temperature: Temperature = USE_DEFAULT_TEMPERATURE,
         response_format: Mapping[str, object] | None = None,
         tools: Sequence[Mapping[str, object]] | None = None,
         *,
@@ -261,7 +263,7 @@ class DeterministicProvider:
         messages: Sequence[MessageInput],
         *,
         model: str | None = None,
-        temperature: int | float | None = 0.2,
+        temperature: Temperature = USE_DEFAULT_TEMPERATURE,
         response_format: Mapping[str, object] | None = None,
         tools: Sequence[Mapping[str, object]] | None = None,
         correlation_id: str | None = None,

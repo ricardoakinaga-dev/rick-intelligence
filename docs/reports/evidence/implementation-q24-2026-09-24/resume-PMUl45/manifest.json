@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "observed_at": "2026-09-25T02:54:44Z",
+  "source_head": "b52f32c141916a2ea3af1a6b913bd91f380606e0",
+  "scope": "Local partial checks, never integrated release acceptance",
+  "checks": [
+    {
+      "artifact": "api-root.log",
+      "sha256": "8601e9f0b4c1b78272f8ffba80496c290cb4d154f1466adcd8d4f32138b88194",
+      "exit_status": 2,
+      "summary": "598 passed, 1 failed; route enumeration incompatible with upgraded FastAPI",
+      "freshness": "STALE"
+    },
+    {
+      "artifact": "retry-contract-before.log",
+      "sha256": "b2689aab338be6a727098430d67d84b8651348a7a86e29df02a4b666ee6ccd2d",
+      "exit_status": 2,
+      "summary": "6 failed, 6 passed: malformed multipart, resource closure and OpenAPI gaps reproduced",
+      "freshness": "STALE"
+    },
+    {
+      "artifact": "retry-contract-verified.log",
+      "sha256": "374624d23b8c52dea8280f57a2dd65d01492cea590ce9b05c9d36f772c14ca46",
+      "exit_status": 0,
+      "summary": "16 passed: binary transport, invalid parts, closure, size bounds and actual routing",
+      "freshness": "CURRENT"
+    },
+    {
+      "artifact": "document-browser.log",
+      "sha256": "9faa3629750dab8c53f8e0d31b3bd59e8922ce53450849f82d8acc8eade27b2b",
+      "exit_status": 0,
+      "summary": "21 passed across 375/768/1440; intercepted API fixtures, not distributed runtime",
+      "freshness": "CURRENT"
+    },
+    {
+      "artifact": "runtime-audit-after.log",
+      "sha256": "15950a68a7ed99c59779717acefdceb3f69cfd31bde67d2c954f2a3cea4d7955",
+      "exit_status": 0,
+      "summary": "No known vulnerabilities found in resolved runtime.lock",
+      "freshness": "CURRENT"
+    },
+    {
+      "artifact": "runtime-audit-after.json",
+      "sha256": "561c731f854e5eac4f1146f167d5ff2319ede883c640ef794a09a8d6dd08ff75",
+      "exit_status": 0,
+      "summary": "Resolved dependency advisory inventory",
+      "freshness": "CURRENT"
+    },
+    {
+      "artifact": "image-audit-before.json",
+      "sha256": "3747c6e15552e772c22d095960aa90eb86ca504434895608fd60bcfdeccdbd64",
+      "exit_status": 1,
+      "summary": "Historical direct image dependency set contained PyJWT and pdfminer.six advisories",
+      "freshness": "STALE"
+    }
+  ],
+  "source_hashes": {
+    "apps/api/src/routes/knowledge.py": "f7c6ea5eb13692a5e2893163036be766aaee1dc8ca2fb7e3a59919bba28c7e09",
+    "apps/api/tests/test_retry_multipart_contract.py": "aae7decedad4815fc99a4657b7a81e2e4701d9ae63a7452b6341983cec1d6780",
+    "apps/api/tests/test_transport_observation.py": "a9bedc4bb614783fc02a9af0a650dade1d1fde5c6713f67f1f71bcdf050c2f64",
+    "apps/web/tests/document-state.spec.ts": "54e18737459859c7e7e475333faa926b65889af4e322eace8c10f439440834ad",
+    "apps/web/app/app/documents/page.tsx": "f3492c3914f8049d5df4cb1dcc14bcb5284e9d762cf44a5871666f838bedb314",
+    "requirements/runtime.in": "9104b88ca65e3508dba1cf38ef102732f406e35cdd8d71e2fdd453852633b103",
+    "requirements/runtime.lock": "04ff1440900b84edb0c6855a8df002eb242b70a0f653ce84468671d6dbffdce8"
+  },
+  "historical_source_binding": "Red-phase full worktree hash was not captured; preserve logs without retroactively fabricating one."
+}

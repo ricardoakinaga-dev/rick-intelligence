@@ -15,7 +15,7 @@ from rick_contracts import (
     ProviderToolCall,
     RetrievalContext,
 )
-from rick_contracts.chat import Citation
+from rick_contracts.chat import ChatStreamEvent, Citation
 from rick_contracts.rag import EvidenceDto
 
 
@@ -114,6 +114,21 @@ def test_professor_contract_preserves_typed_provenance_and_rejects_extra_fields(
             evidence_status="NO_EVIDENCE",
             unexpected="not allowed",
         )
+
+
+def test_chat_stream_metadata_defaults_are_independent_and_round_trip():
+    first = ChatStreamEvent(type="completion")
+    second = ChatStreamEvent(type="completion")
+    assert first.metadata == second.metadata == {}
+    first.metadata["evidence_status"] = "APPROVED_EVIDENCE"
+    assert second.metadata == {}
+    assert ChatStreamEvent.model_validate_json(first.model_dump_json()).metadata == first.metadata
+
+
+@pytest.mark.parametrize("metadata", [None, [], "APPROVED_EVIDENCE", True, 1])
+def test_chat_stream_metadata_rejects_non_objects(metadata):
+    with pytest.raises(ValidationError):
+        ChatStreamEvent(type="completion", metadata=metadata)
 
 
 def test_evidence_contract_rejects_unbounded_or_nonfinite_fields():

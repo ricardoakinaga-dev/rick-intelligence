@@ -1,0 +1,116 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-09-25T14:07:04Z",
+  "review_packet": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T1132Z-c9-fix/c13-review-packet.json",
+  "checkout": {
+    "branch": "main",
+    "head": "b52f32c141916a2ea3af1a6b913bd91f380606e0",
+    "worktree": "dirty shared checkout; unrelated and pre-existing changes remain present"
+  },
+  "scope": "Provenance inventory for the exact C13 local correction that serializes durable admin profile writes with password recovery; not a release manifest.",
+  "frozen_quality_bar": {
+    "path": ".gauntlet/bar.json",
+    "sha256": "f1ea9aa44d0d66e00bb47e75e30ad616ff575897de7d2a40bb5bc8e1f4936310",
+    "source_artifacts": [
+      {
+        "path": ".gauntlet-state-of-art/bar.json",
+        "sha256": "6274bcd8fe7f1d81a0615a00b68673c9d0ac891560774b9975bdd910ed1e1405",
+        "expected_snapshot_sha256": "6274bcd8fe7f1d81a0615a00b68673c9d0ac891560774b9975bdd910ed1e1405"
+      },
+      {
+        "path": ".gauntlet-state-of-art/goal.txt",
+        "sha256": "857f7e900f9d924b03cb5c8cee74fec8808a241e85bc0041db5cdefdeb998acf",
+        "expected_snapshot_sha256": null
+      }
+    ]
+  },
+  "separate_static_quality_bar": {
+    "path": "docs/reports/current-triple-aaa-quality-bar-v1.json",
+    "sha256": "fe0f58eb84bea4d16a138391b1afd85a9312d81fdb2ac7a383c2dbaf767f9633",
+    "source_artifacts": [
+      {
+        "path": "docs/prompts/phase-3-triple-aaa-closure-2026-09-09.txt",
+        "sha256": "0d431cf3ec75e4d6455735d32f135b3270b59996866a28fd7296d73a18cabf3d",
+        "expected_snapshot_sha256": "0d431cf3ec75e4d6455735d32f135b3270b59996866a28fd7296d73a18cabf3d"
+      },
+      {
+        "path": "docs/reports/current-triple-aaa-gap-audit.md",
+        "sha256": "5430215e95cf2f71cfde9b53e714d310b09e5aa4466aa89332cdc6715cc6f171",
+        "expected_snapshot_sha256": "5430215e95cf2f71cfde9b53e714d310b09e5aa4466aa89332cdc6715cc6f171"
+      }
+    ]
+  },
+  "files": {
+    ".gauntlet/bar.json": "f1ea9aa44d0d66e00bb47e75e30ad616ff575897de7d2a40bb5bc8e1f4936310",
+    ".gauntlet-state-of-art/bar.json": "6274bcd8fe7f1d81a0615a00b68673c9d0ac891560774b9975bdd910ed1e1405",
+    ".gauntlet-state-of-art/goal.txt": "857f7e900f9d924b03cb5c8cee74fec8808a241e85bc0041db5cdefdeb998acf",
+    "docs/reports/current-triple-aaa-quality-bar-v1.json": "fe0f58eb84bea4d16a138391b1afd85a9312d81fdb2ac7a383c2dbaf767f9633",
+    "docs/prompts/phase-3-triple-aaa-closure-2026-09-09.txt": "0d431cf3ec75e4d6455735d32f135b3270b59996866a28fd7296d73a18cabf3d",
+    "docs/reports/current-triple-aaa-gap-audit.md": "5430215e95cf2f71cfde9b53e714d310b09e5aa4466aa89332cdc6715cc6f171",
+    "apps/api/src/routes/admin.py": "2af36569195366810742201846cfe565c937aaec4445ef23d190e13cb05304b8",
+    "apps/api/src/services/identity_service.py": "4be2f9142c6edb883a7ca558ad060e67df94f7bc89d2657d8291cc4dd2b8e480",
+    "apps/api/src/services/postgres_identity.py": "0ce17f9a9bc3d7103d6182f8d481bd26c6b2e29830c5d4ed447024b69083e10c",
+    "apps/api/tests/test_audit_factory.py": "d7a3687790f6233a7e0ea93bcc08accb68c7fa42ed33ec6d27c72e9aa0143635",
+    "apps/api/tests/test_in_memory_admin_mutations.py": "a7dbdbab3cdf5286b8cc480a064358f7c767d45a039bb068106815cfaec6aa52",
+    "apps/api/tests/test_postgres_admin_mutations.py": "fdf4241adff59ce74ff397b11708561feb22f3d92b75181ed589e63d598fb73a",
+    "packages/identity/src/rick_identity/provider.py": "c0ac6d703aff059c5186b931db8047af37b73b534f30cb09015e029be5298b9b",
+    "packages/identity/src/rick_identity/protocols.py": "14fe8005608878831b92e40a629d17bb2acc86b774ff0264681fb4d900a7787b",
+    "packages/identity/src/rick_identity/stores.py": "370edf9e68a732f71d2ddb66a8772c406931c51098d743d35f6b95f5073bfbcb",
+    "packages/identity/src/rick_identity/postgres.py": "cb380ed45b65ab49d31673a32d993882b9b036c7770e0bae2b4ad14b6d719382",
+    "packages/identity/src/rick_identity/passwords.py": "29bdcf6213f7fb868d53ddce4d1c8b21565a4efe2c2ba86d4e84593ab79dfacf",
+    "packages/identity/tests/test_provider.py": "53f458980e5a440f6e98c47568ac6d96875d28a464d9b121c20b6f8e989742ef",
+    "packages/identity/tests/test_postgres.py": "cf2b4bbf2cbb55ac03a2e6823801cc3e329075e4498e2482df754cb63ca2fa2a",
+    "infrastructure/scripts/tests/test_migrate.py": "ec183a747fbe6de2a004b2635b6d428101dbad110abf4a4bf22219133341f0c2",
+    "apps/web/types/api.ts": "bc908699b7275d68f3256984330d58ad5a1f0adafc50b2b14f716879f08c712a",
+    "apps/web/components/admin/admin-management.tsx": "cf588a9368fd434bfd5db20f3b0a9bb2ee5e8ee4b400f1f14677c09367667e5c",
+    "apps/web/tests/admin-management.spec.ts": "ea6c7a695182f48dc85c4d627818f41de2cd96fc31a0ff035ebc278723727330",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T1132Z-c9-fix/backend-decision-c10.md": "18a39f87fd0728140efeff86feb76a3cd17337b21a00c7971ae015d348497cd1",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T1132Z-c9-fix/backend-decision-c11.md": "2af922e809fdd0d2d9bb2e412f2aac7fe78c11331290d8c1257f4a9dfc5e906f",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T1132Z-c9-fix/backend-decision-c12.md": "d5b2fb8dd4eef05d302c98f693e6c1ba5db8a9da4097d087c91bf02f1ba72fa6",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T1132Z-c9-fix/backend-decision-c13.md": "dd4f55c54547819109bc37489a11c9205edb809b376feb9e7a5ea32b445c7cfa",
+    "docs/reports/review-q24-19-20-critic-c12-2026-09-25.md": "dc793b241c77628d2bf07f772d052c1b2a8687e552135b4b47448fd7be61068c",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T1132Z-c9-fix/c12-admin-reset-unit.log": "e88b37f14656d8f848d1e8c338adf4a6119be3f2bb628cba03e12b5ef609f3a7",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T1132Z-c9-fix/c12-api-root.log": "f227aae7e6f2361dff7c2bcd2140262aefc9174d181b90ccec397224d4de10d3",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T1132Z-c9-fix/c12-postgres-sibling-reset.log": "f919bc02bdd408430e0b658f5a0f3040218182fc386a4a6132b8cf1ce2628fab",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T1132Z-c9-fix/c12-postgres-migrations-full.log": "b27d403b1e4c91d2fbb5dce171890dea25cef230ed740dcdc9aa20478887b720",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T1132Z-c9-fix/c12-lint.log": "a7a5650dee62a2a315b1b3413dc05105661cd0c4bd71ec25608e7101f4d1dd63",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T1132Z-c9-fix/c12-typecheck.log": "f4e2482bfa89fd0a34aa7a5fab375fdbb03747d3941dd8fecfa8bdb1bc77c92d",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T1132Z-c9-fix/diff-check-c12-postledger.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T1132Z-c9-fix/c11-identity-full.log": "fb9421a174475092e96a3e59ca570ee0e27c12539baa038b6b5715a0fb42557b",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T1132Z-c9-fix/c11-postgres-session-focused.log": "b4534d518d67ec9216dd64b5f8176db0288caf8a40363d40abaff5d7458a1e4b",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T1132Z-c9-fix/admin-management-e2e.log": "fd18ba76a629bb3eb5705d6f9cbe690f85c46c81b0115ff5057640a1a52ef840",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T1132Z-c9-fix/c11-web-lint.log": "8f9596f3e34443b9079584d502523f9a9b1b4c78e3b7bb1432b9387517cb502f",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T1132Z-c9-fix/c11-web-typecheck.log": "b948d9c357fe1ebf6125fa2416acaf6a7fb9741f9fdf13d45371b7669b75ef2e",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T1132Z-c9-fix/c13-sparse-recovery-before-fix.log": "eaa91c86fca147eff0035a786ff3caf85ebf71f984443369acb25971ed0a5b7e",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T1132Z-c9-fix/c13-sparse-recovery-fixed.log": "c0d62ab9a5766831fe057fe7488ab378287cffab68eb4aac0efc2dde43f576b7",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T1132Z-c9-fix/c13-admin-mutations-unit.log": "8dd780d9c5cd5decbe709e26e268076fe280182124b6410fe87589f9cdb9d847",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T1132Z-c9-fix/c13-api-full.log": "aaa2d84f7786e56680b92a2296e35706c38aac4abc327ae3415b28bb03e953de",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T1132Z-c9-fix/c13-postgres-full.log": "a72de341db904904dee821904ab86e11585ac341d84225c05af65823d84f1f0f",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T1132Z-c9-fix/c13-lint.log": "a7a5650dee62a2a315b1b3413dc05105661cd0c4bd71ec25608e7101f4d1dd63",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T1132Z-c9-fix/c13-typecheck.log": "f4e2482bfa89fd0a34aa7a5fab375fdbb03747d3941dd8fecfa8bdb1bc77c92d",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T1132Z-c9-fix/c13-diff-check-postlocal.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T1132Z-c9-fix/c13-canonical-postlocal.log": "018110650a1ede5f367934aaff97a437cb84bff8b9014dd38bca4062912cf2f9",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T1132Z-c9-fix/c13-control-plane-postlocal.log": "f25db1c4dbfed06ee31da5dcb128dc0ce62a7234531e03109bdce4b9d3cde461",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T1132Z-c9-fix/c13-make-validate-postlocal.log": "247888257098b95a3cffe78f0e41e2821ef767c0d0bd8c2dac1767474394de04",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T1132Z-c9-fix/c13-quality-bar-postlocal.log": "005e5f5482d2c554da3a97e69abee45345d1ffdb790a0cd2a7d80ff90ccbaed4",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T1132Z-c9-fix/c13-review-views-postlocal.log": "1b5f715a42c91f35fcf10e0bb03e47dfa93d26c8331255fd51d4348366a8df7f",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T1132Z-c9-fix/c13-markdown-links-postlocal.log": "c44634bc0a08aa785a78905847ba487ed34ba0d3572183415c2527a12b6d1e65"
+  },
+  "results": {
+    "api": "743 passed",
+    "admin_mutation_unit": "15 passed",
+    "postgresql_migrations": "109 passed; disposable PostgreSQL 16.15",
+    "sparse_update_password_recovery_regression": "1 passed against live PostgreSQL; the same test failed before C13 because recovery crossed the paused full-row PATCH",
+    "identity": "30 passed; C11 evidence remains applicable because C13 did not change provider/session code",
+    "postgres_session_regression": "1 passed; C11 evidence remains applicable",
+    "admin_ui": "15 Playwright tests passed in C10; C13 did not change web sources/tests",
+    "static": "make lint and make typecheck passed; C11 web lint/typecheck remain applicable",
+    "canonical_postlocal": "10/10; control plane 10/10; 35 backlog items, 378 execution events, 380 verification records, 28 gates",
+    "make_validate": "PASS",
+    "quality_bars": "Frozen bar source snapshot and separate static-bar sources match individually listed hashes; validation log PASS",
+    "review_views": "11 derived/historical files verified",
+    "relative_links": "69 local Markdown links across 8 updated documents passed",
+    "diff": "git diff --check passed"
+  },
+  "limitations": "Local evidence in a dirty shared checkout. API authentication uses test dependency overrides and does not prove deployed authentication. The in-memory adapter and local lock are process-scoped; PostgreSQL is the durable multi-workspace path. Integrated production worker/runtime, operational monitoring/recovery, provider/model/corpus acceptance, representative RAG quality, visual/accessibility, release and promotion remain open."
+}

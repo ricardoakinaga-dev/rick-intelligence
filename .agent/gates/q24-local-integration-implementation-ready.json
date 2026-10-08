@@ -1,0 +1,84 @@
+{
+  "record_id": "GATE-Q24-LOCAL-INTEGRATION-READY-001",
+  "timestamp": "2026-09-25T02:57:53.612670Z",
+  "gate_id": "IMPLEMENTATION_READY",
+  "scope": "Q24 reversible local integration and regression under Q17-01.A; excludes clinical acceptance, production changes and final runtime promotion",
+  "scope_ref": "Q17-01.A",
+  "version": 1,
+  "criteria": [
+    {
+      "id": "IR-001",
+      "description": "The current user objective authorizes reversible local implementation; all 33 outcomes, exclusions and canonical owners are specified",
+      "required": true,
+      "status": "PASS",
+      "evidence_refs": [
+        "docs/backlog-qualidade-2026-09-24.md",
+        "docs/plano-executivo-qualidade-2026-09-24.md",
+        "docs/roadmap-qualidade-2026-09-24.md",
+        "docs/reports/matriz-rastreabilidade-q24-2026-09-24.md"
+      ],
+      "confidence": "HIGH",
+      "limitations": "This entry decision neither certifies completion nor invents authority for domain acceptance, paid provider calls or production."
+    },
+    {
+      "id": "IR-002",
+      "description": "Bounded implementation seams, compatibility invariants, ownership and failure-first acceptance procedures are executable",
+      "required": true,
+      "status": "PASS",
+      "evidence_refs": [
+        "docs/backlog-qualidade-2026-09-24.md",
+        "docs/roadmap-qualidade-2026-09-24.md",
+        "docs/reports/matriz-rastreabilidade-q24-2026-09-24.md",
+        ".agent/plans/phase-3-runtime-evidence-production-promotion.md",
+        "requirements/runtime.in",
+        "apps/api/tests/test_retry_multipart_contract.py"
+      ],
+      "confidence": "HIGH",
+      "limitations": "Independent builders must return reviewable artifacts. Unresolved design or environment requirements are revisited before their dependent effect; this does not approve unspecific future changes."
+    },
+    {
+      "id": "IR-003",
+      "description": "A clean dependency environment, explicit local regressions, preserved red/green evidence and the frozen quality bars define verification",
+      "required": true,
+      "status": "PASS",
+      "evidence_refs": [
+        "docs/reports/estado-implementacao-q24-2026-09-24.md",
+        "docs/reports/evidence/implementation-q24-2026-09-24/resume-PMUl45/manifest.json",
+        "Makefile",
+        ".gauntlet/bar.json",
+        "docs/reports/current-triple-aaa-quality-bar-v1.json"
+      ],
+      "confidence": "HIGH",
+      "limitations": "Known tests and runnable tooling establish entry readiness only. Integrated regression, real services, independent reviews and promotion remain separate required outcomes."
+    }
+  ],
+  "evidence": [
+    "docs/backlog-qualidade-2026-09-24.md",
+    "docs/plano-executivo-qualidade-2026-09-24.md",
+    "docs/roadmap-qualidade-2026-09-24.md",
+    "docs/reports/matriz-rastreabilidade-q24-2026-09-24.md",
+    "docs/reports/estado-implementacao-q24-2026-09-24.md",
+    ".agent/plans/phase-3-runtime-evidence-production-promotion.md"
+  ],
+  "confidence": "HIGH",
+  "gaps": [],
+  "conditions": [],
+  "authority": {
+    "required": false,
+    "state": "NOT_REQUIRED",
+    "actor": "Lead integrator",
+    "scope": "Q24 reversible local integration and regression under Q17-01.A; excludes clinical acceptance, production changes and final runtime promotion",
+    "decision": "The current user instruction explicitly authorizes all planned reversible local implementation. No additional approval is required for this entry scope; external and final authority is not asserted.",
+    "evidence_ref": ".agent/plans/phase-3-runtime-evidence-production-promotion.md",
+    "expires_or_revalidates": "Any material scope expansion, unsafe external effect, clinical policy acceptance or production action"
+  },
+  "residual_risk": "MEDIUM",
+  "decision": "PASS",
+  "next_action": "Run the hash-locked API regression and integrate each returned patch against its unchanged acceptance tests",
+  "revalidation_triggers": [
+    "A builder changes a shared contract beyond its specified boundary",
+    "A dependency or operational effect requires unmade domain/environment authority",
+    "The frozen bar, protected history or implementation scope changes"
+  ],
+  "supersedes": null
+}

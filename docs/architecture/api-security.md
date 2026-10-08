@@ -2,14 +2,38 @@
 
 ## Default-deny + allowlist
 
-Every non-public route declares `auth+permission` in `routes/ROUTE_REGISTRY`;
-structural test fails on missing policy. Public: `/health/live`, `/health/ready`,
-`/api/v1/auth/login`, `/api/v1/auth/recovery`, `/request-password-reset`,
-`/confirm-password-reset`. Compat `/v1/*` requires a valid API key (401 otherwise).
+Every non-public route declares `auth` plus either a catalog `permission` or an
+explicit `scope: "self"` decision in `routes/ROUTE_REGISTRY`. The structural test
+fails on a missing policy, on a permission the policy engine never grants, on a
+registry entry without a mounted handler and on a handler without an entry.
+Public: `/health/live`, `/health/ready`, `/api/v1/auth/login`,
+`/api/v1/auth/recovery`, `/request-password-reset`, `/confirm-password-reset`.
+Compat `/v1/*` requires a valid API key (401 otherwise).
+
+Declaration model:
+
+- `permission` — `str`, or `list[str]` when the handler denies unless several
+  independent permissions hold. Every id must exist in
+  `rick_authorization.CANONICAL_PERMISSION_IDS`; a fabricated id (one the policy
+  engine never grants) fails the test even if it looks plausible.
+- `scope: "self"` — the route acts only on data the caller already owns (their own
+  session, their own audit operations). `SELF_SCOPED_PATHS` is the explicit
+  allowlist; being on it is a policy decision, never a default, and a self-scoped
+  route must enforce **no** catalog permission at all.
+- Parity is resolved through `routes.ROUTERS`, not `app.routes`: FastAPI 0.141
+  mounts routers as `_IncludedRouter`, so `app.routes` never exposes an `APIRoute`
+  and a parity check written against it compares nothing.
+- Enforcement is proven twice: a static walk of the endpoint **and** its declared
+  delegation targets (`_DELEGATED_ENFORCEMENT`, e.g. `POST /api/v1/chat` is
+  checked inside `ChatApplicationService.chat`), plus a live request as a session
+  that does not hold the declared permissions — which must be `403`.
 
 ## Threat model coverage
 
-- Route auth gaps: registry + anonymous-reject test over every entry.
+- Route auth gaps: registry ↔ handler parity, catalog membership, anonymous-reject
+  over every entry, and a denied-session probe per declared permission.
+- Self-scope boundary: `scope: "self"` routes serve their own caller and refuse a
+  foreign `session_id` / `user_id` (`POST /api/v1/auth/sessions/revoke` → 403).
 - Session confusion: single `get_current_session`; snapshot (role/perms/collections)
   bound at login; bearer never in JSON.
 - Cookie vs Bearer: cookie wins when present; Bearer applies only without a cookie

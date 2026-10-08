@@ -9,6 +9,37 @@ from routes import admin, auth, cases, chat, compatibility_openai, health, knowl
 
 ROUTERS = [health.router, auth.router, sessions.router, chat.router, cases.router, knowledge.router, search.router, admin.router, compatibility_openai.router]
 
+# Paths allowed to declare `scope: "self"` instead of a catalog permission.
+# These routes act only on data the caller already owns (their own session, their
+# own audit operations); there is no catalog permission that expresses "your own
+# session", and inventing one would declare a permission the policy engine never
+# grants. Membership here is an explicit policy decision — a new self-scoped
+# route must be added to this set on purpose, never by default.
+SELF_SCOPED_PATHS = frozenset({
+    "/api/v1/auth/logout",
+    "/api/v1/auth/me",
+    "/api/v1/auth/sessions",
+    "/api/v1/auth/sessions/revoke",
+    "/api/v1/session",
+    "/api/v1/audit/operations",
+    "/api/v1/audit/operations/{operation_id}",
+})
+
+
+def permission_set(entry: dict) -> frozenset[str]:
+    """Catalog permissions an entry requires; empty when nothing is required.
+
+    `permission` is a string for the common case and a list for the routes that
+    deny unless *several* independent permissions hold.
+    """
+    declared = entry.get("permission")
+    if not declared:
+        return frozenset()
+    if isinstance(declared, str):
+        return frozenset({declared})
+    return frozenset(str(item) for item in declared)
+
+
 # (method, path) -> policy. Public entries require no session; compat entries require API key.
 ROUTE_REGISTRY: list[dict] = [
     {"method": "GET", "path": "/health/live", "auth": "public", "permission": None},
@@ -18,11 +49,11 @@ ROUTE_REGISTRY: list[dict] = [
     {"method": "POST", "path": "/api/v1/auth/recovery", "auth": "public", "permission": None},
     {"method": "POST", "path": "/api/v1/auth/request-password-reset", "auth": "public", "permission": None},
     {"method": "POST", "path": "/api/v1/auth/confirm-password-reset", "auth": "public", "permission": None},
-    {"method": "POST", "path": "/api/v1/auth/logout", "auth": "session", "permission": "session:self"},
-    {"method": "GET", "path": "/api/v1/auth/me", "auth": "session", "permission": "session:self"},
-    {"method": "GET", "path": "/api/v1/session", "auth": "session", "permission": "session:self"},
-    {"method": "GET", "path": "/api/v1/auth/sessions", "auth": "session", "permission": "session:self"},
-    {"method": "POST", "path": "/api/v1/auth/sessions/revoke", "auth": "session", "permission": "session:self"},
+    {"method": "POST", "path": "/api/v1/auth/logout", "auth": "session", "permission": None, "scope": "self"},
+    {"method": "GET", "path": "/api/v1/auth/me", "auth": "session", "permission": None, "scope": "self"},
+    {"method": "GET", "path": "/api/v1/session", "auth": "session", "permission": None, "scope": "self"},
+    {"method": "GET", "path": "/api/v1/auth/sessions", "auth": "session", "permission": None, "scope": "self"},
+    {"method": "POST", "path": "/api/v1/auth/sessions/revoke", "auth": "session", "permission": None, "scope": "self"},
     {"method": "POST", "path": "/api/v1/chat", "auth": "session", "permission": "chat.query"},
     {"method": "GET", "path": "/api/v1/cases/catalog/agents", "auth": "session", "permission": "cases.read"},
     {"method": "POST", "path": "/api/v1/cases", "auth": "session", "permission": "cases.manage"},
@@ -31,7 +62,7 @@ ROUTE_REGISTRY: list[dict] = [
     {"method": "PATCH", "path": "/api/v1/cases/{case_id}", "auth": "session", "permission": "cases.manage"},
     {"method": "POST", "path": "/api/v1/cases/{case_id}/reviews", "auth": "session", "permission": "cases.review"},
     {"method": "POST", "path": "/api/v1/cases/{case_id}/feedback", "auth": "session", "permission": "cases.feedback"},
-    {"method": "POST", "path": "/api/v1/conversations", "auth": "session", "permission": "history.read"},
+    {"method": "POST", "path": "/api/v1/conversations", "auth": "session", "permission": ["history.read", "chat.query"]},
     {"method": "GET", "path": "/api/v1/conversations", "auth": "session", "permission": "history.read"},
     {"method": "GET", "path": "/api/v1/conversations/{conversation_id}", "auth": "session", "permission": "history.read"},
     {"method": "POST", "path": "/api/v1/conversations/{conversation_id}/archive", "auth": "session", "permission": "history.read"},
@@ -51,6 +82,9 @@ ROUTE_REGISTRY: list[dict] = [
     {"method": "GET", "path": "/api/v1/ingestion/jobs/{job_id}", "auth": "session", "permission": "ingestion.run"},
     {"method": "POST", "path": "/api/v1/ingestion/jobs/{job_id}/retry", "auth": "session", "permission": "ingestion.run"},
     {"method": "POST", "path": "/api/v1/ingestion/jobs/{job_id}/cancel", "auth": "session", "permission": "ingestion.run"},
+    {"method": "GET", "path": "/api/v1/audit/operations", "auth": "session", "permission": None, "scope": "self"},
+    {"method": "GET", "path": "/api/v1/audit/operations/{operation_id}", "auth": "session", "permission": None, "scope": "self"},
+    {"method": "POST", "path": "/api/v1/audit/operations/{operation_id}/reconcile", "auth": "session", "permission": ["audit.read", "users.manage"]},
     {"method": "GET", "path": "/api/v1/admin/users", "auth": "session", "permission": "users.manage"},
     {"method": "POST", "path": "/api/v1/admin/users", "auth": "session", "permission": "users.manage"},
     {"method": "PATCH", "path": "/api/v1/admin/users/{user_id}", "auth": "session", "permission": "users.manage"},
@@ -61,6 +95,8 @@ ROUTE_REGISTRY: list[dict] = [
     {"method": "GET", "path": "/api/v1/admin/roles", "auth": "session", "permission": "users.manage"},
     {"method": "GET", "path": "/api/v1/admin/jobs", "auth": "session", "permission": "runtime.manage"},
     {"method": "GET", "path": "/api/v1/admin/audit", "auth": "session", "permission": "audit.read"},
+    {"method": "GET", "path": "/api/v1/admin/audit/{event_id}/status", "auth": "session", "permission": "audit.read"},
+    {"method": "POST", "path": "/api/v1/admin/audit/{event_id}/retry", "auth": "session", "permission": "users.manage"},
     {"method": "GET", "path": "/api/v1/admin/health", "auth": "session", "permission": "observability.read"},
     {"method": "GET", "path": "/api/v1/admin/metrics", "auth": "session", "permission": "observability.read"},
     {"method": "GET", "path": "/api/v1/admin/metrics/prometheus", "auth": "session", "permission": "observability.read"},

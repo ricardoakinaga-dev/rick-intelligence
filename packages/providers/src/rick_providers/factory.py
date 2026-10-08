@@ -7,6 +7,8 @@ import httpx
 from rick_providers.client import CorrelationIdFactory, OpenAICompatibleClient, SleepFunction
 from rick_providers.config import ProviderConfig, ProviderConfigurationError
 from rick_providers.deterministic import DeterministicProvider
+from rick_providers.anthropic import AnthropicMessagesClient
+from rick_providers.protocols import AsyncProvider
 
 
 def create_provider(
@@ -16,7 +18,7 @@ def create_provider(
     sleep: SleepFunction | None = None,
     client: httpx.AsyncClient | None = None,
     correlation_id_factory: CorrelationIdFactory | None = None,
-) -> OpenAICompatibleClient | DeterministicProvider:
+) -> AsyncProvider:
     """Create the configured provider with fail-closed deterministic mode.
 
     The default is the OpenAI-compatible adapter.  The deterministic adapter
@@ -37,7 +39,8 @@ def create_provider(
             selected,
             correlation_id_factory=correlation_id_factory,
         )
-    return OpenAICompatibleClient(
+    implementation = AnthropicMessagesClient if selected.provider_kind == "anthropic" else OpenAICompatibleClient
+    return implementation(
         selected,
         transport=transport,
         sleep=sleep,

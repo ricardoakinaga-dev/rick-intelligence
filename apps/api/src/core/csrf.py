@@ -73,18 +73,31 @@ def csrf_request_is_allowed(
     presented_token: str | None,
     configured_token: str | None,
     allowed_origins: Iterable[str],
+    csrf_cookie_value: str | None = None,
 ) -> bool:
     """Return whether a request may mutate state under the cookie session.
 
     Local/test clients retain the existing no-Origin behavior. Once an Origin
     or Referer is supplied it is still validated, so a forged disallowed
     origin never becomes acceptable just because the process is local.
+
+    ``csrf_cookie_value`` is the non-HttpOnly double-submit nonce cookie set at
+    login. When both the per-session double-submit cookie and the presented
+    header exist, they must match (``hmac.compare_digest``). This adds a
+    per-session nonce so that a request without a valid Origin/Referer still
+    needs a session-bound secret, instead of relying solely on the static
+    ``configured_token``.
     """
     if not has_session_cookie or not is_mutating_method(method):
         return True
 
     if configured_token and presented_token and hmac.compare_digest(
         presented_token.encode("utf-8"), configured_token.encode("utf-8")
+    ):
+        return True
+
+    if csrf_cookie_value and presented_token and hmac.compare_digest(
+        presented_token.encode("utf-8"), csrf_cookie_value.encode("utf-8")
     ):
         return True
 

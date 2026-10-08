@@ -27,12 +27,18 @@ sentinel fails if the gate mutates the checkout. The workflow passes
 diagnosis may omit that flag when an already-dirty shared workspace must be
 observed without being mistaken for a gate mutation.
 
-The workflow generates `docs/progress/release-evidence.json` from the exact
+The workflow generates `.runtime/release/release-evidence.json` from the exact
 checkout before invoking the gate. The path is intentionally ignored by Git:
 generated evidence must not be committed into the tree whose fingerprint it
 describes, because that would create a self-referential hash. A missing file is
 still `NOT_RUN`, and because it is mandatory the process exits non-zero. This
 is intentional: a release cannot pass by silently omitting its evidence.
+
+`docs/progress/release-evidence.json` remains the authentic historical control
+input restored by the versioned control bundle. The generator rejects that
+destination, including normalized paths and filesystem aliases, before
+generating gates or writing output. Current consumers never fall back to the
+historical fixture; custom output paths remain supported elsewhere.
 
 ## Evidence freshness
 

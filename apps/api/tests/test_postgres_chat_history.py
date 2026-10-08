@@ -112,8 +112,12 @@ def test_append_writes_user_and_assistant_in_one_transaction_and_replays_idempot
     response = {
         "conversation_id": "conv-1", "message_id": "msg-1", "answer": "Resposta",
         "citations": [{"document_id": "doc-1", "chunk_id": "chunk-1", "title": "Guia"}],
-        "metadata": {"evidence_status": "APPROVED_EVIDENCE"},
+        "metadata": {
+            "evidence_status": "APPROVED_EVIDENCE", "provider_secret": "sk-private-value",
+            "backend": "openai",
+        },
     }
+    safe_response = {**response, "metadata": {"evidence_status": "APPROVED_EVIDENCE", "backend": "openai"}}
     write = Connection([
         ("SELECT metadata FROM rick_messages", [], 0),
         ("SELECT status FROM rick_conversations", [], 0),
@@ -130,8 +134,9 @@ def test_append_writes_user_and_assistant_in_one_transaction_and_replays_idempot
     stored = store.append(session=SESSION, message="Pergunta", response=response, idempotency_key="retry-1")
     repeated = store.get_idempotent(session=SESSION, idempotency_key="retry-1")
 
-    assert stored == response
-    assert repeated == response
+    assert stored == safe_response
+    assert repeated == safe_response
+    assert "sk-private-value" not in repr(write.cursor_instance.queries)
     assert write.commits == 1
     assert len([query for query, _ in write.cursor_instance.queries if "INSERT INTO rick_messages" in query]) == 2
 
@@ -158,3 +163,91 @@ def test_archived_conversation_and_invalid_message_id_fail_closed():
             response={"conversation_id": "conv-1", "message_id": "bad\nmessage", "answer": "ok"},
         )
     assert invalid.value.code == "invalid_input"
+
+
+def _stored_turn(conversation_id: str = "conv-1", fingerprint: str = "fp-alpha"):
+    return {
+        "metadata": {
+            "response": {
+                "conversation_id": conversation_id, "message_id": "msg-1",
+                "answer": "Resposta", "citations": [], "metadata": {"backend": "openai"},
+            },
+            "idempotency_fingerprint": fingerprint,
+        },
+    }
+
+
+def test_idempotent_replay_refuses_a_cross_conversation_reuse():
+    from services.chat_history import IdempotencyConflict
+
+    matched = Connection([("SELECT metadata FROM rick_messages", [_stored_turn()], 1)])
+    store = PostgresChatHistoryStore(factory_for(matched))
+    assert store.get_idempotent(
+        session=SESSION, idempotency_key="retry-1",
+        conversation_id="conv-1", fingerprint="fp-alpha",
+    ) is not None
+
+    foreign = Connection([("SELECT metadata FROM rick_messages", [_stored_turn()], 1)])
+    other = PostgresChatHistoryStore(factory_for(foreign))
+    with pytest.raises(IdempotencyConflict):
+        other.get_idempotent(
+            session=SESSION, idempotency_key="retry-1",
+            conversation_id="conv-2", fingerprint="fp-alpha",
+        )
+
+    rekeyed = Connection([("SELECT metadata FROM rick_messages", [_stored_turn()], 1)])
+    third = PostgresChatHistoryStore(factory_for(rekeyed))
+    with pytest.raises(IdempotencyConflict):
+        third.get_idempotent(
+            session=SESSION, idempotency_key="retry-1",
+            conversation_id="conv-1", fingerprint="fp-beta",
+        )
+
+
+def test_append_refuses_to_move_a_stored_turn_to_another_conversation():
+    from services.chat_history import IdempotencyConflict
+
+    write = Connection([("SELECT metadata FROM rick_messages", [_stored_turn()], 1)])
+    store = PostgresChatHistoryStore(factory_for(write))
+
+    with pytest.raises(IdempotencyConflict):
+        store.append(
+            session=SESSION, message="BETA", idempotency_key="retry-1",
+            fingerprint="fp-alpha",
+            response={"conversation_id": "conv-2", "message_id": "msg-2", "answer": "B"},
+        )
+    assert write.rollbacks == 1
+    assert write.commits == 0
+
+
+def test_append_persists_the_turn_fingerprint_next_to_the_stored_response():
+    write = Connection([
+        ("SELECT metadata FROM rick_messages", [], 0),
+        ("SELECT status FROM rick_conversations", [], 0),
+        ("INSERT INTO rick_conversations", [], 1),
+        ("INSERT INTO rick_messages", [], 1),
+        ("INSERT INTO rick_messages", [], 1),
+        ("UPDATE rick_conversations", [], 1),
+    ])
+    store = PostgresChatHistoryStore(factory_for(write))
+
+    store.append(
+        session=SESSION, message="Pergunta", idempotency_key="retry-1",
+        fingerprint="fp-alpha",
+        response={"conversation_id": "conv-1", "message_id": "msg-1", "answer": "ok"},
+    )
+
+    user_rows = [
+        params for query, params in write.cursor_instance.queries
+        if "INSERT INTO rick_messages" in query and "'user'" in query
+    ]
+    assistant_rows = [
+        params for query, params in write.cursor_instance.queries
+        if "INSERT INTO rick_messages" in query and "'assistant'" in query
+    ]
+    assert user_rows and any(
+        '"idempotency_fingerprint":"fp-alpha"' in str(params) for params in user_rows
+    )
+    assert assistant_rows and all(
+        '"idempotency_fingerprint"' not in str(params) for params in assistant_rows
+    )

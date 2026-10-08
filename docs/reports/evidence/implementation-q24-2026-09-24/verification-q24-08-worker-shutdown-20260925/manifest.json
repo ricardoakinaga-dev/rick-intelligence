@@ -1,0 +1,405 @@
+{
+  "schema_version": 1,
+  "scope": "Q24-08 / Q17-23.A local worker process telemetry shutdown",
+  "status": "PASS",
+  "control_validation": "PASS",
+  "created_at": "2026-09-26T02:16:57.349361Z",
+  "head": "b52f32c141916a2ea3af1a6b913bd91f380606e0",
+  "repository_state": "DIRTY; pre-existing shared changes preserved",
+  "candidate": {
+    "files": [
+      {
+        "path": "infrastructure/docker/worker-entrypoint.py",
+        "sha256": "95f66e89ff3d09422b4db59e504d7b5183e37233925eaa53824f1795b8f7f5d4"
+      },
+      {
+        "path": "infrastructure/docker/tests/test_worker_entrypoint.py",
+        "sha256": "b8bf34d2f78ddc35fbdb6df32d7bca15c868b2d606df6328d7eda6e98a298b70"
+      },
+      {
+        "path": "infrastructure/docker/tests/test_worker_telemetry_process.py",
+        "sha256": "4fbf911e0360f1ab714844ffc685ee85f7e213c4f71014abd4780ab8744f7a9e"
+      },
+      {
+        "path": "packages/observability/src/rick_observability/events.py",
+        "sha256": "673b3d7b4c86a451eb9fe5278e4fe602678d6946813ea0fa39aeca9b5a9a9c15"
+      },
+      {
+        "path": "packages/observability/tests/test_observability.py",
+        "sha256": "d12d842ca58036abcf4858f60d8e312f5e8b04cc2eaba16d71ab6378f0fd104d"
+      },
+      {
+        "path": "docs/architecture/observability-sink-delivery.md",
+        "sha256": "5bfbf7c4c14e05d363ad8a518692191fe4bf6b474aa6ec2020fd76587d771ca6"
+      }
+    ],
+    "fingerprint": "a6ded820e0ba2a3c54399154a8917d2186c951b90c17d7bcfa3b5e11efe54d05"
+  },
+  "independent_review": {
+    "status": "PASS",
+    "reviewer": "Gibbs",
+    "agent_id": "01a0db7b-fac6-7481-bc24-e91e2d7ee69d",
+    "criteria": [
+      "C1",
+      "C2",
+      "C3",
+      "C4",
+      "C5",
+      "C6"
+    ],
+    "findings": [],
+    "tests_independently_rerun": false,
+    "hashes_independently_recomputed": true
+  },
+  "commands": [
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=packages/observability/src python3 -m pytest -q -p no:cacheprovider infrastructure/docker/tests packages/observability/tests",
+      "exit_code": 0,
+      "passed": 46,
+      "log": "final-docker-observability-host.log"
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=<repository API/worker/package source roots> timeout --kill-after=5s 120s /tmp/q24-api-deps-env/bin/python -m pytest -q -p no:cacheprovider -o faulthandler_timeout=30 apps/worker/tests apps/api/tests/test_phase16_health.py apps/api/tests/test_telemetry.py apps/api/tests/test_telemetry_fallback.py",
+      "exit_code": 0,
+      "passed": 129,
+      "warnings": 1,
+      "log": "runtime-regression.log",
+      "execution": "authorized outside-sandbox local synthetic tests"
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-08-worker-shutdown-20260925/verify_budget_contract.py",
+      "exit_code": 0,
+      "expected_mutant_rejections": 9,
+      "log": "budget-mutation.log"
+    },
+    {
+      "name": "final-lint",
+      "command": [
+        "make",
+        "lint"
+      ],
+      "started_at": "2026-09-26T02:12:47.775597+00:00",
+      "exit_code": 0,
+      "finished_at": "2026-09-26T02:12:54.422161+00:00",
+      "tail": [
+        "> rag-frontend-premium@0.1.0 lint",
+        "> ./node_modules/.bin/eslint .",
+        "",
+        "<== CVG frontend lint: exit 0"
+      ]
+    },
+    {
+      "name": "final-typecheck",
+      "command": [
+        "make",
+        "typecheck"
+      ],
+      "started_at": "2026-09-26T02:12:47.776034+00:00",
+      "exit_code": 0,
+      "finished_at": "2026-09-26T02:12:52.813935+00:00",
+      "tail": [
+        "==> CVG frontend TypeScript compiler (compatibility override): npm exec -- tsc --noEmit --ignoreDeprecations 5.0",
+        "<== CVG frontend TypeScript compiler (compatibility override): exit 0",
+        "==> CVG Python compilation (no Python type checker configured): /home/ricardo/rick-intelligence/.runtime/venvs/cvg/bin/python -m compileall -q src",
+        "<== CVG Python compilation (no Python type checker configured): exit 0"
+      ]
+    },
+    {
+      "name": "control-before",
+      "command": [
+        "make",
+        "validate"
+      ],
+      "started_at": "2026-09-26T02:12:47.776596+00:00",
+      "exit_code": 0,
+      "finished_at": "2026-09-26T02:12:56.376616+00:00",
+      "tail": [
+        "Git: head=b52f32c141916a2ea3af1a6b913bd91f380606e0 branch=main worktree=DIRTY (2830 entries) remote_main=b52f32c141916a2ea3af1a6b913bd91f380606e0 sync=HEAD_EQ_ORIGIN_MAIN",
+        "Control-plane check OK: required pointers and current Git observations are structurally consistent.",
+        "PYTHONDONTWRITEBYTECODE=1 python3 \"/home/ricardo/rick-intelligence/scripts/state_of_art/validate_quality_bar.py\"",
+        "{\"path\": \"docs/reports/current-triple-aaa-quality-bar-v1.json\", \"sha256\": \"fe0f58eb84bea4d16a138391b1afd85a9312d81fdb2ac7a383c2dbaf767f9633\", \"status\": \"PASS\"}"
+      ]
+    },
+    {
+      "name": "final-diff-check",
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "started_at": "2026-09-26T02:12:47.777363+00:00",
+      "exit_code": 0,
+      "finished_at": "2026-09-26T02:12:47.843654+00:00",
+      "tail": []
+    },
+    {
+      "name": "derived-views-repaired",
+      "command": [
+        "python3",
+        "scripts/state_of_art/review_control_views.py",
+        "--write"
+      ],
+      "exit_code": 0,
+      "observed_at": "2026-09-26T02:19:01.006603Z",
+      "tail": [
+        "PASS: derived review views and 11 historical files verified; frozen bar check deferred until initialization"
+      ]
+    },
+    {
+      "name": "control-final-repaired",
+      "command": [
+        "make",
+        "validate"
+      ],
+      "exit_code": 0,
+      "observed_at": "2026-09-26T02:19:09.100535Z",
+      "tail": [
+        "Git: head=b52f32c141916a2ea3af1a6b913bd91f380606e0 branch=main worktree=DIRTY (2843 entries) remote_main=b52f32c141916a2ea3af1a6b913bd91f380606e0 sync=HEAD_EQ_ORIGIN_MAIN",
+        "Control-plane check OK: required pointers and current Git observations are structurally consistent.",
+        "PYTHONDONTWRITEBYTECODE=1 python3 \"/home/ricardo/rick-intelligence/scripts/state_of_art/validate_quality_bar.py\"",
+        "{\"path\": \"docs/reports/current-triple-aaa-quality-bar-v1.json\", \"sha256\": \"fe0f58eb84bea4d16a138391b1afd85a9312d81fdb2ac7a383c2dbaf767f9633\", \"status\": \"PASS\"}"
+      ]
+    },
+    {
+      "name": "diff-final",
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exit_code": 0,
+      "observed_at": "2026-09-26T02:19:09.168232Z",
+      "tail": []
+    }
+  ],
+  "counts_note": "Scope-specific counts; do not add to earlier overlapping suites.",
+  "verification_records": [
+    "VER-Q24-08-WORKER-SHUTDOWN-LOCAL-20260926T021657Z",
+    "VER-Q24-08-WORKER-SHUTDOWN-REVIEW-20260926T021657Z"
+  ],
+  "limitations": [
+    "Synthetic callbacks and process-local execution only",
+    "API process-owner shutdown remains unverified",
+    "External collector, distributed runtime, container stop grace, capacity and release remain unverified",
+    "The additional drain budget does not bound total worker shutdown",
+    "Blocked daemon callbacks may be terminated without delivery",
+    "Initial timeouts and missing test-only YAML are preserved in attempt-history.md",
+    "Two newly authored controller metadata fields were normalized after archiving the rejected rows; all pre-continuation ledger bytes remain unchanged."
+  ],
+  "task_statuses": {
+    "Q17-23.A": "VERIFY",
+    "Q17-01.A": "IN_PROGRESS/PARTIAL"
+  },
+  "release_authorized": false,
+  "updated_at": "2026-09-26T02:20:07.150992+00:00",
+  "state_revision": 380,
+  "control_metadata_repair": "control-metadata-repair.json",
+  "artifacts": [
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-08-worker-shutdown-20260925/README.md",
+      "sha256": "f231aa7129705b0587f3dccd753d9e535e942046cabb5be65784920face33b99"
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-08-worker-shutdown-20260925/api-telemetry-regression.log",
+      "sha256": "cdb4ee2aea69cc6a83331bbe96dc2caa9a299d21329efb0336fc02a82e1839a8"
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-08-worker-shutdown-20260925/attempt-history.md",
+      "sha256": "5dc788eb6d984f2b1cec914e284b7db8dc20ac6299234ebfa79ada6a810c311d"
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-08-worker-shutdown-20260925/budget-mutation.log",
+      "sha256": "37b2d62abaf63f37ff95df84d2790b9c1dd5309399ea812154e43cb7574adc20"
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-08-worker-shutdown-20260925/control-before.log",
+      "sha256": "7c4d87802dbcdd6a0dbcfef37bc03df14e18ff58b91a28654cd9ab8d5dbfd70a"
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-08-worker-shutdown-20260925/control-final-repaired.log",
+      "sha256": "19e0b5d841f6afb6fa3828e56e1c35a99735e5375ea1414d651a85ae10ea8595"
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-08-worker-shutdown-20260925/control-final.log",
+      "sha256": "f3924d2d12fa7e82d39deb1b59987795f21cfc22749c4a12a981d91299c172b0"
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-08-worker-shutdown-20260925/control-metadata-repair.json",
+      "sha256": "df238b7e38648cfca78ad3435a2b49fce9e897717feaaffaf957cbd9526c81ef"
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-08-worker-shutdown-20260925/control-rejected-event.jsonl",
+      "sha256": "b6eee58198de970b9e2c0bc185acf963da1b36c1d27af72d83512273a540bf1a"
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-08-worker-shutdown-20260925/control-rejected-verification.jsonl",
+      "sha256": "4f1fa5157ddc66e9a809b038e0b34e8d2b03881e22db0bbf594cd3636e7c53d9"
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-08-worker-shutdown-20260925/control-transaction.json",
+      "sha256": "5acb1ffb48268633c12f83a6d9e20d2095ff458e48521f9a5887b9c9b2016dce"
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-08-worker-shutdown-20260925/derived-views-final.log",
+      "sha256": "df270bed12e28fcfea0d301ac95cf995b7bb454b6047284bff50ce0f7ab08914"
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-08-worker-shutdown-20260925/derived-views-repaired.log",
+      "sha256": "df270bed12e28fcfea0d301ac95cf995b7bb454b6047284bff50ce0f7ab08914"
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-08-worker-shutdown-20260925/diff-check.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-08-worker-shutdown-20260925/diff-final.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-08-worker-shutdown-20260925/docker-regression.log",
+      "sha256": "e5c6205ea68c494d3586d2f6c184511cd0c4cb40226bce6440e6bba1ce8ff9fe"
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-08-worker-shutdown-20260925/final-control-repaired-results.json",
+      "sha256": "fa7661d99b8307655c86e34f6f2a805c3f5ab00000686d41fa3344f8bbaf6b7e"
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-08-worker-shutdown-20260925/final-control-results.json",
+      "sha256": "780bd5622c4e21b1b4214e3e49f2fedb07f094caf99c574412015c4732b7b932"
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-08-worker-shutdown-20260925/final-diff-check.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-08-worker-shutdown-20260925/final-docker-observability-host.log",
+      "sha256": "9cb43fcdd49d7bdca5f996e4a28042157188bfb7913002310fe70cee96207bc7"
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-08-worker-shutdown-20260925/final-docker-observability.log",
+      "sha256": "b9bea8ef05e3bd202477e0846689e7f22de413f083240e3f98afc85ed16e35f2"
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-08-worker-shutdown-20260925/final-integrity.json",
+      "sha256": "2970397d03227cb040a0e6e129b1582d75ee178493b76903a09823579f8a8fb6"
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-08-worker-shutdown-20260925/final-lint.log",
+      "sha256": "a7a5650dee62a2a315b1b3413dc05105661cd0c4bd71ec25608e7101f4d1dd63"
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-08-worker-shutdown-20260925/final-static-results.json",
+      "sha256": "5a553ce637b80d6b2f5ef9a17ae41b38721199ce9f145c9f936ceb895c3efbfd"
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-08-worker-shutdown-20260925/final-typecheck.log",
+      "sha256": "f4e2482bfa89fd0a34aa7a5fab375fdbb03747d3941dd8fecfa8bdb1bc77c92d"
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-08-worker-shutdown-20260925/focused-green.log",
+      "sha256": "0a473dab67432ee9a580c5617c2f6dfc8c06ac9e9e3f5c0c330b3f9365a96922"
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-08-worker-shutdown-20260925/handoff-diff-check.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-08-worker-shutdown-20260925/initial-timeout.md",
+      "sha256": "0c68b089635b669291aa5f8adebda68ca078eb866d80634c89ea4fa16fe88ef3"
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-08-worker-shutdown-20260925/lint.log",
+      "sha256": "a7a5650dee62a2a315b1b3413dc05105661cd0c4bd71ec25608e7101f4d1dd63"
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-08-worker-shutdown-20260925/plan.md",
+      "sha256": "84cbd406a43753a06edb74594afbefbdf577f6cc101f59a174764f5cbd2ed150"
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-08-worker-shutdown-20260925/process-red.log",
+      "sha256": "2cb49d0b6db7a58bedc04f7efe0b6866418c017992edccba2ccae3e55f45d0cf"
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-08-worker-shutdown-20260925/review-after.json",
+      "sha256": "eb0d9cd665a3c6024408c76ba950df67509bddf990a23158ba152cac23b46e6c"
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-08-worker-shutdown-20260925/review-before.json",
+      "sha256": "eb0d9cd665a3c6024408c76ba950df67509bddf990a23158ba152cac23b46e6c"
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-08-worker-shutdown-20260925/review-final-after.json",
+      "sha256": "8c64ef9088079b0655e1969666f7c40962ed36fcb3cf1e43bff764bb74c0314e"
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-08-worker-shutdown-20260925/review-final-before.json",
+      "sha256": "8c64ef9088079b0655e1969666f7c40962ed36fcb3cf1e43bff764bb74c0314e"
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-08-worker-shutdown-20260925/review-gibbs-final.md",
+      "sha256": "c9d022822b79661ef4a9bdf1aaeb0df01d16974ae1b4b77b99ac38b4ed0f4842"
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-08-worker-shutdown-20260925/review-sartre-initial.md",
+      "sha256": "c14772d9e50aed851bcad56453ed990da2627ea2127fcdd7fe2180c9eaac90c7"
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-08-worker-shutdown-20260925/runtime-regression.log",
+      "sha256": "18fe56e9087ca9f867562b59aabc2e00f57e2979097f8ebfe65f8c8af4039b44"
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-08-worker-shutdown-20260925/self-review.md",
+      "sha256": "c035c154ade74a76daa4a2fdf0d9f20c3a52ae8ea7b9368e396530df475191e9"
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-08-worker-shutdown-20260925/static-results.json",
+      "sha256": "f21ba8935f8ed363c72c579748806f2826a4548cc708cba0ff657915f18ecc9e"
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-08-worker-shutdown-20260925/test-runtime.json",
+      "sha256": "16835ea2c7547602020747ed487df4a9061f88228d27d40c89fe9ddc9285c0f8"
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-08-worker-shutdown-20260925/testclient-diagnostic.log",
+      "sha256": "0e40428c95a300baed7c6acd7c5f56f778986b6ae32fc44a6fafb2c888dfdf98"
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-08-worker-shutdown-20260925/typecheck.log",
+      "sha256": "f4e2482bfa89fd0a34aa7a5fab375fdbb03747d3941dd8fecfa8bdb1bc77c92d"
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-08-worker-shutdown-20260925/verify_budget_contract.py",
+      "sha256": "6fcd4d7a8904a9beeaab6f654e79729e4b1dd723a4aec44aa9adcdb347d00ab8"
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-08-worker-shutdown-20260925/worker-regression.log",
+      "sha256": "e76f3db3db4e0b6ed164e493bfc1ad7b1f5c0391405e15c4cc9b568e6f34b88c"
+    }
+  ],
+  "context_snapshot": [
+    {
+      "path": ".agent/state.json",
+      "sha256": "4bc660378993ada3bfe1f4c797c1c25d5018ec920647f67f182e3438a6b6896f"
+    },
+    {
+      "path": ".agent/backlog.json",
+      "sha256": "5e3706697a5f19eca5e03e0326ab90521ea78e631f5f9ca32b50f9072eaf8e2f"
+    },
+    {
+      "path": ".agent/execution-log.jsonl",
+      "sha256": "3f5763d5b5c6520c58edbfe0c443ab4e53f7731ae85b9ab435f5f40262003d1f"
+    },
+    {
+      "path": ".agent/verification.jsonl",
+      "sha256": "9ea88a272b7ebeb94df1012424e5969e92dbcaa2450141256e7f10b3f556ebce"
+    },
+    {
+      "path": ".agent/plans/phase-3-runtime-evidence-production-promotion.md",
+      "sha256": "571c76e96b96aed705af4710883f3c0af4495f63a16de25e92c6c5f807538018"
+    },
+    {
+      "path": "docs/reports/estado-implementacao-q24-2026-09-24.md",
+      "sha256": "71103652deb3db51a7b66b573abfe6546c547bc549cbd62db36e566867d3b8f9"
+    }
+  ]
+}

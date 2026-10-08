@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "task": "RA29-11",
+  "source_snapshot": {
+    "head": "b52f32c141916a2ea3af1a6b913bd91f380606e0",
+    "dirty": true,
+    "copy": "isolated local snapshot"
+  },
+  "results": {
+    "api": {
+      "command": "make api-coverage PYTHON=.venv/bin/python (pytest --cov-fail-under=75 plus exact statement-ratio summary)",
+      "scope": "apps/api/src",
+      "minimum_statements_percent": 75,
+      "positive": { "exit": 0, "tests_passed": 755, "statements_percent": 75.67, "covered_statements": 8385, "total_statements": 11081 },
+      "summarizer_validation": {
+        "command": ".venv/bin/python -m pytest -q scripts/state_of_art/tests/test_summarize_coverage.py",
+        "positive": { "exit": 0, "tests_passed": 7, "source_file_count": 55, "excluded_lines": 45, "statements_percent": 75.67 },
+        "negative_cases": 6
+      }
+    },
+    "web": {
+      "command": "make web-coverage",
+      "scope": "apps/web/lib/{navigation,permissions,presentation}.ts",
+      "minimum_lines_percent": 85,
+      "positive": { "exit": 0, "tests_passed": 4, "lines_percent": 100.0, "covered_lines": 51, "total_lines": 51 },
+      "negative": { "exit": 2, "tests_passed": 1, "lines_percent": 19.6, "mutation": "temporarily reduced unit test corpus" }
+    },
+    "worker": {
+      "command": "make worker-coverage PYTHON=.venv/bin/python",
+      "scope": "apps/worker/*.py excluding apps/worker/tests",
+      "minimum_lines_percent": 74,
+      "positive": { "exit": 0, "tests_passed": 116, "lines_percent": 75.28, "covered_lines": 2872, "total_lines": 3815 },
+      "negative": { "exit": 2, "tests_passed": 22, "lines_percent": 20.05, "mutation": "temporarily reduced worker test corpus" }
+    }
+  },
+  "installation": "uv pip sync --python .venv/bin/python --require-hashes --offline requirements/test.lock; npm ci --offline --ignore-scripts --no-audit --no-fund",
+  "critique_fixes": {
+    "ci_envelopes": "Unit and frontend artifacts upload only .runtime/ci; worker and web QA summaries use separate artifacts. Release downloads still target .runtime/ci.",
+    "python_installs": "Fast, unit, contract and security CI jobs install the complete hashed requirements/test.lock with --only-binary=:all:.",
+    "named_targets": "api16-full replaces the uninstrumented worker and API suites with their coverage targets; web-validate includes web-coverage once. Existing CI lanes invoke coverage targets directly. The API summary gate compares integer covered/total counts without rounding.",
+    "api_gate_tests": "api-coverage runs the summarizer unit suite before the instrumented API suite; tests cover 75%, 74.9%, production path scope, and report-total consistency.",
+    "api_summary_artifact": "The contract workflow uploads the location-free .runtime/qa/api-summary.json when available.",
+    "lock_sha256": {
+      "requirements/runtime.lock": "8dc58f04067faf64a9fc3cebc6767764a88b3e094cf33e999c4a0c5f5da064b3",
+      "requirements/test.lock": "baa656dc45898d4e4f4157f5272a2ef5a00c3ae274f13b79d1fb0a39c571340d"
+    },
+    "static_checks": "YAML/Make/lock checks passed for artifact roots, release paths, hashed installs, coverage dependencies and all 45 runtime/52 test lock entries. In-memory mutations of combined upload roots, unhashed pytest install, omitted API/Web floor, and a package with no hashes were rejected. make -n confirmed each named suite runs once."
+  },
+  "exclusions": {
+    "api": "The denominator includes measured statements in apps/api/src. Coverage.py pragma exclusions are omitted; the recorded API baseline reports 45 excluded lines.",
+    "web": "Unit coverage measures three pure presentation and navigation modules. Browser components and routes are exercised by the separate Playwright suite; their line coverage is not claimed here.",
+    "worker": "Test modules are excluded from the production code denominator. The API health test runs with the worker suite but is outside the worker code denominator."
+  },
+  "limits": [
+    "Local commands reproduce CI gate commands; GitHub Actions was not executed.",
+    "The isolated copy came from a dirty shared source snapshot; integration and CI results require a fresh run after applying the patch.",
+    "No browser E2E, provider, deployed service or production data was used."
+  ]
+}

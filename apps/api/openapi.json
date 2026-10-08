@@ -1916,6 +1916,235 @@
         }
       }
     },
+    "/api/v1/audit/operations": {
+      "get": {
+        "tags": [
+          "Knowledge"
+        ],
+        "summary": "Audit Pending Operations",
+        "operationId": "audit_pending_operations_api_v1_audit_operations_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "session_cookie",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Session Cookie"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/audit/operations/{operation_id}": {
+      "get": {
+        "tags": [
+          "Knowledge"
+        ],
+        "summary": "Audit Operation Status",
+        "operationId": "audit_operation_status_api_v1_audit_operations__operation_id__get",
+        "parameters": [
+          {
+            "name": "operation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Operation Id"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "session_cookie",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Session Cookie"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/audit/operations/{operation_id}/reconcile": {
+      "post": {
+        "tags": [
+          "Knowledge"
+        ],
+        "summary": "Audit Operation Reconcile",
+        "operationId": "audit_operation_reconcile_api_v1_audit_operations__operation_id__reconcile_post",
+        "parameters": [
+          {
+            "name": "operation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Operation Id"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "session_cookie",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Session Cookie"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuditReconciliationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/collections": {
       "post": {
         "tags": [
@@ -2745,6 +2974,21 @@
         "requestBody": {
           "required": true,
           "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "file"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
             "application/json": {
               "schema": {
                 "type": "object",
@@ -2925,6 +3169,21 @@
         "requestBody": {
           "required": true,
           "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "file"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
             "application/json": {
               "schema": {
                 "type": "object",
@@ -3217,6 +3476,9 @@
               }
             }
           },
+          "202": {
+            "description": "User committed; check audit_status for reconciliation or manual review."
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -3299,6 +3561,9 @@
               }
             }
           },
+          "202": {
+            "description": "User committed; check audit_status for reconciliation or manual review."
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -3370,6 +3635,9 @@
                 "schema": {}
               }
             }
+          },
+          "202": {
+            "description": "User disabled; check audit_status for reconciliation or manual review."
           },
           "422": {
             "description": "Validation Error",
@@ -3452,6 +3720,9 @@
                 "schema": {}
               }
             }
+          },
+          "202": {
+            "description": "Credentials reset; check audit_status for reconciliation or manual review."
           },
           "422": {
             "description": "Validation Error",
@@ -3791,6 +4062,150 @@
         }
       }
     },
+    "/api/v1/admin/audit/{event_id}/status": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Admin Audit Status",
+        "operationId": "admin_audit_status_api_v1_admin_audit__event_id__status_get",
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Event Id"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "session_cookie",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Session Cookie"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/audit/{event_id}/retry": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Retry Admin Audit",
+        "operationId": "retry_admin_audit_api_v1_admin_audit__event_id__retry_post",
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Event Id"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "session_cookie",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Session Cookie"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/admin/system": {
       "get": {
         "tags": [
@@ -3973,6 +4388,29 @@
           "catalog_status"
         ],
         "title": "AgentModelCatalogResponse"
+      },
+      "AuditReconciliationRequest": {
+        "properties": {
+          "resolution": {
+            "type": "string",
+            "pattern": "^(effect_confirmed|no_effect)$",
+            "title": "Resolution"
+          },
+          "evidence_ref": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.:\\-]+$",
+            "title": "Evidence Ref"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "resolution",
+          "evidence_ref"
+        ],
+        "title": "AuditReconciliationRequest"
       },
       "AuthorizedAgentModel": {
         "properties": {
@@ -4247,6 +4685,7 @@
       "CaseFeedback": {
         "properties": {
           "contract_version": {
+            "type": "string",
             "const": "clinical-case-contract-v1",
             "title": "Contract Version",
             "default": "clinical-case-contract-v1"
@@ -4469,11 +4908,13 @@
       "CaseRecord": {
         "properties": {
           "contract_version": {
+            "type": "string",
             "const": "clinical-case-contract-v1",
             "title": "Contract Version",
             "default": "clinical-case-contract-v1"
           },
           "clinical_scope_status": {
+            "type": "string",
             "const": "record_review_feedback_only",
             "title": "Clinical Scope Status",
             "default": "record_review_feedback_only"
@@ -4654,6 +5095,7 @@
       "CaseReview": {
         "properties": {
           "contract_version": {
+            "type": "string",
             "const": "clinical-case-contract-v1",
             "title": "Contract Version",
             "default": "clinical-case-contract-v1"
@@ -4953,6 +5395,7 @@
             "title": "Citations"
           },
           "metadata": {
+            "additionalProperties": true,
             "type": "object",
             "title": "Metadata"
           }
@@ -5387,6 +5830,7 @@
             "title": "Citations"
           },
           "metadata": {
+            "additionalProperties": true,
             "type": "object",
             "title": "Metadata"
           },
@@ -5587,6 +6031,30 @@
           "tenant_id"
         ],
         "title": "LoginRequest"
+      },
+      "PermissionOverridesRequest": {
+        "properties": {
+          "add": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 128,
+            "title": "Add"
+          },
+          "remove": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 128,
+            "title": "Remove"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "PermissionOverridesRequest",
+        "description": "Closed wire shape for additive/removal permission overrides."
       },
       "RecoveryRequest": {
         "properties": {
@@ -5923,13 +6391,12 @@
           "permission_overrides": {
             "anyOf": [
               {
-                "type": "object"
+                "$ref": "#/components/schemas/PermissionOverridesRequest"
               },
               {
                 "type": "null"
               }
-            ],
-            "title": "Permission Overrides"
+            ]
           }
         },
         "type": "object",
@@ -5958,6 +6425,13 @@
           "type": {
             "type": "string",
             "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
           }
         },
         "type": "object",

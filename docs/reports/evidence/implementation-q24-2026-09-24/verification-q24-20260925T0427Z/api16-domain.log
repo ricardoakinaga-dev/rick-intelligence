@@ -1,0 +1,6 @@
+PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="/home/ricardo/rick-intelligence/apps/worker:/home/ricardo/rick-intelligence/packages/knowledge/src:/home/ricardo/rick-intelligence/packages/ingestion/src:/home/ricardo/rick-intelligence/packages/retrieval/src:/home/ricardo/rick-intelligence/packages/storage/src" /tmp/rick-q24-resume-PMUl45/runtime-venv/bin/python -m pytest -q -p no:cacheprovider "/home/ricardo/rick-intelligence/packages/knowledge/tests" "/home/ricardo/rick-intelligence/packages/ingestion/tests" "/home/ricardo/rick-intelligence/packages/retrieval/tests"
+........................................................................ [ 25%]
+........................................................................ [ 50%]
+........................................................................ [ 75%]
+.........sssss........................................................   [100%]
+281 passed, 5 skipped in 15.67s

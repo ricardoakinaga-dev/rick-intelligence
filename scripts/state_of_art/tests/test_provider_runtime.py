@@ -22,6 +22,7 @@ from scripts.phase11 import provider_runtime_gate
 
 class _ProviderHandler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
+    tool_stream_finish_reason = "tool_calls"
 
     def do_GET(self) -> None:  # noqa: N802
         if not self.path.endswith("/models"):
@@ -76,7 +77,7 @@ class _ProviderHandler(BaseHTTPRequestHandler):
                                         }
                                     ]
                                 },
-                                "finish_reason": "stop",
+                                "finish_reason": self.tool_stream_finish_reason,
                             }
                         ],
                     },
@@ -120,7 +121,7 @@ class _ProviderHandler(BaseHTTPRequestHandler):
                                     }
                                 ],
                             },
-                            "finish_reason": "stop",
+                            "finish_reason": "tool_calls",
                         }
                     ],
                 }
@@ -226,6 +227,21 @@ def test_real_openai_compatible_endpoint_passes_semantic_checks(provider_url: st
         "embedding-contract",
     }
     assert production_safe is False
+    assert endpoint["host_scope"] == "loopback"
+
+
+@pytest.mark.parametrize("reason,expected", [("tool_calls", "PASS"), ("length", "FAIL"),
+    ("content_filter", "FAIL"), ("stop", "FAIL"), ("nonsense", "FAIL")])
+def test_streamed_tool_probe_requires_successful_tool_termination(provider_url, monkeypatch, reason, expected):
+    monkeypatch.setattr(_ProviderHandler, "tool_stream_finish_reason", reason)
+    status, assertions, production_safe, endpoint = asyncio.run(provider_runtime_gate._run_checks(
+        provider_url, api_key=None, chat_model="chat-test", embedding_model="embedding-test",
+        embedding_dimensions=2, require_tls=False, require_auth=False, allow_nonlocal=False))
+    results = {item.name: item.result for item in assertions}
+    assert results["streaming-tool-call-contract"] == expected
+    assert results["tool-call-contract"] == "PASS"
+    assert results["streaming-contract"] == "PASS"
+    assert status == expected and production_safe is False
     assert endpoint["host_scope"] == "loopback"
 
 

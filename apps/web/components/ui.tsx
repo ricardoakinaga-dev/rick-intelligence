@@ -28,6 +28,7 @@ export function ConfirmDialog({
   title,
   description,
   confirmLabel = "Confirmar",
+  busyLabel = "Removendo…",
   busy = false,
   onCancel,
   onConfirm,
@@ -36,6 +37,7 @@ export function ConfirmDialog({
   title: string;
   description: string;
   confirmLabel?: string;
+  busyLabel?: string;
   busy?: boolean;
   onCancel: () => void;
   onConfirm: () => void;
@@ -52,7 +54,10 @@ export function ConfirmDialog({
   useEffect(() => {
     if (!open) return;
     previousFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    const frame = window.requestAnimationFrame(() => cancelRef.current?.focus());
+    const frame = window.requestAnimationFrame(() => {
+      if (cancelRef.current && !cancelRef.current.disabled) cancelRef.current.focus();
+      else dialogRef.current?.focus();
+    });
     return () => {
       window.cancelAnimationFrame(frame);
       const previous = previousFocusRef.current;
@@ -65,18 +70,26 @@ export function ConfirmDialog({
     if (!open) return;
     const dialog = dialogRef.current;
     if (!dialog) return;
+    if (busy) dialog.focus();
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !busy) {
+      if (event.key === "Escape") {
         event.preventDefault();
-        onCancelRef.current();
+        if (!busy) onCancelRef.current();
         return;
       }
       if (event.key !== "Tab") return;
       const focusable = Array.from(dialog.querySelectorAll<HTMLElement>("button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled)"));
-      if (!focusable.length) return;
+      if (!focusable.length) {
+        event.preventDefault();
+        dialog.focus();
+        return;
+      }
       const first = focusable[0];
       const last = focusable[focusable.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
+      if (!dialog.contains(document.activeElement) || document.activeElement === dialog) {
+        event.preventDefault();
+        (event.shiftKey ? last : first).focus();
+      } else if (event.shiftKey && document.activeElement === first) {
         event.preventDefault();
         last.focus();
       } else if (!event.shiftKey && document.activeElement === last) {
@@ -90,5 +103,5 @@ export function ConfirmDialog({
 
   if (!open) return null;
 
-  return <div className="dialog-backdrop" role="presentation"><section id="confirm-dialog" ref={dialogRef} className="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="confirm-dialog-title" aria-describedby="confirm-dialog-description"><span className="eyebrow">Confirmação necessária</span><h2 id="confirm-dialog-title">{title}</h2><p id="confirm-dialog-description">{description}</p><div className="dialog-actions"><Button ref={cancelRef} variant="secondary" onClick={onCancel} disabled={busy}>Cancelar</Button><Button variant="danger" onClick={onConfirm} disabled={busy} aria-busy={busy}>{busy ? <Spinner label="Confirmando exclusão" /> : null}{busy ? "Removendo…" : confirmLabel}</Button></div></section></div>;
+  return <div className="dialog-backdrop" role="presentation"><section id="confirm-dialog" ref={dialogRef} className="confirm-dialog" role="dialog" tabIndex={-1} aria-busy={busy} aria-modal="true" aria-labelledby="confirm-dialog-title" aria-describedby="confirm-dialog-description"><span className="eyebrow">Confirmação necessária</span><h2 id="confirm-dialog-title">{title}</h2><p id="confirm-dialog-description">{description}</p><div className="dialog-actions"><Button ref={cancelRef} variant="secondary" onClick={onCancel} disabled={busy}>Cancelar</Button><Button variant="danger" onClick={onConfirm} disabled={busy} aria-busy={busy}>{busy ? <Spinner label="Confirmando exclusão" /> : null}{busy ? busyLabel : confirmLabel}</Button></div></section></div>;
 }

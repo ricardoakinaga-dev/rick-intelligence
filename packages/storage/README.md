@@ -51,6 +51,13 @@ scope components and logical keys are validated at the adapter boundary, and
 list results outside the requested namespace are discarded before metadata is
 returned. The bucket and endpoint are validated during construction.
 
+Deletion checks scoped existence with HEAD before DELETE, because S3 returns
+204 even for an absent key. An object observed absent returns `False`; successful
+deletion of an observed object returns `True`. The service credentials therefore
+need both HEAD/read and delete permission. Existence observation and deletion
+are separate requests; the boolean does not prove exclusive ownership under
+concurrent writes or deletes. Both responses are closed, including on failure.
+
 Uploads are materialized only up to `max_object_bytes` and send SHA-256 and
 size as `x-amz-meta-rick-checksum` and `x-amz-meta-rick-size`. Reads enforce
 `max_read_bytes`, response XML enforces `max_response_bytes`, and object

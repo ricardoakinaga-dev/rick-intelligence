@@ -1,6 +1,6 @@
 # Backup and restore reconciliation contract
 
-Status: `LOCAL CONTRACT / EXTERNAL EXECUTION NOT_RUN`.
+Status: `LOCAL CONTRACT / OWNED LOCAL JOINT DRILL PASS / PRODUCTION EXECUTION NOT_RUN`.
 
 `infrastructure/scripts/backup_restore.py` handles a safe file-level rehearsal:
 it copies already-exported components into an atomic backup directory, verifies
@@ -39,9 +39,13 @@ The external drill remains a separate gate. The operator must export and
 restore Postgres conversations/audit data, object-store documents, vector
 records, and any applicable Redis persistence under one release ID; run the
 authorized adapters against the isolated restore; then pass the synthetic
-wrong-tenant smoke matrix and record RPO/RTO. Those service operations require
-runtime access and disposable credentials, so they remain `NOT_RUN` in this
-workspace.
+wrong-tenant smoke matrix and record RPO/RTO. A local owned drill now provides this limited service execution: see
+[restore18 evidence](../reports/evidence/production-2026-10-04/joint-restore18.json).
+It restored a quiesced synthetic dataset using identical images, compared all
+20 PostgreSQL tables/database grants and read objects/scoped vectors through
+the real adapters, then verified internal login/search/tenant denial/revocation.
+Production target, approved RPO/RTO budgets, representative workload and
+independent review remain `NOT_RUN`; the local result does not close AUD03-32.
 
 Example local reconciliation invocation:
 

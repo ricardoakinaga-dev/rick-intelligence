@@ -1,0 +1,125 @@
+name: GHCR candidate images (no promotion)
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact current main commit with all eight construction quality gates passed
+        required: true
+        type: string
+      quality_run_id:
+        description: Actual completed same-SHA canonical quality workflow run ID
+        required: true
+        type: string
+permissions: {}
+concurrency:
+  group: ghcr-candidate-${{ inputs.source_sha }}
+  cancel-in-progress: false
+jobs:
+  candidate:
+    if: github.repository == 'ricardoakinaga-dev/rick-intelligence' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    # Package construction authority only. No deployment/release environment.
+    permissions:
+      contents: read
+      actions: read
+      packages: write
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: api
+            policy_var: RICK_API_CONSTRUCTION_POLICY_JSON
+            policy_hash_var: RICK_API_CONSTRUCTION_POLICY_SHA256
+          - service: worker
+            policy_var: RICK_WORKER_CONSTRUCTION_POLICY_JSON
+            policy_hash_var: RICK_WORKER_CONSTRUCTION_POLICY_SHA256
+          - service: web
+            policy_var: RICK_WEB_CONSTRUCTION_POLICY_JSON
+            policy_hash_var: RICK_WEB_CONSTRUCTION_POLICY_SHA256
+    env:
+      SOURCE_SHA: ${{ inputs.source_sha }}
+      QUALITY_RUN_ID: ${{ inputs.quality_run_id }}
+      SERVICE: ${{ matrix.service }}
+      CONSTRUCTION_POLICY_JSON: ${{ vars[matrix.policy_var] }}
+      CONSTRUCTION_POLICY_SHA256: ${{ vars[matrix.policy_hash_var] }}
+      TOOL_POLICY_JSON: ${{ vars.RICK_TOOL_POLICY_JSON }}
+      TOOL_POLICY_SHA256: ${{ vars.RICK_TOOL_POLICY_SHA256 }}
+      # Required administrator-reviewed immutable refs. No tag defaults.
+      PYTHON_IMAGE: ${{ vars.RICK_PYTHON_IMAGE }}
+      NODE_BUILD_IMAGE: ${{ vars.RICK_NODE_BUILD_IMAGE }}
+      NODE_RUNTIME_IMAGE: ${{ vars.RICK_NODE_RUNTIME_IMAGE }}
+      BUILDKIT_IMAGE: ${{ vars.RICK_BUILDKIT_IMAGE }}
+      BUILDX_VERSION: ${{ vars.RICK_BUILDX_VERSION }}
+      BUILDX_SHA256: ${{ vars.RICK_BUILDX_SHA256 }}
+      BUILDX_GIT_INFO: "true"
+      DOCKERFILE_FRONTEND_IMAGE: ${{ vars.RICK_DOCKERFILE_FRONTEND_IMAGE }}
+      SBOM_GENERATOR_IMAGE: ${{ vars.RICK_SBOM_GENERATOR_IMAGE }}
+      TRIVY_IMAGE: ${{ vars.RICK_TRIVY_IMAGE }}
+      SKOPEO_IMAGE: ${{ vars.RICK_SKOPEO_IMAGE }}
+    steps:
+      - name: Validate dispatch source shape
+        shell: bash
+        run: |
+          set -eu
+          [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$QUALITY_RUN_ID" =~ ^[1-9][0-9]*$ ]]
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ inputs.source_sha }}
+          persist-credentials: false
+      - name: Require all eight actual same-SHA construction quality gates
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          python3 infrastructure/vps/publish_guard.py
+      - name: Install reviewed Buildx binary (checksum before execution)
+        run: python3 infrastructure/vps/buildx_binary.py
+      - name: Require independently hash-bound construction policy before building
+        run: python3 infrastructure/vps/construction_contract.py
+      - name: Create builder using the verified plugin and immutable BuildKit
+        shell: bash
+        run: |
+          set -eu
+          docker buildx create --name rick-candidate --driver docker-container --driver-opt "image=$BUILDKIT_IMAGE" --use
+          docker buildx inspect --bootstrap
+      - name: Build local OCI candidate with provenance and SBOM
+        id: build
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
+        with:
+          context: https://github.com/ricardoakinaga-dev/rick-intelligence.git#${{ inputs.source_sha }}
+          file: infrastructure/docker/${{ matrix.service }}.Dockerfile
+          platforms: linux/amd64
+          push: false
+          outputs: type=oci,dest=publication/image.tar,name=ghcr.io/ricardoakinaga-dev/rick-intelligence-${{ matrix.service }}
+          provenance: mode=max,version=v0.2,builder-id=https://github.com/ricardoakinaga-dev/rick-intelligence/actions/runs/${{ github.run_id }}
+          sbom: generator=${{ env.SBOM_GENERATOR_IMAGE }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/ricardoakinaga-dev/rick-intelligence
+            org.opencontainers.image.revision=${{ inputs.source_sha }}
+          build-args: |
+            PYTHON_IMAGE=${{ env.PYTHON_IMAGE }}
+            NODE_BUILD_IMAGE=${{ env.NODE_BUILD_IMAGE }}
+            NODE_RUNTIME_IMAGE=${{ env.NODE_RUNTIME_IMAGE }}
+            BUILDKIT_SYNTAX=${{ env.DOCKERFILE_FRONTEND_IMAGE }}
+            RICK_API_INTERNAL_URL=http://api:8000
+      - uses: sigstore/cosign-installer@d58896d6a1865668819e1d91763c7751a165e159 # v3.9.2
+        with:
+          cosign-release: v2.5.3
+      - name: Scan exact archive, copy to GHCR, sign and verify immutable candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUILT_DIGEST: ${{ steps.build.outputs.digest }}
+        run: python3 infrastructure/vps/publish_candidate.py
+      - name: Preserve actual construction evidence (contains no secrets)
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ghcr-candidate-${{ inputs.source_sha }}-${{ matrix.service }}
+          path: |
+            publication/*.json
+            publication/*.jsonl
+            publication/registry.digest
+          if-no-files-found: error
+          retention-days: 30

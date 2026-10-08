@@ -20,6 +20,7 @@ from rick_authorization import (
     normalize_permission_overrides,
     permissions_for_role,
 )
+from rick_identity.snapshots import known_role, text_list
 
 
 class OIDCError(Exception):
@@ -190,6 +191,10 @@ class OIDCVerifier:
 
 
 MembershipResolver = Callable[[str, Mapping[str, object], str], Mapping[str, object] | None]
+# Resolver authority contract: return subject, user_id, tenant_id, workspace_id,
+# role, status="active", membership_status="active", authorized_collection_ids.
+# Optional permission_overrides must contain string lists. Claims select the
+# lookup subject/tenant; they never fill missing membership authority fields.
 
 
 class OIDCIdentityProvider:
@@ -244,19 +249,26 @@ class OIDCIdentityProvider:
             membership = self._membership_resolver(subject, claims, tenant)
             if not isinstance(membership, Mapping):
                 raise OIDCError("membership_denied")
-            if membership.get("subject") not in (None, subject) or membership.get("tenant_id") != tenant:
+            if (membership.get("subject") != subject or membership.get("tenant_id") != tenant
+                    or membership.get("status") != "active"
+                    or membership.get("membership_status") != "active"):
                 raise OIDCError("membership_denied")
             workspace = _safe_claim_text(membership, "workspace_id", maximum=128)
-            if workspace is None:
-                workspace = _safe_claim_text(claims, self._workspace_claim, maximum=128)
-            if workspace is None:
+            user_id = _safe_claim_text(membership, "user_id", maximum=256)
+            if workspace is None or user_id is None or not known_role(membership.get("role")):
                 raise OIDCError("membership_denied")
-            role = canonical_role(membership.get("role") or claims.get("role"))
+            if not text_list(membership.get("authorized_collection_ids"), 128, 256):
+                raise OIDCError("membership_denied")
+            overrides = membership.get("permission_overrides", {})
+            if not isinstance(overrides, Mapping) or any(
+                not text_list(overrides[name], 256, 128) for name in ("add", "remove") if name in overrides
+            ):
+                raise OIDCError("membership_denied")
+            role = canonical_role(membership["role"])
             permissions = permissions_for_role(
-                role, normalize_permission_overrides(membership.get("permission_overrides"))
+                role, normalize_permission_overrides(overrides)
             )
             email = _safe_claim_text(membership, "email", maximum=256) or _safe_claim_text(claims, "email", maximum=256)
-            user_id = _safe_claim_text(membership, "user_id", maximum=256) or subject
             allowed = allowed_collection_ids_for_user({
                 "role": role,
                 "authorized_collection_ids": membership.get("authorized_collection_ids", []),
@@ -276,7 +288,7 @@ class OIDCIdentityProvider:
                 session_id=f"oidc:{subject}",
                 allowed_collection_ids=allowed,
             )
-        except OIDCError:
+        except Exception:
             return SessionSnapshot(authenticated=False, session_state="anonymous")
 
     def logout(self, _token: str | None) -> None:

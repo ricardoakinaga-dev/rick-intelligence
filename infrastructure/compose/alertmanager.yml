@@ -1,0 +1,19 @@
+# Delivery requires an operator-reviewed URL file mounted as a Compose secret.
+# No destination or authentication material belongs in this configuration.
+global:
+  resolve_timeout: 5m
+
+route:
+  receiver: reviewed-webhook
+  group_by: [alertname, job, instance]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+
+receivers:
+  - name: reviewed-webhook
+    webhook_configs:
+      - url_file: /run/secrets/rick-alert-webhook-url
+        send_resolved: true
+        max_alerts: 20
+        timeout: 10s

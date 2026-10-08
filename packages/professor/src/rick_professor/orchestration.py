@@ -13,6 +13,8 @@ import math
 import re
 import uuid
 from collections.abc import Callable, Mapping, Sequence
+from contextlib import aclosing
+from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any
 
@@ -113,6 +115,7 @@ class _RequestBudget:
     retrieval_rounds: int = 0
     tool_calls: int = 0
     provider_calls: int = 0
+    retrieval_snapshot: object | None = None
 
 
 class _BudgetExceeded(Exception):
@@ -215,9 +218,15 @@ def _retrieval_decision_metadata(value: object) -> dict[str, str | int | float |
         "citation_support_status", "citation_precision", "citation_recall",
         "citation_completeness", "unsupported_claim_rate", "faithfulness",
         "citation_evaluated_claims", "citation_support_source",
+        "request_policy_version", "request_policy_reason", "request_domain_risk",
+        "request_intent", "request_intent_clarity", "request_policy_allows_answer",
+        "request_policy_human_review_required", "domain_acceptance", "decision_initial_action", "retrieval_strategy",
+        "evidence_collection_mode", "semantic_support_status",
     }
     result: dict[str, str | int | float | bool | None] = {}
     for key in allowed:
+        if key not in metadata:
+            continue
         value = metadata.get(key)
         if isinstance(value, (str, int, float, bool)) or value is None:
             result[key] = value
@@ -462,11 +471,13 @@ class ProfessorOrchestrator:
         chat_provider: ChatProvider | object,
         limits: ProfessorLimits | None = None,
         lease_manager: LeaseManager | LeasePort | None = None,
+        require_publication_revalidation: bool = False,
     ) -> None:
         self.retrieval = retrieval
         self.chat_provider = chat_provider
         self.limits = limits or ProfessorLimits()
         self.lease_manager = lease_manager
+        self.require_publication_revalidation = require_publication_revalidation
 
     @staticmethod
     def _lease_key(request: ProfessorRequest) -> str:
@@ -478,21 +489,28 @@ class ProfessorOrchestrator:
 
     async def run(self, request: ProfessorRequest) -> ProfessorResponse:
         self._validate_request(request)
+        budget = _RequestBudget()
+
+        async def deliver() -> ProfessorResponse:
+            result = await self._run_request(request, budget=budget)
+            # The lease-release await has completed. Revalidate as close as
+            # possible to delivery, rather than approving a queued snapshot.
+            return await self._validate_publication(request, result, budget=budget)
+
         try:
             return await asyncio.wait_for(
-                self._run_request(request),
+                deliver(),
                 timeout=self.limits.max_total_request_seconds,
             )
         except asyncio.TimeoutError:
             return self._failed(request, "total_request_timeout")
 
-    async def _run_request(self, request: ProfessorRequest) -> ProfessorResponse:
+    async def _run_request(self, request: ProfessorRequest, *, budget: _RequestBudget) -> ProfessorResponse:
         lease_key = self._lease_key(request)
         lease_owner = uuid.uuid4().hex
         lease_acquired = False
         lease_handle: object | None = None
         lease_low_level = True
-        budget = _RequestBudget()
         try:
             if self.lease_manager is not None:
                 try:
@@ -610,30 +628,81 @@ class ProfessorOrchestrator:
         except Exception:
             return self._failed(request, "provider_failed", evidence, metadata=decision_metadata)
 
-        if not _completion_within_token_budget(completion, messages, self.limits.max_tokens):
-            return self._failed(
-                request,
-                "token_budget_exceeded",
-                evidence,
-                metadata=decision_metadata,
-            )
+        return self._completion_response(
+            request, completion, messages, evidence, metadata=decision_metadata,
+        )
 
+    def _completion_response(
+        self, request: ProfessorRequest, completion: ChatCompletionResult,
+        messages: Sequence[ProviderMessage], evidence: Sequence[_TrustedEvidence],
+        *, metadata: Mapping[str, str | int | float | bool | None],
+        pending_tool_calls: bool = False,
+    ) -> ProfessorResponse:
+        """One completion contract for JSON, incremental and buffered streams."""
+        # A tool-call budget bounds received calls; it does not execute them.
+        # An answer awaiting tools cannot be approved by a textual stop marker.
+        if completion.finish_reason != "stop" or completion.tool_calls or pending_tool_calls:
+            return self._failed(request, "completion_incomplete", evidence, metadata=metadata)
+        if not _completion_within_token_budget(completion, messages, self.limits.max_tokens):
+            return self._failed(request, "token_budget_exceeded", evidence, metadata=metadata)
+        plain_answer = _CITATION_MARKER.sub("", completion.content).strip()
+        if len(plain_answer) > self.limits.max_answer_chars:
+            return self._failed(request, "answer_budget_exceeded", evidence, metadata=metadata)
         answer, citations, invalid = self._citations(completion.content, evidence)
         if invalid:
-            return self._static(request, "CITATION_INVALID", _INVALID_CITATION_ANSWER, evidence, metadata=decision_metadata)
+            rejected_metadata = dict(metadata)
+            if rejected_metadata.get("decision_action") == "ANSWER":
+                rejected_metadata.update(decision_action="ABSTAIN", decision_reason="citation_invalid")
+            return self._static(request, "CITATION_INVALID", _INVALID_CITATION_ANSWER, evidence, metadata=rejected_metadata)
         return ProfessorResponse(
-            conversation_id=request.conversation_id,
-            answer=answer,
-            evidence_status="APPROVED_EVIDENCE",
-            citations=citations,
+            conversation_id=request.conversation_id, answer=answer,
+            evidence_status="APPROVED_EVIDENCE", citations=citations,
             evidence=[item.response_dict() for item in evidence],
-            metadata={
-                **decision_metadata,
-                "evidence_count": len(evidence),
-                "provider_model": completion.model[:128],
-                "finish_reason": completion.finish_reason,
-            },
+            metadata={**metadata, "evidence_count": len(evidence),
+                      "provider_model": completion.model[:128], "finish_reason": completion.finish_reason},
         )
+
+    async def _validate_publication(
+        self, request: ProfessorRequest, response: ProfessorResponse, *, budget: _RequestBudget,
+    ) -> ProfessorResponse:
+        if response.evidence_status != "APPROVED_EVIDENCE":
+            return response
+        validator = getattr(self.retrieval, "validate_publication", None)
+        if not callable(validator) and not self.require_publication_revalidation:
+            return response
+        valid = False
+        try:
+            ids = {item.evidence_id for item in response.evidence}
+            snapshot = [dict(item) for item in _retrieved_items(budget.retrieval_snapshot)
+                        if isinstance(item, Mapping) and item.get("evidence_id") in ids]
+            cited = {(citation.document_id, citation.chunk_id) for citation in response.citations}
+            cited_ids = [item["evidence_id"] for item in snapshot
+                         if (item.get("document_id"), item.get("chunk_id")) in cited]
+            if callable(validator) and len(snapshot) == len(ids):
+                valid = await _call_maybe_async(
+                    validator, context=request.retrieval_context.model_dump(),
+                    evidence=snapshot, cited_evidence_ids=cited_ids,
+                ) is True
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            valid = False
+        if not valid:
+            return self._static(
+                request, "CITATION_INVALID", _INVALID_CITATION_ANSWER, (),
+                metadata={**response.metadata, "decision_action": "ABSTAIN",
+                          "decision_reason": "publication_sources_changed",
+                          "publication_validation": "failed"},
+            )
+        return response.model_copy(update={"metadata": {
+            **response.metadata, "publication_validation": "verified",
+            "semantic_support_status": "NOT_EVALUATED",
+            "publication_authorization": (
+                "live_grants_and_collection"
+                if getattr(self.retrieval, "authorization_revalidator", None) is not None
+                else "request_scope_and_collection"
+            ),
+        }})
 
     async def _run_with_lease_heartbeat(
         self,
@@ -733,14 +802,22 @@ class ProfessorOrchestrator:
     async def stream(self, request: ProfessorRequest):
         """Yield a bounded stream and a safe terminal response."""
         self._validate_request(request)
+        budget = _RequestBudget()
         try:
             async with asyncio.timeout(self.limits.max_total_request_seconds):
-                async for event in self._stream_request(request):
-                    yield event
+                async with aclosing(self._stream_request(request, budget=budget)) as source:
+                    async for event in source:
+                        if event.get("kind") == "final":
+                            event = {**event, "response": await self._validate_publication(
+                                request, event["response"], budget=budget,
+                            )}
+                        else:
+                            event = {**event, "provisional": True}
+                        yield event
         except TimeoutError:
             yield {"kind": "final", "response": self._failed(request, "total_request_timeout")}
 
-    async def _stream_request(self, request: ProfessorRequest):
+    async def _stream_request(self, request: ProfessorRequest, *, budget: _RequestBudget):
         """Yield provider deltas and one validated final response.
 
         The generator owns the lease for its whole lifetime. A caller that
@@ -754,7 +831,6 @@ class ProfessorOrchestrator:
         lease_acquired = False
         lease_handle: object | None = None
         lease_low_level = True
-        budget = _RequestBudget()
         try:
             if self.lease_manager is not None:
                 try:
@@ -793,8 +869,9 @@ class ProfessorOrchestrator:
                 )
             else:
                 source = self._stream_generation(request, budget=budget)
-            async for event in self._stream_with_reasoning_budget(request, source):
-                yield event
+            async with aclosing(self._stream_with_reasoning_budget(request, source)) as bounded:
+                async for event in bounded:
+                    yield event
         finally:
             if lease_acquired and self.lease_manager is not None:
                 try:
@@ -828,16 +905,18 @@ class ProfessorOrchestrator:
         """
 
         if self.lease_manager is None or not callable(getattr(self.lease_manager, "renew", None)):
-            async for event in self._stream_generation(request, budget=budget):
-                yield event
+            async with aclosing(self._stream_generation(request, budget=budget)) as source:
+                async for event in source:
+                    yield event
             return
 
         events: asyncio.Queue[tuple[str, object | None]] = asyncio.Queue(maxsize=16)
 
         async def produce() -> None:
             try:
-                async for event in self._stream_generation(request, budget=budget):
-                    await events.put(("event", event))
+                async with aclosing(self._stream_generation(request, budget=budget)) as source:
+                    async for event in source:
+                        await events.put(("event", event))
                 await events.put(("done", None))
             except asyncio.CancelledError:
                 raise
@@ -902,6 +981,10 @@ class ProfessorOrchestrator:
                     yield event
         except TimeoutError:
             yield {"kind": "final", "response": self._failed(request, "reasoning_timeout")}
+        finally:
+            close = getattr(source, "aclose", None)
+            if callable(close):
+                await close()
 
     async def _stream_generation(self, request: ProfessorRequest, *, budget: _RequestBudget):
         try:
@@ -939,15 +1022,8 @@ class ProfessorOrchestrator:
                     yield {"kind": "final", "response": self._failed(request, "token_budget_exceeded", evidence, metadata=decision_metadata)}
                     return
                 yield {"kind": "delta", "delta": completion.content}
-                answer, citations, invalid = self._citations(completion.content, evidence)
-                if invalid:
-                    yield {"kind": "final", "response": self._static(request, "CITATION_INVALID", _INVALID_CITATION_ANSWER, evidence, metadata=decision_metadata)}
-                    return
-                yield {"kind": "final", "response": ProfessorResponse(
-                    conversation_id=request.conversation_id, answer=answer,
-                    evidence_status="APPROVED_EVIDENCE", citations=citations,
-                    evidence=[item.response_dict() for item in evidence],
-                    metadata={**decision_metadata, "evidence_count": len(evidence), "provider_model": completion.model[:128], "finish_reason": completion.finish_reason},
+                yield {"kind": "final", "response": self._completion_response(
+                    request, completion, messages, evidence, metadata=decision_metadata,
                 )}
             except _BudgetExceeded as error:
                 yield {"kind": "final", "response": self._failed(request, f"{error.budget_name}_budget_exceeded", evidence, metadata=decision_metadata)}
@@ -960,9 +1036,13 @@ class ProfessorOrchestrator:
         content_parts: list[str] = []
         model = ""
         finish_reason = "unknown"
+        terminal_seen = False
         correlation_id = f"chat-{request.conversation_id}"[:128]
         usage = None
         stream_tool_indexes: set[int] = set()
+        stream = None
+        content_chars = 0
+        prompt_tokens = sum(_estimated_tokens(message.content) for message in messages)
         try:
             self._consume_provider_call(budget)
             stream = await _call_maybe_async(
@@ -970,10 +1050,14 @@ class ProfessorOrchestrator:
             )
             async for raw_chunk in stream:
                 chunk = raw_chunk if isinstance(raw_chunk, ChatCompletionChunk) else ChatCompletionChunk.model_validate(raw_chunk)
+                if terminal_seen and (chunk.delta or chunk.tool_calls or chunk.finish_reason is not None):
+                    raise ValueError("content, tools or termination after terminal provider event")
                 model = chunk.model
                 correlation_id = chunk.correlation_id
                 if chunk.usage is not None:
                     usage = chunk.usage
+                    if usage.total_tokens > self.limits.max_tokens:
+                        raise _BudgetExceeded("token")
                 new_tool_indexes = {
                     delta.index for delta in chunk.tool_calls or []
                 }.difference(stream_tool_indexes)
@@ -981,9 +1065,17 @@ class ProfessorOrchestrator:
                     self._consume_tool_calls(budget, len(new_tool_indexes))
                     stream_tool_indexes.update(new_tool_indexes)
                 if chunk.delta:
+                    content_chars += len(chunk.delta)
+                    # Bound memory and emitted provisional text during the
+                    # stream, including citation syntax, before adding a chunk.
+                    if content_chars > self.limits.max_answer_chars + 8 * 140:
+                        raise _BudgetExceeded("answer")
+                    if prompt_tokens + (content_chars + 3) // 4 > self.limits.max_tokens:
+                        raise _BudgetExceeded("token")
                     content_parts.append(chunk.delta)
                     yield {"kind": "delta", "delta": chunk.delta}
                 if chunk.finish_reason:
+                    terminal_seen = True
                     finish_reason = chunk.finish_reason
         except _BudgetExceeded as error:
             yield {"kind": "final", "response": self._failed(request, f"{error.budget_name}_budget_exceeded", evidence, metadata=decision_metadata)}
@@ -993,6 +1085,10 @@ class ProfessorOrchestrator:
         except Exception:
             yield {"kind": "final", "response": self._failed(request, "provider_failed", evidence, metadata=decision_metadata)}
             return
+        finally:
+            close = getattr(stream, "aclose", None)
+            if callable(close):
+                await close()
 
         content = "".join(content_parts).strip()
         if not content or not model:
@@ -1006,21 +1102,15 @@ class ProfessorOrchestrator:
             if not _completion_within_token_budget(completion, messages, self.limits.max_tokens):
                 yield {"kind": "final", "response": self._failed(request, "token_budget_exceeded", evidence, metadata=decision_metadata)}
                 return
-            answer, citations, invalid = self._citations(completion.content, evidence)
         except _BudgetExceeded as error:
             yield {"kind": "final", "response": self._failed(request, f"{error.budget_name}_budget_exceeded", evidence, metadata=decision_metadata)}
             return
         except Exception:
             yield {"kind": "final", "response": self._failed(request, "provider_failed", evidence, metadata=decision_metadata)}
             return
-        if invalid:
-            yield {"kind": "final", "response": self._static(request, "CITATION_INVALID", _INVALID_CITATION_ANSWER, evidence, metadata=decision_metadata)}
-            return
-        yield {"kind": "final", "response": ProfessorResponse(
-            conversation_id=request.conversation_id, answer=answer,
-            evidence_status="APPROVED_EVIDENCE", citations=citations,
-            evidence=[item.response_dict() for item in evidence],
-            metadata={**decision_metadata, "evidence_count": len(evidence), "provider_model": completion.model[:128], "finish_reason": completion.finish_reason},
+        yield {"kind": "final", "response": self._completion_response(
+            request, completion, messages, evidence, metadata=decision_metadata,
+            pending_tool_calls=bool(stream_tool_indexes),
         )}
 
     def _consume_retrieval_round(self, budget: _RequestBudget) -> None:
@@ -1048,7 +1138,12 @@ class ProfessorOrchestrator:
                 raise TypeError("retrieval dependency has no retrieve callable")
             target = self.retrieval
         context = request.retrieval_context.model_dump()
-        return await _call_maybe_async(target, query=request.query, context=context)
+        result = await _call_maybe_async(
+            target, query=request.query, context=context,
+            history=[item.content for item in request.history],
+        )
+        budget.retrieval_snapshot = deepcopy(result)
+        return result
 
     @staticmethod
     def _validate_request(request: ProfessorRequest) -> None:
@@ -1070,6 +1165,12 @@ class ProfessorOrchestrator:
         *,
         metadata: Mapping[str, str | int | float | bool | None] | None = None,
     ) -> ProfessorResponse:
+        if status == "NO_EVIDENCE":
+            answer = {
+                "ASK_FOR_CLARIFICATION": "Please clarify which document operation you need help with.",
+                "ESCALATE": "This request requires additional review before an answer can be generated.",
+                "ABSTAIN": "I cannot provide a grounded answer to this request under the current policy and available sources.",
+            }.get((metadata or {}).get("decision_action"), answer)
         return ProfessorResponse(
             conversation_id=request.conversation_id,
             answer=answer[: self.limits.max_answer_chars],
@@ -1086,12 +1187,15 @@ class ProfessorOrchestrator:
         *,
         metadata: Mapping[str, str | int | float | bool | None] | None = None,
     ) -> ProfessorResponse:
+        failed_metadata = dict(metadata or {})
+        if failed_metadata.get("decision_action") == "ANSWER":
+            failed_metadata.update(decision_action="ABSTAIN", decision_reason="generation_not_completed")
         return ProfessorResponse(
             conversation_id=request.conversation_id,
-            answer=_GENERATION_FAILED_ANSWER,
+            answer=_GENERATION_FAILED_ANSWER[: self.limits.max_answer_chars],
             evidence_status="GENERATION_FAILED",
             evidence=[item.response_dict() for item in evidence],
-            metadata={**dict(metadata or {}), "failure_stage": stage, "evidence_count": len(evidence)},
+            metadata={**failed_metadata, "failure_stage": stage, "evidence_count": len(evidence)},
         )
 
     def _citations(
@@ -1103,7 +1207,7 @@ class ProfessorOrchestrator:
         all_markers = _ANY_CITATION_MARKER.findall(raw_answer)
         markers = _CITATION_MARKER.findall(raw_answer)
         by_id = {item.evidence_id: item for item in evidence}
-        if len(all_markers) != len(markers) or any(marker not in by_id for marker in markers):
+        if not markers or len(all_markers) != len(markers) or any(marker not in by_id for marker in markers):
             return _INVALID_CITATION_ANSWER, [], True
         citations: list[Citation] = []
         seen: set[str] = set()

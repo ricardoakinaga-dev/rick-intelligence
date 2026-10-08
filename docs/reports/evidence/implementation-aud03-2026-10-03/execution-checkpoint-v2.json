@@ -1,0 +1,859 @@
+{
+  "schema_version": "aud03.execution-checkpoint.v2",
+  "recorded_at": "2026-10-03T13:32:22.745370+00:00",
+  "goal_scope": "All original 36 tasks/eight milestones; frozen backlog unchanged",
+  "quality_bar_sha256": "d56c6e04eff7e60461387bea51ed8722c221c172aa99dc57255f7e9b539cd92d",
+  "goal_turn_classification": "PROGRESS",
+  "consecutive_no_progress_blocked_turns": 0,
+  "global_verdict": "NO-GO",
+  "candidate": "Shared dirty worktree; HEAD unchanged. Current authored-file fingerprint plus scoped independent review binding recorded. No sealed release candidate, commit, push or deployment.",
+  "evidence_policy": "Artifacts index observations, not authority. Recompute source freshness from source manifests; non-acceptance states never imply DONE.",
+  "tasks": [
+    {
+      "id": "AUD03-01",
+      "required": true,
+      "acceptance_sha256": "21cb977df6c076b5cba2d576d4fb450459130cb7562aaf92cca9efff40eb1e8b",
+      "local_state": "BASELINE_PRESERVED",
+      "full_acceptance": "NOT_DECLARED",
+      "evidence": [
+        {
+          "path": "baseline.json",
+          "exists": true,
+          "sha256": "05202fe67fcc636833f33068900996b31cef8ce8fe21528a250c8e648434c1ff"
+        },
+        {
+          "path": "audit-baseline/scorecard.json",
+          "exists": true,
+          "sha256": "adfa74886c5e8923732dafd08d02cacd560518e50f9ea25beca455f83d1ffafd"
+        }
+      ],
+      "note": "Original source and audit reproductions preserved; no promotion claim.",
+      "inherited_state_requires_freshness_check": true
+    },
+    {
+      "id": "AUD03-02",
+      "required": true,
+      "acceptance_sha256": "f41f5fc92bb6b2b4600959f3498719e4aead035d8f363b9063b62f50ba430a0b",
+      "local_state": "LOCAL_REVIEWED",
+      "full_acceptance": "NOT_DECLARED",
+      "evidence": [
+        {
+          "path": "lead/review-carson/review-I1.json",
+          "exists": true,
+          "sha256": "d7ef9865ac04f3800011f1fcdca3f38985957e83d970d29d99dc117a5110a814"
+        },
+        {
+          "path": "lead/identity-live-rework1.command.json",
+          "exists": true,
+          "sha256": "5bb0107f589f97073bc1d904f40bee7514e2aed518fc49d3532a48cb0a584e9b"
+        }
+      ],
+      "note": "Previous bounded independent observation retained; current integrated regression passes. Recompute prior boundary freshness before full acceptance; installed runtime not proven.",
+      "inherited_state_requires_freshness_check": true
+    },
+    {
+      "id": "AUD03-03",
+      "required": true,
+      "acceptance_sha256": "bb04c2441861125342a9e5f351af4d778d0459412fa111f082c3a2be1658c07d",
+      "local_state": "LOCAL_REVIEWED",
+      "full_acceptance": "NOT_DECLARED",
+      "evidence": [
+        {
+          "path": "audit06/candidate.json",
+          "exists": true,
+          "sha256": "3cf0d8039ce6ed8d344fba4ab5c67905b4d4b3ea01319a71a1a7935d05f0f4cb"
+        },
+        {
+          "path": "lead/api-contract-audit06.command.json",
+          "exists": true,
+          "sha256": "4ee73124457fe5d2409cd59767dcf83263ec607673c5749a1416120be9d44f69"
+        },
+        {
+          "path": "lead/review-aristotle/report.md",
+          "exists": true,
+          "sha256": "2b6fdce5eb81e4441c371f2371c3408707c85a5aaf27df74a46ef22b85e14a5b"
+        },
+        {
+          "path": "lead/review-aristotle/fingerprint.json",
+          "exists": true,
+          "sha256": "1b1a3c59a62f9de7699d8f2c405bfe77ec2d1838c7e9c04dd81b3d841efa1dc2"
+        }
+      ],
+      "note": "Previous bounded independent observation retained; current integrated regression passes. Recompute prior boundary freshness before full acceptance; installed runtime not proven.",
+      "inherited_state_requires_freshness_check": true
+    },
+    {
+      "id": "AUD03-04",
+      "required": true,
+      "acceptance_sha256": "89d8a2c3ff93105a0cc838f808f7708f87dcac4196519b335e9ce11e60f00fde",
+      "local_state": "LOCAL_REVIEWED",
+      "full_acceptance": "NOT_DECLARED",
+      "evidence": [
+        {
+          "path": "lead/review-carson/review-I1.json",
+          "exists": true,
+          "sha256": "d7ef9865ac04f3800011f1fcdca3f38985957e83d970d29d99dc117a5110a814"
+        },
+        {
+          "path": "lead/identity-live-rework1.command.json",
+          "exists": true,
+          "sha256": "5bb0107f589f97073bc1d904f40bee7514e2aed518fc49d3532a48cb0a584e9b"
+        }
+      ],
+      "note": "Previous bounded independent observation retained; current integrated regression passes. Recompute prior boundary freshness before full acceptance; installed runtime not proven.",
+      "inherited_state_requires_freshness_check": true
+    },
+    {
+      "id": "AUD03-05",
+      "required": true,
+      "acceptance_sha256": "ae5a937f25f7e734dc63a37755a58ca128d4754bcaa437b86be1e30b2bc79858",
+      "local_state": "LOCAL_REVIEWED",
+      "full_acceptance": "NOT_DECLARED",
+      "evidence": [
+        {
+          "path": "lead/review-carson/review-I1.json",
+          "exists": true,
+          "sha256": "d7ef9865ac04f3800011f1fcdca3f38985957e83d970d29d99dc117a5110a814"
+        },
+        {
+          "path": "lead/identity-live-rework1.command.json",
+          "exists": true,
+          "sha256": "5bb0107f589f97073bc1d904f40bee7514e2aed518fc49d3532a48cb0a584e9b"
+        }
+      ],
+      "note": "Previous bounded independent observation retained; current integrated regression passes. Recompute prior boundary freshness before full acceptance; installed runtime not proven.",
+      "inherited_state_requires_freshness_check": true
+    },
+    {
+      "id": "AUD03-06",
+      "required": true,
+      "acceptance_sha256": "6a6867cc90155f03f256001f5ec2d43dba90fa4d802b2b94fa7273306b4cdec6",
+      "local_state": "BOUNDED_LOCAL_REVIEWED",
+      "full_acceptance": "NOT_DECLARED",
+      "note": "69 independent probes pass; native memory/SQLite rollback and custom uncertainty/replay/reconcile accepted locally. Parent 15 real owned-PG checks pass; installed runtime not proven.",
+      "historical_evidence": [
+        {
+          "path": "audit06/rework2/candidate.json",
+          "exists": true,
+          "sha256": "604e667793e7c99a1c4939960417ada2f716c99051ced30c6e423dd8bf9d7bbe"
+        },
+        {
+          "path": "lead/review-laplace-invalid/report.md",
+          "exists": true,
+          "sha256": "04bc9487bceda0968a34d53fc24830ae946314ef35f56951a14dc8f9cf8a0b0e"
+        }
+      ],
+      "evidence": [
+        {
+          "path": "lead/continuation-audit-final-review/lead-verdict-index.json",
+          "exists": true,
+          "sha256": "aa2c56d7da844331c7ba544187879e62259d9081a6b57bb119449a2ad2c5e867"
+        },
+        {
+          "path": "lead/continuation-20261003-audit-postgres-sealed.command.json",
+          "exists": true,
+          "sha256": "d81dbe1db186d7407abe25e7c54e7f7fd6dfddbaca60ff65d58960f1978efdf4"
+        },
+        {
+          "path": "lead/continuation-20261003-custom-owner-final.command.json",
+          "exists": true,
+          "sha256": "d8d834ab45817838e9a285e12a380d2511812b5fb65f6ac5ee8e362a7f261766"
+        }
+      ]
+    },
+    {
+      "id": "AUD03-07",
+      "required": true,
+      "acceptance_sha256": "08c8fd599acc418eda966fac68e712786850158506c658f6ccf0393ece4ad50f",
+      "local_state": "PENDING_DOMAIN_POLICY",
+      "full_acceptance": "NOT_DECLARED",
+      "evidence": [],
+      "note": "User clinical policy decision absent; preserve closed-by-default feature flags.",
+      "inherited_state_requires_freshness_check": true
+    },
+    {
+      "id": "AUD03-08",
+      "required": true,
+      "acceptance_sha256": "6ca1f813420acc584699f06ba06b4f16174b27a8ff82b319f17c5272a218f10e",
+      "local_state": "BOUNDED_LOCAL_REVIEWED",
+      "full_acceptance": "NOT_DECLARED",
+      "note": "Stale compensation reviewed locally; 20 independent ingestion probes and current regressions pass. Subsequent admin-only drift disclosed separately.",
+      "historical_evidence": [
+        {
+          "path": "ingestion/rework3/verification.json",
+          "exists": true,
+          "sha256": "f9eca488c1545d725ae0d2cedd13085937770ed5f7bd1867c52cd14c79ef09c3"
+        }
+      ],
+      "evidence": [
+        {
+          "path": "lead/continuation-ingestion-final-review/novel-final.log",
+          "exists": true,
+          "sha256": "e7ab6cb453358ec9bd719915d1ea45b18560d6bbb76a1657aa917ba26fe4e1a0"
+        },
+        {
+          "path": "lead/continuation-20261003-ingestion-postgres-owned.command.json",
+          "exists": true,
+          "sha256": "a80b1517e9d20bfee97022782153a89de909b0cf1ea766c065aad3d11a7dcbb5"
+        },
+        {
+          "path": "lead/continuation-20261003-review-current-binding.json",
+          "exists": true,
+          "sha256": "2e756f8cef7954d11ac8da7d85ec41eea2e245ba79dda9473aa69bc0994248c9"
+        }
+      ]
+    },
+    {
+      "id": "AUD03-09",
+      "required": true,
+      "acceptance_sha256": "fbc625ee6e6226bdc4f239aef482145caef04facefaadf76cf39eb89d774f43a",
+      "local_state": "BOUNDED_LOCAL_REVIEWED",
+      "full_acceptance": "NOT_DECLARED",
+      "note": "Commit/cancel/ack and unavailable recovery reads reviewed. Unknown outcomes retain source/data and remain nonterminal; explicit service recovery is process-local, without HTTP/background/restart guarantees.",
+      "historical_evidence": [
+        {
+          "path": "lead/review-confucius/audit-result.json",
+          "exists": true,
+          "sha256": "880a3ed88da5c24c5a6f3068fdbca23a80e29faee0981205406fb9a0f4a4c08b"
+        }
+      ],
+      "evidence": [
+        {
+          "path": "lead/continuation-ingestion-final-review/novel-final.log",
+          "exists": true,
+          "sha256": "e7ab6cb453358ec9bd719915d1ea45b18560d6bbb76a1657aa917ba26fe4e1a0"
+        },
+        {
+          "path": "lead/continuation-20261003-ingestion-postgres-owned.command.json",
+          "exists": true,
+          "sha256": "a80b1517e9d20bfee97022782153a89de909b0cf1ea766c065aad3d11a7dcbb5"
+        },
+        {
+          "path": "lead/continuation-20261003-review-current-binding.json",
+          "exists": true,
+          "sha256": "2e756f8cef7954d11ac8da7d85ec41eea2e245ba79dda9473aa69bc0994248c9"
+        }
+      ]
+    },
+    {
+      "id": "AUD03-10",
+      "required": true,
+      "acceptance_sha256": "5bb35faa627d3327903c931cf3ba054b84bffac086d9f9c6ef68739e368454ab",
+      "local_state": "BOUNDED_LOCAL_REVIEWED",
+      "full_acceptance": "NOT_DECLARED",
+      "note": "Scope IDs and retained legacy references pass local independent probes; installed migration inventory remains absent.",
+      "historical_evidence": [
+        {
+          "path": "ingestion/rework3/verification.json",
+          "exists": true,
+          "sha256": "f9eca488c1545d725ae0d2cedd13085937770ed5f7bd1867c52cd14c79ef09c3"
+        }
+      ],
+      "evidence": [
+        {
+          "path": "lead/continuation-ingestion-final-review/novel-final.log",
+          "exists": true,
+          "sha256": "e7ab6cb453358ec9bd719915d1ea45b18560d6bbb76a1657aa917ba26fe4e1a0"
+        },
+        {
+          "path": "lead/continuation-20261003-ingestion-postgres-owned.command.json",
+          "exists": true,
+          "sha256": "a80b1517e9d20bfee97022782153a89de909b0cf1ea766c065aad3d11a7dcbb5"
+        },
+        {
+          "path": "lead/continuation-20261003-review-current-binding.json",
+          "exists": true,
+          "sha256": "2e756f8cef7954d11ac8da7d85ec41eea2e245ba79dda9473aa69bc0994248c9"
+        }
+      ]
+    },
+    {
+      "id": "AUD03-11",
+      "required": true,
+      "acceptance_sha256": "0bcb39007fe5d68e0b037b415b2a96b731cff7007eb94e394bec4498e22bf9c3",
+      "local_state": "BOUNDED_LOCAL_REVIEWED",
+      "full_acceptance": "NOT_DECLARED",
+      "note": "Archive/catalog ownership and aliases pass local independent controls.",
+      "historical_evidence": [
+        {
+          "path": "lead/review-confucius/audit-result.json",
+          "exists": true,
+          "sha256": "880a3ed88da5c24c5a6f3068fdbca23a80e29faee0981205406fb9a0f4a4c08b"
+        }
+      ],
+      "evidence": [
+        {
+          "path": "lead/continuation-ingestion-final-review/novel-final.log",
+          "exists": true,
+          "sha256": "e7ab6cb453358ec9bd719915d1ea45b18560d6bbb76a1657aa917ba26fe4e1a0"
+        },
+        {
+          "path": "lead/continuation-20261003-ingestion-postgres-owned.command.json",
+          "exists": true,
+          "sha256": "a80b1517e9d20bfee97022782153a89de909b0cf1ea766c065aad3d11a7dcbb5"
+        },
+        {
+          "path": "lead/continuation-20261003-review-current-binding.json",
+          "exists": true,
+          "sha256": "2e756f8cef7954d11ac8da7d85ec41eea2e245ba79dda9473aa69bc0994248c9"
+        }
+      ]
+    },
+    {
+      "id": "AUD03-12",
+      "required": true,
+      "acceptance_sha256": "acfe4b86db961c3daee052d6d8aa7167f01225cb25831809c5194c661287ba5e",
+      "local_state": "CONDITIONAL_LOCAL_REVIEWED",
+      "full_acceptance": "NOT_DECLARED",
+      "note": "Memory/SQLite exact retained lineage independently accepted; parent 53 current real-PG knowledge/ingestion checks pass, no installed/distributed parity claim.",
+      "historical_evidence": [
+        {
+          "path": "ingestion/rework3/verification.json",
+          "exists": true,
+          "sha256": "f9eca488c1545d725ae0d2cedd13085937770ed5f7bd1867c52cd14c79ef09c3"
+        }
+      ],
+      "evidence": [
+        {
+          "path": "lead/continuation-ingestion-final-review/novel-final.log",
+          "exists": true,
+          "sha256": "e7ab6cb453358ec9bd719915d1ea45b18560d6bbb76a1657aa917ba26fe4e1a0"
+        },
+        {
+          "path": "lead/continuation-20261003-ingestion-postgres-owned.command.json",
+          "exists": true,
+          "sha256": "a80b1517e9d20bfee97022782153a89de909b0cf1ea766c065aad3d11a7dcbb5"
+        },
+        {
+          "path": "lead/continuation-20261003-review-current-binding.json",
+          "exists": true,
+          "sha256": "2e756f8cef7954d11ac8da7d85ec41eea2e245ba79dda9473aa69bc0994248c9"
+        }
+      ]
+    },
+    {
+      "id": "AUD03-13",
+      "required": true,
+      "acceptance_sha256": "32d3eb33d516a771946ad874f7136d4d2190e906eba8934316062ae3f26ea987",
+      "local_state": "LOCAL_REVIEWED",
+      "full_acceptance": "NOT_DECLARED",
+      "evidence": [
+        {
+          "path": "lead/admission-slo-review3-current.command.json",
+          "exists": true,
+          "sha256": "e7f64e34f350b5692887dc8794500223860c710aa9bead72bc22e5bf1e9cced2"
+        },
+        {
+          "path": "lead/review-maxwell/report.md",
+          "exists": true,
+          "sha256": "77d2c28d7ea660b28fef44d3636c75647cbb45ebca881e849712445b34d19990"
+        }
+      ],
+      "note": "Previous bounded independent observation retained; current integrated regression passes. Recompute prior boundary freshness before full acceptance; installed runtime not proven.",
+      "inherited_state_requires_freshness_check": true
+    },
+    {
+      "id": "AUD03-14",
+      "required": true,
+      "acceptance_sha256": "81e5b4bc5570f74070065cfcd354dccf3b84b9d3c8328bdac02171c7e6e6d256",
+      "local_state": "BOUNDED_LOCAL_REVIEWED",
+      "full_acceptance": "NOT_DECLARED",
+      "note": "123 independent completion/envelope/tool/usage probes pass on stable scoped source; parent 584 focused tests pass. Live providers not exercised.",
+      "historical_evidence": [
+        {
+          "path": "lead/review-huygens/report.md",
+          "exists": true,
+          "sha256": "76787415d78db6296b9d1d8c52b0fd093b483327033e1b5737e998d52d50ba4d"
+        }
+      ],
+      "evidence": [
+        {
+          "path": "lead/continuation-provider-final-review/lead-verdict-index.json",
+          "exists": true,
+          "sha256": "a6b4a28f32fae39098001f71858ecad84d4b82019404ed7de11c032e80367796"
+        },
+        {
+          "path": "lead/continuation-20261003-provider-empty-usage-final.command.json",
+          "exists": true,
+          "sha256": "080e8a354e036ccadec406e7b8253cadde63f47162cbda6eb4ad220f74d28274"
+        }
+      ]
+    },
+    {
+      "id": "AUD03-15",
+      "required": true,
+      "acceptance_sha256": "56503714b42f9727362fc3260e9252a0a22d739b30ecf877c5f7f4b029bd4701",
+      "local_state": "LOCAL_REVIEWED",
+      "full_acceptance": "NOT_DECLARED",
+      "evidence": [
+        {
+          "path": "lead/review-locke/audit-report.md",
+          "exists": true,
+          "sha256": "e0c3ae7aafd9debfdaf14bc5c90c78e60daa127fbb455758bacc6106e02fc6ec"
+        },
+        {
+          "path": "lead/review-maxwell/report.md",
+          "exists": true,
+          "sha256": "77d2c28d7ea660b28fef44d3636c75647cbb45ebca881e849712445b34d19990"
+        }
+      ],
+      "note": "Previous bounded independent observation retained; current integrated regression passes. Recompute prior boundary freshness before full acceptance; installed runtime not proven.",
+      "inherited_state_requires_freshness_check": true
+    },
+    {
+      "id": "AUD03-16",
+      "required": true,
+      "acceptance_sha256": "9018abf9b0f1729829a11781ecf7cc5681a60e2613d40c14fd627da52d52e565",
+      "local_state": "LOCAL_REVIEWED",
+      "full_acceptance": "NOT_DECLARED",
+      "evidence": [
+        {
+          "path": "lead/review-ptolemy/probe-results.json",
+          "exists": true,
+          "sha256": "c1e5c35a44b8c0213a27b4a10cc973a73843db961fd545f477db8eb2c66ecc8e"
+        }
+      ],
+      "note": "Current production-build browser339 and web coverage76 unit cases pass. Fixtures only; installed IdP/backend absent; previous scoped independent review authority remains bounded.",
+      "inherited_state_requires_freshness_check": true
+    },
+    {
+      "id": "AUD03-17",
+      "required": true,
+      "acceptance_sha256": "76bc1826e27ed61605390a2ee7623301996257a4ca939683e8898e694e04a0c9",
+      "local_state": "LOCAL_REVIEWED",
+      "full_acceptance": "NOT_DECLARED",
+      "evidence": [
+        {
+          "path": "lead/review-ptolemy/probe-results.json",
+          "exists": true,
+          "sha256": "c1e5c35a44b8c0213a27b4a10cc973a73843db961fd545f477db8eb2c66ecc8e"
+        }
+      ],
+      "note": "Current production-build browser339 and web coverage76 unit cases pass. Fixtures only; installed IdP/backend absent; previous scoped independent review authority remains bounded.",
+      "inherited_state_requires_freshness_check": true
+    },
+    {
+      "id": "AUD03-18",
+      "required": true,
+      "acceptance_sha256": "ff8eeb072220aeb9368c0d3f499113cbf9c48d6808c82f45b426bb93fbded5a2",
+      "local_state": "LOCAL_REVIEWED",
+      "full_acceptance": "NOT_DECLARED",
+      "evidence": [
+        {
+          "path": "lead/review-ptolemy/probe-results.json",
+          "exists": true,
+          "sha256": "c1e5c35a44b8c0213a27b4a10cc973a73843db961fd545f477db8eb2c66ecc8e"
+        }
+      ],
+      "note": "Current production-build browser339 and web coverage76 unit cases pass. Fixtures only; installed IdP/backend absent; previous scoped independent review authority remains bounded.",
+      "inherited_state_requires_freshness_check": true
+    },
+    {
+      "id": "AUD03-19",
+      "required": true,
+      "acceptance_sha256": "53ac4a62a889406f331b926bbf0bc16eff87686d90fe43de11d982a9fe8eaf59",
+      "local_state": "LOCAL_REVIEWED",
+      "full_acceptance": "NOT_DECLARED",
+      "evidence": [
+        {
+          "path": "lead/admission-slo-review3-current.command.json",
+          "exists": true,
+          "sha256": "e7f64e34f350b5692887dc8794500223860c710aa9bead72bc22e5bf1e9cced2"
+        },
+        {
+          "path": "lead/review-maxwell/report.md",
+          "exists": true,
+          "sha256": "77d2c28d7ea660b28fef44d3636c75647cbb45ebca881e849712445b34d19990"
+        }
+      ],
+      "note": "Previous bounded independent observation retained; current integrated regression passes. Recompute prior boundary freshness before full acceptance; installed runtime not proven.",
+      "inherited_state_requires_freshness_check": true
+    },
+    {
+      "id": "AUD03-20",
+      "required": true,
+      "acceptance_sha256": "259c38306a684f5e6c4fb09e50fbe8036417bc9066e3f126f099b01b48605d02",
+      "local_state": "LOCAL_REVIEWED",
+      "full_acceptance": "NOT_DECLARED",
+      "evidence": [
+        {
+          "path": "lead/web-coverage-canonical.command.json",
+          "exists": true,
+          "sha256": "5dc9f7c0a8b6db9dd642a54c9cca70d238ba4b14df3d9a7da1a91b8636b847e2"
+        }
+      ],
+      "note": "Current production-build browser339 and web coverage76 unit cases pass. Fixtures only; installed IdP/backend absent; previous scoped independent review authority remains bounded.",
+      "inherited_state_requires_freshness_check": true
+    },
+    {
+      "id": "AUD03-21",
+      "required": true,
+      "acceptance_sha256": "30c0de0f6e90446f1a7f6f2e074aa26c511fdf7fef4a2bd4f3ac77e432eb7d09",
+      "local_state": "LOCAL_REPRODUCED",
+      "full_acceptance": "NOT_DECLARED",
+      "evidence": [
+        {
+          "path": "lead/control-restore-final-projection/commands.json",
+          "exists": true,
+          "sha256": "777ee8808d45582ecfb7793bf2a66ba5a090157fb7d46035d32d6f51f6682a50"
+        },
+        {
+          "path": "lead/control-restore-final-projection/projection-files.json",
+          "exists": true,
+          "sha256": "e70e0ba5195356fd10e4657b8a5f2745a8df4bc4dac97c6de0d90667797aac45"
+        }
+      ],
+      "note": "Fresh declared-input projection: npmci/controlrestore/validate positives and corruption/missing negatives pass their expected exits; full CI integration separate.",
+      "inherited_state_requires_freshness_check": true
+    },
+    {
+      "id": "AUD03-22",
+      "required": true,
+      "acceptance_sha256": "afeed8c0765f96a4d047fac4883a7038c3d320ce48073bd980316fbb923089d9",
+      "local_state": "LOCAL_REVIEWED",
+      "full_acceptance": "NOT_DECLARED",
+      "evidence": [
+        {
+          "path": "lead/review-ramanujan/report.md",
+          "exists": true,
+          "sha256": "37f68293008d4cb82e629973970dd48ed20ac93a51d5a87fa29e275fbe8e363b"
+        }
+      ],
+      "note": "Hash-locked environment and pip check observed locally; Python3.12.3 Node22.19.0 npm10.9.3 used for current checks.",
+      "inherited_state_requires_freshness_check": true
+    },
+    {
+      "id": "AUD03-23",
+      "required": true,
+      "acceptance_sha256": "39fee42425663231db8a5f1a4099724361763011b3aa801051a3ed1e43c00990",
+      "local_state": "LOCAL_REVIEWED",
+      "full_acceptance": "NOT_DECLARED",
+      "evidence": [
+        {
+          "path": "lead/review-ramanujan/report.md",
+          "exists": true,
+          "sha256": "37f68293008d4cb82e629973970dd48ed20ac93a51d5a87fa29e275fbe8e363b"
+        }
+      ],
+      "note": "Action SHA and meaningful package-suite wiring accepted locally; hosted CI not observed.",
+      "inherited_state_requires_freshness_check": true
+    },
+    {
+      "id": "AUD03-24",
+      "required": true,
+      "acceptance_sha256": "b7b7d5483ddb889a2c2da31693a6ec8c7c9d6b7b9d76001dfced56e51db94f90",
+      "local_state": "BOUNDED_STATIC_REVIEWED",
+      "full_acceptance": "NOT_DECLARED",
+      "note": "434 current regression tests and independent 16 runtime TS plus CI probes pass. Dynamic/interprocedural flow conservatively unsupported; hosted CI not executed.",
+      "historical_evidence": [
+        {
+          "path": "lead/review-fermat/report.txt",
+          "exists": true,
+          "sha256": "1bfe2f34d7f048755a48c1d5f0acd29d85165235b00d6e82a3a26490ac484807"
+        }
+      ],
+      "evidence": [
+        {
+          "path": "lead/continuation-ci-final-review/lead-verdict-index.json",
+          "exists": true,
+          "sha256": "8284f05085b81d7b8a492c12b5ea4c3363fb8402c3490039ef0420da5ee9d4f6"
+        },
+        {
+          "path": "lead/continuation-20261003-tooling-sealed.command.json",
+          "exists": true,
+          "sha256": "3ab36a24b1fda2d12a794d959d7b50072647b56500f38c83de18f5afb58732a5"
+        }
+      ]
+    },
+    {
+      "id": "AUD03-25",
+      "required": true,
+      "acceptance_sha256": "abd29a3041894ee3f3b15474223b7ae2e75ccf5bc8e65bc90cc09519ba9af801",
+      "local_state": "LOCAL_LINKS_VERIFIED",
+      "full_acceptance": "NOT_DECLARED",
+      "evidence": [
+        {
+          "path": "lead/continuation-20261003-docs-links-sealed.json",
+          "exists": true,
+          "sha256": "aeb79c3608c3641f475b809a96202acd101e29ca01e58bd1c052a2bbcc15d1cf"
+        }
+      ],
+      "note": "198 authored Markdown documents,480 inline local links: zero missing, stable final document hashes. Scope excludes evidence archives/fenced examples/reference grammar/heading anchors."
+    },
+    {
+      "id": "AUD03-26",
+      "required": true,
+      "acceptance_sha256": "d5fa9ccd582171606c3c6a1654858c2104c1b003db89f193422d0ae4521477a0",
+      "local_state": "LOCAL_INTEGRATION_PASSED",
+      "full_acceptance": "NOT_DECLARED",
+      "note": "1305 API,154 worker,1100 tooling,339 production browser,canonical controls/schema checks pass with scope binding. Broader program and required external gates not complete.",
+      "historical_evidence": [
+        {
+          "path": "lead/api-locked-integrated-wave4.command.json",
+          "exists": true,
+          "sha256": "87fd511f35e9e2d6d450ed17e22313f5c6fc793bc5de8185226d3d9f91c0163c"
+        },
+        {
+          "path": "lead/domain-locked-integrated-wave4.command.json",
+          "exists": true,
+          "sha256": "1f2e4bfe831fd167e84b7e30559ec65db80ac33431e92f41f6d4b0b43e4f46d5"
+        },
+        {
+          "path": "lead/unit-make-integrated-wave4.command.json",
+          "exists": true,
+          "sha256": "af03b232370825722366cc998265160f5f3e0c505e134c1b37a594ac6f51d5ef"
+        }
+      ],
+      "evidence": [
+        {
+          "path": "lead/continuation-20261003-coverage-sealed.command.json",
+          "exists": true,
+          "sha256": "933d27a8298bf448ef23e8cf60f8b44721d14148ba419a4d4d698d5a2fb4838d"
+        },
+        {
+          "path": "lead/continuation-20261003-browser-output-fixed.command.json",
+          "exists": true,
+          "sha256": "0948870606d2c154afdab3fa60d2bcf75819e51afb41defe8dd781c9d24c5d9b"
+        },
+        {
+          "path": "lead/continuation-20261003-tooling-sealed.command.json",
+          "exists": true,
+          "sha256": "3ab36a24b1fda2d12a794d959d7b50072647b56500f38c83de18f5afb58732a5"
+        },
+        {
+          "path": "lead/continuation-20261003-controls-sealed.command.json",
+          "exists": true,
+          "sha256": "4d6b70ddd35c610b0f295c77cf7498a8b71aa20559d904cee876098780dad194"
+        },
+        {
+          "path": "lead/continuation-20261003-contract-sealed.command.json",
+          "exists": true,
+          "sha256": "ba671ead29acc7ff0f02ff3d07e3629eab92370bf26a15116e5e778df4056724"
+        }
+      ]
+    },
+    {
+      "id": "AUD03-27",
+      "required": true,
+      "acceptance_sha256": "2c94812a262a6c5fb954c1ef8268fde3e153fde9e5a39116796ce93dc1f343f8",
+      "local_state": "MISSING_INSTALLED_TARGET",
+      "full_acceptance": "NOT_DECLARED",
+      "evidence": [],
+      "note": "Disposable database is not installed data inventory; read-only installed source/authority input missing.",
+      "inherited_state_requires_freshness_check": true
+    },
+    {
+      "id": "AUD03-28",
+      "required": true,
+      "acceptance_sha256": "fb991379038d35684949a21c81baad0d14fe115b803f31d996ce13fd9c5b5053",
+      "local_state": "PARTIAL_LOCAL_RUNTIME",
+      "full_acceptance": "NOT_DECLARED",
+      "note": "12 real source-built owned-MinIO S3 checks pass; S3 scoped independent approval. OCI parity, real provider and complete installed golden path absent.",
+      "historical_evidence": [
+        {
+          "path": "runtime/object-store-image-discovery.json",
+          "exists": true,
+          "sha256": "76e58b9aaa1d0a21e0e9794ebbfe3c5cc3f7da28b4b1eb5d78b35b9c489f1f6a"
+        },
+        {
+          "path": "runtime/qdrant-live-fault.json",
+          "exists": true,
+          "sha256": "8b2d5e8cd95a81ba49a56cd4dc02f6a1885564a7832f9c63c0928351d6179edf"
+        }
+      ],
+      "evidence": [
+        {
+          "path": "runtime/minio-source-object-908e713609a815b9.json",
+          "exists": true,
+          "sha256": "b531551b6e42175601ee064d9f450cbf25420f6cd66aa57832a1a848639add4f"
+        },
+        {
+          "path": "lead/continuation-provider-storage-review/verification.json",
+          "exists": true,
+          "sha256": "be7ffa1bca6599fdae2653e09da48f1c2e4e56ae3b081459446afa3ae5c0628e"
+        }
+      ]
+    },
+    {
+      "id": "AUD03-29",
+      "required": true,
+      "acceptance_sha256": "4a1657ab2aadc120d1449fec1a18e3606ae59c20efc1aa737773e820d25395af",
+      "local_state": "MISSING_APPROVED_CORPUS_PROVIDER",
+      "full_acceptance": "NOT_DECLARED",
+      "evidence": [],
+      "note": "Representative corpus, sample/threshold approval and real inference not supplied; synthetic cases do not satisfy.",
+      "inherited_state_requires_freshness_check": true
+    },
+    {
+      "id": "AUD03-30",
+      "required": true,
+      "acceptance_sha256": "7cf98874672cf6262536bf4dc5b6e59349509b5de20b90e405bee6ae1299d60a",
+      "local_state": "EXTERNAL_INPUT_REQUIRED",
+      "full_acceptance": "NOT_DECLARED",
+      "evidence": [
+        {
+          "path": "runtime/redis-api-replicas-consistent-identity.json",
+          "exists": true,
+          "sha256": "7d0faa688f7a05ddf383808d8545c683e7cd891a0f101024be79cee4c1c72c73"
+        },
+        {
+          "path": "lead/redis-api-replicas-consistent-identity.command.json",
+          "exists": true,
+          "sha256": "7a28b8eddeb1d7b9a121f73644ac7d29f17221fcd1ad5760cd7d9762ba19db7f"
+        }
+      ],
+      "note": "Local two-process API Redis rate policies pass. Synthetic dev principal/stubgen; real IdP/complete cross-store revocation still absent.",
+      "inherited_state_requires_freshness_check": true
+    },
+    {
+      "id": "AUD03-31",
+      "required": true,
+      "acceptance_sha256": "32fd06a446ea6df9c853625bd2d668b1b8c3d100fbf057596998189f0ef66ebc",
+      "local_state": "MISSING_COLLECTOR_ALERT_RUNTIME",
+      "full_acceptance": "NOT_DECLARED",
+      "evidence": [],
+      "note": "No configured collector/backends/alert destination; SLO code tests do not prove collection.",
+      "inherited_state_requires_freshness_check": true
+    },
+    {
+      "id": "AUD03-32",
+      "required": true,
+      "acceptance_sha256": "b31c08f3ea1b7bdea85d08028841c03a1cd5efeba4e3bf14eaa50c16ed8583b1",
+      "local_state": "PARTIAL_LOCAL_RUNTIME",
+      "full_acceptance": "NOT_DECLARED",
+      "evidence": [
+        {
+          "path": "lead/migrations-live-full.command.json",
+          "exists": true,
+          "sha256": "9ab2e83ffd113b1da43668ecae849eb7f5dfeb647a86053b3b11834f0b044c1d"
+        }
+      ],
+      "note": "147 migration/PG restore tests observed; full tenant object/vector reconciliation and agreed RPO/RTO missing.",
+      "inherited_state_requires_freshness_check": true
+    },
+    {
+      "id": "AUD03-33",
+      "required": true,
+      "acceptance_sha256": "a95664b634795cb1352d39184aea85501e94fac3ee561bd92457eb24f1ba99cb",
+      "local_state": "MISSING_REPRESENTATIVE_LOAD_BUDGETS",
+      "full_acceptance": "NOT_DECLARED",
+      "evidence": [],
+      "note": "No approved representative load/environment and capacity/cost budgets.",
+      "inherited_state_requires_freshness_check": true
+    },
+    {
+      "id": "AUD03-34",
+      "required": true,
+      "acceptance_sha256": "528887e85634c0b9220a2bbf45b10e9836249c921f8d27fa70d948efc57b0232",
+      "local_state": "PARTIAL_LOCAL_RUNTIME",
+      "full_acceptance": "NOT_DECLARED",
+      "evidence": [
+        {
+          "path": "lead/redis-live-fault-corrected.command.json",
+          "exists": true,
+          "sha256": "3ff20a9c5e8d8fdf5da06c87bb98d083c75f2344afb45027da90cd4265a64906"
+        },
+        {
+          "path": "lead/qdrant-live-fault.command.json",
+          "exists": true,
+          "sha256": "414b5277d3c06bce90304c262d6fcc900abd7df49f7e897fa768c7524cdb4c3a"
+        }
+      ],
+      "note": "Own disposable Redis/Qdrant pause/recovery probes run and current vector fault lane passes; full pipeline chaos/alert evidence absent.",
+      "inherited_state_requires_freshness_check": true
+    },
+    {
+      "id": "AUD03-35",
+      "required": true,
+      "acceptance_sha256": "950f5f69d745bd01e285fb93107e76889f3dc850a85cd9a2679b9c5a9512a38c",
+      "local_state": "MISSING_SOAK_CONDITIONS",
+      "full_acceptance": "NOT_DECLARED",
+      "evidence": [],
+      "note": "Approved duration/load/abort/resource budgets absent; short functional probes are not soak.",
+      "inherited_state_requires_freshness_check": true
+    },
+    {
+      "id": "AUD03-36",
+      "required": true,
+      "acceptance_sha256": "e4e3c96a3a54c1cc0998c96b60cb3f819f98fec9bd8782c8afb21f11977821f8",
+      "local_state": "NO_GO",
+      "full_acceptance": "NOT_DECLARED",
+      "evidence": [
+        {
+          "path": "lead/continuation-20261003-review-current-binding.json",
+          "exists": true,
+          "sha256": "2e756f8cef7954d11ac8da7d85ec41eea2e245ba79dda9473aa69bc0994248c9"
+        }
+      ],
+      "note": "Local corrective round validated in bounded scopes; missing external gates, clinical policy and sealed release authority remain. No full36-task acceptance or score increase claimed."
+    }
+  ],
+  "next_action": "Retomar com v2; conferir hashes antes de reutilizar observações. Avançar os gates externos AUD03-27..36 com inventário/IdP/provider/corpus/collector/budgets/autoridade efetivamente fornecidos; política clínica AUD03-07 segue fechada. Não reaplicar migração instalada sem inventário D02.",
+  "resources": {
+    "max_parallel_agents": 4,
+    "python": "3.12.3 locked venv",
+    "node": "22.19.0",
+    "npm": "10.9.3",
+    "source_minio": "Own bounded loopback container removed by harness; build preserved, no OCI parity",
+    "active_agents": 0,
+    "active_parent_commands": "none after final binding/link verification"
+  },
+  "predecessor": {
+    "path": "execution-checkpoint-v1.json",
+    "sha256": "6c23e7a137fbc582d3cc7bb439f828ea9d0e530f522f34a10be6b062e882164d"
+  },
+  "checkpoint_status": "LOCAL_ROUND_VALIDATED_EXTERNAL_GATES_PENDING",
+  "current_candidate": {
+    "path": "lead/continuation-20261003-candidate-fingerprint.json",
+    "sha256": "b65c8a616c312ebf3d2b1a7db9fe3afb0bf73c9af7b8487db9e9a9e719009d63"
+  },
+  "independent_reviews": {
+    "path": "lead/continuation-20261003-review-current-binding.json",
+    "sha256": "2e756f8cef7954d11ac8da7d85ec41eea2e245ba79dda9473aa69bc0994248c9"
+  },
+  "validation_results": [
+    {
+      "name": "API/worker coverage",
+      "command_record": "lead/continuation-20261003-coverage-sealed.command.json",
+      "result": "PASS; API1305/18skips,worker154;76.92/75.32 floors75/74"
+    },
+    {
+      "name": "tooling",
+      "command_record": "lead/continuation-20261003-tooling-sealed.command.json",
+      "result": "PASS1100/74skips"
+    },
+    {
+      "name": "browser production",
+      "command_record": "lead/continuation-20261003-browser-output-fixed.command.json",
+      "result": "PASS339;18performance samples LCPmax936ms CLSmax0.0022; synthetic transport"
+    },
+    {
+      "name": "controls and types",
+      "command_record": "lead/continuation-20261003-controls-sealed.command.json",
+      "result": "PASS"
+    },
+    {
+      "name": "OpenAPI",
+      "command_record": "lead/continuation-20261003-contract-sealed.command.json",
+      "result": "PASS55paths,byte-identical"
+    },
+    {
+      "name": "owned PostgreSQL audit",
+      "command_record": "lead/continuation-20261003-audit-postgres-sealed.command.json",
+      "result": "PASS15;randomschemas"
+    },
+    {
+      "name": "owned PostgreSQL knowledge/ingestion",
+      "command_record": "lead/continuation-20261003-ingestion-postgres-owned.command.json",
+      "result": "PASS53;unique synthetic tenant fixtures, no migrations in this run"
+    }
+  ],
+  "external_missing_inputs": [
+    "Installed migration/data inventory D02",
+    "Real IdP/provider/representative corpus and thresholds",
+    "Collector/backend/alert destination",
+    "Approved load,capacity,cost,DR RPO/RTO and soak budgets",
+    "Signing/promotion authority",
+    "Clinical policy AUD03-07"
+  ]
+}

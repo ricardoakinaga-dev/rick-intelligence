@@ -18,6 +18,7 @@ from datetime import datetime
 from typing import Protocol
 
 from services.chat_history import (
+    IdempotencyConflict,
     InMemoryChatHistoryStore,
     STREAM_CONTEXT_EXCLUDED_STATUSES,
     STREAM_TERMINAL_STATUSES,
@@ -26,6 +27,10 @@ from services.chat_history import (
     _filter_citations,
     _turn_allowed,
     _scope,
+    _safe_stream_metadata,
+    _safe_chat_response,
+    expectation_requested,
+    require_idempotent_match,
 )
 
 
@@ -46,7 +51,13 @@ def _row_dict(cursor: object, row: object) -> dict[str, object]:
     if isinstance(row, Mapping):
         return {str(key): value for key, value in row.items()}
     description = getattr(cursor, "description", None) or ()
-    names = [item[0] for item in description if isinstance(item, (tuple, list)) and item]
+    names: list[str] = []
+    for item in description:
+        name = getattr(item, "name", None)
+        if not isinstance(name, str) and isinstance(item, (tuple, list)) and item:
+            name = item[0]
+        if isinstance(name, str):
+            names.append(name)
     return dict(zip(names, row if isinstance(row, (tuple, list)) else ()))
 
 
@@ -118,6 +129,15 @@ class PostgresChatHistoryStore:
             yield connection, cursor
             if write:
                 connection.commit()
+        except IdempotencyConflict:
+            # An incompatible idempotent reuse must surface as a conflict and
+            # never be rewritten into a generic storage failure.
+            if write and connection is not None:
+                try:
+                    connection.rollback()
+                except Exception:
+                    pass
+            raise
         except PostgresChatHistoryError:
             if write and connection is not None:
                 try:
@@ -287,7 +307,9 @@ class PostgresChatHistoryStore:
             messages.append({"role": str(role), "content": str(row.get("content") or "")})
         return messages[-bounded * 2:] if bounded else []
 
-    def get_idempotent(self, *, session: object, idempotency_key: str) -> dict[str, object] | None:
+    def get_idempotent(self, *, session: object, idempotency_key: str,
+                       conversation_id: str | None = None,
+                       fingerprint: str | None = None) -> dict[str, object] | None:
         scope = _scope(session)
         key = _bounded_key(idempotency_key)
         with self._session() as (_connection, cursor):
@@ -297,27 +319,39 @@ class PostgresChatHistoryStore:
                   AND role='user' AND idempotency_key=%s LIMIT 1
             """, (*scope, key))
             row = self._one(cursor)
-        metadata = _json(row.get("metadata"), {}) if row else {}
+        if row is None:
+            return None
+        metadata = _json(row.get("metadata"), {})
         response = metadata.get("response") if isinstance(metadata, Mapping) else None
+        if expectation_requested(conversation_id, fingerprint):
+            require_idempotent_match(
+                stored_conversation_id=response.get("conversation_id") if isinstance(response, Mapping) else None,
+                stored_fingerprint=metadata.get("idempotency_fingerprint") if isinstance(metadata, Mapping) else None,
+                expected_conversation_id=conversation_id,
+                expected_fingerprint=fingerprint,
+            )
         if _stored_stream_status(metadata) in STREAM_CONTEXT_EXCLUDED_STATUSES:
             return None
-        return dict(response) if isinstance(response, Mapping) else None
+        if not isinstance(response, Mapping):
+            return None
+        try:
+            return _safe_chat_response(response, max_answer_chars=self.max_answer_chars)
+        except ValueError:
+            return None
 
     def append(self, *, session: object, message: str, response: Mapping[str, object],
-               idempotency_key: str | None = None) -> dict[str, object]:
+               idempotency_key: str | None = None, fingerprint: str | None = None) -> dict[str, object]:
         scope = _scope(session)
-        conversation_id = _conversation_id(response.get("conversation_id"))
-        message_id = _bounded_key(response.get("message_id"))
+        safe_response = _safe_chat_response(response, max_answer_chars=self.max_answer_chars)
+        conversation_id = _conversation_id(safe_response.get("conversation_id"))
+        message_id = _bounded_key(safe_response.get("message_id"))
         key = _bounded_key(idempotency_key) if idempotency_key is not None else None
-        answer = str(response.get("answer") or "")[: self.max_answer_chars]
-        citations = InMemoryChatHistoryStore._safe_citations(response.get("citations"))
-        safe_response = {
-            "conversation_id": conversation_id,
-            "message_id": message_id,
-            "answer": answer,
-            "citations": citations,
-            "metadata": dict(response.get("metadata") or {}) if isinstance(response.get("metadata"), Mapping) else {},
-        }
+        answer = safe_response["answer"]
+        citations = safe_response["citations"]
+        stored_metadata = json.dumps(
+            {"response": safe_response, "idempotency_fingerprint": fingerprint},
+            ensure_ascii=False, separators=(",", ":"),
+        )
         user_message_id = f"user-{uuid.uuid5(uuid.NAMESPACE_URL, f'{scope}:{conversation_id}:{message_id}').hex[:24]}"
         with self._session(write=True) as (_connection, cursor):
             if key:
@@ -326,6 +360,12 @@ class PostgresChatHistoryStore:
                 if existing:
                     stored = _json(existing.get("metadata"), {})
                     replay = stored.get("response") if isinstance(stored, Mapping) else None
+                    require_idempotent_match(
+                        stored_conversation_id=replay.get("conversation_id") if isinstance(replay, Mapping) else None,
+                        stored_fingerprint=stored.get("idempotency_fingerprint") if isinstance(stored, Mapping) else None,
+                        expected_conversation_id=conversation_id,
+                        expected_fingerprint=fingerprint,
+                    )
                     stream_status = _stored_stream_status(stored)
                     if stream_status not in STREAM_CONTEXT_EXCLUDED_STATUSES:
                         return dict(replay) if isinstance(replay, Mapping) else dict(response)
@@ -345,7 +385,7 @@ class PostgresChatHistoryStore:
                         WHERE tenant_id=%s AND workspace_id=%s AND user_id=%s
                           AND message_id=%s AND role='user'
                     """, (conversation_id, str(message or "")[:20_000],
-                           json.dumps({"response": safe_response}, ensure_ascii=False, separators=(",", ":")),
+                           stored_metadata,
                            *scope, old_user_message_id))
                     assistant_metadata = {
                         "turn_user_message_id": old_user_message_id,
@@ -373,7 +413,7 @@ class PostgresChatHistoryStore:
                     (message_id, conversation_id, tenant_id, workspace_id, user_id, role, content, citations, metadata, idempotency_key)
                 VALUES (%s,%s,%s,%s,%s,'user',%s,'[]'::jsonb,CAST(%s AS jsonb),%s)
             """, (user_message_id, conversation_id, *scope, str(message or "")[:20_000],
-                   json.dumps({"response": safe_response}, ensure_ascii=False, separators=(",", ":")), key))
+                   stored_metadata, key))
             assistant_metadata = {
                 "turn_user_message_id": user_message_id,
                 **safe_response["metadata"],
@@ -392,6 +432,7 @@ class PostgresChatHistoryStore:
         self, *, session: object, message: str, conversation_id: str, message_id: str,
         status: str, answer: str = "", error_code: str | None = None,
         metadata: Mapping[str, object] | None = None, idempotency_key: str | None = None,
+        fingerprint: str | None = None,
     ) -> dict[str, object]:
         if status not in STREAM_TERMINAL_STATUSES:
             raise PostgresChatHistoryError("invalid_input")
@@ -410,6 +451,7 @@ class PostgresChatHistoryStore:
                 "metadata": stream_metadata,
             },
             idempotency_key=idempotency_key,
+            fingerprint=fingerprint,
         )
 
     def _history_entries(
@@ -452,6 +494,7 @@ class PostgresChatHistoryStore:
             if not _turn_allowed(value.get("citations"), allowed_collection_ids):
                 continue
             value["citations"] = _filter_citations(value.get("citations"), allowed_collection_ids)
+            value["metadata"] = _safe_stream_metadata(value.get("metadata"))
             value["question"] = row.get("question") or ""
             value["created_at"] = _timestamp(row.get("created_at"))
             result.append(value)

@@ -1,0 +1,19 @@
+python3 "/home/ricardo/rick-intelligence/scripts/phase11/runner.py" lint
+==> current root boundary validator: /home/ricardo/rick-intelligence/.runtime/venvs/cvg/bin/python scripts/phase15/check_boundaries.py
+{
+  "status": "PASS",
+  "checked": "/home/ricardo/rick-intelligence",
+  "errors": []
+}
+<== current root boundary validator: exit 0
+==> Phase 1.1 Python syntax: /home/ricardo/rick-intelligence/.runtime/venvs/cvg/bin/python -m py_compile scripts/phase11/check_skeleton.py scripts/phase11/runner.py scripts/phase11/test_check_skeleton.py scripts/phase15/check_boundaries.py scripts/phase15/test_check_boundaries.py
+<== Phase 1.1 Python syntax: exit 0
+==> Locker JavaScript syntax: node --check server.js
+<== Locker JavaScript syntax: exit 0
+==> CVG frontend lint: npm run lint
+
+> rag-frontend-premium@0.1.0 lint
+> ./node_modules/.bin/eslint .
+
+<== CVG frontend lint: exit 0
+exit_code=0

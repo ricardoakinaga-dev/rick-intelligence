@@ -1,0 +1,38 @@
+{
+  "checked_direct_packages": {
+    "fastapi": {
+      "explicit_ci_pins": "PASS",
+      "pyproject_runtime_in_runtime_lock_uv_lock": "PASS",
+      "version": "0.141.1"
+    },
+    "pydantic": {
+      "explicit_ci_pins": "PASS",
+      "pyproject_runtime_in_runtime_lock_uv_lock": "PASS",
+      "version": "2.13.5"
+    },
+    "python-multipart": {
+      "explicit_ci_pins": "PASS",
+      "pyproject_runtime_in_runtime_lock_uv_lock": "PASS",
+      "version": "0.0.32"
+    },
+    "starlette": {
+      "explicit_ci_pins": "PASS",
+      "pyproject_runtime_in_runtime_lock_uv_lock": "PASS",
+      "version": "1.7.0"
+    },
+    "uvicorn": {
+      "explicit_ci_pins": "PASS",
+      "pyproject_runtime_in_runtime_lock_uv_lock": "PASS",
+      "version": "0.54.0"
+    }
+  },
+  "note": "CI jobs that install the core HTTP stack directly match canonical exact pins; quality CI consumes requirements/runtime.lock.",
+  "status": "PASS",
+  "workflows": [
+    ".github/workflows/phase-1.3.yml",
+    ".github/workflows/phase-1.3.1.yml",
+    ".github/workflows/phase-1.4.yml",
+    ".github/workflows/phase-1.5.yml",
+    ".github/workflows/phase-1.6.yml"
+  ]
+}

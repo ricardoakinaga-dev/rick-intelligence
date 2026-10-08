@@ -14,6 +14,15 @@ for _pkg in ("contracts", "authorization", "identity"):
     if str(_p) not in sys.path:
         sys.path.insert(0, str(_p))
 
+import os
+
+LEGACY_ROOT = Path(os.environ.get("RICK_LEGACY_REFERENCE", str(ROOT / ".runtime" / "legacy-reference")))
+if not (LEGACY_ROOT / "cvg-master-rag-v2" / "src").is_dir():
+    raise RuntimeError(
+        "legacy differential reference is missing; run "
+        "`python3 scripts/phase15/legacy_reference.py` before this suite"
+    )
+
 
 def _load_legacy_authorization():
     """Load the preserved legacy module read-only by file path (never alters it).
@@ -27,7 +36,7 @@ def _load_legacy_authorization():
     name = "legacy_cvg_authorization_ro"
     if name in sys.modules:
         return sys.modules[name]
-    legacy_src = str(ROOT / "cvg-master-rag-v2" / "src")
+    legacy_src = str(LEGACY_ROOT / "cvg-master-rag-v2" / "src")
     saved_path = list(sys.path)
     saved_services = {key: value for key, value in sys.modules.items()
                       if key == "services" or key.startswith("services.")}
@@ -36,7 +45,7 @@ def _load_legacy_authorization():
     try:
         sys.path.insert(0, legacy_src)
         spec = _importlib_util.spec_from_file_location(
-            name, ROOT / "cvg-master-rag-v2" / "src" / "services" / "authorization.py")
+            name, LEGACY_ROOT / "cvg-master-rag-v2" / "src" / "services" / "authorization.py")
         module = _importlib_util.module_from_spec(spec)
         sys.modules[name] = module
         spec.loader.exec_module(module)

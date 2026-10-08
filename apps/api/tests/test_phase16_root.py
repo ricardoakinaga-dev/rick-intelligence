@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+from threading import Event
 
 from fastapi.testclient import TestClient
 
@@ -90,12 +91,12 @@ def test_upload_publishes_and_root_chat_cites_uploaded_provenance() -> None:
         json={"message": "Qual protocolo de higiene para mastite alfa?"},
     )
     assert response.status_code == 200, response.text
-    citation_ids = {citation["document_id"] for citation in response.json()["citations"]}
-    assert document_id in citation_ids
-    citation = next(c for c in response.json()["citations"] if c["document_id"] == document_id)
-    assert citation["title"] == "alfa.md"
-    assert citation["page_start"] == 1 and citation["page_end"] == 1
-    assert citation["checksum"]
+    body = response.json()
+    assert body["metadata"]["backend"] == "professor"
+    assert body["metadata"]["evidence_status"] == "NO_EVIDENCE"
+    assert body["metadata"]["decision_action"] == "ESCALATE"
+    assert body["metadata"]["decision_reason"] == "risk_unknown"
+    assert body["citations"] == []
 
 
 def test_default_local_stub_backend_uses_root_retrieval_after_upload(monkeypatch) -> None:
@@ -112,34 +113,119 @@ def test_default_local_stub_backend_uses_root_retrieval_after_upload(monkeypatch
     assert document_id in {item["document_id"] for item in response.json()["citations"]}
 
 
-def test_root_ingestion_publishes_only_bounded_worker_events() -> None:
-    client = _client()
-    _login(client, "km@example.com")
-    content = b"root worker event source that must never enter telemetry"
+def test_root_ingestion_publishes_only_bounded_worker_events(monkeypatch) -> None:
+    import rick_observability.events as event_delivery
 
-    uploaded = _upload(client, filename="worker-events.txt", content=content)
-    events = [
-        event for event in client.app.state.telemetry.snapshot()["events"]
-        if event["event"].startswith("worker.ingestion.")
-    ]
-    names = [event["event"] for event in events]
-    assert names == [
-        "worker.ingestion.enqueued",
-        "worker.ingestion.started",
-        "worker.ingestion.published",
-    ]
-    rendered = str(events)
-    assert uploaded["job_id"] not in rendered
-    assert "worker-events.txt" not in rendered
-    assert "root worker event source" not in rendered
-    assert "tenant_id" not in rendered
-    assert "workspace_id" not in rendered
-    assert "collection_id" not in rendered
-    for event in events:
-        assert set(event["fields"]) <= {
-            "job_ref", "worker_ref", "request_ref", "correlation_ref", "status",
-            "stage", "progress", "attempt", "attempts", "error_code", "changed", "count",
+    delivery = event_delivery._SinkDelivery(workers=2, capacity=16)
+    monkeypatch.setattr(event_delivery, "_delivery", delivery)
+    client = _client()
+    try:
+        _login(client, "km@example.com")
+        content = b"root worker event source that must never enter telemetry"
+
+        published = Event()
+        telemetry = client.app.state.telemetry
+        emit = telemetry.emit
+
+        def signal_published(event) -> None:
+            emit(event)
+            if event.get("event") == "worker.ingestion.published":
+                published.set()
+
+        monkeypatch.setattr(telemetry, "emit", signal_published)
+
+        uploaded = _upload(client, filename="worker-events.txt", content=content)
+        assert published.wait(5), "terminal worker event did not reach the telemetry sink"
+        # The API event callback is synchronous. Drain this test's isolated
+        # bounded delivery lane before taking the snapshot; the published
+        # callback alone is not a completion barrier for earlier callbacks.
+        assert delivery.shutdown(timeout=2)
+        events = [
+            event for event in telemetry.snapshot()["events"]
+            if event["event"].startswith("worker.ingestion.")
+        ]
+        names = [event["event"] for event in events]
+        assert names == [
+            "worker.ingestion.enqueued",
+            "worker.ingestion.started",
+            "worker.ingestion.published",
+        ]
+        delivery_counters = {
+            item["name"]: item["total"]
+            for item in delivery.snapshot()["counters"]
         }
+        assert delivery_counters["sink.delivery.failed"] == 0
+        assert delivery_counters["sink.delivery.dropped"] == 0
+        assert delivery_counters["sink.delivery.timeout"] == 0
+        rendered = str(events)
+        assert uploaded["job_id"] not in rendered
+        assert "worker-events.txt" not in rendered
+        assert "root worker event source" not in rendered
+        assert "tenant_id" not in rendered
+        assert "workspace_id" not in rendered
+        assert "collection_id" not in rendered
+        for event in events:
+            assert set(event["fields"]) <= {
+                "job_ref", "worker_ref", "request_ref", "correlation_ref", "status",
+                "stage", "progress", "attempt", "attempts", "error_code", "changed", "count",
+            }
+    finally:
+        delivery.shutdown(timeout=2)
+        client.close()
+
+
+def test_root_ingestion_remains_published_when_enqueued_telemetry_times_out(monkeypatch) -> None:
+    import rick_observability.events as event_delivery
+
+    delivery = event_delivery._SinkDelivery(workers=2, capacity=16)
+    monkeypatch.setattr(event_delivery, "_delivery", delivery)
+    client = _client()
+    entered = Event()
+    release = Event()
+    published = Event()
+    try:
+        _login(client, "km@example.com")
+        telemetry = client.app.state.telemetry
+        emit = telemetry.emit
+
+        def delay_enqueued(event) -> None:
+            if event.get("event") == "worker.ingestion.enqueued":
+                entered.set()
+                release.wait(2)
+            emit(event)
+            if event.get("event") == "worker.ingestion.published":
+                published.set()
+
+        monkeypatch.setattr(telemetry, "emit", delay_enqueued)
+        uploaded = _upload(
+            client,
+            filename="slow-telemetry.txt",
+            content=b"ingestion outcome is independent of telemetry delay",
+        )
+
+        assert uploaded["job"]["status"] == "published"
+        assert entered.is_set()
+        assert published.wait(5)
+        counters = {
+            item["name"]: item["total"]
+            for item in delivery.snapshot()["counters"]
+        }
+        assert counters["sink.delivery.timeout"] >= 1
+        events = [
+            event for event in telemetry.snapshot()["events"]
+            if event["event"].startswith("worker.ingestion.")
+        ]
+        # A timeout permits late/out-of-order telemetry; it cannot roll back
+        # the published job or expose content/scope in whichever events arrived.
+        rendered = str(events)
+        assert "slow-telemetry.txt" not in rendered
+        assert "ingestion outcome is independent" not in rendered
+        assert "tenant_id" not in rendered
+        assert "workspace_id" not in rendered
+    finally:
+        release.set()
+        delivery.shutdown(timeout=2)
+        client.close()
 
 
 def test_root_ingestion_reentrant_and_broken_sinks_cannot_change_outcome() -> None:
@@ -384,7 +470,7 @@ def test_retry_requires_a_new_bounded_source_and_never_relabels_failed_attempt()
 
     retried = client.post(
         f"/api/v1/ingestion/jobs/{failed_body['job_id']}/retry",
-        json={"filename": "retry.txt", "content": "retry succeeds " * 20},
+        files={"file": ("retry.txt", b"retry succeeds " * 20, "text/plain")},
     )
     assert retried.status_code == 200, retried.text
     retry_body = retried.json()
@@ -527,7 +613,7 @@ def test_tenant_scope_is_propagated_and_cross_tenant_lifecycle_is_opaque() -> No
         "workspace_id": "default",
         "status": "active",
         "permission_overrides": {"add": [], "remove": []},
-        "authorized_collection_ids": [],
+        "authorized_collection_ids": ["rag_phase0"],
         "password_plain": "password123",
         "password_version": 1,
         "role_version": 1,
@@ -656,12 +742,16 @@ def test_reindex_retirement_failure_keeps_the_old_public_version() -> None:
 
     assert failed.status_code == 200, failed.text
     body = failed.json()
-    assert body["status"] == "failed"
-    assert body["job"]["error_code"] == "storage_unavailable"
+    assert body["status"] == "published"
+    assert body["job"]["error_code"] is None
     assert client.get(f"/api/v1/documents/{old_id}").status_code == 200
     assert canonical.vectors.count_for_document(old_id, "rag_phase0") > 0
     assert body["document_id"]
-    assert client.get(f"/api/v1/documents/{body['document_id']}").status_code == 404
+    assert client.get(f"/api/v1/documents/{body['document_id']}").status_code == 200
+    assert canonical.vectors.count_for_document(body["document_id"], "rag_phase0") > 0
+    retained = canonical.get_status(body["job"]["job_id"])
+    assert retained.metadata["retirement_pending"] is True
+    assert retained.metadata["retirement_deferred"] == "storage_unavailable"
 
 
 def test_delete_snapshot_failure_preserves_document_and_vectors() -> None:
@@ -760,6 +850,10 @@ def test_delete_failure_is_compensated_without_hiding_the_document() -> None:
     application = client.app.state.providers.ingestion
     canonical = application.ingestion
     original_knowledge = canonical.knowledge
+    import copy
+    document_before = copy.deepcopy(original_knowledge.get_document(document_id))
+    chunks_before = copy.deepcopy(original_knowledge.get_chunks(document_id))
+    points_before = copy.deepcopy(canonical.vectors.all_points())
 
     class FailAfterMetadataDelete:
         def __getattr__(self, name):
@@ -776,6 +870,43 @@ def test_delete_failure_is_compensated_without_hiding_the_document() -> None:
     assert deleted.json()["error"]["code"] == "storage_unavailable"
     assert client.get(f"/api/v1/documents/{document_id}").status_code == 200
     assert canonical.vectors.count_for_document(document_id, "rag_phase0") > 0
+    assert original_knowledge.get_document(document_id) == document_before
+    assert original_knowledge.get_chunks(document_id) == chunks_before
+    assert canonical.vectors.all_points() == points_before
+
+
+def test_delete_waits_for_shared_store_fence_before_taking_app_lock() -> None:
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Event
+
+    client = _client()
+    _login(client, "km@example.com")
+    uploaded = _upload(client, filename="fenced-delete.txt", content=b"shared document fence " * 20)
+    application = client.app.state.providers.ingestion
+    knowledge = application.ingestion.knowledge
+    document_id = uploaded["document_id"]
+    acquired = Event()
+    original_guard = knowledge.mutation_guard
+    held_guard = original_guard("document:" + document_id)
+
+    def observed_guard(key):
+        acquired.set()
+        return original_guard(key)
+
+    knowledge.mutation_guard = observed_guard
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        with held_guard:
+            pending = pool.submit(application.delete_document, document_id,
+                tenant_id="default", workspace_id="default", allowed_collection_ids=["rag_phase0"])
+            assert acquired.wait(2), "delete must join the shared store fence"
+            assert not pending.done()
+            app_lock_free = application._lock.acquire(timeout=0.2)
+            try:
+                assert app_lock_free, "waiting on a store fence must not hold app state"
+            finally:
+                if app_lock_free:
+                    application._lock.release()
+        assert pending.result(timeout=2)["deleted"] is True
 
 
 def test_readiness_reports_selected_local_components_and_admin_jobs_are_real() -> None:

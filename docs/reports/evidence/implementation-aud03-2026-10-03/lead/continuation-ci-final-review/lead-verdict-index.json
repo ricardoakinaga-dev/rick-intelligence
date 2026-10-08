@@ -1,0 +1,17 @@
+{
+  "recorded_at": "2026-10-03T13:27:55.004843+00:00",
+  "role": "Lead index of independent agent handoff; not a new review",
+  "reviewer": "Archimedes",
+  "criterion": "AUD03-24",
+  "verdict": "BOUNDED_STATIC_APPROVE",
+  "runtime_ts_probes": 16,
+  "tests": 434,
+  "exit_code": 0,
+  "source_hashes_unchanged": true,
+  "evidence": "probe.log",
+  "limits": [
+    "Arbitrary dynamic flow and interprocedural effects conservatively unsupported",
+    "Two harmless dynamic cases reject conservatively",
+    "Actual hosted CI not executed"
+  ]
+}

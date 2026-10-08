@@ -1,0 +1,7 @@
+{
+  "recorded_at": "2026-10-03T13:26:52.638871+00:00",
+  "raw_record": "continuation-20261003-ingestion-postgres-owned.command.json",
+  "correction": "Copied runner print says random-schema migrations. Actual knowledge fixture uses isolated unique synthetic tenant/user scopes in the already migrated owned lab; it does not run migrations. It removes only those fixture rows. Original harness and raw output remain preserved.",
+  "fixture": "packages/knowledge/tests/test_aud03_postgres_live.py:94",
+  "runner_sha256": "b4e4f20b4f394137427cc247a985328ac0f2d927221c29fb55ffb39aa3d86742"
+}

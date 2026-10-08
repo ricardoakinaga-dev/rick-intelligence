@@ -1,0 +1,62 @@
+[
+  {
+    "name": "final-lint",
+    "command": [
+      "make",
+      "lint"
+    ],
+    "started_at": "2026-09-26T02:12:47.775597+00:00",
+    "exit_code": 0,
+    "finished_at": "2026-09-26T02:12:54.422161+00:00",
+    "tail": [
+      "> rag-frontend-premium@0.1.0 lint",
+      "> ./node_modules/.bin/eslint .",
+      "",
+      "<== CVG frontend lint: exit 0"
+    ]
+  },
+  {
+    "name": "final-typecheck",
+    "command": [
+      "make",
+      "typecheck"
+    ],
+    "started_at": "2026-09-26T02:12:47.776034+00:00",
+    "exit_code": 0,
+    "finished_at": "2026-09-26T02:12:52.813935+00:00",
+    "tail": [
+      "==> CVG frontend TypeScript compiler (compatibility override): npm exec -- tsc --noEmit --ignoreDeprecations 5.0",
+      "<== CVG frontend TypeScript compiler (compatibility override): exit 0",
+      "==> CVG Python compilation (no Python type checker configured): /home/ricardo/rick-intelligence/.runtime/venvs/cvg/bin/python -m compileall -q src",
+      "<== CVG Python compilation (no Python type checker configured): exit 0"
+    ]
+  },
+  {
+    "name": "control-before",
+    "command": [
+      "make",
+      "validate"
+    ],
+    "started_at": "2026-09-26T02:12:47.776596+00:00",
+    "exit_code": 0,
+    "finished_at": "2026-09-26T02:12:56.376616+00:00",
+    "tail": [
+      "Git: head=b52f32c141916a2ea3af1a6b913bd91f380606e0 branch=main worktree=DIRTY (2830 entries) remote_main=b52f32c141916a2ea3af1a6b913bd91f380606e0 sync=HEAD_EQ_ORIGIN_MAIN",
+      "Control-plane check OK: required pointers and current Git observations are structurally consistent.",
+      "PYTHONDONTWRITEBYTECODE=1 python3 \"/home/ricardo/rick-intelligence/scripts/state_of_art/validate_quality_bar.py\"",
+      "{\"path\": \"docs/reports/current-triple-aaa-quality-bar-v1.json\", \"sha256\": \"fe0f58eb84bea4d16a138391b1afd85a9312d81fdb2ac7a383c2dbaf767f9633\", \"status\": \"PASS\"}"
+    ]
+  },
+  {
+    "name": "final-diff-check",
+    "command": [
+      "git",
+      "diff",
+      "--check"
+    ],
+    "started_at": "2026-09-26T02:12:47.777363+00:00",
+    "exit_code": 0,
+    "finished_at": "2026-09-26T02:12:47.843654+00:00",
+    "tail": []
+  }
+]

@@ -10,13 +10,13 @@ from __future__ import annotations
 import math
 import json
 import re
-from typing import Literal
+from typing import Final, Literal
 
 from pydantic import ConfigDict, Field, field_validator, model_validator
 
 from rick_contracts.base import StrictContractModel
 
-PROVIDER_CONTRACT_VERSION = "provider-contract-v1"
+PROVIDER_CONTRACT_VERSION: Final = "provider-contract-v1"
 _PROVIDER_CONTROL = re.compile(r"[\x00-\x1f\x7f]")
 
 
@@ -63,7 +63,7 @@ class ProviderErrorDto(StrictContractModel):
 
     model_config = ConfigDict(extra="forbid", strict=True)
 
-    contract_version: Literal[PROVIDER_CONTRACT_VERSION] = PROVIDER_CONTRACT_VERSION
+    contract_version: Literal["provider-contract-v1"] = PROVIDER_CONTRACT_VERSION
     code: ProviderErrorCode
     operation: Literal["chat_completion", "embeddings"]
     correlation_id: str = Field(min_length=1, max_length=128)
@@ -75,7 +75,7 @@ class ProviderErrorDto(StrictContractModel):
 class EmbeddingResult(StrictContractModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
-    contract_version: Literal[PROVIDER_CONTRACT_VERSION] = PROVIDER_CONTRACT_VERSION
+    contract_version: Literal["provider-contract-v1"] = PROVIDER_CONTRACT_VERSION
     model: str = Field(min_length=1, max_length=256)
     dimensions: int = Field(gt=0, le=16_384)
     vector: list[float] = Field(min_length=1, max_length=16_384)
@@ -195,11 +195,12 @@ class ProviderToolCallDelta(StrictContractModel):
 class ChatCompletionResult(StrictContractModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
-    contract_version: Literal[PROVIDER_CONTRACT_VERSION] = PROVIDER_CONTRACT_VERSION
+    contract_version: Literal["provider-contract-v1"] = PROVIDER_CONTRACT_VERSION
     model: str = Field(min_length=1, max_length=256)
     content: str = Field(default="", max_length=1_000_000)
     tool_calls: list[ProviderToolCall] | None = Field(default=None, max_length=32)
-    finish_reason: Literal["stop", "length", "content_filter", "unknown"] = "stop"
+    # An omitted conclusion is unsuccessful; only an explicit stop can approve.
+    finish_reason: Literal["stop", "length", "content_filter", "tool_calls", "unknown"] = "unknown"
     correlation_id: str = Field(min_length=1, max_length=128)
     usage: ProviderUsage | None = None
 
@@ -219,10 +220,10 @@ class ChatCompletionChunk(StrictContractModel):
 
     model_config = ConfigDict(extra="forbid", strict=True)
 
-    contract_version: Literal[PROVIDER_CONTRACT_VERSION] = PROVIDER_CONTRACT_VERSION
+    contract_version: Literal["provider-contract-v1"] = PROVIDER_CONTRACT_VERSION
     model: str = Field(min_length=1, max_length=256)
     delta: str = Field(default="", max_length=1_000_000)
     tool_calls: list[ProviderToolCallDelta] | None = Field(default=None, max_length=32)
-    finish_reason: Literal["stop", "length", "content_filter", "unknown"] | None = None
+    finish_reason: Literal["stop", "length", "content_filter", "tool_calls", "unknown"] | None = None
     correlation_id: str = Field(min_length=1, max_length=128)
     usage: ProviderUsage | None = None

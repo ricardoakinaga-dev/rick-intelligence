@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "scope": "Independent read-only assessment of the current local Q24-19/Q24-20 implementation only; do not assess or infer whole-product release readiness.",
+  "acceptance_criteria": [
+    "Every durable administrative identity mutation must commit its completion event atomically with the mutation, or fail closed before the mutation. Unknown providers must not inherit a non-atomic fallback.",
+    "Any non-atomic development fallback must be explicitly limited to a process-local volatile provider and must not run in production mode or production-safe composition.",
+    "Tenant-scoped authority must not change a global password or global profile field affecting a user associated with another tenant without explicit account-wide authority. A rejected request must leave credentials, versions, sessions and completion outbox unchanged.",
+    "The PostgreSQL mutation and outbox path must preserve rollback on completion-write failure, tenant membership scope, stable/idempotent reconciliation, bounded retries/dead-letter/manual retry, and worker runtime composition/recovery.",
+    "Evidence should include the relevant API regressions, actual PostgreSQL behavior, restart recovery and independent consumer concurrency. Identify any material gap or false claim."
+  ],
+  "review_instruction": "Use a fresh context. Inspect only this packet and its hash-listed implementation/test files. Do not read earlier C1/C2 reports or this conversation. Make no repository changes. Return ACCEPT or REJECT for this scoped local implementation, with severity, exact file/line, concrete failure path, evidence and residual limitations. Do not claim whole-product or release acceptance.",
+  "files": {
+    "apps/api/src/routes/admin.py": "b20fbb4fefc2445cb349bf1d1a7c34e71b6cbd824cd55ac96f4cea8baca1ab35",
+    "apps/api/src/services/identity_service.py": "d8d085c30661fdbef6a5f88b32891d2c1eaec4eea7a5d2d54b59b2ab9d6b8c4f",
+    "apps/api/src/services/postgres_identity.py": "840fb4769821491595e9dbfc8e40160b997d551fa12d06f3a4debb4929089f42",
+    "packages/identity/src/rick_identity/postgres.py": "cb8e2bca5d73412c3f41815fc342591c87675396bc3719583ab40e28f2d278bb",
+    "apps/api/tests/test_audit_factory.py": "cf839d5e380fd4acada45e1e203aebeb8fb761d3c5b30b476e110fe62703723d",
+    "apps/api/tests/test_postgres_admin_mutations.py": "ccaa41ede88db399c156bf9cfa43ba5e541431f46b4a7440e94c179b9c60d09b",
+    "apps/worker/admin_audit_outbox.py": "046595f9da759a3fc3f08eff1233cb5d53665d444301c053932124b51d76ee3a",
+    "apps/worker/deployment_composition.py": "09b8ebae1d2f869226789b013050b2ffb2cf9e7c96f5b2a7556e1a46189cf818",
+    "apps/worker/tests/test_admin_audit_outbox.py": "a6d47c7ba1172a701ac012a8652287da05aba74814ca75bcb1b9259dc6317de2",
+    "apps/worker/tests/test_deployment_composition.py": "e390ff5f01232a233ec803daf2cceb1c85e58c2f97cd0e60e11401b50a5afc12",
+    "infrastructure/migrations/0007_admin_audit_reconciliation.sql": "4af11b3250c3b5f3d2ea1e3a1042883ccf3cb703370daa6011cd4c2c748ae6e2",
+    "infrastructure/scripts/tests/test_migrate.py": "7cb397ea9783a234a3ced939db28dcc7455f891b0263d569aa71608e6495b1d9",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0729Z/api16-root.log": "5cc87c92b0dc102d68d20dab7ff21070b421facbd5ca7ac27d671e1512893d0a",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0729Z/postgres-migrations.log": "0cdfb2a24f10cb6d920a669f27c9d5f1306b05a5fa40938382df86cb11bc44af",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0729Z/identity-postgres.log": "42790f1f4cee88a8b8ad8e0d2cc06fa49ed803c84fc349d16722dc1aa029fe77",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0653Z/api16-worker-final.log": "d3fb2f2ff41556a8dbc47542286332b4a4d45b527566c855a2cd8f81f1b5462a"
+  },
+  "reported_test_results": {
+    "api": "714 passed; see hashed api16-root.log",
+    "worker": "116 passed; see hashed api16-worker-final.log",
+    "postgresql": "108 passed against disposable PostgreSQL 16.15; see hashed postgres-migrations.log",
+    "identity_store": "11 passed; see hashed identity-postgres.log",
+    "static": "make lint, make typecheck and make ops-static passed; associated logs are listed in the evidence manifest"
+  }
+}

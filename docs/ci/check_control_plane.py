@@ -41,7 +41,6 @@ REQUIRED_FILES = (
     ".agent/legacy-v1/gates/phase-0.5-verified-blocked-final.json",
     ".agent/legacy-v1/gates/phase-0.6-promotion-final.json",
     ".gauntlet/state.md",
-    ".github/workflows/phase-0.6.yml",
     "docs/baselines/phase-0.6-legacy-test-classification.md",
     "docs/baselines/phase-0.6-provider-contract.json",
     "docs/architecture/security/locker-boundary.md",

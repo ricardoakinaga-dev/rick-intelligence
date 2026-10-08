@@ -46,9 +46,12 @@ class ExternalCompositionInputs:
     object_store_transport: object
     identity: object
     created_by: str
+    authorization_revalidator: object | None = None
     qdrant_transport: object | None = None
     provider_transport: object | None = None
     provider_client: object | None = None
+    embedding_provider_transport: object | None = None
+    embedding_provider_client: object | None = None
     redis_client: object | None = None
     rate_limiter: object | None = None
     rate_limit_namespace: object | None = None
@@ -106,6 +109,7 @@ def load_external_providers(
     try:
         providers._composition_owned = True
         providers._composition_inputs = inputs
+        providers._embedding_adapter.transferred_client = inputs.embedding_provider_client
     except (AttributeError, TypeError):
         # A narrow test seam may return an immutable sentinel; the loader's
         # contract is still satisfied and the caller retains its ownership.
@@ -139,9 +143,18 @@ class SyncEmbeddingAdapter:
         self.timeout_seconds = float(timeout_seconds)
         self._bridge: _AsyncLoopBridge | None = None
         self._bridge_lock = Lock()
+        self.transferred_client: object | None = None
+        self._closed = False
+        self._closing = False
+        self._disposed = False
+        self._close_lock = Lock()
+        self._closed_resources: set[int] = set()
+        self._client_close_obligation = None
 
     def _get_bridge(self) -> "_AsyncLoopBridge":
         with self._bridge_lock:
+            if self._closed or self._closing or self._disposed:
+                raise ExternalCompositionError("provider event loop closed")
             if self._bridge is None:
                 self._bridge = _AsyncLoopBridge()
             return self._bridge
@@ -149,19 +162,80 @@ class SyncEmbeddingAdapter:
     def _run(self, awaitable: object) -> object:
         if not inspect.isawaitable(awaitable):
             return awaitable
+        try:
+            bridge = self._get_bridge()
+        except Exception:
+            close = getattr(awaitable, "close", None)
+            if callable(close):
+                close()
+            raise
+        return bridge.run(awaitable, timeout=self.timeout_seconds)
 
-        return self._get_bridge().run(awaitable, timeout=self.timeout_seconds)
+    async def health_check(self) -> bool:
+        """Probe the dedicated client on its owning loop without inference."""
+        method = getattr(self.provider, "health_check", None)
+        if not callable(method):
+            return False
+        try:
+            result = await asyncio.to_thread(lambda: self._run(method()))
+            return getattr(result, "ok", result) is True
+        except Exception:
+            return False
 
-    def close(self) -> None:
-        with self._bridge_lock:
-            bridge, self._bridge = self._bridge, None
-        if bridge is not None:
-            closer = getattr(self.provider, "aclose", None)
-            try:
-                if callable(closer):
-                    bridge.run(closer(), timeout=self.timeout_seconds)
-            finally:
-                bridge.close()
+    def close(self, *, timeout: float | None = None) -> None:
+        """One bounded retry on the original loop; successes are never repeated."""
+        from rick_providers.cleanup import ClientCloseObligation
+
+        with self._close_lock:
+            if self._closed:
+                return
+            if self._disposed:
+                raise ExternalCompositionError("provider cleanup incomplete after disposal")
+            with self._bridge_lock:
+                self._closing = True
+                if self._bridge is None:
+                    self._bridge = _AsyncLoopBridge()
+                bridge = self._bridge
+            budget = self.timeout_seconds if timeout is None else min(self.timeout_seconds, max(0.0, timeout))
+            deadline = time.monotonic() + budget
+            failed = False
+            pending = [resource for resource in (self.provider, self.transferred_client)
+                       if resource is not None and id(resource) not in self._closed_resources]
+            for index, resource in enumerate(pending):
+                closer = getattr(resource, "aclose", None)
+                if resource is self.transferred_client and callable(closer):
+                    if self._client_close_obligation is None:
+                        self._client_close_obligation = ClientCloseObligation(resource)
+                    closer = self._client_close_obligation.aclose
+                try:
+                    if callable(closer):
+                        remaining = (deadline - time.monotonic()) / (len(pending) - index)
+                        if remaining <= 0 or bridge.run(closer(), timeout=remaining) is False:
+                            raise ExternalCompositionError("provider cleanup incomplete")
+                    self._closed_resources.add(id(resource))
+                except Exception:
+                    failed = True
+            if failed:
+                # Keep the bridge alive for the next explicit bounded retry.
+                raise ExternalCompositionError("provider cleanup incomplete")
+            bridge.close()
+            self._bridge = None
+            self._closed = True
+
+    def dispose(self, *, timeout: float | None = None) -> None:
+        """Last cleanup attempt, then release the loop even if cleanup failed.
+
+        An operator may call this after a finite retry budget. Failed disposal
+        raises, and every later close keeps reporting incomplete cleanup.
+        """
+        try:
+            self.close(timeout=timeout)
+        finally:
+            with self._close_lock:
+                self._disposed = True
+                if self._bridge is not None:
+                    self._bridge.close()
+                    self._bridge = None
 
     def embed(self, texts: list[str]) -> list[list[float]]:
         if not isinstance(texts, list) or not texts or len(texts) > 256:
@@ -189,6 +263,7 @@ class _AsyncLoopBridge:
     def __init__(self) -> None:
         self._ready = Event()
         self._closed = False
+        self._disposal_incomplete = False
         self._lock = Lock()
         self._loop: asyncio.AbstractEventLoop | None = None
         self._thread = Thread(target=self._serve, name="rick-sync-provider-loop", daemon=True)
@@ -209,7 +284,11 @@ class _AsyncLoopBridge:
             for task in pending:
                 task.cancel()
             if pending:
-                loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+                done, unfinished = loop.run_until_complete(asyncio.wait(pending, timeout=0.25))
+                self._disposal_incomplete = bool(unfinished)
+                for task in done:
+                    if not task.cancelled():
+                        task.exception()
             loop.close()
 
     def run(self, awaitable: object, *, timeout: float) -> object:
@@ -217,6 +296,9 @@ class _AsyncLoopBridge:
             return awaitable
         with self._lock:
             if self._closed or self._loop is None:
+                close = getattr(awaitable, "close", None)
+                if callable(close):
+                    close()
                 raise ExternalCompositionError("provider event loop closed")
             loop = self._loop
 
@@ -236,12 +318,16 @@ class _AsyncLoopBridge:
     def close(self) -> None:
         with self._lock:
             if self._closed:
+                if self._thread.is_alive() or self._disposal_incomplete:
+                    raise ExternalCompositionError("provider event loop disposal incomplete")
                 return
             self._closed = True
             loop = self._loop
         if loop is not None:
             loop.call_soon_threadsafe(loop.stop)
         self._thread.join(1.0)
+        if self._thread.is_alive() or self._disposal_incomplete:
+            raise ExternalCompositionError("provider event loop disposal incomplete")
 
 
 def _canonical_job_result(job: object, result: object) -> JobResult:
@@ -260,11 +346,13 @@ def _canonical_job_result(job: object, result: object) -> JobResult:
     object_key = payload.get("object_key") if isinstance(payload, Mapping) else None
     if isinstance(object_key, str) and object_key:
         output_refs["object_key"] = object_key
-    updated_at = getattr(job, "updated_at", 0.0)
+    finished_at = result.get("finished_at") if isinstance(result, Mapping) else getattr(result, "finished_at", None)
+    if finished_at is None:
+        raise RuntimeError("ingestion handler returned no authoritative finish")
     return JobResult(
         output_refs=output_refs,
         document_id=document_id,
-        completed_at=max(time.time(), float(updated_at)),
+        completed_at=finished_at,
     )
 
 
@@ -365,12 +453,24 @@ def build_external_providers(
     # Identity is supplied by the deployment policy. The type check is kept
     # intentionally duck-typed so an approved OIDC+admin facade can be used
     # without the API importing a provider-specific callback broker.
-    if getattr(inputs.identity, "production_safe", False) is not True:
+    if settings.environment == "production" and getattr(inputs.identity, "production_safe", False) is not True:
         raise ExternalCompositionError("production-safe identity provider")
-    if callable(getattr(inputs.identity, "issue_password_reset", None)) and (
+    if settings.environment == "production" and callable(getattr(inputs.identity, "issue_password_reset", None)) and (
         inputs.password_reset_delivery is None
     ):
         raise ExternalCompositionError("password reset delivery")
+    authorization_revalidator = inputs.authorization_revalidator
+    if not callable(authorization_revalidator):
+        authorization_revalidator = getattr(inputs.identity, "refresh_authorization_context", None)
+    if settings.environment == "production" and not callable(authorization_revalidator):
+        raise ExternalCompositionError("live authorization revalidator for chat publication")
+    from services.authorization_service import make_authorization_revalidator
+
+    authorization_revalidator = make_authorization_revalidator(
+        authorization_revalidator,
+        compatibility_workspace_id=settings.compat_workspace_id,
+        compatibility_collection_ids=settings.compat_allowed_collection_ids,
+    )
 
     if not isinstance(inputs.worker_scope, tuple) or len(inputs.worker_scope) != 3:
         raise ExternalCompositionError("worker scope")
@@ -414,6 +514,13 @@ def build_external_providers(
         api_key=settings.qdrant_api_key or None,
         timeout=max(0.1, settings.provider_timeout_ms / 1_000),
         transport=inputs.qdrant_transport,
+        # Explicit rather than relying on the constructor default: `auto`
+        # selects hybrid (dense+sparse) when the prepared index exposes sparse
+        # vectors and degrades to dense-only with a visible `degraded` result
+        # during the transition. The canonical ingestion preflight creates a
+        # hybrid (sparse-enabled) schema, so this resolves to hybrid in the
+        # canonical lab and remains a fail-safe dense path for legacy schemas.
+        retrieval_mode="auto",
     )
     provider_config = ProviderConfig(
         base_url=settings.provider_base_url,
@@ -424,6 +531,14 @@ def build_external_providers(
         timeout_ms=settings.provider_timeout_ms,
         environment=settings.environment,
         provider_kind=settings.selected_provider_kind,
+        embedding_provider_kind=settings.embedding_provider_kind or None,
+        embedding_base_url=settings.embedding_base_url or None,
+        embedding_api_key=settings.embedding_api_key or None,
+        anthropic_version=settings.provider_anthropic_version,
+        max_output_tokens=settings.provider_max_output_tokens,
+        max_attempts=settings.provider_max_attempts,
+        retry_delay_ms=settings.provider_retry_delay_ms,
+        max_backoff_ms=settings.provider_max_backoff_ms,
     )
     provider = ResilientProvider(
         create_provider(
@@ -433,8 +548,31 @@ def build_external_providers(
         ),
         max_prompt_chars=max(1_000, settings.max_chat_message_chars * 8),
     )
+    if inputs.embedding_provider_client is not None and inputs.embedding_provider_client is inputs.provider_client:
+        raise ExternalCompositionError("distinct chat and embedding HTTP clients")
+    explicit_embeddings = any((settings.embedding_provider_kind,
+                               settings.embedding_base_url, settings.embedding_api_key))
+    embedding_config = ProviderConfig(
+        base_url=settings.embedding_base_url or settings.provider_base_url,
+        api_key=(settings.embedding_api_key or None) if explicit_embeddings else
+                (settings.external_chat_api_key or None),
+        provider_kind=settings.embedding_provider_kind or settings.selected_provider_kind,
+        chat_model=settings.provider_embedding_model,
+        embedding_model=settings.provider_embedding_model,
+        embedding_dimensions=settings.provider_embedding_dimensions,
+        timeout_ms=settings.provider_timeout_ms,
+        environment=settings.environment,
+        max_attempts=settings.provider_max_attempts,
+        retry_delay_ms=settings.provider_retry_delay_ms,
+        max_backoff_ms=settings.provider_max_backoff_ms,
+    )
+    embedding_provider = ResilientProvider(create_provider(
+        embedding_config,
+        transport=inputs.embedding_provider_transport,
+        client=inputs.embedding_provider_client,
+    ))
     embeddings = SyncEmbeddingAdapter(
-        provider,
+        embedding_provider,
         model=settings.provider_embedding_model,
         dimensions=settings.provider_embedding_dimensions,
         timeout_seconds=max(0.1, settings.provider_timeout_ms / 1_000),
@@ -462,6 +600,7 @@ def build_external_providers(
         provider=provider,
         lease=lease,
         knowledge=knowledge,
+        authorization_revalidator=authorization_revalidator,
     )
     canonical_ingestion = IngestionService(
         knowledge=knowledge,
@@ -486,6 +625,9 @@ def build_external_providers(
         temp_root=inputs.worker_temp_root,
         created_by=inputs.created_by,
     )
+    # Both API status/cancellation and worker lease recovery consult the same
+    # durable publication receipt before retrying or failing a queue attempt.
+    canonical_queue.publication_reconciler = handler.recover_job
 
     def canonical_ingestion_handler(job, lease, *, cancelled):
         record = SimpleNamespace(
@@ -495,6 +637,10 @@ def build_external_providers(
             workspace_id=job.workspace_id,
             collection_id=job.collection_id,
             payload=dict(job.payload),
+            attempt_count=job.attempt_count,
+            started_at=job.attempts[-1].started_at if job.attempts else None,
+            created_at=job.created_at,
+            updated_at=job.updated_at,
         )
         result = handler(record, lease_lost_check=cancelled)
         return _canonical_job_result(job, result)
@@ -534,6 +680,7 @@ def build_external_providers(
         "qdrant": probe(vectors.health_check),
         "queue": probe(queue.health_check),
         "redis": probe(rate_limiter.readiness_check),
+        "embedding_provider": probe(embeddings.health_check),
     }
     # Register checks at the same names used by the production lifecycle. A
     # component without an explicit probe remains not-ready through the

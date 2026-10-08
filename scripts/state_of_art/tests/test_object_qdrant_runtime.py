@@ -166,6 +166,18 @@ def test_overall_status_never_upgrades_a_blocked_lane(gate: ModuleType) -> None:
     assert gate._overall_status({"status": "FAIL"}, {"status": "PASS"}) == "FAIL"
 
 
+def test_failure_remains_visible_with_an_unavailable_external_lane(gate: ModuleType) -> None:
+    assert gate._overall_status({"status": "FAIL"}, {"status": "BLOCKED_EXTERNAL"}) == "FAIL"
+    assert gate._overall_status({"status": "BLOCKED_EXTERNAL"}, {"status": "FAIL"}) == "FAIL"
+    report = gate._gate_report("BLOCKED_EXTERNAL", [
+        gate.GateResult("upsert", "FAIL", "write rejected"),
+        gate.GateResult("fault-endpoint", "BLOCKED_EXTERNAL", "not configured"),
+    ], production_safe=True)
+    assert report["status"] == "FAIL"
+    assert report["live"] is False
+    assert report["production_safe"] is report["promotable"] is False
+
+
 def test_phase3_adapter_forwards_real_fault_endpoints(adapter: ModuleType, monkeypatch: pytest.MonkeyPatch) -> None:
     observed: dict[str, object] = {}
 

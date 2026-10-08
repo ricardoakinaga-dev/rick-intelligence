@@ -3,4 +3,4 @@ name = "rick-ingestion"
 version = "1.4.0"
 description = "Canonical ingestion pipeline (parsers, chunking, jobs, idempotent index)"
 requires-python = ">=3.12"
-dependencies = ["rick-knowledge"]
+dependencies = ["rick-knowledge", "pdfplumber==0.11.10", "python-docx==1.2.0"]

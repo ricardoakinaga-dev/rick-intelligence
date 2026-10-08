@@ -58,9 +58,10 @@ requires:
 - zero unresolved Critical/High finding at final review and a human Go/No-Go
   bound to the exact artifact and rollback owner.
 
-The final required report for the predecessor prompt is
-[`docs/reports/state-of-art-triple-aaa-promotion-report.md`](../reports/state-of-art-triple-aaa-promotion-report.md).
-It contains the predecessor prompt's 26 sections and 25-dimension scorecard.
+The predecessor prompt required a final report at
+`docs/reports/state-of-art-triple-aaa-promotion-report.md`, with 26 sections
+and a 25-dimension scorecard. That artifact is absent from this checkout;
+this historical requirement is not evidence of a completed promotion report.
 The current report supersedes those counts. Until the active report has current evidence, the candidate is not
 AAA or Triple AAA.
 

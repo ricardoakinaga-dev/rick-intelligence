@@ -1,0 +1,29 @@
+{
+  "files": [
+    {
+      "path": "infrastructure/docker/worker-entrypoint.py",
+      "sha256": "95f66e89ff3d09422b4db59e504d7b5183e37233925eaa53824f1795b8f7f5d4"
+    },
+    {
+      "path": "infrastructure/docker/tests/test_worker_entrypoint.py",
+      "sha256": "b8bf34d2f78ddc35fbdb6df32d7bca15c868b2d606df6328d7eda6e98a298b70"
+    },
+    {
+      "path": "infrastructure/docker/tests/test_worker_telemetry_process.py",
+      "sha256": "4fbf911e0360f1ab714844ffc685ee85f7e213c4f71014abd4780ab8744f7a9e"
+    },
+    {
+      "path": "packages/observability/src/rick_observability/events.py",
+      "sha256": "673b3d7b4c86a451eb9fe5278e4fe602678d6946813ea0fa39aeca9b5a9a9c15"
+    },
+    {
+      "path": "packages/observability/tests/test_observability.py",
+      "sha256": "d12d842ca58036abcf4858f60d8e312f5e8b04cc2eaba16d71ab6378f0fd104d"
+    },
+    {
+      "path": "docs/architecture/observability-sink-delivery.md",
+      "sha256": "5bfbf7c4c14e05d363ad8a518692191fe4bf6b474aa6ec2020fd76587d771ca6"
+    }
+  ],
+  "fingerprint": "a6ded820e0ba2a3c54399154a8917d2186c951b90c17d7bcfa3b5e11efe54d05"
+}

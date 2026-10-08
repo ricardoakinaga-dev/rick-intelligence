@@ -1,0 +1,19 @@
+== EXPERIMENTO exp-a17 (2026-10-08) ==
+== contexto: erro tipado proposital em packages/contracts/src (coberto pelo baseline) ==
+== comando: make typecheck ==
+python3 "/home/ricardo/rick-intelligence/scripts/phase11/runner.py" typecheck
+==> canonical web TypeScript compiler: npm run typecheck
+
+> rick-intelligence-web@0.1.0 typecheck
+> tsc --noEmit
+
+<== canonical web TypeScript compiler: exit 0
+==> canonical scripts/packages Python compilation: /home/ricardo/rick-intelligence/.runtime/venvs/cvg/bin/python -m compileall -q scripts packages
+<== canonical scripts/packages Python compilation: exit 0
+==> canonical Python gradual type check (mypy baseline): /home/ricardo/rick-intelligence/.runtime/venvs/cvg/bin/python /home/ricardo/rick-intelligence/scripts/phase11/typecheck_baseline.py
+packages/contracts/src/rick_contracts/locking.py:57: error: Incompatible types in assignment (expression has type "str", variable has type "int")  [assignment]
+FAIL: packages/contracts/src: 1 erro(s) mypy, baseline aceita 0
+FAIL: type checking gradual (docs/baselines/mypy-baseline.txt): 1 erro(s) cobertos, 1 violação(ões) de baseline
+<== canonical Python gradual type check (mypy baseline): exit 1
+make: *** [Makefile:127: typecheck] Erro 1
+exp_exit=2

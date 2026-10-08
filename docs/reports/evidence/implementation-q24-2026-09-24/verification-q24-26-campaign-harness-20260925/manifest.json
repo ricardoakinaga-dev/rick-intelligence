@@ -1,0 +1,77 @@
+{
+  "attempt_history": [
+    {
+      "artifact": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-26-campaign-harness-20260925/evaluation-tests.log",
+      "outcome": "Initial test run: 34 passed, 1 failed because fixture-path containment was checked after the pack evaluator; wrapper now checks containment first."
+    },
+    {
+      "artifact": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-26-campaign-harness-20260925/evaluation-tests-retry.log",
+      "outcome": "35 tests passed after the path-check correction; this predates the split-overlap case and metric projection."
+    },
+    {
+      "artifact": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-26-campaign-harness-20260925/evaluation-tests-final.log",
+      "outcome": "36 tests passed after split-overlap coverage; this predates offline metric projection."
+    },
+    {
+      "artifact": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-26-campaign-harness-20260925/evaluation-tests-post-projection.log",
+      "outcome": "Final 36 tests passed after surfacing source-support, citation-support and ACL fixture metrics."
+    }
+  ],
+  "campaign_result": {
+    "blocker_count": 9,
+    "campaign_status": "NOT_RUN",
+    "eligibility_status": "BLOCKED",
+    "harness_status": "PASS",
+    "hit_at_1": {
+      "confidence_interval": [
+        0.34238022750665303,
+        1.0
+      ],
+      "estimate": 1.0,
+      "sample_size": 2,
+      "status": "DESCRIPTIVE",
+      "successes": 2
+    },
+    "negative_case_count": 3,
+    "negative_observed_disposition": "NOT_MEASURED",
+    "pack_case_count": 5,
+    "positive_case_count": 2,
+    "split_status": "NOT_ASSIGNED",
+    "strata_count": 5,
+    "synthetic_acl_leakage_count": 0,
+    "unassigned_case_count": 5
+  },
+  "checkout": {
+    "head": "b52f32c141916a2ea3af1a6b913bd91f380606e0",
+    "worktree": "dirty shared checkout; other user and program changes remain present"
+  },
+  "created_at": "2026-09-25T17:27:36Z",
+  "files": {
+    "docs/evaluation/campaigns/README.md": "7d232b84bd5e873657d70462a5db6bbef96a8851398414123ef9e9debed286bb",
+    "docs/evaluation/campaigns/rec22-local-synthetic-v1/manifest.json": "6e9f078ebfb153ed01c1b32b75e9e791a6687e6ab5740364307ab4357efbf2b2",
+    "docs/evaluation/packs/rec22-local-v2/cases.json": "adb90cc36db83f0b69c1b1ac04d2e3108fd84a4ee6a36d99e684681defd036b7",
+    "docs/evaluation/packs/rec22-local-v2/manifest.json": "eaf88ffe512b26af923d8ae2ea810efd90b26a97d42f1363e1f84301fc4fec88",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-26-campaign-harness-20260925/evaluation-tests-final.log": "4a6f7dc993cea3fba66a3e68299dced76776056af0ead01835b22156256aa762",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-26-campaign-harness-20260925/evaluation-tests-post-projection.log": "68a9be6a4cc7b0eaf279dc9feeb44733473dc9e98dad14539cbe9c68769b3e7a",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-26-campaign-harness-20260925/evaluation-tests-retry.log": "ed49551a8dab8e41e48e0220a6f7f8123885d74d60defccd5b41123d753e4325",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-26-campaign-harness-20260925/evaluation-tests.log": "dd644ed64137241f75c75f9d2016f0cec508c98c715ac624192c91be10c4565a",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-26-campaign-harness-20260925/rec22-local-synthetic-campaign-result-final.json": "3b6785fa3619bda6c69425dc69ee1cc7649bfe349a45b874881b3a90b5df8ca1",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-26-campaign-harness-20260925/rec22-local-synthetic-campaign-result.json": "972b5071efcd588b7de8abd148b259af20cc571e4f30f0c07ef27cafaf6da407",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-26-campaign-harness-20260925/repository-lint-post-projection.log": "a7a5650dee62a2a315b1b3413dc05105661cd0c4bd71ec25608e7101f4d1dd63",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-26-campaign-harness-20260925/repository-lint.log": "a7a5650dee62a2a315b1b3413dc05105661cd0c4bd71ec25608e7101f4d1dd63",
+    "scripts/state_of_art/evaluate_campaign.py": "2104d6d991a035f8a8cda5dac34623589aca339adfc68ead0884ac6ab0e790f8",
+    "scripts/state_of_art/evaluate_pack.py": "fef016f07d9ed9d3f1c2d0fe4044dc344c48969457f15b9dc332360a32ad9476",
+    "scripts/state_of_art/tests/test_evaluate_campaign.py": "81a876bf379219d6cc45d0c77895c246ccdb34196a1ac23c8c1aa5c36291c8ac"
+  },
+  "limitations": "All observations are checked-in synthetic/offline fixtures. Two positive cases (one per model/corpus stratum) are far below the declared minimum of 30; all cases remain unassigned to train/calibration/reserved; corpus rights/representativeness, product candidate, provider, domain ambiguity policy and risk acceptance are not approved. No generated answer or abstention behavior was observed. PASS is only a harness/fixture result; campaign_status remains NOT_RUN and eligibility is BLOCKED.",
+  "procedure": {
+    "environment": "Linux; 3.12.3; offline recorded fixtures; no API, provider, vector store or network invoked",
+    "evaluation": "PYTHONPATH=scripts/state_of_art PYTHONDONTWRITEBYTECODE=1 python3 scripts/state_of_art/evaluate_campaign.py --campaign docs/evaluation/campaigns/rec22-local-synthetic-v1/manifest.json --pretty",
+    "lint": "make lint passed",
+    "tests": "PYTHONPATH=scripts/state_of_art PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -q -p no:cacheprovider scripts/state_of_art/tests/test_evaluate_campaign.py scripts/state_of_art/tests/test_evaluate_pack.py scripts/state_of_art/tests/test_evaluate_retrieval.py",
+    "tests_result": "36 passed"
+  },
+  "result": "PASS",
+  "schema_version": 1,
+  "scope": "Q24-26 local offline campaign-manifest harness, split/strata validation, uncertainty projection and synthetic fixture checks; not a real retrieval/model campaign."
+}

@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-09-25T18:16:00Z",
+  "scope": "Q24-08 / Q17-23.A bounded process-local best-effort sink delivery across the observability package and standalone API fallback, including administrative signal exposure. Local implementation slice only.",
+  "checkout": {
+    "head": "b52f32c141916a2ea3af1a6b913bd91f380606e0",
+    "worktree": "shared dirty checkout; 2405 status entries at final manifest creation"
+  },
+  "result": "PASS",
+  "results": {
+    "observability_package": "17 passed in 0.41s (observability-tests.log).",
+    "api_telemetry_focused": "13 passed, 2 deprecation warnings in 1.07s (api-telemetry-focused-tests.log).",
+    "api_full": "748 passed, 421 dependency deprecation warnings in 47.88s (api-root-suite.log).",
+    "worker_regression": "116 passed, 7 warnings in 2.48s (api-worker-suite.log).",
+    "static": "make lint and make typecheck passed (static-checks.log).",
+    "make_validate": "PASS after the checkpoint update: boundary check; control-plane 10/10; 35 backlog items, 389 events, 392 verification records, 28 gates; controller integrity; frozen quality bar (make-validate.log).",
+    "diff_check": "PASS (diff-check.log).",
+    "derived_views": "PASS; regenerated at state revision 365 with the canonical active action preserved."
+  },
+  "contract": {
+    "workers": 2,
+    "queue_capacity": 1024,
+    "default_emit_wait_seconds": 0.25,
+    "timeout_none": "uses the finite default wait",
+    "overload": "drop new best-effort events when the waiting queue is full",
+    "callback_failure": "count as failed and return False when observed before timeout",
+    "timeout": "False is an observation timeout; queued/active callback may complete later",
+    "shutdown": "explicit process-level terminal bounded drain; not wired to FastAPI per-app lifespan",
+    "metrics": "bounded gauges and fixed outcome counters exposed in API JSON and Prometheus routes"
+  },
+  "baseline_observation": "Before the fix, the new fallback regressions reproduced caller blocking for timeout=None and a blocking emit descriptor, and a sink exception returned True. Initial red output was observed during this session but was not saved as a raw log.",
+  "limitations": "No external telemetry exporter, representative load/latency test, distributed runtime, or process-owner shutdown hook integration was exercised. No independent review of this exact snapshot was run. Q17-23.A remains VERIFY; no release approval is claimed.",
+  "files": {
+    "apps/api/src/core/telemetry.py": "1d42db55303844ee9888a577d520fee6192475977864e4fca7449cd46ccf62f9",
+    "apps/api/tests/test_telemetry.py": "114cf5b804bc8efbca7291c070326a83bed762a9a60f6001f51ef0353440779d",
+    "apps/api/tests/test_telemetry_fallback.py": "cd7d73244430c30e2c9ec8be5bbec22fb9875593e29ceb0eaf455871efe518a6",
+    "packages/observability/src/rick_observability/events.py": "ee3d89f27d51c14d14431bf3998150e53dee457e7376e96d865be36f5802820c",
+    "packages/observability/src/rick_observability/__init__.py": "6372c7e47e789e461b62d5f80c0fb3535c7c0f7ecf762603a39a7032e5fced8a",
+    "packages/observability/tests/test_observability.py": "ed1ab9ad54d1ced399d56ca321e920fd0dd42c81d63381e39a70d47b4fcfbff5",
+    "packages/observability/README.md": "e60b51208063ea853a1aa6d2f0acf35bf56811a273c08b65fc43b51cf60fb231",
+    "docs/architecture/observability-sink-delivery.md": "5744b122132ec3e4a002d85440a11c2795c95c9ab70c6087429f9cb0ea60f5e7",
+    "docs/backlog-qualidade-2026-09-24.md": "7cecc7864601d5a3027ea571e7617c3f44a8d9a2ebc35a59775932acdf68996f",
+    "docs/reports/estado-implementacao-q24-2026-09-24.md": "e086c8d139dc26b6ed3bfc2bb58527bf47081af86cd66f7cb9e75c6241371176",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-08-sink-delivery-20260925/api-root-suite.log": "35e99e9067846e960f6833461e811a804524a2c685aa9e04b2bd9b379627470f",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-08-sink-delivery-20260925/api-worker-suite.log": "bc880023f809b74eaca71fe34afdf955c0d575feddcb2d7b14ef0bb609cae28f",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-08-sink-delivery-20260925/api-telemetry-focused-tests.log": "f6e29544d9c8234d1ca92c53b1b0a71b946f623e3af5747318e1c9d0b796ebd9",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-08-sink-delivery-20260925/observability-tests.log": "a539735ba6c602bf87a3a6320a30ea2d4c4bae961ae49f61add34498f560126c",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-08-sink-delivery-20260925/static-checks.log": "b76f9c1dda9973ed5509782547cc0d98710914b2931252bca579b652c558129d",
+    ".agent/state.json": "91885c399f89c3e20e2229d9cc73773bf3d98c880f7f24f80ec3299be22e6545",
+    ".agent/backlog.json": "074ac397dd6b7b5a4116a28859bbebe1fe801a6491925245ad2ea150c6f9c1ed",
+    ".agent/verification.jsonl": "12aae61f36f428309dd5b9ea451881e63eb708fcd19fe609aab317c21af807b5",
+    ".agent/execution-log.jsonl": "e57699183c5664df1fd194cd3d9711a7701b50ebe46e7020e3aef61ccb310b45",
+    ".orchestrate/state.json": "cadaefb11f4eee999329cd10f504d710126185661d83ec5df2dc852593f6e954",
+    ".orchestrate-state-of-art/state.json": "cadaefb11f4eee999329cd10f504d710126185661d83ec5df2dc852593f6e954",
+    ".gauntlet-state-of-art/state.json": "cc7b8473a7e8d75aa27c909f70430b86a331f71538045c6cc873f105f1e364af",
+    ".gauntlet/state.md": "f7287f22a9ea84f02310df63576b1e44c574a9660e91df19515b9a370dc54483",
+    ".gauntlet-state-of-art/state.md": "7d576103274e57b24010bf404f169a81ca7978fffb6135c4e820dd335fb9c368",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-08-sink-delivery-20260925/make-validate.log": "33968d997778ed1aeea55693710e3196ec8334fa65cc100feb659837506967cb",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-08-sink-delivery-20260925/diff-check.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "control_plane": {
+    "state_revision": 365,
+    "active_task": "Q17-01.A",
+    "active_action_id": "Q17-01.A:VERIFY-Q17-19A-DEPLOYED-INVENTORY",
+    "item_status": "Q17-23.A VERIFY; no status promotion."
+  }
+}

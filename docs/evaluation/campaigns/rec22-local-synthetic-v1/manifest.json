@@ -1,0 +1,63 @@
+{
+  "campaign_id": "rec22-local-synthetic-v1",
+  "candidate": {
+    "candidate_id": "offline-recorded-observations-fixture",
+    "configuration": {
+      "evaluation_mode": "offline_recorded_observations_only",
+      "k_values": [
+        1,
+        2,
+        3
+      ],
+      "model_ids": [
+        "offline-ranker-a",
+        "offline-ranker-b"
+      ],
+      "pack_id": "rec22-local-synthetic-v2",
+      "pack_version": "2.0.0",
+      "provider_invocation": false
+    },
+    "configuration_sha256": "d05c2be585a2de573d9464970c4879d2e43189710c1a1b1e6a839ec9fe1dd2c1",
+    "is_product_candidate": false,
+    "source_revision": "b52f32c141916a2ea3af1a6b913bd91f380606e0",
+    "worktree_status": "DIRTY_SHARED_WORKTREE"
+  },
+  "corpus": {
+    "authorized_for_product_evaluation": false,
+    "corpus_id": "synthetic-corpus",
+    "representative": false,
+    "rights_status": "SYNTHETIC_ONLY",
+    "version": "2026-09-08"
+  },
+  "domain_review": {
+    "ambiguity_policy_status": "NOT_APPROVED",
+    "risk_acceptance_status": "NOT_APPROVED",
+    "status": "NOT_APPROVED"
+  },
+  "evaluation_design": {
+    "minimum_cases_per_positive_stratum": 30,
+    "uncertainty_method": "two_sided_wilson_95_percent",
+    "unit": "query_case"
+  },
+  "pack_path": "packs/rec22-local-v2",
+  "provider": {
+    "calls_performed": 0,
+    "provider_id": "offline-recorded-ranker",
+    "status": "NOT_RUN"
+  },
+  "schema_version": "retrieval-campaign.v1",
+  "split": {
+    "calibration_case_ids": [],
+    "rationale": "Synthetic offline fixtures are not an authorized campaign sample and are not assigned to data splits.",
+    "reserved_case_ids": [],
+    "status": "NOT_ASSIGNED",
+    "train_case_ids": [],
+    "unassigned_case_ids": [
+      "alpha-positive",
+      "beta-positive",
+      "negative-no-evidence",
+      "negative-weak-evidence",
+      "negative-unsupported-assertion"
+    ]
+  }
+}

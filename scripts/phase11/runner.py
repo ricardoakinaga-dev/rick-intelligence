@@ -28,11 +28,9 @@ except ModuleNotFoundError:  # Direct execution from the scripts/phase11 directo
     sys.path.insert(0, str(ROOT))
     from scripts.state_of_art.json_boundary import loads_json
 
-CVG = ROOT / "cvg-master-rag-v2"
-FRONTEND = CVG / "frontend"
-PROFESSOR = ROOT / "rick-professor"
-LOCKER = ROOT / "modulo-redis-locker"
-PYTHON = str((ROOT / ".runtime/venvs/cvg/bin/python") if (ROOT / ".runtime/venvs/cvg/bin/python").is_file() else Path(sys.executable))
+WEB = ROOT / "apps" / "web"
+API = ROOT / "apps" / "api"
+WORKER = ROOT / "apps" / "worker"
 NPM = os.environ.get("NPM", "npm")
 NODE = os.environ.get("NODE", "node")
 try:
@@ -62,10 +60,35 @@ except ModuleNotFoundError:  # Direct execution from the scripts/phase11 directo
         validate_preflight,
         write_preflight,
     )
-GENERATED_COMPONENT_ARTIFACTS = (
-    PROFESSOR / "test/artifacts/phase-0.6-provider-contract.json",
-    FRONTEND / "next-env.d.ts",
-)
+try:
+    from scripts.phase13.pyenv import interpreter as _canonical_interpreter
+    from scripts.phase13.pyenv import pythonpath as _canonical_pythonpath
+except ModuleNotFoundError:  # Direct execution from the scripts/phase11 directory.
+    sys.path.insert(0, str(ROOT))
+    from scripts.phase13.pyenv import interpreter as _canonical_interpreter
+    from scripts.phase13.pyenv import pythonpath as _canonical_pythonpath
+
+
+def canonical_env() -> dict[str, str]:
+    """PYTHONPATH for canonical suites: apps/*/src + packages/*/src, no exports needed."""
+    return {"PYTHONPATH": _canonical_pythonpath()}
+
+
+def worker_suite_env() -> dict[str, str]:
+    """Worker suite import path: ``worker.tests.*`` needs ``apps`` itself.
+
+    ``apps/worker`` is already a source root, but the shared worker tests
+    import each other as ``worker.tests.<module>``, which resolves from the
+    parent directory. Only this lane pays for it, so the canonical PYTHONPATH
+    contract for every other suite stays untouched.
+    """
+
+    env = canonical_env()
+    env["PYTHONPATH"] = os.pathsep.join([str(ROOT / "apps"), env["PYTHONPATH"]])
+    return env
+
+
+PYTHON = _canonical_interpreter()
 LOCAL_DOCKER_HOST = "unix:///var/run/docker.sock"
 COMPOSE_WAIT_TIMEOUT_DEFAULT = 180
 COMPOSE_RUNTIME_DIR = ROOT / ".runtime/phase-3/compose"
@@ -87,21 +110,6 @@ COMPOSE_ENV_EXAMPLES = {
     "docker-compose.dev.yml": "infrastructure/compose/.env.dev.example",
     "docker-compose.staging.yml": "infrastructure/compose/.env.staging.example",
 }
-
-
-def _missing_cvg_approved_corpus(cvg_root: Path = CVG) -> list[Path]:
-    """Return mandatory preserved-corpus artifacts that are unavailable.
-
-    The preserved CVG full suite is intentionally corpus-backed.  Running it
-    without its approved dataset produces a large, misleading derivative red
-    surface (empty retrieval, missing evaluation data and absent tenant
-    fixtures).  This preflight does not substitute a fixture or declare the
-    suite green; it gives the caller a typed external blocker before the
-    corpus-dependent command starts.
-    """
-
-    required = (cvg_root / "src/data/default/dataset.json",)
-    return [path for path in required if not path.is_file() or path.is_symlink()]
 
 
 def _command_text(command: Sequence[str]) -> str:
@@ -561,50 +569,15 @@ def run_cases(cases: Iterable[tuple[str, Sequence[str], Path, dict[str, str] | N
     return all(results)
 
 
-def run_preserving_generated_artifacts(
-    cases: Iterable[tuple[str, Sequence[str], Path, dict[str, str] | None, int]],
-) -> bool:
-    """Run preserved suites without leaking their disposable report files into root Git."""
-
-    snapshots: dict[Path, bytes | None] = {}
-    for path in GENERATED_COMPONENT_ARTIFACTS:
-        try:
-            snapshots[path] = path.read_bytes() if path.is_file() else None
-        except OSError as exc:
-            print(f"Could not snapshot generated artifact {path}: {exc}", file=sys.stderr, flush=True)
-            return False
-
-    result = False
-    try:
-        result = run_cases(cases)
-    finally:
-        restore_ok = True
-        for path, content in snapshots.items():
-            try:
-                if content is None:
-                    if path.is_file():
-                        path.unlink()
-                else:
-                    path.write_bytes(content)
-            except OSError as exc:
-                restore_ok = False
-                print(f"Could not restore generated artifact {path}: {exc}", file=sys.stderr, flush=True)
-        result = result and restore_ok
-    return result
-
-
-def cvg_env() -> dict[str, str]:
-    return {
-        "PYTHONPATH": str(CVG / "src"),
-        "OPENAI_API_KEY": "",
-        "RERANKING_ENABLED": "false",
-        "RAG_SKIP_QDRANT_BOOTSTRAP": "1",
-        "SESSION_COOKIE_SECURE": "false",
-    }
-
-
-def npm_case(label: str, component: Path, args: Sequence[str], *, timeout: int = 600):
-    return (label, [NPM, *args], component, None, timeout)
+def npm_case(
+    label: str,
+    component: Path,
+    args: Sequence[str],
+    *,
+    timeout: int = 600,
+    env: dict[str, str] | None = None,
+):
+    return (label, [NPM, *args], component, env, timeout)
 
 
 def python_case(label: str, args: Sequence[str], *, cwd: Path = ROOT, env=None, timeout: int = 600):
@@ -621,18 +594,28 @@ def root_check_case():
 
 def mode_bootstrap() -> int:
     cases = [
-        ("preserved CVG runtime bootstrap", ["bash", "scripts/phase05/bootstrap-runtime.sh"], ROOT, None, 1200),
-        npm_case("CVG frontend lockfile install", FRONTEND, ["ci", "--ignore-scripts", "--no-audit", "--no-fund"], timeout=1200),
-        npm_case("Professor lockfile install", PROFESSOR, ["ci", "--ignore-scripts", "--no-audit", "--no-fund"], timeout=1200),
-        npm_case("Locker lockfile install", LOCKER, ["ci", "--ignore-scripts", "--no-audit", "--no-fund"], timeout=1200),
+        ("runtime bootstrap from hash-locked requirements",
+         ["bash", "scripts/phase05/bootstrap-runtime.sh"], ROOT, None, 1200),
+        npm_case("canonical web lockfile install", WEB,
+                 ["ci", "--ignore-scripts", "--no-audit", "--no-fund"], timeout=1200),
         root_check_case(),
     ]
-    return 0 if run_preserving_generated_artifacts(cases) else 1
+    return 0 if run_cases(cases) else 1
 
 
 def mode_test_fast() -> int:
     cases = [
         root_check_case(),
+        python_case(
+            "evidence store regression (AUD07-18)",
+            ["-m", "unittest", "scripts/phase11/test_evidence_store.py"],
+            timeout=180,
+        ),
+        python_case(
+            "worktree hygiene / gitignore coverage (AUD07-19)",
+            ["-m", "unittest", "scripts/phase11/test_untracked_hygiene.py"],
+            timeout=120,
+        ),
         python_case(
             "Phase 1.1 boundary validator regression",
             ["-m", "unittest", "scripts/phase11/test_check_skeleton.py"],
@@ -644,61 +627,58 @@ def mode_test_fast() -> int:
             timeout=120,
         ),
         python_case(
-            "CVG focused contract/security regression",
-            [
-                "-m",
-                "pytest",
-                "-q",
-                "src/tests/test_phase05_contract.py",
-                "src/tests/test_phase05_security.py",
-                "src/tests/test_phase06_rbac.py",
-                "src/tests/test_p0_closeout.py",
-            ],
-            cwd=CVG,
-            env=cvg_env(),
+            "Phase 1.5 benchmark contract regression",
+            ["-m", "unittest", "scripts/phase15/test_phase15_benchmark.py"],
+            timeout=120,
+        ),
+        python_case(
+            "canonical route/security contract regression",
+            [str(ROOT / "scripts" / "phase13" / "phase13.py"), "security"],
+            env=canonical_env(),
             timeout=600,
         ),
-        npm_case("Professor tests", PROFESSOR, ["test", "--", "--test-force-exit"], timeout=600),
-        npm_case("Locker tests", LOCKER, ["test"], timeout=300),
+        python_case(
+            "canonical retrieval ACL regression",
+            [str(ROOT / "scripts" / "phase13" / "phase14.py"), "acl"],
+            env=canonical_env(),
+            timeout=600,
+        ),
+        python_case(
+            "CI runner and workflow-validator regressions",
+            ["-m", "pytest", "-q", "-p", "no:cacheprovider",
+             str(ROOT / "scripts" / "phase11" / "test_check_workflow_actions.py"),
+             str(ROOT / "scripts" / "phase11" / "test_compose_lifecycle.py")],
+            env=canonical_env(),
+            timeout=600,
+        ),
     ]
-    return 0 if run_preserving_generated_artifacts(cases) else 1
+    return 0 if run_cases(cases) else 1
 
 
 def mode_test() -> int:
-    cases = [root_check_case()]
-    missing_corpus = _missing_cvg_approved_corpus()
-    if missing_corpus:
-        relative_paths = ", ".join(path.relative_to(ROOT).as_posix() for path in missing_corpus)
-        print(
-            "==> CVG complete preserved suite: BLOCKED_EXTERNAL",
-            flush=True,
-        )
-        print(
-            "<== CVG complete preserved suite: BLOCKED_EXTERNAL "
-            f"(approved corpus artifact unavailable: {relative_paths})",
-            file=sys.stderr,
-            flush=True,
-        )
-    else:
-        cases.append(
-            python_case(
-                "CVG complete preserved suite",
-                ["-m", "pytest", "-q"],
-                cwd=CVG,
-                env=cvg_env(),
-                timeout=1200,
-            )
-        )
-    cases.extend(
-        [
-            npm_case("Professor complete tests", PROFESSOR, ["test", "--", "--test-force-exit"], timeout=600),
-            npm_case("Locker complete tests", LOCKER, ["test"], timeout=300),
-            npm_case("CVG frontend lint and browser smoke", FRONTEND, ["test"], timeout=1200),
-        ]
-    )
-    if not run_preserving_generated_artifacts(cases):
-        return 1
-    return 2 if missing_corpus else 0
+    cases = [
+        root_check_case(),
+        python_case(
+            "canonical Python suites (packages, API, differential)",
+            [str(ROOT / "scripts" / "phase13" / "phase14.py"), "full"],
+            env=canonical_env(),
+            timeout=3600,
+        ),
+        python_case(
+            "canonical worker suite",
+            ["-m", "pytest", "-q", str(ROOT / "apps" / "worker" / "tests")],
+            env=worker_suite_env(),
+            timeout=900,
+        ),
+        python_case(
+            "validator and CI-runner regression suites",
+            ["-m", "pytest", "-q", "-p", "no:cacheprovider",
+             str(ROOT / "scripts" / "phase11"), str(ROOT / "scripts" / "phase15")],
+            env=canonical_env(),
+            timeout=1800,
+        ),
+    ]
+    return 0 if run_cases(cases) else 1
 
 
 def mode_lint() -> int:
@@ -714,37 +694,53 @@ def mode_lint() -> int:
                 "scripts/phase11/test_check_skeleton.py",
                 "scripts/phase15/check_boundaries.py",
                 "scripts/phase15/test_check_boundaries.py",
+                "scripts/phase15/legacy_reference.py",
+                "scripts/phase13/pyenv.py",
+                "scripts/phase13/pyexec.py",
+                "scripts/phase13/phase13.py",
+                "scripts/phase13/phase131.py",
+                "scripts/phase13/phase14.py",
             ],
             timeout=120,
         ),
-        ("Locker JavaScript syntax", [NODE, "--check", "server.js"], LOCKER, None, 120),
-        npm_case("CVG frontend lint", FRONTEND, ["run", "lint"], timeout=600),
+        python_case(
+            "canonical API/worker Python syntax",
+            ["-m", "compileall", "-q", "apps/api/src", "apps/worker"],
+            timeout=300,
+        ),
+        npm_case("canonical web lint", WEB, ["run", "lint"], timeout=600),
     ]
     return 0 if run_cases(cases) else 1
 
 
 def mode_typecheck() -> int:
     cases = [
-        npm_case("Professor TypeScript compiler", PROFESSOR, ["run", "build"], timeout=600),
-        (
-            "CVG frontend TypeScript compiler (compatibility override)",
-            [NPM, "exec", "--", "tsc", "--noEmit", "--ignoreDeprecations", "5.0"],
-            FRONTEND,
-            None,
-            600,
+        npm_case("canonical web TypeScript compiler", WEB, ["run", "typecheck"], timeout=600),
+        python_case(
+            "canonical scripts/packages Python compilation",
+            ["-m", "compileall", "-q", "scripts", "packages"],
+            timeout=600,
         ),
-        python_case("CVG Python compilation (no Python type checker configured)", ["-m", "compileall", "-q", "src"], cwd=CVG, env=cvg_env(), timeout=300),
+        python_case(
+            "canonical Python gradual type check (mypy baseline)",
+            [str(ROOT / "scripts" / "phase11" / "typecheck_baseline.py")],
+            timeout=900,
+        ),
     ]
     return 0 if run_cases(cases) else 1
 
 
 def mode_build() -> int:
     cases = [
-        npm_case("Professor build", PROFESSOR, ["run", "build"], timeout=600),
-        npm_case("CVG frontend production build", FRONTEND, ["run", "build"], timeout=1200),
-        python_case("CVG Python compilation", ["-m", "compileall", "-q", "src"], cwd=CVG, env=cvg_env(), timeout=300),
+        npm_case(
+            "canonical web production build",
+            WEB,
+            ["run", "build"],
+            timeout=1200,
+            env={"RICK_API_INTERNAL_URL": "http://127.0.0.1:8001"},
+        ),
     ]
-    return 0 if run_preserving_generated_artifacts(cases) else 1
+    return 0 if run_cases(cases) else 1
 
 
 def _http_ready(url: str) -> bool:
@@ -807,54 +803,6 @@ def _stop_pid(label: str, pid: int) -> None:
         pass
 
 
-def _wait_for_http(url: str, process: subprocess.Popen[bytes] | None = None, timeout: float = 10) -> bool:
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        if _http_ready(url):
-            return True
-        if process is not None and process.poll() is not None:
-            return False
-        time.sleep(0.25)
-    return False
-
-
-def _start_locker() -> tuple[subprocess.Popen[bytes] | None, object | None]:
-    log_dir = ROOT / ".runtime"
-    log_dir.mkdir(parents=True, exist_ok=True)
-    log_handle = (log_dir / "phase11-locker.log").open("ab")
-    environment = os.environ.copy()
-    environment.update({"PORT": "3317", "REDIS_URL": "redis://127.0.0.1:6380"})
-    try:
-        process = subprocess.Popen(
-            [NPM, "start"],
-            cwd=LOCKER,
-            env=environment,
-            stdout=log_handle,
-            stderr=subprocess.STDOUT,
-        )
-    except OSError:
-        log_handle.close()
-        return None, None
-    if not _wait_for_http("http://127.0.0.1:3317/healthz", process):
-        process.terminate()
-        process.wait(timeout=5)
-        log_handle.close()
-        return None, None
-    return process, log_handle
-
-
-def _stop_process(process: subprocess.Popen[bytes] | None, log_handle: object | None) -> None:
-    if process is not None and process.poll() is None:
-        process.terminate()
-        try:
-            process.wait(timeout=10)
-        except subprocess.TimeoutExpired:
-            process.kill()
-            process.wait(timeout=5)
-    if log_handle is not None:
-        log_handle.close()  # type: ignore[union-attr]
-
-
 def _with_local_services(cases: list[tuple[str, Sequence[str], Path, dict[str, str] | None, int]]) -> bool:
     qdrant_was_ready = _http_ready("http://127.0.0.1:6337/readyz")
     redis_was_ready = _redis_ready()
@@ -865,9 +813,6 @@ def _with_local_services(cases: list[tuple[str, Sequence[str], Path, dict[str, s
     service_was_ready = {"Qdrant": qdrant_was_ready, "Redis": redis_was_ready}
     service_pids_before = {label: _read_pid(path) for label, path in service_pid_paths.items()}
     services_started: dict[str, int] = {}
-    locker_process: subprocess.Popen[bytes] | None = None
-    locker_log = None
-    locker_was_ready = _http_ready("http://127.0.0.1:3317/healthz")
     try:
         if not (qdrant_was_ready and redis_was_ready):
             started_ok = run_case("start isolated Qdrant/Redis", ["bash", "scripts/phase05/start-local-services.sh"])
@@ -879,34 +824,44 @@ def _with_local_services(cases: list[tuple[str, Sequence[str], Path, dict[str, s
                     services_started[label] = pid
             if not started_ok:
                 return False
-        if not locker_was_ready:
-            locker_process, locker_log = _start_locker()
-            if locker_process is None:
-                print("Locker integration process could not become ready; see .runtime/phase11-locker.log", file=sys.stderr)
-                return False
         return run_cases(cases)
     finally:
-        _stop_process(locker_process, locker_log)
         for label, pid in services_started.items():
             _stop_pid(label, pid)
             print(f"Stopped only runner-started {label} PID {pid}.", flush=True)
 
 
 def mode_test_integration() -> int:
+    """Canonical suites executed with the loopback Qdrant/Redis stack running."""
     cases = [
-        python_case("CVG deterministic integration E2E", ["scripts/phase05/phase05_e2e.py", "--mode", "full"], env=cvg_env(), timeout=600),
-        python_case("CVG deterministic restart E2E", ["scripts/phase05/phase05_e2e.py", "--mode", "restart"], env=cvg_env(), timeout=600),
-        python_case("CVG non-leakage integration test", ["-m", "pytest", "-q", "src/tests/integration/test_tkt_010_non_leakage.py"], cwd=CVG, env=cvg_env(), timeout=600),
-        ("Locker real HTTP integration", [NODE, "scripts/phase05/locker_e2e.mjs"], ROOT, {"LOCKER_URL": "http://127.0.0.1:3317"}, 300),
+        python_case("canonical worker suite against local services",
+                    ["-m", "pytest", "-q", str(WORKER / "tests")],
+                    env=canonical_env(), timeout=900),
+        python_case("canonical storage suite against local services",
+                    ["-m", "pytest", "-q", str(ROOT / "packages" / "storage" / "tests")],
+                    env=canonical_env(), timeout=900),
+        python_case("canonical health/readiness suite against local services",
+                    ["-m", "pytest", "-q", str(API / "tests" / "test_phase16_health.py")],
+                    env=canonical_env(), timeout=900),
     ]
     return 0 if _with_local_services(cases) else 1
 
 
 def mode_eval() -> int:
+    """Offline retrieval/ACL/provenance evaluation against a versioned fixture."""
+    env = canonical_env()
+    env["PYTHONPATH"] = os.pathsep.join([str(ROOT), env["PYTHONPATH"]])
     cases = [
-        python_case("deterministic Phase 0.5 RAG plumbing evaluation", ["scripts/phase05/phase05_e2e.py", "--mode", "full"], env=cvg_env(), timeout=600),
+        python_case(
+            "deterministic retrieval/ACL/provenance evaluation",
+            ["scripts/state_of_art/evaluate_retrieval.py",
+             "--fixture", "scripts/state_of_art/tests/fixtures/retrieval_fixture.json",
+             "--pretty"],
+            env=env,
+            timeout=600,
+        ),
     ]
-    return 0 if _with_local_services(cases) else 1
+    return 0 if run_cases(cases) else 1
 
 
 def mode_ci() -> int:
@@ -916,8 +871,15 @@ def mode_ci() -> int:
 
 
 def mode_validate() -> int:
-    label, command, cwd, env_updates, timeout = root_check_case()
-    return 0 if run_case(label, command, cwd=cwd, env_updates=env_updates, timeout=timeout) else 1
+    cases = [
+        root_check_case(),
+        python_case(
+            "evidence store policy (AUD07-18)",
+            ["scripts/phase11/evidence_store.py", "check"],
+            timeout=180,
+        ),
+    ]
+    return 0 if run_cases(cases) else 1
 
 
 def mode_compose(action: str) -> int:

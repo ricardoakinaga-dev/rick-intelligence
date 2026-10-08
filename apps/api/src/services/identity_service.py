@@ -19,6 +19,11 @@ import hashlib
 import secrets
 import time
 import uuid
+from collections.abc import Mapping
+from functools import wraps
+from contextlib import contextmanager
+from copy import deepcopy
+from threading import RLock
 
 from rick_authorization import permission_granted
 from rick_contracts.security import SessionSnapshot
@@ -37,24 +42,72 @@ def _mode() -> str:
     return (os.getenv("RICK_IDENTITY_MODE") or "dev").strip().lower()
 
 
+def _serialize_admin_mutation(method):
+    """Serialize local admin checks and writes within this process."""
+
+    @wraps(method)
+    def serialized(self, *args, **kwargs):
+        with self._admin_mutation_lock:
+            return method(self, *args, **kwargs)
+
+    return serialized
+
+
 class InMemoryIdentityProvider:
     """Hermetic provider for tests/dev. Policy-free: delegates everything."""
 
     def __init__(self, *, mode: str | None = None, verifier: object | None = None) -> None:
         self.mode = (mode or _mode()).lower()
         self.production_safe = False
+        # This provider is process-local; durable identity adapters must use
+        # the atomic mutation + audit-outbox methods instead of route fallback.
+        self.durable_admin_mutations = False
+        self._admin_mutation_lock = RLock()
         self._users = InMemoryUserStore()
         self._sessions = InMemorySessionStore()
         if verifier is None:
             verifier = Pbkdf2Verifier() if self.mode == "production" else PlainTestVerifier()
         if self.mode == "production" and isinstance(verifier, PlainTestVerifier):
             raise RuntimeError("Refusing to start: test credential verifier selected in production mode.")
+        # PlainTestVerifier is deliberately limited to this process-local fixture
+        # store. Any other verifier must receive a one-way hash; this keeps a
+        # persistent/custom store from ever receiving password_plain.
+        self._verifier = verifier
         self._provider = IdentityProviderImpl(users=self._users, sessions=self._sessions, verifier=verifier)  # type: ignore[arg-type]
         self._login_attempts: dict[str, list[float]] = {}
         self._reset_tokens: dict[str, tuple[str, float]] = {}
         self._seed_demo_users()
 
     # -- seed data (DATA, not policy: grants/overrides resolved by canonical engine) --
+    @contextmanager
+    def audit_transaction(self, actor):
+        """Local owner rollback boundary; audit helper holds its sink transaction inside."""
+        with self._admin_mutation_lock, self._sessions._snapshot_lock:
+            users, emails, sessions = deepcopy((self._users._by_id, self._users._by_email, self._sessions._sessions))
+            try:
+                yield None
+            except BaseException:
+                self._users._by_id = users
+                self._users._by_email = emails
+                self._sessions._sessions = sessions
+                raise
+
+    def revoke_in_transaction(self, *, connection=None, **kwargs):
+        return self.revoke(**kwargs)
+
+    def grant_collection_in_transaction(self, *, actor, user_id, collection_id, granted, connection=None):
+        from core.errors import ApiError
+        from services.authorization_service import has_permission
+        if not has_permission(actor, "collections.manage"):
+            raise ApiError("forbidden")
+        self._assert_same_workspace(actor, user_id)
+        user = self._users.get_by_id(user_id)
+        grants = [item for item in (user.get("authorized_collection_ids") or []) if item != collection_id]
+        if granted:
+            grants.append(collection_id)
+        self.update_user(actor=actor, user_id=user_id, authorized_collection_ids=grants)
+        return {"user_id": user_id, "collection_id": collection_id, "granted": granted}
+
     def _seed_demo_users(self) -> None:
         # This provider is intentionally hermetic. Production must inject a
         # real external identity implementation; never create a universal
@@ -64,17 +117,27 @@ class InMemoryIdentityProvider:
         seeds = [
             {"user_id": "admin", "email": "admin@example.com", "role": "PLATFORM_ADMIN",
              "tenant_id": "default", "workspace_id": "default",
-             "permission_overrides": {"add": [], "remove": []}, "authorized_collection_ids": []},
+             "permission_overrides": {"add": [], "remove": []}, "authorized_collection_ids": ["*"]},
             {"user_id": "km", "email": "km@example.com", "role": "KNOWLEDGE_MANAGER",
              "tenant_id": "default", "workspace_id": "default",
-             "permission_overrides": {"add": [], "remove": []}, "authorized_collection_ids": []},
+             "permission_overrides": {"add": [], "remove": []}, "authorized_collection_ids": ["*"]},
             {"user_id": "vet", "email": "vet@example.com", "role": "VETERINARIAN",
              "tenant_id": "default", "workspace_id": "default",
              "permission_overrides": {"add": [], "remove": []}, "authorized_collection_ids": ["rag_phase0"]},
         ]
         for record in seeds:
-            record = {**record, "password_plain": "password123"}
+            record = {**record}
+            self._set_password(record, "password123")
             self._users.seed({**record, "status": "active", "password_version": 1, "role_version": 1})
+
+    def _set_password(self, record: dict, password: str) -> None:
+        """Store credentials without plaintext except in ephemeral test fixtures."""
+        if isinstance(self._verifier, PlainTestVerifier):
+            record["password_plain"] = password
+            record.pop("password_hash", None)
+        else:
+            record["password_hash"] = hash_password(password)
+            record.pop("password_plain", None)
 
     # -- rate limiting (transport-level, not RBAC policy) --
     def check_login_rate(self, key: str, *, limit_per_min: int) -> None:
@@ -95,6 +158,7 @@ class InMemoryIdentityProvider:
             return SessionSnapshot(authenticated=False, session_state="anonymous", tenant_id=None)
         return SessionSnapshot(**{k: v for k, v in data.items() if k in SessionSnapshot.model_fields})
 
+    @_serialize_admin_mutation
     def login(self, *, email, password, tenant_id, ip, user_agent) -> dict:
         from core.errors import ApiError
 
@@ -108,6 +172,35 @@ class InMemoryIdentityProvider:
     def validate_token(self, token: str | None) -> SessionSnapshot:
         return self._to_snapshot(self._provider.validate_session(token))
 
+    def refresh_authorization_context(self, *, context: Mapping[str, object]) -> dict[str, object] | None:
+        """Read current local grants for final publication and cache replay checks."""
+        user_id = context.get("user_id")
+        tenant_id = context.get("tenant_id")
+        workspace_id = context.get("workspace_id")
+        if any(
+            not isinstance(value, str) or not value.strip()
+            for value in (user_id, tenant_id, workspace_id)
+        ):
+            return None
+        scoped_lookup = getattr(self._users, "get_by_id_for_tenant_workspace", None)
+        if not callable(scoped_lookup):
+            return None
+        user = scoped_lookup(user_id, tenant_id, workspace_id)
+        if not isinstance(user, Mapping):
+            return None
+        if (
+            user.get("user_id") != user_id
+            or user.get("tenant_id") != tenant_id
+            or user.get("workspace_id", "default") != workspace_id
+            or user.get("status", "active") != "active"
+            or user.get("membership_status", "active") != "active"
+        ):
+            return None
+        from services.authorization_service import refresh_context_from_user
+
+        return refresh_context_from_user(context, user)
+
+    @_serialize_admin_mutation
     def logout(self, token: str | None) -> None:
         self._provider.logout(token)
 
@@ -156,10 +249,26 @@ class InMemoryIdentityProvider:
             if (user := self._provider.get_user(record.get("user_id", ""))) is not None
         ]
 
-    def create_user(self, *, email: str, role: str, tenant_id: str, password: str) -> dict:
+    def admin_target_in_scope(self, *, user_id: str, tenant_id: str, workspace_id: str) -> bool:
+        """Check the exact local membership before an administrative route delegates."""
+        return self._users.get_by_id_for_tenant_workspace(user_id, tenant_id, workspace_id) is not None
+
+    @_serialize_admin_mutation
+    def create_user(self, *, actor, email: str, role: str, tenant_id: str, password: str) -> dict:
         """Create a real hermetic user; external providers own production writes."""
         from core.errors import ApiError
 
+        actor_tenant = getattr(actor, "tenant_id", None)
+        actor_workspace = getattr(actor, "workspace_id", None)
+        if (
+            not isinstance(actor_tenant, str)
+            or not actor_tenant.strip()
+            or not isinstance(actor_workspace, str)
+            or not actor_workspace.strip()
+            or not isinstance(tenant_id, str)
+            or actor_tenant.strip() != tenant_id.strip()
+        ):
+            raise ApiError("forbidden")
         normalized_email = (email or "").strip().lower()
         candidate_role = (role or "").strip().lower()
         normalized_role = candidate_role.upper() if candidate_role.upper() in CANONICAL_ROLES else LEGACY_ROLE_ALIASES.get(candidate_role)
@@ -171,23 +280,21 @@ class InMemoryIdentityProvider:
             "user_id": f"user-{uuid.uuid4().hex[:16]}",
             "email": normalized_email,
             "role": normalized_role,
-            "tenant_id": tenant_id,
-            "workspace_id": "default",
+            "tenant_id": actor_tenant.strip(),
+            "workspace_id": actor_workspace.strip(),
             "status": "active",
             "permission_overrides": {"add": [], "remove": []},
             "authorized_collection_ids": [],
             "password_version": 1,
             "role_version": 1,
         }
-        if self.mode == "production":
-            record["password_hash"] = hash_password(password)
-        else:
-            record["password_plain"] = password
+        self._set_password(record, password)
         self._users.save(record)
         return self._provider.get_user(record["user_id"]) or {
             "user_id": record["user_id"], "email": normalized_email, "role": role,
         }
 
+    @_serialize_admin_mutation
     def update_user(self, *, actor, user_id: str, email: str | None = None,
                     role: str | None = None, workspace_id: str | None = None,
                     authorized_collection_ids: list[str] | None = None,
@@ -195,13 +302,13 @@ class InMemoryIdentityProvider:
         """Apply a tenant-scoped profile update and invalidate changed roles."""
         from core.errors import ApiError
 
-        self._assert_same_tenant(actor, user_id)
-        user = self._users.get_by_id(user_id)
-        if user is None:
-            raise ApiError("not_found")
+        user = self._assert_same_workspace(actor, user_id)
         if email is not None:
             normalized = email.strip().lower()
-            if not normalized or self._users.get_by_email(normalized) not in (None, user):
+            email_owner = self._users.get_by_email(normalized)
+            if not normalized or (
+                email_owner is not None and email_owner.get("user_id") != user_id
+            ):
                 raise ApiError("conflict")
             user["email"] = normalized
         if role is not None:
@@ -210,13 +317,24 @@ class InMemoryIdentityProvider:
             if normalized_role not in CANONICAL_ROLES:
                 raise ApiError("validation_error")
             if canonical_role(user.get("role")) != normalized_role:
+                if (
+                    canonical_role(user.get("role")) == "PLATFORM_ADMIN"
+                    and user.get("status", "active") == "active"
+                    and user.get("membership_status", "active") == "active"
+                    and normalized_role != "PLATFORM_ADMIN"
+                    and self._active_admin_count(
+                        user.get("tenant_id"), user.get("workspace_id", "default"),
+                    ) <= 1
+                ):
+                    raise ApiError("conflict", "The last active administrator cannot be demoted.")
                 user["role"] = normalized_role
                 user["role_version"] = int(user.get("role_version", 1)) + 1
         if workspace_id is not None:
             workspace = workspace_id.strip()
             if not workspace or len(workspace) > 128:
                 raise ApiError("validation_error")
-            user["workspace_id"] = workspace
+            if workspace != user.get("workspace_id", "default"):
+                raise ApiError("forbidden")
         if authorized_collection_ids is not None:
             user["authorized_collection_ids"] = sorted({value.strip() for value in authorized_collection_ids if value.strip()})
         if permission_overrides is not None:
@@ -224,45 +342,46 @@ class InMemoryIdentityProvider:
         self._users.save(user)
         return self._provider.get_user(user_id) or {"user_id": user_id}
 
+    @_serialize_admin_mutation
     def deactivate_user(self, *, actor, user_id: str) -> int:
-        """Disable a user and revoke every active session atomically in memory."""
+        """Disable this workspace membership and revoke only its sessions."""
         from core.errors import ApiError
 
-        self._assert_same_tenant(actor, user_id)
-        user = self._users.get_by_id(user_id)
-        if user is None:
-            raise ApiError("not_found")
-        if user.get("status", "active") != "active":
+        user = self._assert_same_workspace(actor, user_id)
+        if (
+            user.get("status", "active") != "active"
+            or user.get("membership_status", "active") != "active"
+        ):
             return 0
         if canonical_role(user.get("role")) == "PLATFORM_ADMIN":
-            active_admins = sum(
-                1 for candidate in self._users._by_id.values()
-                if candidate.get("tenant_id") == actor.tenant_id
-                and candidate.get("status", "active") == "active"
-                and canonical_role(candidate.get("role")) == "PLATFORM_ADMIN"
+            active_admins = self._active_admin_count(
+                user.get("tenant_id"), user.get("workspace_id", "default"),
             )
             if active_admins <= 1:
                 raise ApiError("conflict", "The last active administrator cannot be disabled.")
-        user["status"] = "disabled"
-        user["password_version"] = int(user.get("password_version", 1)) + 1
+        user["membership_status"] = "disabled"
         self._users.save(user)
-        return self._provider.revoke_user_sessions(user_id, reason="user_disabled")
+        revoked = 0
+        tenant_id = user.get("tenant_id")
+        workspace_id = user.get("workspace_id", "default")
+        for token in self._sessions.tokens_for_user(user_id):
+            session = self._sessions.get(token)
+            if (
+                session is not None
+                and session.get("tenant_id") == tenant_id
+                and session.get("workspace_id", "default") == workspace_id
+            ):
+                revoked += self._provider.revoke_session(token)
+        return revoked
 
+    @_serialize_admin_mutation
     def reset_password(self, *, actor, user_id: str, password: str) -> int:
         from core.errors import ApiError
 
-        self._assert_same_tenant(actor, user_id)
+        user = self._assert_same_workspace(actor, user_id)
         if not isinstance(password, str) or len(password) < 8:
             raise ApiError("validation_error")
-        user = self._users.get_by_id(user_id)
-        if user is None:
-            raise ApiError("not_found")
-        if self.mode == "production":
-            user["password_hash"] = hash_password(password)
-            user.pop("password_plain", None)
-        else:
-            user["password_plain"] = password
-            user.pop("password_hash", None)
+        self._set_password(user, password)
         user["password_version"] = int(user.get("password_version", 1)) + 1
         self._users.save(user)
         return self._provider.revoke_user_sessions(user_id, reason="password_reset")
@@ -270,8 +389,28 @@ class InMemoryIdentityProvider:
     def issue_password_reset(self, *, email: str, tenant_id: str | None) -> str | None:
         """Issue a short-lived single-use token for an injected delivery port."""
         normalized = (email or "").strip().lower()
-        user = self._users.get_by_email(normalized)
-        if user is None or (tenant_id and user.get("tenant_id") != tenant_id.strip()):
+        if tenant_id is None:
+            resolver = getattr(self._users, "get_unique_active_by_email", None)
+            user = resolver(normalized) if callable(resolver) else None
+        elif not isinstance(tenant_id, str) or not tenant_id.strip():
+            return None
+        else:
+            resolver = getattr(self._users, "get_by_email_for_tenant", None)
+            user = resolver(normalized, tenant_id.strip()) if callable(resolver) else None
+        if (
+            user is None
+            or user.get("status", "active") != "active"
+            or user.get("membership_status", "active") != "active"
+        ):
+            return None
+        if (
+            not isinstance(user.get("user_id"), str)
+            or not user["user_id"].strip()
+            or not isinstance(user.get("tenant_id"), str)
+            or not user["tenant_id"].strip()
+            or not isinstance(user.get("workspace_id", "default"), str)
+            or not user.get("workspace_id", "default").strip()
+        ):
             return None
         token = secrets.token_urlsafe(32)
         self._reset_tokens[hashlib.sha256(token.encode("utf-8")).hexdigest()] = (
@@ -279,6 +418,7 @@ class InMemoryIdentityProvider:
         )
         return token
 
+    @_serialize_admin_mutation
     def consume_password_reset(self, *, token: str, new_password: str) -> int:
         from core.errors import ApiError
 
@@ -289,19 +429,20 @@ class InMemoryIdentityProvider:
         if record is None or time.time() >= record[1]:
             raise ApiError("validation_error", "Invalid or expired reset token.")
         user = self._users.get_by_id(record[0])
-        if user is None or user.get("status", "active") != "active":
+        if (
+            user is None
+            or user.get("status", "active") != "active"
+            or user.get("membership_status", "active") != "active"
+        ):
             raise ApiError("validation_error", "Invalid or expired reset token.")
         if len(new_password) < 8:
             raise ApiError("validation_error")
-        if self.mode == "production":
-            user["password_hash"] = hash_password(new_password)
-            user.pop("password_plain", None)
-        else:
-            user["password_plain"] = new_password
+        self._set_password(user, new_password)
         user["password_version"] = int(user.get("password_version", 1)) + 1
         self._users.save(user)
         return self._provider.revoke_user_sessions(user["user_id"], reason="password_recovery")
 
+    @_serialize_admin_mutation
     def revoke_session_by_id(self, *, actor, session_id: str) -> int:
         """Resolve a session identifier without exposing bearer tokens."""
         for token in list(self._sessions._sessions):
@@ -326,6 +467,41 @@ class InMemoryIdentityProvider:
         ):
             raise ApiError("forbidden")
 
+    def _assert_same_workspace(self, actor, user_id: str) -> dict:
+        from core.errors import ApiError
+
+        target = self._users.get_by_id(user_id)
+        actor_tenant = getattr(actor, "tenant_id", None)
+        actor_workspace = getattr(actor, "workspace_id", None)
+        target_tenant = target.get("tenant_id") if isinstance(target, dict) else None
+        target_workspace = target.get("workspace_id", "default") if isinstance(target, dict) else None
+        if (
+            not isinstance(actor_tenant, str)
+            or not actor_tenant.strip()
+            or not isinstance(actor_workspace, str)
+            or not actor_workspace.strip()
+            or not isinstance(target_tenant, str)
+            or not target_tenant.strip()
+            or not isinstance(target_workspace, str)
+            or not target_workspace.strip()
+            or target_tenant != actor_tenant.strip()
+            or target_workspace != actor_workspace.strip()
+        ):
+            raise ApiError("forbidden")
+        return dict(target)
+
+    def _active_admin_count(self, tenant_id: str, workspace_id: str) -> int:
+        return sum(
+            1
+            for candidate in self._users.list_users(
+                tenant_id=tenant_id, workspace_id=workspace_id,
+            )
+            if candidate.get("status", "active") == "active"
+            and candidate.get("membership_status", "active") == "active"
+            and canonical_role(candidate.get("role")) == "PLATFORM_ADMIN"
+        )
+
+    @_serialize_admin_mutation
     def revoke(self, *, actor, target_token, target_session_id, target_user_id, revoke_all) -> int:
         from core.errors import ApiError
 

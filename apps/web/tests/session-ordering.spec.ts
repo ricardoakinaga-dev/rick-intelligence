@@ -123,7 +123,7 @@ for (const logoutStatus of [200, 503]) {
     if (logoutStatus === 503) {
       await expect(notice).toContainText("não foi possível confirmar a saída no servidor");
       await expect(notice).not.toContainText("Synthetic login rejected.");
-      await page.screenshot({path:resolve(process.cwd(), `../../artifacts/visual/state-of-art/logout-failure-${testInfo.project.name}.png`),fullPage:true});
+      await page.screenshot({path:resolve(process.env.RICK_AUD03_WEB_EVIDENCE_DIR || "../../artifacts/visual/state-of-art", `logout-failure-${testInfo.project.name}.png`),fullPage:true});
     }
     await release(200, identity("older"));
     await page.evaluate(() => window.history.pushState(null, "", "/app"));

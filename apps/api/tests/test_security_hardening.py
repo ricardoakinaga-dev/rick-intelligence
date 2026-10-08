@@ -171,6 +171,33 @@ def test_production_csrf_token_can_authorize_without_origin():
     assert response.status_code == 200
 
 
+def test_production_double_submit_csrf_nonce_authorizes_without_origin_or_static_token():
+    client = _production_client()
+    client.cookies.set("rick_session", "cookie-token")
+    client.cookies.set("rick_csrf", "session-scoped-nonce")
+
+    response = client.post(
+        "/api/v1/auth/logout",
+        headers={"X-CSRF-Token": "session-scoped-nonce"},
+    )
+
+    assert response.status_code == 200
+
+
+def test_production_double_submit_csrf_nonce_mismatch_is_rejected():
+    client = _production_client()
+    client.cookies.set("rick_session", "cookie-token")
+    client.cookies.set("rick_csrf", "session-scoped-nonce")
+
+    response = client.post(
+        "/api/v1/auth/logout",
+        headers={"X-CSRF-Token": "attacker-guessed-value"},
+    )
+
+    assert response.status_code == 403
+    assert response.json()["error"]["code"] == "forbidden"
+
+
 def test_production_referer_origin_is_checked_when_origin_is_absent():
     client = _production_client()
     client.cookies.set("rick_session", "cookie-token")

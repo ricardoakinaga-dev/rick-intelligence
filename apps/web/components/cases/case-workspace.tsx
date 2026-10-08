@@ -1,9 +1,10 @@
 "use client";
 
 import { AlertTriangle, ClipboardCheck, FileText, MessageSquareText, Plus, RefreshCw, ShieldCheck, UserCheck } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { api, ApiError } from "@/lib/api";
 import { hasPermission } from "@/lib/permissions";
+import { sessionScopeKey } from "@/lib/session-scope";
 import { useSession } from "@/components/session-provider";
 import { Button, EmptyState, Panel, Spinner, StatusPill } from "@/components/ui";
 import type { AgentModelCatalogResponse, CaseDetailResponse, CaseRecord } from "@/types/api";
@@ -46,7 +47,12 @@ function formatDate(value: number | null | undefined) {
 
 export function CaseWorkspace() {
   const { session } = useSession();
-  const canRead = hasPermission(session, "cases.read");
+  return <ScopedCaseWorkspace key={sessionScopeKey(session)} />;
+}
+
+function ScopedCaseWorkspace() {
+  const { session } = useSession();
+  const canRead = Boolean(session?.authenticated) && hasPermission(session, "cases.read");
   const canManage = hasPermission(session, "cases.manage");
   const canReview = hasPermission(session, "cases.review");
   const canFeedback = hasPermission(session, "cases.feedback");
@@ -62,6 +68,13 @@ export function CaseWorkspace() {
   const [feedbackNote, setFeedbackNote] = useState("");
   const [feedbackKind, setFeedbackKind] = useState<"correction" | "clarification" | "quality_issue" | "scope_note">("clarification");
   const [busy, setBusy] = useState<string | null>(null);
+  const lifetime = useRef(0);
+  const listGeneration = useRef(0);
+  const detailGeneration = useRef(0);
+
+  // Layout cleanup invalidates callbacks at the same commit that removes the
+  // old private view, including StrictMode's setup/cleanup replay.
+  useLayoutEffect(() => () => { lifetime.current += 1; }, []);
 
   const selected = useMemo(() => items.find(item => item.case_id === selectedId) ?? null, [items, selectedId]);
 
@@ -70,22 +83,32 @@ export function CaseWorkspace() {
       setState("restricted");
       return;
     }
+    const scope = lifetime.current;
+    const operation = ++listGeneration.current;
+    const current = () => lifetime.current === scope && listGeneration.current === operation;
+    detailGeneration.current += 1;
     setState("loading");
     setMessage(null);
     setDetail(null);
+    setBusy(null);
     try {
       const result = await api.listCases(canReview ? "workspace" : "mine");
+      if (!current()) return;
       setItems(result.items);
       setSelectedId(previous => result.items.some(item => item.case_id === previous) ? previous : result.items[0]?.case_id ?? null);
       setState("ready");
       try {
-        setCatalog(await api.agentModelCatalog());
+        const next = await api.agentModelCatalog();
+        if (!current()) return;
+        setCatalog(next);
       } catch (cause) {
+        if (!current()) return;
         if (!(cause instanceof ApiError && cause.status === 409 && cause.code === "conflict")) {
           setMessage("O catálogo de agentes não está disponível; nenhum modelo é executado por esta tela.");
         }
       }
     } catch (cause) {
+      if (!current()) return;
       const result = errorMessage(cause, "Não foi possível carregar os registros de caso.");
       setState(result.state);
       setMessage(result.message);
@@ -95,18 +118,24 @@ export function CaseWorkspace() {
   }, [canRead, canReview]);
 
   const loadDetail = useCallback(async (caseId: string) => {
+    const scope = lifetime.current;
+    const operation = ++detailGeneration.current;
+    const current = () => lifetime.current === scope && detailGeneration.current === operation;
     setSelectedId(caseId);
+    setDetail(null);
     setBusy(`detail:${caseId}`);
     try {
-      setDetail(await api.getCase(caseId));
-      setMessage(null);
+      const next = await api.getCase(caseId);
+      if (!current()) return;
+      setDetail(next);
     } catch (cause) {
+      if (!current()) return;
       const result = errorMessage(cause, "Não foi possível carregar os detalhes deste registro.");
       setState(result.state);
       setMessage(result.message);
       setDetail(null);
     } finally {
-      setBusy(null);
+      if (current()) setBusy(null);
     }
   }, []);
 
@@ -121,54 +150,63 @@ export function CaseWorkspace() {
   async function createCase(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!canManage || !form.title.trim() || !form.summary.trim()) return;
+    const scope = lifetime.current;
     setBusy("create");
     setMessage(null);
     try {
       const created = await api.createCase(formPayload(form));
+      if (lifetime.current !== scope) return;
       setForm(emptyForm);
       setItems(previous => [created, ...previous.filter(item => item.case_id !== created.case_id)]);
       setSelectedId(created.case_id);
       setDetail({ case: created, reviews: [], feedback: [] });
     } catch (cause) {
+      if (lifetime.current !== scope) return;
       const result = errorMessage(cause, "Não foi possível registrar o caso.");
       setState(result.state);
       setMessage(result.message);
     } finally {
-      setBusy(null);
+      if (lifetime.current === scope) setBusy(null);
     }
   }
 
   async function submitReview(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!canReview || !selectedId || !reviewNote.trim()) return;
+    const scope = lifetime.current;
     setBusy("review");
     try {
       await api.reviewCase(selectedId, { decision, review_note: reviewNote.trim() });
+      if (lifetime.current !== scope) return;
       setReviewNote("");
-      await Promise.all([loadDetail(selectedId), load()]);
+      await load();
     } catch (cause) {
+      if (lifetime.current !== scope) return;
       const result = errorMessage(cause, "Não foi possível registrar a revisão.");
       setState(result.state);
       setMessage(result.message);
     } finally {
-      setBusy(null);
+      if (lifetime.current === scope) setBusy(null);
     }
   }
 
   async function submitFeedback(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!canFeedback || !selectedId || !feedbackNote.trim()) return;
+    const scope = lifetime.current;
     setBusy("feedback");
     try {
       await api.feedbackCase(selectedId, { kind: feedbackKind, feedback_note: feedbackNote.trim() });
+      if (lifetime.current !== scope) return;
       setFeedbackNote("");
-      await Promise.all([loadDetail(selectedId), load()]);
+      await load();
     } catch (cause) {
+      if (lifetime.current !== scope) return;
       const result = errorMessage(cause, "Não foi possível registrar o feedback.");
       setState(result.state);
       setMessage(result.message);
     } finally {
-      setBusy(null);
+      if (lifetime.current === scope) setBusy(null);
     }
   }
 

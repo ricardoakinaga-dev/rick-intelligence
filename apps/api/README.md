@@ -77,12 +77,27 @@ admitting traffic; missing or invalid composition fails closed.
 - Compat/external: `Authorization: Bearer <compat-key>` or `X-API-Key` on `/v1/*` only.
 - Precedence: valid cookie wins over Bearer (tested). See `docs/architecture/api-security.md`.
 
+The process-local demo identity stores plaintext credentials only with `PlainTestVerifier`; a non-plain verifier hashes seeded and newly assigned passwords. Administrative update, deactivation and reset routes check the target's exact tenant/workspace membership before emitting a requested audit event. Both identity providers repeat the scope check during mutation; the PostgreSQL provider performs its authoritative check inside the transaction, so the route precheck alone is never treated as atomic authorization.
+
 ## Tests
 
 ```bash
 make api-test        # full apps/api matrix
 make api-contract    # OpenAPI generation check
 make api-security    # route-policy + import-boundary + negatives
-make api16-full      # ingestion, lifecycle, readiness, root API, benchmark
+make api16-full      # ingestion, lifecycle, worker/API coverage floors, benchmark
+make api-coverage    # full API suite with 75% statement coverage floor
 make api16-verify    # sanitized full/regression evidence matrix
 ```
+
+The API coverage gate uses the hash-locked `requirements/test.lock` environment and writes its JSON report under `.runtime/qa/`. Its exact 75% floor applies to measured statements under `apps/api/src`; Coverage.py pragma exclusions are outside that denominator (the recorded baseline has 45 excluded lines). Both `api16-full` and the contract CI lane run this gate in place of a second uninstrumented API suite.
+
+API and worker coverage use separate data files, `.runtime/qa/.coverage-api` and `.runtime/qa/.coverage-worker`, so `make -j2 api-coverage worker-coverage` preserves each suite's denominator. Concurrent invocations of the same target still share that target's report paths.
+
+The locked environment currently emits one `StarletteDeprecationWarning` from `starlette.testclient` using `httpx`. API dependency maintenance owns the warning; a future validated FastAPI/Starlette update with `httpx2` support is the target. The suite does not suppress it globally. Runs under an older system Python environment produced hundreds of warnings and are not the CI baseline.
+
+
+Canonical API and worker test recipes include `packages/storage/src`, which
+both composed runtimes import. This makes isolated ingestion/worker bridge
+subsets reproducible without depending on another test module adding that path
+during collection. Package domain tests keep their separate dependency boundary.

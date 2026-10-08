@@ -1,0 +1,382 @@
+{
+  "schema_version": 1,
+  "observed_at": "2026-09-25T07:14:07Z",
+  "source_head": "b52f32c141916a2ea3af1a6b913bd91f380606e0",
+  "worktree_state": "DIRTY shared checkout; HEAD is the baseline only. Hashes bind the listed source, documentation, control and command artifacts, not a clean release candidate.",
+  "scope": "Current Q24-19/Q24-20 local implementation verification after C1 findings, including real PostgreSQL mutation/outbox behavior and worker composition wiring. The 72/100 repository score and item scores remain the historical 2026-09-24 audit snapshot.",
+  "checks": [
+    {
+      "artifact": "api16-root.log",
+      "command": "PYTHONDONTWRITEBYTECODE=1 make api16-root",
+      "exit_status": 0,
+      "summary": "706 passed; 394 dependency deprecation warnings",
+      "freshness": "CURRENT",
+      "sha256": "c04ac4d33f295058ca669eed3fe53080bd9a41aca3e3e6249a30794e8e770ab2"
+    },
+    {
+      "artifact": "api16-worker.log",
+      "command": "PYTHONDONTWRITEBYTECODE=1 make api16-worker",
+      "exit_status": 0,
+      "summary": "Earlier complete worker run passed 115 before adding the build_worker reconciler-composition regression.",
+      "freshness": "SUPERSEDED",
+      "sha256": "e340cfe127ec4f1ff16f101a3c0a8ace7610e360b0f9b0b52c2477a70ff81b45"
+    },
+    {
+      "artifact": "postgres-migrations.log",
+      "command": "RICK_MIGRATION_POSTGRES_TESTS=1 PYTHONPATH=/tmp/rick-intelligence-q24-psycopg PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -q -p no:cacheprovider infrastructure/scripts/tests/test_migrate.py",
+      "exit_status": 0,
+      "summary": "108 passed against disposable PostgreSQL 16.15",
+      "freshness": "CURRENT",
+      "sha256": "0d31a054f9f69851a8d027f9c1c6211208e1e5b1de36837725a858aab5f2c63a"
+    },
+    {
+      "artifact": "lint.log",
+      "command": "PYTHONDONTWRITEBYTECODE=1 make lint",
+      "exit_status": 0,
+      "summary": "Repository configured boundary, syntax and frontend lint checks passed",
+      "freshness": "CURRENT",
+      "sha256": "a7a5650dee62a2a315b1b3413dc05105661cd0c4bd71ec25608e7101f4d1dd63"
+    },
+    {
+      "artifact": "typecheck.log",
+      "command": "PYTHONDONTWRITEBYTECODE=1 make typecheck",
+      "exit_status": 0,
+      "summary": "Configured TypeScript compilation and Python compilation passed; no Python type checker is configured",
+      "freshness": "CURRENT",
+      "sha256": "f4e2482bfa89fd0a34aa7a5fab375fdbb03747d3941dd8fecfa8bdb1bc77c92d"
+    },
+    {
+      "artifact": "ops-static.log",
+      "command": "PYTHONDONTWRITEBYTECODE=1 make ops-static",
+      "exit_status": 0,
+      "summary": "Migration checksum/order and operational static checks passed; migration execution is recorded separately",
+      "freshness": "CURRENT",
+      "sha256": "fe2e5b2d7c8fc442d97df5d04bb70b2ac92fc920fa45ded651e2162606088dce"
+    },
+    {
+      "artifact": "control-check-initial-failure-after-c1-record.log",
+      "command": "make validate before the referenced evidence manifest was created",
+      "exit_status": 2,
+      "summary": "Superseded control failure: canonical entries were valid; two evidence references resolved after the manifest was written",
+      "freshness": "SUPERSEDED",
+      "sha256": "33a6bdcd30861aed1c327976720a7f37442610cc00f44702a26a4a2a799b7a93"
+    },
+    {
+      "artifact": "review-views-final.log",
+      "command": "python3 scripts/state_of_art/review_control_views.py --write",
+      "exit_status": 0,
+      "summary": "Derived review-control views regenerated and historical integrity passed.",
+      "freshness": "CURRENT",
+      "sha256": "df270bed12e28fcfea0d301ac95cf995b7bb454b6047284bff50ce0f7ab08914"
+    },
+    {
+      "artifact": "control-plane-post-ledger.log",
+      "command": "python3 docs/ci/check_control_plane.py",
+      "exit_status": 0,
+      "summary": "All 10 controller checks passed; 35 backlog items, 338 events, 340 verifications, 28 gates.",
+      "freshness": "CURRENT",
+      "sha256": "73a14e1894806d042c5a8f26726d902dbfe674c902ed856b863a05969884ceb7"
+    },
+    {
+      "artifact": "make-validate-post-ledger.log",
+      "command": "make validate",
+      "exit_status": 0,
+      "summary": "Boundary, canonical controller, derived views, frozen quality bar and repository validation passed after ledger update.",
+      "freshness": "CURRENT",
+      "sha256": "a0cc38a710b626ae924c12a9e4d809091ccb9e90e55c47d9cd5f4560b747516c"
+    },
+    {
+      "artifact": "diff-check-post-ledger.log",
+      "command": "git diff --check",
+      "exit_status": 0,
+      "summary": "No whitespace or patch-format errors.",
+      "freshness": "CURRENT",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "artifact": "control-plane-sealed-candidate.log",
+      "command": "python3 docs/ci/check_control_plane.py",
+      "exit_status": 0,
+      "summary": "Canonical controller 10/10 passed after source, docs, manifest and ledger updates.",
+      "freshness": "CURRENT",
+      "sha256": "73a14e1894806d042c5a8f26726d902dbfe674c902ed856b863a05969884ceb7"
+    },
+    {
+      "artifact": "make-validate-sealed-candidate.log",
+      "command": "make validate",
+      "exit_status": 0,
+      "summary": "Current state, 35 backlog items, 338 events, 340 verifications, 28 gates, derived views and frozen bar validated.",
+      "freshness": "CURRENT",
+      "sha256": "a0cc38a710b626ae924c12a9e4d809091ccb9e90e55c47d9cd5f4560b747516c"
+    },
+    {
+      "artifact": "diff-check-sealed-candidate.log",
+      "command": "git diff --check",
+      "exit_status": 0,
+      "summary": "No whitespace or patch-format errors after the final local implementation and documentation updates.",
+      "freshness": "CURRENT",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "artifact": "make-validate-final-manifest.log",
+      "command": "make validate",
+      "exit_status": 0,
+      "summary": "Final canonical validation passed after creation of the current evidence manifest.",
+      "freshness": "CURRENT",
+      "sha256": "a0cc38a710b626ae924c12a9e4d809091ccb9e90e55c47d9cd5f4560b747516c"
+    },
+    {
+      "artifact": "diff-check-final-manifest.log",
+      "command": "git diff --check",
+      "exit_status": 0,
+      "summary": "Final diff check passed after all current source and documentation edits.",
+      "freshness": "CURRENT",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "artifact": "api16-worker-final.log",
+      "command": "PYTHONDONTWRITEBYTECODE=1 make api16-worker",
+      "exit_status": 0,
+      "summary": "116 passed; includes the build_worker() -> DeploymentRuntime -> PostgresAdminAuditReconciler composition assertion.",
+      "freshness": "CURRENT",
+      "sha256": "d3fb2f2ff41556a8dbc47542286332b4a4d45b527566c855a2cd8f81f1b5462a"
+    },
+    {
+      "artifact": "review-views-review-packet.log",
+      "command": "python3 scripts/state_of_art/review_control_views.py --write",
+      "exit_status": 0,
+      "summary": "Derived review views regenerated and 11 historical files verified.",
+      "freshness": "CURRENT",
+      "sha256": "df270bed12e28fcfea0d301ac95cf995b7bb454b6047284bff50ce0f7ab08914"
+    },
+    {
+      "artifact": "control-plane-review-packet.log",
+      "command": "python3 docs/ci/check_control_plane.py",
+      "exit_status": 0,
+      "summary": "All 10 canonical controller checks passed; 35 backlog items, 339 events, 341 verification records, 28 gates.",
+      "freshness": "CURRENT",
+      "sha256": "fdc0bc65cf2ae9c74d3f89b5f4483b7e956398725f04ccdac02fac45a597bbde"
+    },
+    {
+      "artifact": "make-validate-review-packet.log",
+      "command": "make validate",
+      "exit_status": 0,
+      "summary": "Current control state, review views and frozen quality bar passed after worker composition evidence was recorded.",
+      "freshness": "CURRENT",
+      "sha256": "d8a1fbe3b32cdc7ac79f39866e6b1f1613b96b358036b7e28269b800de5133e2"
+    },
+    {
+      "artifact": "diff-check-review-packet.log",
+      "command": "git diff --check",
+      "exit_status": 0,
+      "summary": "No whitespace or patch-format errors after the final worker composition test and checkpoint updates.",
+      "freshness": "CURRENT",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "artifact": "control-plane-sealed-final.log",
+      "command": "python3 docs/ci/check_control_plane.py",
+      "exit_status": 0,
+      "summary": "Final pre-review controller check passed all 10 checks; 35 backlog items, 339 events, 341 verification records, 28 gates.",
+      "freshness": "CURRENT",
+      "sha256": "fdc0bc65cf2ae9c74d3f89b5f4483b7e956398725f04ccdac02fac45a597bbde"
+    },
+    {
+      "artifact": "make-validate-sealed-final.log",
+      "command": "make validate",
+      "exit_status": 0,
+      "summary": "Final pre-review canonical validation and quality-bar validation passed.",
+      "freshness": "CURRENT",
+      "sha256": "d8a1fbe3b32cdc7ac79f39866e6b1f1613b96b358036b7e28269b800de5133e2"
+    },
+    {
+      "artifact": "diff-check-sealed-final.log",
+      "command": "git diff --check",
+      "exit_status": 0,
+      "summary": "Final pre-review diff check passed.",
+      "freshness": "CURRENT",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "runtime_resources": [
+    {
+      "service": "PostgreSQL",
+      "image": "postgres:16-alpine",
+      "server_version": "16.15",
+      "disposable": true,
+      "scope": "Complete migration integration suite; includes atomic admin mutation failure boundaries and real outbox worker runtime tests.",
+      "teardown": "Disposable test fixture owns and removes the PostgreSQL container at suite teardown."
+    }
+  ],
+  "independent_reviews": {
+    "C1": {
+      "result": "REJECT acceptance not established for the earlier pre-fix packet",
+      "report": "docs/reports/review-q24-19-20-critic-c1-2026-09-25.md",
+      "disposition": "The specific runtime restart, four-mutation rollback, two-consumer concurrency and manual-review fallback evidence gaps have been addressed by the current tests and fail-closed semantics."
+    },
+    "final_review": "PENDING; fresh reviewer will receive current implementation excerpts, test logs and this manifest."
+  },
+  "source_hashes": {
+    "apps/api/src/routes/admin.py": "c6aef8ed18a7432a19218ced9c0c21b52fe1cb5d71bb29e4f32f4fe22877739d",
+    "apps/api/src/services/postgres_identity.py": "4935484cae435aaae5a411f26eae8b37a1e5170916a4b4b3170a7923952b5a5c",
+    "apps/api/src/services/postgres_audit.py": "33e66c14537449d0a4983ff7ac210532519b13360aadc0b2cd3dd6434a66fc33",
+    "apps/api/src/services/sqlite_audit.py": "e04dd62b50cb2f94c727d5bfbe2ac2ba856af4fc5b9d0efc20a76526799251fd",
+    "apps/api/tests/test_audit_factory.py": "f2895f17c7fee33a8e89444a7e7b05b5cc77085ab425a7da8b56560b70935cdd",
+    "apps/api/tests/test_admin_audit_outbox_routes.py": "abc77851263d4abed50be2cf40148d39727eec6a2580d0a1e269c669b87a7caa",
+    "apps/api/tests/test_postgres_admin_mutations.py": "7d0ad84ccd2206f4de3259ba082d1fe3109c0ea9769beeed755dbf0e53a4bc1c",
+    "apps/worker/admin_audit_outbox.py": "046595f9da759a3fc3f08eff1233cb5d53665d444301c053932124b51d76ee3a",
+    "apps/worker/deployment_composition.py": "09b8ebae1d2f869226789b013050b2ffb2cf9e7c96f5b2a7556e1a46189cf818",
+    "apps/worker/tests/test_admin_audit_outbox.py": "a6d47c7ba1172a701ac012a8652287da05aba74814ca75bcb1b9259dc6317de2",
+    "apps/worker/tests/test_deployment_composition.py": "e390ff5f01232a233ec803daf2cceb1c85e58c2f97cd0e60e11401b50a5afc12",
+    "infrastructure/migrations/0007_admin_audit_reconciliation.sql": "4af11b3250c3b5f3d2ea1e3a1042883ccf3cb703370daa6011cd4c2c748ae6e2",
+    "infrastructure/scripts/tests/test_migrate.py": "ada0a230375e4ec0dbffdad243fe9a3af28ce7434e3c8008273e5f216a26f014"
+  },
+  "artifacts": [
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0653Z/api16-root.log",
+      "sha256": "c04ac4d33f295058ca669eed3fe53080bd9a41aca3e3e6249a30794e8e770ab2",
+      "bytes": 3646
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0653Z/api16-worker.log",
+      "sha256": "e340cfe127ec4f1ff16f101a3c0a8ace7610e360b0f9b0b52c2477a70ff81b45",
+      "bytes": 2504
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0653Z/postgres-migrations.log",
+      "sha256": "0d31a054f9f69851a8d027f9c1c6211208e1e5b1de36837725a858aab5f2c63a",
+      "bytes": 181
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0653Z/lint.log",
+      "sha256": "a7a5650dee62a2a315b1b3413dc05105661cd0c4bd71ec25608e7101f4d1dd63",
+      "bytes": 879
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0653Z/typecheck.log",
+      "sha256": "f4e2482bfa89fd0a34aa7a5fab375fdbb03747d3941dd8fecfa8bdb1bc77c92d",
+      "bytes": 607
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0653Z/ops-static.log",
+      "sha256": "fe2e5b2d7c8fc442d97df5d04bb70b2ac92fc920fa45ded651e2162606088dce",
+      "bytes": 1375
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0653Z/control-check-initial-failure-after-c1-record.log",
+      "sha256": "33a6bdcd30861aed1c327976720a7f37442610cc00f44702a26a4a2a799b7a93",
+      "bytes": 1806
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0653Z/review-views-final.log",
+      "sha256": "df270bed12e28fcfea0d301ac95cf995b7bb454b6047284bff50ce0f7ab08914",
+      "bytes": 108
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0653Z/control-plane-post-ledger.log",
+      "sha256": "73a14e1894806d042c5a8f26726d902dbfe674c902ed856b863a05969884ceb7",
+      "bytes": 1193
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0653Z/make-validate-post-ledger.log",
+      "sha256": "a0cc38a710b626ae924c12a9e4d809091ccb9e90e55c47d9cd5f4560b747516c",
+      "bytes": 1730
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0653Z/diff-check-post-ledger.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0653Z/control-plane-sealed-candidate.log",
+      "sha256": "73a14e1894806d042c5a8f26726d902dbfe674c902ed856b863a05969884ceb7",
+      "bytes": 1193
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0653Z/make-validate-sealed-candidate.log",
+      "sha256": "a0cc38a710b626ae924c12a9e4d809091ccb9e90e55c47d9cd5f4560b747516c",
+      "bytes": 1730
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0653Z/diff-check-sealed-candidate.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0653Z/make-validate-final-manifest.log",
+      "sha256": "a0cc38a710b626ae924c12a9e4d809091ccb9e90e55c47d9cd5f4560b747516c",
+      "bytes": 1730
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0653Z/diff-check-final-manifest.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0653Z/api16-worker-final.log",
+      "sha256": "d3fb2f2ff41556a8dbc47542286332b4a4d45b527566c855a2cd8f81f1b5462a",
+      "bytes": 2504
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0653Z/review-views-review-packet.log",
+      "sha256": "df270bed12e28fcfea0d301ac95cf995b7bb454b6047284bff50ce0f7ab08914",
+      "bytes": 108
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0653Z/control-plane-review-packet.log",
+      "sha256": "fdc0bc65cf2ae9c74d3f89b5f4483b7e956398725f04ccdac02fac45a597bbde",
+      "bytes": 1193
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0653Z/make-validate-review-packet.log",
+      "sha256": "d8a1fbe3b32cdc7ac79f39866e6b1f1613b96b358036b7e28269b800de5133e2",
+      "bytes": 1730
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0653Z/diff-check-review-packet.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0653Z/control-plane-sealed-final.log",
+      "sha256": "fdc0bc65cf2ae9c74d3f89b5f4483b7e956398725f04ccdac02fac45a597bbde",
+      "bytes": 1193
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0653Z/make-validate-sealed-final.log",
+      "sha256": "d8a1fbe3b32cdc7ac79f39866e6b1f1613b96b358036b7e28269b800de5133e2",
+      "bytes": 1730
+    },
+    {
+      "path": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0653Z/diff-check-sealed-final.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    }
+  ],
+  "limitations": [
+    "The worktree is dirty and shared; this is scoped local evidence, not a clean or releasable candidate.",
+    "PostgreSQL restart proof uses the real DeploymentRuntime reconciler loop and a live database, while the unrelated primary ingestion worker is represented by a minimal lifecycle test double.",
+    "The evidence does not establish the full API/worker external dependency graph, approved provider/model/corpus, clinical/domain acceptance, representative RAG quality, restore/RPO/RTO, capacity/chaos/soak, production telemetry, visual/accessibility, release or promotion.",
+    "C1 did not review the corrective changes. The fresh final independent review remains pending; D01-D05 and D07 decisions remain with their human owners."
+  ],
+  "documentation_hashes": {
+    "docs/reports/estado-implementacao-q24-2026-09-24.md": "ce760dce7f1b0c5ed19981ab94d666fa001d197829e8873df7b6f440bcde9f68",
+    "docs/reports/review-q24-19-20-critic-c1-2026-09-25.md": "9d372779a2e8bd7c627435f88c93a171b15c28c8a87ce93c0946d4e688e463d3",
+    "docs/reports/matriz-rastreabilidade-q24-2026-09-24.md": "cca093ef0be28c685228d8b9b14e58bc66e36f0066a1f1694de070c39009d0ed",
+    "docs/plano-executivo-qualidade-2026-09-24.md": "53d9648973448d326a183470e9249c2101b7ac59d7e85a5cce50029cd4ab7189",
+    "docs/roadmap-qualidade-2026-09-24.md": "f69883d97a6947d80afe10cbd66329db07e49e0c0ff4e452fd5be6871809faa0",
+    "docs/backlog-qualidade-2026-09-24.md": "e2bb5e7ebd953603913ee4ee0a46f1387d8fbba351ca6e6877502545a3b912b6",
+    "docs/relatorio-auditoria-2026-09-24.md": "1a03dd5a78d8a945ba126a8163c73fc0fa69af8c0ced09cc50a9984da3be9f4f",
+    "docs/reports/relatorio-auditoria-2026-09-24.md": "9da0bf706d382c0b45aeaae312f0db173c31b2d03c7ff7b9d6d65230ded0552e",
+    ".agent/plans/phase-3-runtime-evidence-production-promotion.md": "0ac1412efceea40653d6b5b86d84233e4823a0dabcf0900fdb94f95578fc89b3"
+  },
+  "control_hashes": {
+    ".agent/state.json": "ff2aaca95deaad873fee88f127b90a759105c92a53e94d5610fd8a93691d33bf",
+    ".agent/backlog.json": "77e8a6e42ed5506938083c809ef99d7391a1fe39022dd160d5e97cd4a8ef2582",
+    ".agent/execution-log.jsonl": "1888221407b817797362bd08f2ffabf28d8ab54275080c7d8d3310f348d009aa",
+    ".agent/verification.jsonl": "46214e436e6323d5a8b9c31988342c084081203253e6418ec4f9d4ed95577994",
+    ".gauntlet/state.json": "76181b7c2106bd3226f39e024830bdcc04dca8d529cf1eb65b552100877fe83c",
+    ".gauntlet/bar.json": "f1ea9aa44d0d66e00bb47e75e30ad616ff575897de7d2a40bb5bc8e1f4936310"
+  },
+  "prior_evidence_manifest": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0427Z/manifest.json"
+}

@@ -1,0 +1,225 @@
+# Only deploy.py supplies validated refs/config. Existing external volumes are never deleted.
+x-bounds: &bounds
+  restart: unless-stopped
+  stop_grace_period: 40s
+  logging: {driver: json-file, options: {max-size: "10m", max-file: "3"}}
+x-job: &job
+  user: "${VPS_OPERATIONS_USER:?reviewed non-root UID:GID required}"
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  tmpfs: ["/tmp:rw,nosuid,nodev,noexec,mode=1777"]
+  restart: "no"
+  profiles: [operations]
+  networks: [private, outbound]
+  environment: &tls-env
+    SSL_CERT_FILE: /tls/ca-bundle.crt
+    REQUESTS_CA_BUNDLE: /tls/ca-bundle.crt
+    VPS_PLAN_SHA256: ${VPS_PLAN_SHA256:-none}
+  volumes: &job-volumes
+    - ${TLS_STORE_CA:?required}:/tls/ca-bundle.crt:ro
+    - ./db_guard.py:/ops/db_guard.py:ro
+    - ./contracts.py:/ops/contracts.py:ro
+    - ${VPS_SCOPE_SQL:?required}:/ops/0008-scope-preflight.sql:ro
+    - ${VPS_PLAN_FILE:?required}:/ops/migration-plan.json:ro
+services:
+  postgres:
+    <<: *bounds
+    image: ${POSTGRES_IMAGE:?immutable ref required}
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?required}
+      POSTGRES_USER: ${POSTGRES_USER:?required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?required}
+    volumes: [postgres-data:/var/lib/postgresql/data]
+    networks: [private]
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+  redis:
+    <<: *bounds
+    user: "${VPS_TLS_USER:?reviewed key reader UID:GID required}"
+    image: ${REDIS_IMAGE:?immutable ref required}
+    environment: {REDIS_PASSWORD: "${REDIS_PASSWORD:?required}"}
+    # Password is read inside container; never part of host command arguments.
+    command: [sh, -ec, 'exec redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD" --port 0 --tls-port 6379 --tls-cert-file /tls/store.crt --tls-key-file /tls/store.key --tls-ca-cert-file /tls/ca-bundle.crt --tls-auth-clients no']
+    volumes:
+      - redis-data:/data
+      - ${TLS_STORE_CERT:?required}:/tls/store.crt:ro
+      - ${TLS_STORE_KEY:?required}:/tls/store.key:ro
+      - ${TLS_STORE_CA:?required}:/tls/ca-bundle.crt:ro
+    networks: [private]
+    healthcheck:
+      test: [CMD-SHELL, 'REDISCLI_AUTH="$$REDIS_PASSWORD" redis-cli --tls --cacert /tls/ca-bundle.crt -h redis --sni redis ping | grep -q PONG']
+      interval: 10s
+      timeout: 5s
+      retries: 12
+  qdrant:
+    <<: *bounds
+    image: ${QDRANT_IMAGE:?immutable ref required}
+    environment: {QDRANT__SERVICE__API_KEY: "${RICK_QDRANT_API_KEY:?required}"}
+    volumes: [qdrant-data:/qdrant/storage]
+    networks: [private]
+    # Official CPU Debian image includes bash; no curl/wget assumption.
+    healthcheck:
+      test: [CMD, bash, -ec, 'exec 3<>/dev/tcp/127.0.0.1/6333; printf "GET /readyz HTTP/1.0\r\n\r\n" >&3; read -r line <&3; [[ "$$line" == *" 200 "* ]]']
+      interval: 10s
+      timeout: 5s
+      retries: 12
+  object-store:
+    <<: *bounds
+    image: ${MINIO_IMAGE:?immutable ref required}
+    command: [server, /data, --console-address, ':9001']
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?required}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?required}
+    volumes: [object-data:/data]
+    networks: [private]
+    healthcheck:
+      test: [CMD, curl, -fsS, --max-time, '4', http://127.0.0.1:9000/minio/health/ready]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+  stores-tls:
+    <<: *bounds
+    user: "${VPS_TLS_USER:?reviewed key reader UID:GID required}"
+    image: ${CADDY_IMAGE:?immutable ref required}
+    command: [caddy, run, --config, /etc/caddy/Caddyfile, --adapter, caddyfile]
+    volumes:
+      - ./stores.Caddyfile:/etc/caddy/Caddyfile:ro
+      - ${TLS_STORE_CERT:?required}:/tls/store.crt:ro
+      - ${TLS_STORE_KEY:?required}:/tls/store.key:ro
+    networks:
+      private: {aliases: [objects.internal, vectors.internal]}
+    depends_on:
+      object-store: {condition: service_healthy}
+      qdrant: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, caddy, validate, --config, /etc/caddy/Caddyfile, --adapter, caddyfile]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+  db-preflight:
+    <<: *job
+    env_file: ["${VPS_PREFLIGHT_FILE:?required}"]
+    image: ${RICK_API_IMAGE:?required}
+    entrypoint: [python, /ops/db_guard.py, inspect]
+  db-migrate:
+    <<: *job
+    env_file: ["${VPS_MIGRATION_FILE:?required}"]
+    image: ${RICK_API_IMAGE:?required}
+    entrypoint: [python, /ops/db_guard.py, apply]
+  db-retained-preflight:
+    <<: *job
+    env_file: ["${VPS_PREFLIGHT_FILE:?required}"]
+    image: ${RICK_API_IMAGE:?required}
+    environment:
+      <<: *tls-env
+      VPS_RETAINED_SOURCE_SHA: ${VPS_RETAINED_SOURCE_SHA:?required}
+    entrypoint: [python, /ops/db_guard.py, inspect-retained]
+  db-rollback-preflight:
+    <<: *job
+    env_file: ["${VPS_PREFLIGHT_FILE:?required}"]
+    image: ${RICK_API_IMAGE:?required}
+    environment:
+      <<: *tls-env
+      VPS_ROLLBACK_POLICY_SHA256: ${VPS_ROLLBACK_POLICY_SHA256:-none}
+    volumes:
+      - ${TLS_STORE_CA:?required}:/tls/ca-bundle.crt:ro
+      - ./db_guard.py:/ops/db_guard.py:ro
+      - ./contracts.py:/ops/contracts.py:ro
+      - ${VPS_ROLLBACK_POLICY_FILE:?required}:/ops/rollback-policy.json:ro
+      - ${VPS_ROLLBACK_EVIDENCE_FILE:?required}:/ops/rollback-compatibility.json:ro
+      - ${VPS_RETAINED_MIGRATIONS:?required}:/ops/retained-migrations:ro
+    entrypoint: [python, /ops/db_guard.py, inspect-rollback]
+  object-bootstrap:
+    <<: *job
+    env_file: ["${VPS_OBJECT_FILE:?required}"]
+    image: ${MC_IMAGE:?immutable ref required}
+    environment:
+      SSL_CERT_FILE: /tls/ca-bundle.crt
+      MC_CONFIG_DIR: /tmp/mc
+    volumes:
+      - ${TLS_STORE_CA:?required}:/tls/ca-bundle.crt:ro
+      - ./object-bootstrap.sh:/ops/bootstrap.sh:ro
+    entrypoint: [sh, /ops/bootstrap.sh]
+    depends_on: {stores-tls: {condition: service_healthy}}
+  vector-bootstrap:
+    <<: *job
+    env_file: ["${VPS_VECTOR_FILE:?required}"]
+    image: ${RICK_API_IMAGE:?required}
+    entrypoint: [python, /opt/rick/infrastructure/compose/bootstrap_qdrant.py]
+    depends_on: {stores-tls: {condition: service_healthy}}
+  api:
+    <<: *bounds
+    image: ${RICK_API_IMAGE:?required}
+    env_file: ["${VPS_RUNTIME_FILE:?required}"]
+    environment:
+      <<: *tls-env
+      RICK_API_COMPOSITION: deployment_composition:build_api_inputs
+      RICK_CLINICAL_CASES_ENABLED: "false"
+      RICK_CLINICAL_CASES_D04_ENABLED: "false"
+    volumes: ["${TLS_STORE_CA:?required}:/tls/ca-bundle.crt:ro"]
+    networks: [private, outbound, frontend]
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      stores-tls: {condition: service_healthy}
+    # Python is declared in this image. Readiness includes composition probes.
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready',timeout=4).read()"]
+      interval: 30s
+      timeout: 5s
+      retries: 4
+      start_period: 40s
+  worker:
+    <<: *bounds
+    image: ${RICK_WORKER_IMAGE:?required}
+    env_file: ["${VPS_RUNTIME_FILE:?required}"]
+    environment:
+      <<: *tls-env
+      RICK_WORKER_COMPOSITION: deployment_composition:build_worker
+      RICK_CLINICAL_CASES_ENABLED: "false"
+      RICK_CLINICAL_CASES_D04_ENABLED: "false"
+    volumes: ["${TLS_STORE_CA:?required}:/tls/ca-bundle.crt:ro"]
+    networks: [private, outbound]
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      stores-tls: {condition: service_healthy}
+    # Preserve image's worker composition healthcheck, allow bounded client probes.
+    healthcheck: {interval: 30s, timeout: 45s, retries: 3, start_period: 40s}
+  web:
+    <<: *bounds
+    image: ${RICK_WEB_IMAGE:?required}
+    environment: {RICK_API_INTERNAL_URL: 'http://api:8000', NODE_ENV: production}
+    networks: [frontend]
+    depends_on: {api: {condition: service_healthy}}
+  edge:
+    <<: *bounds
+    user: "${VPS_TLS_USER:?reviewed key reader UID:GID required}"
+    image: ${CADDY_IMAGE:?immutable ref required}
+    environment: {VPS_DOMAIN: "${VPS_DOMAIN:?required}", VPS_ACME_EMAIL: "${VPS_ACME_EMAIL:?required}"}
+    ports: ['80:80', '443:443', '443:443/udp']
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+    networks: [frontend, outbound]
+    depends_on: {web: {condition: service_healthy}}
+    healthcheck:
+      test: [CMD, caddy, validate, --config, /etc/caddy/Caddyfile, --adapter, caddyfile]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+volumes:
+  postgres-data: {external: true, name: "${POSTGRES_VOLUME:?required}"}
+  redis-data: {external: true, name: "${REDIS_VOLUME:?required}"}
+  qdrant-data: {external: true, name: "${QDRANT_VOLUME:?required}"}
+  object-data: {external: true, name: "${OBJECT_VOLUME:?required}"}
+  caddy-data: {external: true, name: "${CADDY_VOLUME:?required}"}
+networks:
+  private: {internal: true}
+  frontend: {internal: true}
+  outbound: {}

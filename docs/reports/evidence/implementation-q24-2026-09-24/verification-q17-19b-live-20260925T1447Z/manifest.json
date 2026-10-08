@@ -1,0 +1,104 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-09-25T17:46:15Z",
+  "scope": "Q17-19.B local disposable-PostgreSQL canonical queue lifecycle evidence, PostgreSQL migration/integration regression, worker and job-contract suites, and local worker launcher signal test. This manifest does not claim production acceptance or close Q17-19.A.",
+  "checkout": {
+    "head": "b52f32c141916a2ea3af1a6b913bd91f380606e0",
+    "worktree": "dirty shared checkout; 2396 status entries; unrelated and prior changes remain present"
+  },
+  "result": "PASS",
+  "results": {
+    "canonical_queue_live_postgresql": "1 passed in 4.54s (postgres-jobs-live-final.log)",
+    "postgres_migrations_and_integration": "110 passed, 2 warnings in 53.96s (postgres-migrations-full.log)",
+    "worker_suite": "116 passed, 7 warnings in 3.13s (worker-suite.log)",
+    "jobs_contract_suite": "44 passed in 0.23s (jobs-contract-suite.log)",
+    "worker_launcher_sigterm": "8 passed in 0.13s (worker-process-test.log)",
+    "static_checks": "make lint and make typecheck passed (lint-after-worker-process.log, typecheck.log)",
+    "migration_source_inventory": "offline source inventory/check passed (migration-source-inventory.log)",
+    "documentation_integrity": "passed (documentation-integrity.log)"
+  },
+  "environment": {
+    "platform": "Linux 7.0.0-31-generic; Python 3.12.3",
+    "database": "Two ownership-scoped disposable Docker PostgreSQL 16.15 instances using postgres:16-alpine; image sha256:3c5c8892d184f738f4fe282d14ddaa613a38f00f4189d2d94725ebe6f2909ddb.",
+    "isolation": "Each recorded fixture is limited to 1 CPU, 512 MiB memory and 256 MiB tmpfs, with a dynamically assigned loopback port.",
+    "teardown": "Both completed fixture teardown records report remaining_containers=0.",
+    "external_access": "No production or deployed database was accessed; no provider or external runtime was used."
+  },
+  "attempt_history": [
+    {
+      "artifact": "postgres-jobs-live.log",
+      "outcome": "Initial focused queue integration failed; the recorded error was corrected in subsequent implementation iterations."
+    },
+    {
+      "artifact": "postgres-jobs-live-attempt2.log",
+      "outcome": "Focused retry exposed backward timestamp movement after database round-trip; preserved as a failed intermediate attempt."
+    },
+    {
+      "artifact": "postgres-jobs-live-fixed.log",
+      "outcome": "Focused retry exposed PostgreSQL timestamp precision ordering in attempt history; preserved as a failed intermediate attempt."
+    },
+    {
+      "artifact": "postgres-jobs-live-fixed2.log",
+      "outcome": "Focused retry exposed a rollback-state expectation/transaction behavior defect; preserved as a failed intermediate attempt."
+    },
+    {
+      "artifact": "postgres-jobs-live-final.log",
+      "outcome": "Final focused canonical queue integration passed after corrections."
+    }
+  ],
+  "limitations": "This is scoped local evidence. It does not prove an inventory of deployed 0004/0005 migration histories/checksums, D02-authorized runtime topology, Redis coordination, distributed recovery, complete production operations, or release approval. Q17-19.A and PH2-P0-02 remain open for deployed-installation evidence and independent exact-snapshot review.",
+  "files": {
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q17-19b-live-20260925T1447Z/diff-check-final.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q17-19b-live-20260925T1447Z/documentation-integrity.log": "6f94154ede226b6923d931db9219fd71ed072dfac557f4480d949a9afd0be1e1",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q17-19b-live-20260925T1447Z/jobs-contract-suite.log": "62d32190f0eb16db3e0127f2e11e1097b03f623b026b6cadd4a82af0ab504337",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q17-19b-live-20260925T1447Z/lint-after-worker-process.log": "a7a5650dee62a2a315b1b3413dc05105661cd0c4bd71ec25608e7101f4d1dd63",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q17-19b-live-20260925T1447Z/lint.log": "a7a5650dee62a2a315b1b3413dc05105661cd0c4bd71ec25608e7101f4d1dd63",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q17-19b-live-20260925T1447Z/make-validate-final.log": "47ac260bea78f913255d286e53b6da364eb734fc0bc3261781fd3266d2d446db",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q17-19b-live-20260925T1447Z/make-validate-preservation-conflict.log": "37373079c9d8d8498427b32724be12a10e74319191a84e4ee51184cca213ba44",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q17-19b-live-20260925T1447Z/migration-source-inventory.log": "dea0f87d4d67ab17e9eb00ff9a2efc01771f24bd0db0491ac1f2d825cb559e90",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q17-19b-live-20260925T1447Z/postgres-jobs-live-attempt2.log": "e18a7da5f5495ad5f9c10ddf9bcf49dbeed6af35d93d39a9b9039737227f18e0",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q17-19b-live-20260925T1447Z/postgres-jobs-live-final.log": "6f8850329e0c2cd322e51885c0448a8a49fe617ab276afd38ea3c19b88e710f5",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q17-19b-live-20260925T1447Z/postgres-jobs-live-fixed.log": "736baa111a232a6ebb3e39dd9612875898a2414b5e87c8618af84f4bd7c088ad",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q17-19b-live-20260925T1447Z/postgres-jobs-live-fixed2.log": "ad98aafaf9e8ae6639ef8a4c1c28c30f3a8fd9899c66bb9c8ba3bdf5ac50d895",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q17-19b-live-20260925T1447Z/postgres-jobs-live.log": "ee0b83244c819b6fa59c0d4af749917f73aebdcfab8003e28566d2adea9d4c2f",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q17-19b-live-20260925T1447Z/postgres-migrations-full.log": "017f9234c5139daea3efd1c2c00ab36d7fd0dd6303214db246c9d32044f57acb",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q17-19b-live-20260925T1447Z/postgres-suite-artifacts/rick-q24-migration-75f8b73468524a9bb68e7b8f50228e97/backup-sha256.txt": "5a562c7ad2455721b6e557a01389bd0134a4497670b2e8d216b554a526895440",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q17-19b-live-20260925T1447Z/postgres-suite-artifacts/rick-q24-migration-75f8b73468524a9bb68e7b8f50228e97/docker-commands.jsonl": "c539cdf44b0ca481c5b5fb4f76416d1f800cd369bd8c517369c5cbaedf399d62",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q17-19b-live-20260925T1447Z/postgres-suite-artifacts/rick-q24-migration-75f8b73468524a9bb68e7b8f50228e97/interrupted-cli.log": "dfd865bbdff290de922a36f0d609e0664a669b9bdeb5ab59de0782e700f02c04",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q17-19b-live-20260925T1447Z/postgres-suite-artifacts/rick-q24-migration-75f8b73468524a9bb68e7b8f50228e97/postgres.log": "bda7c8934b0fe7f8c8b99853a09ef5aea91b18cec608746bd48f2221a87c5659",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q17-19b-live-20260925T1447Z/postgres-suite-artifacts/rick-q24-migration-75f8b73468524a9bb68e7b8f50228e97/pre0005-synthetic.dump": "1d02e2a7f765d1abcbbec7e2b9307b3953306ecaf3b7dd303aa88a0663a645b4",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q17-19b-live-20260925T1447Z/postgres-suite-artifacts/rick-q24-migration-75f8b73468524a9bb68e7b8f50228e97/recovery.json": "3b3a36efc1ca6d51dcafd0a62f7344e2ece4c8c4886cd130214a033e5fb07582",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q17-19b-live-20260925T1447Z/postgres-suite-artifacts/rick-q24-migration-75f8b73468524a9bb68e7b8f50228e97/resource.json": "a7de0f5216156d8d8e9a1ee824db97a6bd79abec7785224e08f7b6c0b7d5be65",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q17-19b-live-20260925T1447Z/postgres-suite-artifacts/rick-q24-migration-75f8b73468524a9bb68e7b8f50228e97/teardown.json": "7f1630fb282afc54ae67e4a26b24dc7d57d7ba73459b8c064f074530b4c49591",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q17-19b-live-20260925T1447Z/postgres-test-artifacts/rick-q24-migration-ee8bb6c7d8e74910964f1bf39577726e/docker-commands.jsonl": "698a8d92dcc56f6b70278a48d2a5e8f79fea395f6686c7027347216bb5a9d963",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q17-19b-live-20260925T1447Z/postgres-test-artifacts/rick-q24-migration-ee8bb6c7d8e74910964f1bf39577726e/postgres.log": "e6bb04e1c7ae0a838174abb12749dab9993b79820618d68390c4458342259a6b",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q17-19b-live-20260925T1447Z/postgres-test-artifacts/rick-q24-migration-ee8bb6c7d8e74910964f1bf39577726e/resource.json": "65a0741c7c017436b25ecb9c6602a5cd27e72ced22873155f3dad47b9cdca173",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q17-19b-live-20260925T1447Z/postgres-test-artifacts/rick-q24-migration-ee8bb6c7d8e74910964f1bf39577726e/teardown.json": "f6ba50494f3f4f5faf8cb4a02849baa136b4357dabc15a3cad22d7534911e357",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q17-19b-live-20260925T1447Z/postgres-test-artifacts-attempt2/rick-q24-migration-9584225d618b4950837f0e9aaf307ed5/docker-commands.jsonl": "a8dfadc36cde5320d050816feb904c2a680d35e70497362a59211336a6632f3f",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q17-19b-live-20260925T1447Z/postgres-test-artifacts-attempt2/rick-q24-migration-9584225d618b4950837f0e9aaf307ed5/postgres.log": "bc5ddb5b711591a6c3187a94bef828c6d3a112d89b8165a421b8d0f546add53a",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q17-19b-live-20260925T1447Z/postgres-test-artifacts-attempt2/rick-q24-migration-9584225d618b4950837f0e9aaf307ed5/resource.json": "978820f2b37d566555329d01d95415dabe172ddf0ceba9baf98d7b687101e59d",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q17-19b-live-20260925T1447Z/postgres-test-artifacts-attempt2/rick-q24-migration-9584225d618b4950837f0e9aaf307ed5/teardown.json": "d017e380bf54640fd433835b606e6e024b18ea3df756406555ffb29efe07a700",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q17-19b-live-20260925T1447Z/postgres-test-artifacts-final/rick-q24-migration-bc0d2178367d45249aa4bf325fb24d38/docker-commands.jsonl": "f0eaee656c115b36c0c4dcf0373865a53466fbf0b2566cbea063779c1d8e1d4f",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q17-19b-live-20260925T1447Z/postgres-test-artifacts-final/rick-q24-migration-bc0d2178367d45249aa4bf325fb24d38/postgres.log": "f6939e9a2b70e6e02f3c126452c03b590862336ea78f89888b2a07ebde0af9c5",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q17-19b-live-20260925T1447Z/postgres-test-artifacts-final/rick-q24-migration-bc0d2178367d45249aa4bf325fb24d38/resource.json": "0a1c7b6836e31990a7405b8b50ba8ba808e035b6b23a2cddc2d40febeb6bbbae",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q17-19b-live-20260925T1447Z/postgres-test-artifacts-final/rick-q24-migration-bc0d2178367d45249aa4bf325fb24d38/teardown.json": "47a0fccb0609ae4a4476d7553f0126068c08e1f87ab8f0bf266e338e255518a0",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q17-19b-live-20260925T1447Z/postgres-test-artifacts-fixed/rick-q24-migration-1b70f87a1995404e92eca0e546b05531/docker-commands.jsonl": "98c3140747e55827799550ac3a5716e9d75747bba2a53d930daa499c8fd3d5e9",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q17-19b-live-20260925T1447Z/postgres-test-artifacts-fixed/rick-q24-migration-1b70f87a1995404e92eca0e546b05531/postgres.log": "0505a8e627abd5ab142d3150fa5d4d3d07a7a957e707829bb0de104ff1301418",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q17-19b-live-20260925T1447Z/postgres-test-artifacts-fixed/rick-q24-migration-1b70f87a1995404e92eca0e546b05531/resource.json": "4c7d5d4130b6de0b79e09e82e4a1d163ef308595409651efddd1df1024d6d5bc",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q17-19b-live-20260925T1447Z/postgres-test-artifacts-fixed/rick-q24-migration-1b70f87a1995404e92eca0e546b05531/teardown.json": "5d0ed8be4dd910e07a35354fb74283c8a7fd29458c78ffa671e44100713348a9",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q17-19b-live-20260925T1447Z/postgres-test-artifacts-fixed2/rick-q24-migration-1170d4ebcb9949f49f2c14d50f8d2089/docker-commands.jsonl": "aa5f04451e2a07a3fc3e3ad2eca4335f114ee6538781f312b5e2266d39050e35",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q17-19b-live-20260925T1447Z/postgres-test-artifacts-fixed2/rick-q24-migration-1170d4ebcb9949f49f2c14d50f8d2089/postgres.log": "ba42087c65b8dd6e5997d1dc1c909d7798b8f9326ebc90a08650d8cd20d6a41f",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q17-19b-live-20260925T1447Z/postgres-test-artifacts-fixed2/rick-q24-migration-1170d4ebcb9949f49f2c14d50f8d2089/resource.json": "f4edf7764539548e577df180570560e5eb1a0ebc18185e559cb06f76be5209d8",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q17-19b-live-20260925T1447Z/postgres-test-artifacts-fixed2/rick-q24-migration-1170d4ebcb9949f49f2c14d50f8d2089/teardown.json": "936c697ad470a794b0a159697b1b49146a2949cd6c6ca24cd72df9167d6e2f8b",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q17-19b-live-20260925T1447Z/review-views.log": "df270bed12e28fcfea0d301ac95cf995b7bb454b6047284bff50ce0f7ab08914",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q17-19b-live-20260925T1447Z/typecheck.log": "f4e2482bfa89fd0a34aa7a5fab375fdbb03747d3941dd8fecfa8bdb1bc77c92d",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q17-19b-live-20260925T1447Z/worker-process-test.log": "092afb193e0565b502e8c29ec6c9f2e9ed67befee919192e41fe9bd294ef0cc2",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q17-19b-live-20260925T1447Z/worker-suite.log": "e332b282f36e0f779a42baacf695f43df6d949c633db4b6c547caeafa43ddfdb",
+    "apps/worker/postgres_jobs.py": "33aa2f7f328c846efb3502c6944944e9c9f1694fd81886b9b425fccb7718414d",
+    "apps/worker/tests/test_postgres_jobs.py": "c8df8207922c226c2c75a62e9cf83d39860127ce10f735c21e1d85db89a70c21",
+    "infrastructure/scripts/tests/test_migrate.py": "4e4028dc1acdcdbf37ceba56f48282a787e9966564506de4b9760f4cff33229f",
+    "packages/jobs/src/rick_jobs/contracts.py": "874ecf0d6e73135c1a87db6de711fd829abc746dc724a6d0a23f302cb0ec36ce",
+    "infrastructure/docker/worker-entrypoint.py": "2ee5c82bbb4d6a094eeb807498cc148e939c5c428750d2f27772a32ac792b50b",
+    "infrastructure/docker/tests/test_worker_entrypoint.py": "f0088c82c76828c2ebe0427d97756d1fdc55ae960e438063c8450d5be56ea3f1"
+  }
+}

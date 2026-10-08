@@ -11,9 +11,12 @@ import asyncio
 import time
 import uuid
 import inspect
+import logging
 from collections.abc import AsyncIterator, Mapping, Sequence
 from threading import RLock
 from typing import Any, Callable
+
+from rick_providers.sampling import Temperature, USE_DEFAULT_TEMPERATURE
 
 from rick_contracts.providers import (
     ChatCompletionChunk,
@@ -23,6 +26,7 @@ from rick_contracts.providers import (
     ProviderToolCallDelta,
     ProviderToolCallDeltaFunction,
 )
+from rick_providers.cleanup import CleanupError, await_io, bounded_cleanup, FACADE_CLEANUP_SECONDS
 from rick_providers.errors import ProviderError, provider_error
 from rick_providers.protocols import AsyncProvider
 
@@ -31,8 +35,38 @@ class ProviderBudgetError(ValueError):
     """Raised only at the local policy boundary for an over-budget request."""
 
 
+def _raise_if_cancelling() -> None:
+    """Preserve caller cancellation swallowed by a delegated await.
+
+    A delegate can acknowledge cancellation with uncancel(). Otherwise its
+    completed effects must not turn an outstanding cancellation into success.
+    Leave the caller's cancellation count untouched.
+    """
+    task = asyncio.current_task()
+    if task is not None and task.cancelling():
+        raise asyncio.CancelledError
+
+
 class ResilientProvider:
     """Bounded async provider facade with finite failure isolation."""
+
+    @staticmethod
+    def _production_safe(provider: AsyncProvider) -> bool:
+        """Fail closed: a port is production-safe only when it proves it is.
+
+        A custom port used to inherit ``True`` from the absence of a declared
+        value, so an adapter without a probe reported itself as fit for
+        production.  The contract is now explicit — the port either declares
+        ``production_safe = True`` (an owned, named decision) or exposes a live
+        ``health_check`` probe, and a test port is never production-safe.
+        """
+
+        declared = getattr(provider, "production_safe", None)
+        if getattr(provider, "is_test_provider", False) is True:
+            return False
+        if declared is True or declared is False:
+            return declared
+        return callable(getattr(provider, "health_check", None))
 
     def __init__(
         self,
@@ -66,7 +100,7 @@ class ResilientProvider:
         self.provider = provider
         self.provider_kind = getattr(provider, "provider_kind", "resilient")
         self.is_test_provider = getattr(provider, "is_test_provider", False)
-        self.production_safe = getattr(provider, "production_safe", self.is_test_provider is not True)
+        self.production_safe = self._production_safe(provider)
         self.failure_threshold = failure_threshold
         self.cooldown_seconds = float(cooldown_seconds)
         self.max_messages = max_messages
@@ -77,6 +111,8 @@ class ResilientProvider:
         self._lock = RLock()
         self._consecutive_failures = 0
         self._open_until = 0.0
+        self._close_complete = False
+        self._close_lock = asyncio.Lock()
 
     @property
     def is_open(self) -> bool:
@@ -94,18 +130,20 @@ class ResilientProvider:
         ``readiness_check`` remains a cheap local signal for callers that need
         to avoid I/O.  The canonical API readiness composition registers this
         method explicitly so an open network path cannot be reported healthy
-        merely because the circuit is closed.
+        merely because the circuit is closed — and a port that exposes no probe
+        at all is not healthy either: circuit state is not reachability.
         """
 
         if self.is_open:
             return False
         target = getattr(self.provider, "health_check", None)
         if not callable(target):
-            return self.readiness_check()
+            return False
         try:
             result = target()
             if inspect.isawaitable(result):
                 result = await result
+            _raise_if_cancelling()
         except asyncio.CancelledError:
             raise
         except Exception:
@@ -182,7 +220,7 @@ class ResilientProvider:
         self,
         model_or_messages: str | Sequence[ProviderMessage | Mapping[str, object]] | None = None,
         messages: Sequence[ProviderMessage | Mapping[str, object]] | None = None,
-        temperature: int | float | None = 0.2,
+        temperature: Temperature = USE_DEFAULT_TEMPERATURE,
         response_format: Mapping[str, object] | None = None,
         tools: Sequence[Mapping[str, object]] | None = None,
         *,
@@ -196,12 +234,13 @@ class ResilientProvider:
             result = await self.provider.chat_completion(
                 model_or_messages,
                 messages,
-                temperature,
-                response_format,
-                tools,
+                **({} if temperature is USE_DEFAULT_TEMPERATURE else {"temperature": temperature}),
+                response_format=response_format,
+                tools=tools,
                 model=model,
                 correlation_id=correlation,
             )
+            _raise_if_cancelling()
         except ProviderError as exc:
             self._record_failure(exc)
             raise
@@ -221,6 +260,7 @@ class ResilientProvider:
         correlation = self._guard("embeddings", correlation_id)
         try:
             result = await self.provider.get_embedding(text, model=model, correlation_id=correlation)
+            _raise_if_cancelling()
         except ProviderError as exc:
             self._record_failure(exc)
             raise
@@ -232,7 +272,7 @@ class ResilientProvider:
         self,
         model_or_messages: str | Sequence[ProviderMessage | Mapping[str, object]] | None = None,
         messages: Sequence[ProviderMessage | Mapping[str, object]] | None = None,
-        temperature: int | float | None = 0.2,
+        temperature: Temperature = USE_DEFAULT_TEMPERATURE,
         response_format: Mapping[str, object] | None = None,
         tools: Sequence[Mapping[str, object]] | None = None,
         *, model: str | None = None, correlation_id: str | None = None,
@@ -246,7 +286,7 @@ class ResilientProvider:
         self,
         model_or_messages: str | Sequence[ProviderMessage | Mapping[str, object]] | None,
         messages: Sequence[ProviderMessage | Mapping[str, object]] | None,
-        temperature: int | float | None,
+        temperature: Temperature,
         response_format: Mapping[str, object] | None,
         tools: Sequence[Mapping[str, object]] | None,
         *, model: str | None, correlation_id: str | None,
@@ -260,6 +300,7 @@ class ResilientProvider:
                 model_or_messages, messages, temperature, response_format, tools,
                 model=model, correlation_id=correlation,
             )
+            _raise_if_cancelling()
             self._validate_result_tool_budget(result)
             yield ChatCompletionChunk(
                 model=result.model, delta=result.content, finish_reason=result.finish_reason,
@@ -283,34 +324,90 @@ class ResilientProvider:
             return
         try:
             stream = target(
-                model_or_messages, messages, temperature, response_format, tools,
+                model_or_messages, messages,
+                **({} if temperature is USE_DEFAULT_TEMPERATURE else {"temperature": temperature}),
+                response_format=response_format, tools=tools,
                 model=model, correlation_id=correlation,
             )
-            if inspect.isawaitable(stream):
-                stream = await stream
-            tool_call_indices: set[int] = set()
-            async for chunk in stream:
-                if not isinstance(chunk, ChatCompletionChunk):
-                    chunk = ChatCompletionChunk.model_validate(chunk)
-                for tool_call in chunk.tool_calls or []:
-                    tool_call_indices.add(tool_call.index)
-                if len(tool_call_indices) > self.max_tool_calls:
-                    raise ProviderBudgetError("provider tool-call budget exceeded")
-                yield chunk
+            iterator = None
+            terminal = None
+            first_failure = None
+            try:
+                if inspect.isawaitable(stream):
+                    stream = await stream
+                    _raise_if_cancelling()
+                iterator = aiter(stream)
+                tool_call_indices: set[int] = set()
+                while True:
+                    try:
+                        chunk = await await_io(anext(iterator), None, drain_budget=FACADE_CLEANUP_SECONDS)
+                    except StopAsyncIteration:
+                        _raise_if_cancelling()
+                        break
+                    _raise_if_cancelling()
+                    if not isinstance(chunk, ChatCompletionChunk):
+                        chunk = ChatCompletionChunk.model_validate(chunk)
+                    if terminal is not None:
+                        raise provider_error("malformed_response", "chat_completion", correlation, 0)
+                    for tool_call in chunk.tool_calls or []:
+                        tool_call_indices.add(tool_call.index)
+                    if len(tool_call_indices) > self.max_tool_calls:
+                        raise ProviderBudgetError("provider tool-call budget exceeded")
+                    if chunk.finish_reason is not None:
+                        terminal = chunk
+                    else:
+                        yield chunk
+            except BaseException as exc:
+                first_failure = exc
+                raise
+            finally:
+                resources = [iterator] if iterator is stream else [iterator, stream]
+                closers = [resource.aclose for resource in resources if callable(getattr(resource, "aclose", None))]
+                try:
+                    await bounded_cleanup(closers, budget=FACADE_CLEANUP_SECONDS)
+                except CleanupError:
+                    if first_failure is not None:
+                        logging.getLogger(__name__).error(
+                            "provider_facade_cleanup_after_failure code=%s",
+                            first_failure.code if isinstance(first_failure, ProviderError) else type(first_failure).__name__,
+                        )
+                    if isinstance(first_failure, asyncio.CancelledError):
+                        raise first_failure from None
+                    raise
         except asyncio.CancelledError:
             raise
         except ProviderBudgetError:
             raise
+        except CleanupError:
+            raise provider_error("internal_error", "chat_completion", correlation, 0) from None
         except ProviderError as exc:
             self._record_failure(exc)
             raise
         else:
+            _raise_if_cancelling()
             self._record_success()
+            if terminal is not None:
+                yield terminal
 
     async def aclose(self) -> None:
+        if self._close_complete:
+            return
         closer = getattr(self.provider, "aclose", None)
         if callable(closer):
-            await closer()
+            async def close_once():
+                async with self._close_lock:
+                    if self._close_complete:
+                        return
+                    result = await closer()
+                    if result is not False:
+                        # Cleanup owns this completion even when its caller
+                        # is cancelled. Failed/unfinished closes stay retryable.
+                        self._close_complete = True
+                    return result
+
+            await bounded_cleanup([close_once], budget=FACADE_CLEANUP_SECONDS)
+        else:
+            self._close_complete = True
 
 
 __all__ = ["ProviderBudgetError", "ResilientProvider"]

@@ -21,12 +21,14 @@ import subprocess
 import sys
 
 try:
+    from scripts.state_of_art.release_evidence_paths import CURRENT_RELEASE_EVIDENCE
     from scripts.state_of_art.json_boundary import load_json
     from scripts.state_of_art import packet_seal
     from scripts.state_of_art import promotion_engine
     from scripts.state_of_art import triple_aaa_capability_matrix
     from scripts.state_of_art.release_integrity import capture_checkout
 except ImportError:  # pragma: no cover - direct script execution fallback.
+    from release_evidence_paths import CURRENT_RELEASE_EVIDENCE
     from json_boundary import load_json
     import packet_seal
     import promotion_engine
@@ -40,7 +42,7 @@ SOURCE_PROMPT = "docs/prompts/triple-aaa-runtime-closure-2026-09-10.txt"
 QUALITY_BAR = "docs/reports/current-triple-aaa-quality-bar-v1.json"
 PACKET_SCHEMA = "state-of-art-triple-aaa-verify.v2"
 PHASE3_EVIDENCE_ARTIFACT = ".runtime/phase-3/capability-matrix.json"
-RELEASE_EVIDENCE_ARTIFACT = "docs/progress/release-evidence.json"
+RELEASE_EVIDENCE_ARTIFACT = CURRENT_RELEASE_EVIDENCE
 FRONTEND_RUNTIME_ARTIFACT = ".runtime/phase-3/frontend-supply-runtime-evidence.json"
 SUPPLY_RUNTIME_ARTIFACT = ".runtime/phase-3/supply-chain-runtime-evidence.json"
 FRONTEND_RUNTIME_COMMAND = ("make", "phase3-frontend-supply-runtime")
@@ -131,7 +133,7 @@ def _remove_current_matrix(path: Path) -> None:
 
 def _manifest_artifact_hash() -> str | None:
     try:
-        payload = load_json(ROOT / "docs/progress/release-evidence.json")
+        payload = load_json(ROOT / CURRENT_RELEASE_EVIDENCE)
     except (OSError, UnicodeDecodeError, json.JSONDecodeError):
         return None
     binding = payload.get("commit_binding") if isinstance(payload, dict) else None
@@ -510,7 +512,7 @@ def _external_lanes() -> tuple[Lane, ...]:
     frontend_command = FRONTEND_RUNTIME_COMMAND
     return (
         Lane("release-integrity", None, external=True, detail="clean checkout and current mandatory evidence are required", blocked_if_not_run=True),
-        Lane("lab-readiness", None, external=True, detail="approved disposable Docker daemon is unavailable", blocked_if_not_run=True),
+        Lane("lab-readiness", None, external=True, detail="approved disposable Docker daemon is unavailable; see docs/architecture/promotion-authority.md#lab-readiness", blocked_if_not_run=True),
         Lane("postgresql-runtime", ("make", "phase3-postgres-runtime"), external=True, blocked_return_codes=frozenset({2})),
         Lane("multi-worker-runtime", ("make", "phase3-multi-worker-runtime"), external=True, detail="two-process worker fencing requires an approved disposable PostgreSQL runtime", blocked_return_codes=frozenset({2})),
         Lane("redis-runtime", ("make", "phase3-redis-runtime"), external=True, blocked_return_codes=frozenset({2})),
@@ -538,12 +540,12 @@ def _external_lanes() -> tuple[Lane, ...]:
         Lane("restore-drill", ("make", "phase3-restore-runtime"), external=True, detail="restore authority and disposable backups are unavailable", blocked_return_codes=frozenset({2})),
         Lane("file-security-runtime", ("make", "phase3-file-security-runtime"), external=True, detail="hostile file corpus requires an approved isolated worker runtime", blocked_return_codes=frozenset({2})),
         Lane("performance", ("make", "phase3-performance"), external=True, detail="performance requires an approved RICK_PHASE3_PERFORMANCE_COMMAND harness", blocked_return_codes=frozenset({2})),
-        Lane("independent-reviews", None, external=True, detail="fresh independent reviewers are not executable in this process", blocked_if_not_run=True),
+        Lane("independent-reviews", None, external=True, detail="fresh independent reviewers are not executable in this process; see docs/architecture/promotion-authority.md#independent-reviews", blocked_if_not_run=True),
         Lane("chaos", ("make", "phase3-chaos"), external=True, detail="chaos requires an approved RICK_PHASE3_CHAOS_COMMAND harness", blocked_return_codes=frozenset({2})),
         Lane("soak", ("make", "phase3-soak"), external=True, detail="soak requires an approved RICK_PHASE3_SOAK_COMMAND harness", blocked_return_codes=frozenset({2})),
-        Lane("production-runtime", None, external=True, detail="production-like runtime authority is unavailable", blocked_if_not_run=True),
-        Lane("sealed-packet", None, external=True, detail="packet sealing must follow current evidence and independent review", blocked_if_not_run=True),
-        Lane("final-go-no-go", None, external=True, detail="authorized human Go/No-Go is unavailable", blocked_if_not_run=True),
+        Lane("production-runtime", None, external=True, detail="production-like runtime authority is unavailable; see docs/architecture/promotion-authority.md#production-runtime", blocked_if_not_run=True),
+        Lane("sealed-packet", None, external=True, detail="packet sealing must follow current evidence and independent review; see docs/architecture/promotion-authority.md#sealed-packet", blocked_if_not_run=True),
+        Lane("final-go-no-go", None, external=True, detail="authorized human Go/No-Go is unavailable; see docs/architecture/promotion-authority.md#final-go-no-go", blocked_if_not_run=True),
     )
 
 
@@ -555,7 +557,7 @@ def _release_gate() -> Lane:
             "scripts/state_of_art/release_integrity.py",
             "--require-clean",
             "--evidence",
-            "docs/progress/release-evidence.json",
+            CURRENT_RELEASE_EVIDENCE,
         ),
         external=True,
         detail="typed release evidence is not promotable until the checkout is clean and all mandatory gates pass",

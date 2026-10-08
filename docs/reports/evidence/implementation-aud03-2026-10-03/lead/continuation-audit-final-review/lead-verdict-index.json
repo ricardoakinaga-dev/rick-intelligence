@@ -1,0 +1,15 @@
+{
+  "recorded_at": "2026-10-03T13:26:52.638755+00:00",
+  "role": "Lead index of independent agent handoff; not a new review",
+  "reviewer": "Copernicus",
+  "criterion": "AUD03-06",
+  "verdict": "BOUNDED_LOCAL_APPROVE",
+  "tests": 69,
+  "exit_code": 0,
+  "fingerprinted_files_unchanged": 213,
+  "evidence": "verified.log",
+  "limits": [
+    "Memory/SQLite and PostgreSQL fixture; real PG parent observation separate",
+    "No live IdP/production/deployment approval"
+  ]
+}

@@ -36,6 +36,21 @@ def _alias_int(name: str, legacy: str, default: int) -> int:
         raise ValueError(f"Invalid or conflicting integer configuration: {name}/{legacy}") from None
 
 
+def _frontier_setting(name: str, openai_name: str, anthropic_name: str, openai_default: str, anthropic_default: str) -> str:
+    kind = _alias("LLM_PROVIDER", "RICK_PROVIDER", provider=True)
+    return _alias(name, anthropic_name if kind == "anthropic" else openai_name,
+                  anthropic_default if kind == "anthropic" else openai_default)
+
+
+def _frontier_key() -> str:
+    key = _alias("LLM_API_KEY", "EXTERNAL_CHAT_API_KEY")
+    vendor_name = "ANTHROPIC_API_KEY" if _alias("LLM_PROVIDER", "RICK_PROVIDER", provider=True) == "anthropic" else "OPENAI_API_KEY"
+    vendor = _get(vendor_name)
+    if key.strip() and vendor.strip() and key != vendor:
+        raise ValueError(f"Conflicting configuration: LLM_API_KEY/EXTERNAL_CHAT_API_KEY and {vendor_name}")
+    return key if key.strip() else vendor
+
+
 def _get_bool(name: str, default: bool) -> bool:
     raw = os.getenv(name)
     if raw is None:
@@ -88,6 +103,7 @@ class ApiSettings:
     session_cookie_samesite: str = field(default_factory=lambda: _get("SESSION_COOKIE_SAMESITE", "lax"))
     csrf_token: str = field(default_factory=lambda: _get("CSRF_TOKEN", ""), repr=False)
     csrf_header_name: str = field(default_factory=lambda: _get("CSRF_HEADER_NAME", "X-CSRF-Token"))
+    csrf_cookie_name: str = field(default_factory=lambda: _get("CSRF_COOKIE_NAME", "rick_csrf"))
 
     max_json_bytes: int = field(default_factory=lambda: _get_int("API_MAX_JSON_BYTES", 1_048_576))
     max_upload_bytes: int = field(default_factory=lambda: _get_int("API_MAX_UPLOAD_BYTES", 50 * 1024 * 1024))
@@ -99,7 +115,7 @@ class ApiSettings:
     trusted_proxies: tuple[str, ...] = ()
 
     # Secrets enter only via config; never serialized to logs/API.
-    external_chat_api_key: str = field(default_factory=lambda: _alias("LLM_API_KEY", "EXTERNAL_CHAT_API_KEY"), repr=False)
+    external_chat_api_key: str = field(default_factory=_frontier_key, repr=False)
     compat_api_key: str = field(default_factory=lambda: _get("RICK_COMPAT_API_KEY", "") or _get("PROFESSOR_API_KEY", ""), repr=False)
     compat_workspace_id: str = field(default_factory=lambda: (_get("RICK_COMPAT_WORKSPACE_ID", "default") or "default").strip())
     compat_allowed_collection_ids: tuple[str, ...] = field(
@@ -117,11 +133,19 @@ class ApiSettings:
     # `professor` is the root grounded path; `legacy` is an explicit rollback.
     chat_backend_mode: str = field(default_factory=lambda: (_get("RICK_API_CHAT_BACKEND", "stub") or "stub").strip().lower())
     provider_kind: str = field(default_factory=lambda: _alias("LLM_PROVIDER", "RICK_PROVIDER", provider=True))
-    provider_base_url: str = field(default_factory=lambda: _alias("LLM_BASE_URL", "OPENAI_BASE_URL", "https://api.openai.com/v1"))
-    provider_chat_model: str = field(default_factory=lambda: _alias("LLM_MODEL", "OPENAI_CHAT_MODEL", "gpt-4o-mini"))
+    provider_base_url: str = field(default_factory=lambda: _frontier_setting("LLM_BASE_URL", "OPENAI_BASE_URL", "ANTHROPIC_BASE_URL", "https://api.openai.com/v1", "https://api.anthropic.com/v1"))
+    provider_chat_model: str = field(default_factory=lambda: _frontier_setting("LLM_MODEL", "OPENAI_CHAT_MODEL", "ANTHROPIC_CHAT_MODEL", "gpt-4o-mini", ""))
     provider_embedding_model: str = field(default_factory=lambda: _alias("EMBEDDING_MODEL", "OPENAI_EMBEDDING_MODEL", "text-embedding-3-small"))
     provider_embedding_dimensions: int = field(default_factory=lambda: _alias_int("EMBEDDING_DIMENSION", "OPENAI_EMBEDDING_DIMENSIONS", 1536))
     provider_timeout_ms: int = field(default_factory=lambda: _get_int("OPENAI_TIMEOUT_MS", 30000))
+    provider_max_attempts: int = field(default_factory=lambda: _get_int("OPENAI_MAX_ATTEMPTS", 3))
+    provider_retry_delay_ms: int = field(default_factory=lambda: _get_int("OPENAI_RETRY_DELAY_MS", 250))
+    provider_max_backoff_ms: int = field(default_factory=lambda: _get_int("OPENAI_MAX_BACKOFF_MS", 30000))
+    embedding_provider_kind: str = field(default_factory=lambda: _provider_name(_get("RICK_EMBEDDING_PROVIDER")))
+    embedding_base_url: str = field(default_factory=lambda: _get("EMBEDDING_BASE_URL").strip())
+    embedding_api_key: str = field(default_factory=lambda: _get("EMBEDDING_API_KEY").strip(), repr=False)
+    provider_anthropic_version: str = field(default_factory=lambda: _get("ANTHROPIC_VERSION", "2023-06-01").strip())
+    provider_max_output_tokens: int = field(default_factory=lambda: _get_int("ANTHROPIC_MAX_TOKENS", 4096))
     locker_base_url: str = field(default_factory=lambda: _get("RICK_LOCKER_BASE_URL", ""))
 
     login_rate_limit_per_min: int = field(default_factory=lambda: _get_int("LOGIN_RATE_LIMIT_PER_MIN", 10))
@@ -202,6 +226,8 @@ class ApiSettings:
             raise ValueError("SESSION_COOKIE_NAME must be a visible token")
         if not self.csrf_header_name or any(ord(char) < 0x21 or ord(char) > 0x7E for char in self.csrf_header_name):
             raise ValueError("CSRF_HEADER_NAME must be a visible token")
+        if not self.csrf_cookie_name or any(ord(char) < 0x21 or ord(char) > 0x7E for char in self.csrf_cookie_name):
+            raise ValueError("CSRF_COOKIE_NAME must be a visible token")
         if self.login_rate_limit_per_min <= 0 or self.login_rate_limit_per_min > 100_000:
             raise ValueError("LOGIN_RATE_LIMIT_PER_MIN out of range")
         if self.chat_rate_limit_per_min <= 0 or self.chat_rate_limit_per_min > 100_000:
@@ -266,13 +292,41 @@ class ApiSettings:
             raise ValueError("RICK_IDENTITY_MODE must be test|dev|production")
         if self.chat_backend_mode not in {"stub", "professor", "legacy"}:
             raise ValueError("RICK_API_CHAT_BACKEND must be stub|professor|legacy")
-        if self.provider_kind and self.provider_kind not in {"openai", "openai_compatible", "deterministic"}:
-            raise ValueError("RICK_PROVIDER must be openai|openai_compatible|deterministic")
+        if self.provider_kind and self.provider_kind not in {"openai", "openai_compatible", "anthropic", "deterministic"}:
+            raise ValueError("RICK_PROVIDER must be openai|openai_compatible|anthropic|deterministic")
+        if self.environment == "production" and self.selected_provider_kind == "deterministic":
+            raise ValueError("production cannot use deterministic provider")
         if self.provider_embedding_dimensions <= 0 or self.provider_embedding_dimensions > 16_384:
             raise ValueError("OPENAI_EMBEDDING_DIMENSIONS out of range")
         if self.provider_timeout_ms <= 0 or self.provider_timeout_ms > 120_000:
             raise ValueError("OPENAI_TIMEOUT_MS out of range")
+        for name, value, minimum, maximum in (
+            ("OPENAI_MAX_ATTEMPTS", self.provider_max_attempts, 1, 10),
+            ("OPENAI_RETRY_DELAY_MS", self.provider_retry_delay_ms, 0, 120_000),
+            ("OPENAI_MAX_BACKOFF_MS", self.provider_max_backoff_ms, 0, 120_000),
+        ):
+            if type(value) is not int or not minimum <= value <= maximum:
+                raise ValueError(f"{name} out of range")
         if self.chat_backend_mode == "professor":
+            from rick_providers import ProviderConfig, ProviderConfigurationError
+            try:
+                ProviderConfig(
+                    base_url=self.provider_base_url, api_key=self.external_chat_api_key or None,
+                    chat_model=self.provider_chat_model, embedding_model=self.provider_embedding_model,
+                    embedding_dimensions=self.provider_embedding_dimensions,
+                    timeout_ms=self.provider_timeout_ms, environment=self.environment,
+                    max_attempts=self.provider_max_attempts,
+                    retry_delay_ms=self.provider_retry_delay_ms,
+                    max_backoff_ms=self.provider_max_backoff_ms,
+                    provider_kind=self.selected_provider_kind,
+                    embedding_provider_kind=self.embedding_provider_kind or None,
+                    embedding_base_url=self.embedding_base_url or None,
+                    embedding_api_key=self.embedding_api_key or None,
+                    anthropic_version=self.provider_anthropic_version,
+                    max_output_tokens=self.provider_max_output_tokens,
+                ).validate()
+            except ProviderConfigurationError:
+                raise ValueError("Invalid provider configuration (including independent embeddings)") from None
             try:
                 parsed_provider_url = urlsplit(self.provider_base_url)
                 _ = parsed_provider_url.port
@@ -327,5 +381,5 @@ class ApiSettings:
                 raise ValueError("production Professor mode requires a provider API key")
             if self.provider_kind == "deterministic":
                 raise ValueError("production Professor mode cannot use deterministic provider")
-            if not self.locker_base_url.strip():
+            if not self.locker_base_url.strip() and not self.redis_url.strip():
                 raise ValueError("production Professor mode requires a lease service")

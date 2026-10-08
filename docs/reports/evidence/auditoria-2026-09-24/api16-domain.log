@@ -1,0 +1,6 @@
+PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="/home/ricardo/rick-intelligence/packages/knowledge/src:/home/ricardo/rick-intelligence/packages/ingestion/src:/home/ricardo/rick-intelligence/packages/retrieval/src" python3 -m pytest -q -p no:cacheprovider "/home/ricardo/rick-intelligence/packages/knowledge/tests" "/home/ricardo/rick-intelligence/packages/ingestion/tests" "/home/ricardo/rick-intelligence/packages/retrieval/tests"
+........................................................................ [ 31%]
+........................................................................ [ 62%]
+........................................................................ [ 93%]
+................                                                         [100%]
+232 passed in 11.09s

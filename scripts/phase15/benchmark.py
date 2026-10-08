@@ -29,14 +29,16 @@ if api_source not in sys.path:
 from rick_locking import InMemoryLeaseClient
 from rick_professor import ProfessorLimits
 from rick_providers import DeterministicProvider
+from rick_knowledge import content_checksum
 from services.knowledge_service import seed_demo_corpus, seed_demo_points
 from services.retrieval_service import RetrievalApplicationService
 from services.professor_backend import ProfessorBackendError, ProfessorChatBackend
 
 
-DEMO_QUERY = (
-    "Mastite bovina exige higiene rigorosa na ordenha, isolamento do animal "
-    "afetado e avaliação veterinária antes da escolha do tratamento."
+DEMO_QUERY = "Como enviar um documento"
+DEMO_TEXT = (
+    "Documentos podem ser enviados para uma coleção e consultados com citações "
+    "das fontes autorizadas."
 )
 SAMPLES = 30
 SOAK_ITERATIONS = 10
@@ -194,6 +196,7 @@ async def _run_failure_scenarios(
     retrieval: RetrievalApplicationService,
     *,
     context: dict[str, object],
+    knowledge=None,
 ) -> list[dict[str, object]]:
     scenarios: list[tuple[str, str, object]] = [
         (
@@ -203,6 +206,7 @@ async def _run_failure_scenarios(
                 retrieval=retrieval,
                 provider=_FailingChatProvider(),
                 lease=InMemoryLeaseClient(),
+                knowledge=knowledge,
             ),
         ),
         (
@@ -212,6 +216,7 @@ async def _run_failure_scenarios(
                 retrieval=retrieval,
                 provider=DeterministicProvider(embedding_dimensions=1536, environment="local"),
                 lease=_UnavailableLease(),
+                knowledge=knowledge,
             ),
         ),
     ]
@@ -274,6 +279,31 @@ async def _run_local_soak(
     }
 
 
+def _benchmark_points(knowledge, embeddings) -> list[dict]:
+    """Build a coherent, non-clinical fixture on canonical knowledge models."""
+
+    points = seed_demo_points(knowledge, embeddings)
+    document = knowledge.get_document("doc-stub-1")
+    chunks = knowledge.get_chunks("doc-stub-1")
+    if document is None or not chunks:
+        raise RuntimeError("benchmark fixture could not be seeded")
+    checksum = content_checksum(DEMO_TEXT)
+    chunk = chunks[0]
+    chunk.text = DEMO_TEXT
+    chunk.checksum = checksum
+    document.content_checksum = checksum
+    knowledge.replace_document_chunks(document.document_id, [chunk])
+    point = points[0]
+    payload = point["payload"]
+    payload["text"] = DEMO_TEXT
+    payload["checksum"] = checksum
+    payload["document_checksum"] = checksum
+    # Keep the fixture semantically anchored to the allowlisted request while
+    # retaining a source excerpt that exercises the publication gate.
+    point["vector"] = embeddings.embed([DEMO_QUERY])[0]
+    return points
+
+
 async def _run() -> dict[str, object]:
     memory_before = _memory_snapshot()
     from rick_knowledge import InMemoryKnowledgeStore
@@ -281,10 +311,12 @@ async def _run() -> dict[str, object]:
     knowledge = InMemoryKnowledgeStore()
     seed_demo_corpus(knowledge)
     retrieval = RetrievalApplicationService(knowledge=knowledge)
-    retrieval.attach_points(seed_demo_points(knowledge, retrieval.embeddings))
+    retrieval.attach_points(_benchmark_points(knowledge, retrieval.embeddings))
     provider = DeterministicProvider(embedding_dimensions=1536, environment="local")
     lease = InMemoryLeaseClient()
-    backend = ProfessorChatBackend(retrieval=retrieval, provider=provider, lease=lease)
+    backend = ProfessorChatBackend(
+        retrieval=retrieval, provider=provider, lease=lease, knowledge=knowledge,
+    )
     context = {
         "tenant_id": "default",
         "user_id": "benchmark-user",
@@ -325,7 +357,9 @@ async def _run() -> dict[str, object]:
         ttft_samples.append(ttft_ms)
         completion_samples.append(completion_ms)
 
-    failure_scenarios = await _run_failure_scenarios(retrieval, context=context)
+    failure_scenarios = await _run_failure_scenarios(
+        retrieval, context=context, knowledge=knowledge,
+    )
     soak_scenario = await _run_local_soak(backend, context=context)
     memory_after = _memory_snapshot()
     local_scenarios_pass = (

@@ -39,7 +39,13 @@ def _row_dict(cursor: object, row: object) -> dict[str, object]:
     if isinstance(row, Mapping):
         return {str(key): value for key, value in row.items()}
     description = getattr(cursor, "description", None) or ()
-    names = [item[0] for item in description if isinstance(item, (tuple, list)) and item]
+    names: list[str] = []
+    for item in description:
+        name = getattr(item, "name", None)
+        if not isinstance(name, str) and isinstance(item, (tuple, list)) and item:
+            name = item[0]
+        if isinstance(name, str):
+            names.append(name)
     return dict(zip(names, row if isinstance(row, (tuple, list)) else ()))
 
 

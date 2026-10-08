@@ -22,6 +22,7 @@ import sys
 from typing import Sequence
 
 try:
+    from scripts.state_of_art.release_evidence_paths import CURRENT_RELEASE_EVIDENCE, release_output_path
     from scripts.state_of_art.json_boundary import load_json
     from scripts.state_of_art.release_integrity import capture_checkout
     from scripts.state_of_art.release_manifest import (
@@ -35,6 +36,7 @@ try:
         artifact_set_digest,
     )
 except ImportError:  # pragma: no cover - direct script execution fallback.
+    from release_evidence_paths import CURRENT_RELEASE_EVIDENCE, release_output_path
     from json_boundary import load_json
     from release_integrity import capture_checkout
     from release_manifest import (
@@ -53,7 +55,7 @@ ROOT = Path(__file__).resolve().parents[2]
 SHA1_RE = re.compile(r"^[0-9a-f]{40}$", re.IGNORECASE)
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$", re.IGNORECASE)
 CI_ENVELOPE_SCHEMA = "state-of-art-ci-evidence.v1"
-DEFAULT_OUTPUT = "docs/progress/release-evidence.json"
+DEFAULT_OUTPUT = CURRENT_RELEASE_EVIDENCE
 DEFAULT_ARTIFACTS = (
     ".github/workflows/state-of-art-quality.yml",
     ".github/workflows/quality.yml",
@@ -69,6 +71,7 @@ DEFAULT_ARTIFACTS = (
     "docs/reports/triple-aaa-runtime-capability-matrix.json",
     "scripts/state_of_art/triple_aaa_capability_matrix.py",
     "scripts/state_of_art/verify_sealed_promotion.py",
+    "scripts/state_of_art/release_evidence_paths.py",
     "apps/worker/deployment_composition.py",
     "apps/api/src/services/object_store_transport.py",
     "apps/api/src/core/otel.py",
@@ -601,6 +604,7 @@ def generate_manifest(
     artifact_paths: Sequence[str] = DEFAULT_ARTIFACTS,
 ) -> ReleaseEvidenceManifest:
     root = root.resolve()
+    release_output_path(root, output)
     checkout = capture_checkout(root)
     artifacts: list[ArtifactFingerprint] = []
     for relative in artifact_paths:
@@ -725,14 +729,14 @@ def _parse_args(argv: Sequence[str]) -> argparse.Namespace:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parse_args(sys.argv[1:] if argv is None else argv)
+    output = release_output_path(ROOT, args.output)
+    output.relative_to(ROOT.resolve())
     manifest = generate_manifest(
         ROOT,
         output=args.output,
         environment=args.environment,
         artifact_paths=tuple(args.artifacts or DEFAULT_ARTIFACTS),
     )
-    output = (ROOT / args.output).resolve()
-    output.relative_to(ROOT.resolve())
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(manifest.to_dict(), ensure_ascii=False, sort_keys=True, indent=2) + "\n", encoding="utf-8")
     print(json.dumps({"output": args.output, "status": manifest.status, "manifest_id": manifest.manifest_id}, sort_keys=True))

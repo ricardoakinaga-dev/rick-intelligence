@@ -70,7 +70,7 @@ class ProviderDouble:
     async def complete(self, *, messages, conversation_id: str) -> ChatCompletionResult:
         self.calls += 1
         self.messages.append((messages, conversation_id))
-        return ChatCompletionResult(model="deterministic", content=self.content, correlation_id="corr-1")
+        return ChatCompletionResult(model="deterministic", content=self.content, finish_reason="stop", correlation_id="corr-1")
 
 
 @pytest.mark.asyncio
@@ -124,6 +124,136 @@ async def test_unknown_or_forged_citation_marker_is_rejected() -> None:
     assert response.evidence_status == "CITATION_INVALID"
     assert response.citations == []
     assert "ev-forged" not in response.answer
+
+
+class StreamingProviderDouble(ProviderDouble):
+    async def stream(self, *, messages, conversation_id: str):
+        self.calls += 1
+        self.messages.append((messages, conversation_id))
+        for character in self.content:
+            yield ChatCompletionChunk(
+                model="deterministic", delta=character, correlation_id="corr-1",
+            )
+        yield ChatCompletionChunk(model="deterministic", finish_reason="stop", correlation_id="corr-1")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("path", ["completion", "stream_fallback"])
+async def test_omitted_typed_conclusion_is_unsuccessful(path):
+    class MissingConclusion(ProviderDouble):
+        async def complete(self, **kwargs):
+            result = ChatCompletionResult(
+                model="test", content="Grounded answer [cite:ev-1]", correlation_id="c",
+            )
+            assert result.finish_reason == "unknown"
+            return result
+
+    orchestrator = ProfessorOrchestrator(
+        retrieval=RetrievalDouble([_evidence()]), chat_provider=MissingConclusion(),
+    )
+    if path == "completion":
+        response = await orchestrator.run(_request())
+    else:
+        response = [event async for event in orchestrator.stream(_request())][-1]["response"]
+    assert response.evidence_status == "GENERATION_FAILED"
+    assert response.metadata["failure_stage"] == "completion_incomplete"
+    assert response.citations == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("tail", ["content", "new_tool", "existing_tool", "terminal", "usage"])
+async def test_terminal_stream_allows_only_usage_tail(tail):
+    closed = asyncio.Event()
+    tool = {"index": 0, "id": "call-1", "type": "function",
+            "function": {"name": "report_status", "arguments": "{}"}}
+
+    class TerminalStream:
+        async def stream(self, **kwargs):
+            try:
+                yield ChatCompletionChunk(model="test", delta="Grounded answer [cite:ev-1]", correlation_id="c")
+                if tail == "existing_tool":
+                    yield ChatCompletionChunk(model="test", tool_calls=[tool], correlation_id="c")
+                yield ChatCompletionChunk(model="test", finish_reason="stop", correlation_id="c")
+                if tail == "usage":
+                    yield ChatCompletionChunk(model="test", correlation_id="c",
+                        usage=ProviderUsage(prompt_tokens=1, completion_tokens=1, total_tokens=2))
+                elif tail == "content":
+                    yield ChatCompletionChunk(model="test", delta="forbidden continuation", correlation_id="c")
+                elif tail == "terminal":
+                    yield ChatCompletionChunk(model="test", finish_reason="stop", correlation_id="c")
+                else:
+                    yield ChatCompletionChunk(model="test", tool_calls=[tool], correlation_id="c")
+            finally:
+                closed.set()
+
+    events = [event async for event in ProfessorOrchestrator(
+        retrieval=RetrievalDouble([_evidence()]), chat_provider=TerminalStream(),
+        limits=ProfessorLimits(max_tool_calls=1),
+    ).stream(_request())]
+    response = events[-1]["response"]
+    assert closed.is_set()
+    if tail == "usage":
+        assert response.evidence_status == "APPROVED_EVIDENCE"
+    else:
+        assert response.evidence_status == "GENERATION_FAILED"
+        assert response.metadata["failure_stage"] == "provider_failed"
+        assert response.citations == []
+        assert all(event.get("delta") != "forbidden continuation" for event in events)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("path", ["completion", "stream", "stream_fallback"])
+@pytest.mark.parametrize(
+    ("content", "status", "answer"),
+    [
+        ("Uncited answer", "CITATION_INVALID", None),
+        ("I cannot answer from the sources.", "CITATION_INVALID", None),
+        ("Answer [cite:ev-forged]", "CITATION_INVALID", None),
+        ("Answer [citation:ev-1]", "CITATION_INVALID", None),
+        ("Answer [cite:]", "CITATION_INVALID", None),
+        ("Answer [cite:ev-1] [cite:ev-forged]", "CITATION_INVALID", None),
+        ("Grounded answer [cite:ev-1]", "APPROVED_EVIDENCE", "Grounded answer"),
+        ("Grounded answer [cite:ev-1] [cite:ev-1]", "APPROVED_EVIDENCE", "Grounded answer"),
+    ],
+)
+async def test_completion_paths_require_valid_citations(path: str, content: str, status: str, answer: str | None) -> None:
+    retrieval = RetrievalDouble([_evidence()])
+    provider = StreamingProviderDouble(content) if path == "stream" else ProviderDouble(content)
+    orchestrator = ProfessorOrchestrator(retrieval=retrieval, chat_provider=provider)
+    request = _request()
+
+    if path == "completion":
+        response = await orchestrator.run(request)
+    else:
+        events = [event async for event in orchestrator.stream(request)]
+        assert [event["kind"] for event in events].count("final") == 1
+        assert events[-1]["kind"] == "final"
+        assert "".join(event["delta"] for event in events if event["kind"] == "delta") == content
+        assert all("response" not in event for event in events if event["kind"] == "delta")
+        response = events[-1]["response"]
+
+    assert response.evidence_status == status
+    assert response.conversation_id == request.conversation_id
+    assert len(response.evidence) == 1
+    assert response.metadata["evidence_count"] == 1
+    if answer is None:
+        assert response.answer == "I could not verify the source references in the generated response."
+        assert response.citations == []
+    else:
+        assert response.answer == answer
+        assert [citation.model_dump() for citation in response.citations] == [{
+            "document_id": "document-1", "chunk_id": "chunk-1", "title": "Source one",
+            "collection_id": "collection-1", "page_start": None, "page_end": None,
+            "checksum": "checksum-1",
+        }]
+        assert response.metadata["provider_model"] == "deterministic"
+    assert provider.calls == retrieval.calls == 1
+    assert retrieval.contexts == [request.retrieval_context.model_dump()]
+    messages, conversation_id = provider.messages[0]
+    assert conversation_id == request.conversation_id
+    assert messages[1].content == f"User request:\n{request.query}"
+    assert "SOURCE ev-1\nA supported fact.\nEND SOURCE ev-1" in messages[0].content
+    assert "marker [cite:<evidence_id>] using an id from the supplied sources. Never invent ids." in messages[0].content
 
 
 @pytest.mark.asyncio
@@ -186,6 +316,8 @@ async def test_evidence_and_answer_are_bounded() -> None:
 
     assert len(response.evidence[0].text) == 80
     assert len(response.answer) <= 40
+    assert response.evidence_status == "GENERATION_FAILED"
+    assert response.metadata["failure_stage"] == "answer_budget_exceeded"
 
 
 @pytest.mark.asyncio
@@ -433,6 +565,7 @@ async def test_provider_token_budget_is_enforced_from_reported_usage() -> None:
             return ChatCompletionResult(
                 model="metered",
                 content="Grounded answer [cite:ev-1]",
+                finish_reason="stop",
                 correlation_id="corr-metered",
                 usage=ProviderUsage(prompt_tokens=10, completion_tokens=90, total_tokens=100),
             )
@@ -534,3 +667,113 @@ async def test_stream_reasoning_timeout_emits_safe_terminal_response() -> None:
 
     assert events[-1]["kind"] == "final"
     assert events[-1]["response"].metadata["failure_stage"] == "reasoning_timeout"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("path", ["completion", "stream", "stream_fallback"])
+@pytest.mark.parametrize("reason", ["length", "content_filter", "unknown", "tool_calls"])
+async def test_non_stop_completions_are_never_approved(path, reason):
+    class Provider(ProviderDouble):
+        async def complete(self, **kwargs):
+            result = await super().complete(**kwargs)
+            return result.model_copy(update={"finish_reason": reason})
+
+        async def stream(self, **kwargs):
+            yield ChatCompletionChunk(model="test", delta="Grounded answer [cite:ev-1]", correlation_id="c")
+            yield ChatCompletionChunk(model="test", finish_reason=reason, correlation_id="c")
+
+    provider = Provider()
+    if path == "stream_fallback":
+        provider.stream = None
+    orchestrator = ProfessorOrchestrator(retrieval=RetrievalDouble([_evidence()]), chat_provider=provider)
+    if path == "completion":
+        response = await orchestrator.run(_request())
+    else:
+        response = [event async for event in orchestrator.stream(_request())][-1]["response"]
+    assert response.evidence_status == "GENERATION_FAILED"
+    assert response.metadata["failure_stage"] == "completion_incomplete"
+    assert response.citations == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("case", ["no_stop", "length_then_stop", "text_after_stop", "oversized", "reported_tokens"])
+async def test_broken_provider_stream_never_completes_successfully(case):
+    closed = asyncio.Event()
+
+    class BrokenStream:
+        async def stream(self, **kwargs):
+            try:
+                if case == "oversized":
+                    yield ChatCompletionChunk(model="test", delta="x" * 50_000, correlation_id="c")
+                elif case == "reported_tokens":
+                    yield ChatCompletionChunk(model="test", delta="text", correlation_id="c",
+                        usage=ProviderUsage(prompt_tokens=9_000, completion_tokens=1, total_tokens=9_001))
+                else:
+                    yield ChatCompletionChunk(model="test", delta="Grounded answer [cite:ev-1]", correlation_id="c")
+                    if case == "length_then_stop":
+                        yield ChatCompletionChunk(model="test", finish_reason="length", correlation_id="c")
+                        yield ChatCompletionChunk(model="test", finish_reason="stop", correlation_id="c")
+                    if case == "text_after_stop":
+                        yield ChatCompletionChunk(model="test", finish_reason="stop", correlation_id="c")
+                        yield ChatCompletionChunk(model="test", delta="unapproved continuation", correlation_id="c")
+            finally:
+                closed.set()
+
+    events = [event async for event in ProfessorOrchestrator(
+        retrieval=RetrievalDouble([_evidence()]), chat_provider=BrokenStream(),
+    ).stream(_request())]
+    assert events[-1]["response"].evidence_status == "GENERATION_FAILED"
+    assert events[-1]["response"].citations == []
+    assert closed.is_set()
+    if case in {"oversized", "reported_tokens"}:
+        assert [event["kind"] for event in events] == ["final"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("path", ["json", "stream"])
+@pytest.mark.parametrize("validator", ["missing", "false", "raises", "malformed"])
+async def test_required_final_publication_hook_cannot_be_bypassed(path, validator):
+    class Retrieval(RetrievalDouble):
+        async def validate_publication(self, **kwargs):
+            if validator == "raises":
+                raise RuntimeError("private publication failure")
+            return {"valid": True} if validator == "malformed" else False
+
+    retrieval = Retrieval([_evidence()])
+    if validator == "missing":
+        retrieval.validate_publication = None
+    orchestrator = ProfessorOrchestrator(
+        retrieval=retrieval, chat_provider=StreamingProviderDouble(),
+        require_publication_revalidation=True,
+    )
+    if path == "json":
+        result = await orchestrator.run(_request())
+    else:
+        result = [event async for event in orchestrator.stream(_request())][-1]["response"]
+    assert result.evidence_status == "CITATION_INVALID"
+    assert result.citations == result.evidence == []
+    assert "private" not in result.answer
+
+
+@pytest.mark.asyncio
+async def test_final_validation_runs_after_json_lease_release():
+    valid = True
+
+    class Retrieval(RetrievalDouble):
+        async def validate_publication(self, **kwargs):
+            return valid
+
+    class Lease:
+        async def acquire(self, **kwargs):
+            return {"acquired": True}
+
+        async def release(self, **kwargs):
+            nonlocal valid
+            valid = False
+
+    result = await ProfessorOrchestrator(
+        retrieval=Retrieval([_evidence()]), chat_provider=ProviderDouble(),
+        lease_manager=Lease(), require_publication_revalidation=True,
+    ).run(_request())
+    assert result.evidence_status == "CITATION_INVALID"
+    assert result.citations == []

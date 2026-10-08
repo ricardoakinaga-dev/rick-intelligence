@@ -77,6 +77,7 @@ def _service(request: Request) -> ChatApplicationService:
     return ChatApplicationService(
         providers.chat_backend, providers.chat_history,
         telemetry=getattr(request.app.state, "telemetry", None),
+        authorization_revalidator=getattr(providers.identity, "refresh_authorization_context", None),
     )  # type: ignore[arg-type]
 
 

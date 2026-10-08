@@ -16,6 +16,8 @@ import secrets
 import time
 from typing import Iterator, Protocol
 
+from rick_identity.snapshots import legacy_snapshot, snapshot_payload, valid_authorization_snapshot
+
 
 class DbConnection(Protocol):
     def cursor(self) -> object: ...
@@ -53,7 +55,13 @@ def _row_dict(cursor: object, row: object) -> dict[str, object]:
     if isinstance(row, Mapping):
         return {str(key): value for key, value in row.items()}
     description = getattr(cursor, "description", None) or ()
-    names = [item[0] for item in description if isinstance(item, (tuple, list)) and item]
+    names: list[str] = []
+    for item in description:
+        name = getattr(item, "name", None)
+        if not isinstance(name, str) and isinstance(item, (tuple, list)) and item:
+            name = item[0]
+        if isinstance(name, str):
+            names.append(name)
     return dict(zip(names, row if isinstance(row, (tuple, list)) else ()))
 
 
@@ -121,26 +129,7 @@ def _bounded_text_list(value: object, *, maximum_items: int, maximum_item_length
 
 
 def _valid_authorization_snapshot(value: Mapping[str, object]) -> bool:
-    if "permissions" in value and not _bounded_text_list(
-        value["permissions"], maximum_items=256, maximum_item_length=128,
-    ):
-        return False
-    if "allowed_collection_ids" in value and not _bounded_text_list(
-        value["allowed_collection_ids"], maximum_items=128, maximum_item_length=256,
-    ):
-        return False
-    if "authorization_snapshot_version" in value:
-        version = value["authorization_snapshot_version"]
-        if isinstance(version, bool) or not isinstance(version, int) or not 1 <= version <= 16:
-            return False
-    if "authorization_state" in value and value["authorization_state"] not in {
-        "AUTHORITATIVE", "MIGRATED", "LEGACY_UNMIGRATED",
-    }:
-        return False
-    for name, maximum in (("email", 256), ("role", 64), ("canonical_role", 64)):
-        if name in value and not _bounded_text(value[name], maximum=maximum):
-            return False
-    return True
+    return valid_authorization_snapshot(value)
 
 
 def _epoch(value: object) -> float | None:
@@ -171,26 +160,32 @@ class _PostgresStoreBase:
         self._close_connections = close_connections
 
     @contextmanager
-    def _session(self, *, write: bool = False) -> Iterator[tuple[DbConnection, object]]:
-        connection: DbConnection | None = None
+    def _session(
+        self,
+        *,
+        write: bool = False,
+        connection: DbConnection | None = None,
+    ) -> Iterator[tuple[DbConnection, object]]:
+        owns_connection = connection is None
         cursor: object | None = None
         try:
-            connection = self._connection_factory()
+            if owns_connection:
+                connection = self._connection_factory()
             if connection is None:
                 raise PostgresIdentityError()
             cursor = connection.cursor()
             yield connection, cursor
-            if write:
+            if write and owns_connection:
                 connection.commit()
         except PostgresIdentityError:
-            if write and connection is not None:
+            if write and owns_connection and connection is not None:
                 try:
                     connection.rollback()
                 except Exception:
                     pass
             raise
         except Exception:
-            if write and connection is not None:
+            if write and owns_connection and connection is not None:
                 try:
                     connection.rollback()
                 except Exception:
@@ -204,7 +199,7 @@ class _PostgresStoreBase:
                         close()
                     except Exception:
                         pass
-            if self._close_connections and connection is not None:
+            if owns_connection and self._close_connections and connection is not None:
                 try:
                     connection.close()
                 except Exception:
@@ -275,45 +270,79 @@ class PostgresUserStore(_PostgresStoreBase):
             })
         return record
 
-    def get_by_email(self, email: str) -> dict | None:
+    def get_by_email(self, email: str, *, connection: DbConnection | None = None) -> dict | None:
         try:
             value = _required(email, maximum=256).casefold()
         except PostgresIdentityError:
             return None
-        with self._session() as (_connection, cursor):
+        with self._session(connection=connection) as (_connection, cursor):
             self._execute(cursor, self._SELECT + " WHERE lower(u.email) = %s ORDER BY m.tenant_id, m.workspace_id LIMIT 1", (value,))
             row = self._fetchone(cursor)
         return self._record(row) if row else None
 
-    def get_by_email_for_tenant(self, email: str, tenant_id: str) -> dict | None:
+    def get_by_email_for_tenant(
+        self, email: str, tenant_id: str, *, connection: DbConnection | None = None
+    ) -> dict | None:
+        """Resolve one active membership for this email inside the tenant."""
         try:
             value = _required(email, maximum=256).casefold()
             tenant = _required(tenant_id, maximum=128)
         except PostgresIdentityError:
             return None
-        with self._session() as (_connection, cursor):
-            self._execute(cursor, self._SELECT + " WHERE lower(u.email) = %s AND m.tenant_id = %s LIMIT 1", (value, tenant))
-            row = self._fetchone(cursor)
-        return self._record(row) if row else None
+        with self._session(connection=connection) as (_connection, cursor):
+            self._execute(
+                cursor,
+                self._SELECT
+                + " WHERE lower(u.email) = %s AND m.tenant_id = %s"
+                + " AND u.status = 'active' AND m.status = 'active' LIMIT 2",
+                (value, tenant),
+            )
+            rows = self._fetchall(cursor)
+        if len(rows) != 1:
+            return None
+        return self._record(rows[0])
 
-    def get_by_id(self, user_id: str) -> dict | None:
+    def get_unique_active_by_email(
+        self, email: str, *, connection: DbConnection | None = None
+    ) -> dict | None:
+        """Resolve a single active membership globally, rejecting ambiguity."""
+        try:
+            value = _required(email, maximum=256).casefold()
+        except PostgresIdentityError:
+            return None
+        with self._session(connection=connection) as (_connection, cursor):
+            self._execute(
+                cursor,
+                self._SELECT
+                + " WHERE lower(u.email) = %s"
+                + " AND u.status = 'active' AND m.status = 'active' LIMIT 2",
+                (value,),
+            )
+            rows = self._fetchall(cursor)
+        if len(rows) != 1:
+            return None
+        return self._record(rows[0])
+
+    def get_by_id(self, user_id: str, *, connection: DbConnection | None = None) -> dict | None:
         try:
             value = _required(user_id)
         except PostgresIdentityError:
             return None
-        with self._session() as (_connection, cursor):
+        with self._session(connection=connection) as (_connection, cursor):
             self._execute(cursor, self._SELECT + " WHERE u.user_id = %s ORDER BY m.tenant_id, m.workspace_id LIMIT 1", (value,))
             row = self._fetchone(cursor)
         return self._record(row) if row else None
 
-    def get_by_id_for_tenant(self, user_id: str, tenant_id: str) -> dict | None:
+    def get_by_id_for_tenant(
+        self, user_id: str, tenant_id: str, *, connection: DbConnection | None = None
+    ) -> dict | None:
         """Resolve one membership projection at the caller's tenant boundary."""
         try:
             value = _required(user_id)
             tenant = _required(tenant_id, maximum=128)
         except PostgresIdentityError:
             return None
-        with self._session() as (_connection, cursor):
+        with self._session(connection=connection) as (_connection, cursor):
             self._execute(
                 cursor,
                 self._SELECT + " WHERE u.user_id = %s AND m.tenant_id = %s LIMIT 1",
@@ -322,22 +351,121 @@ class PostgresUserStore(_PostgresStoreBase):
             row = self._fetchone(cursor)
         return self._record(row) if row else None
 
-    def count_active_platform_admins(self, tenant_id: str) -> int:
-        """Count active administrators in one tenant at the SQL boundary."""
+    def get_by_id_for_tenant_workspace(
+        self,
+        user_id: str,
+        tenant_id: str,
+        workspace_id: str,
+        *,
+        connection: DbConnection | None = None,
+    ) -> dict | None:
+        """Resolve one membership only inside the full tenant/workspace scope."""
+        try:
+            value = _required(user_id)
+            tenant = _required(tenant_id, maximum=128)
+            workspace = _required(workspace_id, maximum=128)
+        except PostgresIdentityError:
+            return None
+        with self._session(connection=connection) as (_connection, cursor):
+            self._execute(
+                cursor,
+                self._SELECT + " WHERE u.user_id = %s AND m.tenant_id = %s AND m.workspace_id = %s LIMIT 1",
+                (value, tenant, workspace),
+            )
+            row = self._fetchone(cursor)
+        return self._record(row) if row else None
+
+    def get_by_id_for_tenant_workspace_for_update(
+        self,
+        user_id: str,
+        tenant_id: str,
+        workspace_id: str,
+        *,
+        connection: DbConnection,
+    ) -> dict | None:
+        """Read and lock the exact membership row inside a transaction."""
+        try:
+            value = _required(user_id)
+            tenant = _required(tenant_id, maximum=128)
+            workspace = _required(workspace_id, maximum=128)
+        except PostgresIdentityError:
+            return None
+        with self._session(connection=connection) as (_connection, cursor):
+            self._execute(
+                cursor,
+                self._SELECT
+                + " WHERE u.user_id = %s AND m.tenant_id = %s AND m.workspace_id = %s"
+                + " FOR UPDATE OF m",
+                (value, tenant, workspace),
+            )
+            row = self._fetchone(cursor)
+        return self._record(row) if row else None
+
+    def lock_user_for_update(self, user_id: str, *, connection: DbConnection) -> bool:
+        """Lock a global account row before a credential or profile mutation."""
+        value = _required(user_id)
+        with self._session(connection=connection) as (_connection, cursor):
+            self._execute(
+                cursor,
+                "SELECT user_id FROM rick_users WHERE user_id = %s FOR UPDATE",
+                (value,),
+            )
+            return self._fetchone(cursor) is not None
+
+    def has_membership_outside_tenant(
+        self,
+        user_id: str,
+        tenant_id: str,
+        *,
+        connection: DbConnection,
+    ) -> bool:
+        """Check account scope after locking its row to serialize new memberships."""
+        user = _required(user_id)
         tenant = _required(tenant_id, maximum=128)
-        with self._session() as (_connection, cursor):
+        with self._session(connection=connection) as (_connection, cursor):
             self._execute(
                 cursor,
                 """
+                SELECT EXISTS (
+                    SELECT 1 FROM rick_memberships
+                     WHERE user_id = %s AND tenant_id <> %s
+                ) AS has_other_tenant_memberships
+                """,
+                (user, tenant),
+            )
+            row = self._fetchone(cursor)
+        value = (row or {}).get("has_other_tenant_memberships")
+        if not isinstance(value, bool):
+            raise PostgresIdentityError()
+        return value
+
+    def count_active_platform_admins(
+        self,
+        tenant_id: str,
+        *,
+        workspace_id: str | None = None,
+        connection: DbConnection | None = None,
+    ) -> int:
+        """Count active administrators at the requested membership boundary."""
+        tenant = _required(tenant_id, maximum=128)
+        workspace_clause = " AND m.workspace_id = %s" if workspace_id is not None else ""
+        params: tuple[object, ...] = (tenant,)
+        if workspace_id is not None:
+            params += (_required(workspace_id, maximum=128),)
+        with self._session(connection=connection) as (_connection, cursor):
+            self._execute(
+                cursor,
+                f"""
                 SELECT COUNT(*) AS count
                   FROM rick_users u
                   JOIN rick_memberships m ON m.user_id = u.user_id
                  WHERE m.tenant_id = %s
+                   {workspace_clause}
                    AND m.role = 'PLATFORM_ADMIN'
                    AND m.status = 'active'
                    AND u.status = 'active'
                 """,
-                (tenant,),
+                params,
             )
             row = self._fetchone(cursor)
         try:
@@ -368,14 +496,22 @@ class PostgresUserStore(_PostgresStoreBase):
                 result.setdefault(record["user_id"], record)
         return list(result.values())
 
-    def save(self, record: dict) -> None:
+    def save(self, record: dict, *, connection: DbConnection | None = None) -> None:
         user_id = _required(record.get("user_id"))
         email = _required(record.get("email"), maximum=256).casefold()
         tenant = _required(record.get("tenant_id"), maximum=128)
         workspace = _required(record.get("workspace_id", "default"), maximum=128)
         role = _required(record.get("role"), maximum=64).upper()
         status = _required(record.get("status", "active"), maximum=32).lower()
-        if status not in {"active", "disabled", "pending"} or role not in {"PLATFORM_ADMIN", "KNOWLEDGE_MANAGER", "VETERINARIAN"}:
+        membership_status = _required(
+            record.get("membership_status", "active" if status == "active" else "disabled"),
+            maximum=32,
+        ).lower()
+        if (
+            status not in {"active", "disabled", "pending"}
+            or membership_status not in {"active", "disabled"}
+            or role not in {"PLATFORM_ADMIN", "KNOWLEDGE_MANAGER", "VETERINARIAN"}
+        ):
             raise PostgresIdentityError("invalid_input")
         overrides = record.get("permission_overrides", {"add": [], "remove": []})
         grants = record.get("authorized_collection_ids", [])
@@ -386,7 +522,7 @@ class PostgresUserStore(_PostgresStoreBase):
         password_hash = record.get("password_hash")
         if password_hash is not None and not isinstance(password_hash, str):
             raise PostgresIdentityError("invalid_input")
-        with self._session(write=True) as (_connection, cursor):
+        with self._session(write=True, connection=connection) as (_connection, cursor):
             self._execute(cursor, """
                 INSERT INTO rick_users
                     (user_id, external_subject, email, status, password_hash, password_version, role_version)
@@ -406,8 +542,56 @@ class PostgresUserStore(_PostgresStoreBase):
                     role = EXCLUDED.role, status = EXCLUDED.status,
                     permission_overrides = EXCLUDED.permission_overrides,
                     authorized_collection_ids = EXCLUDED.authorized_collection_ids, updated_at = NOW()
-            """, (tenant, user_id, workspace, role, "active" if status == "active" else "disabled",
+            """, (tenant, user_id, workspace, role, membership_status,
                    overrides_json, grants_json))
+
+    def update_membership_status(
+        self,
+        *,
+        user_id: str,
+        tenant_id: str,
+        workspace_id: str,
+        status: str,
+        connection: DbConnection | None = None,
+    ) -> bool:
+        """Update only one tenant membership without rewriting global user fields."""
+        user = _required(user_id)
+        tenant = _required(tenant_id, maximum=128)
+        workspace = _required(workspace_id, maximum=128)
+        normalized_status = _required(status, maximum=32).lower()
+        if normalized_status not in {"active", "disabled"}:
+            raise PostgresIdentityError("invalid_input")
+        with self._session(write=True, connection=connection) as (_connection, cursor):
+            self._execute(cursor, """
+                UPDATE rick_memberships
+                   SET status = %s, updated_at = NOW()
+                 WHERE user_id = %s AND tenant_id = %s AND workspace_id = %s
+            """, (normalized_status, user, tenant, workspace))
+            return cursor.rowcount == 1
+
+    def update_password_credentials(
+        self,
+        *,
+        user_id: str,
+        password_hash: str,
+        connection: DbConnection | None = None,
+    ) -> bool:
+        """Update global password credentials without touching any membership."""
+        user = _required(user_id)
+        encoded_hash = _required(password_hash, maximum=1024)
+        with self._session(write=True, connection=connection) as (_connection, cursor):
+            self._execute(
+                cursor,
+                """
+                UPDATE rick_users
+                   SET password_hash = %s,
+                       password_version = COALESCE(password_version, 1) + 1,
+                       updated_at = NOW()
+                 WHERE user_id = %s AND status = 'active'
+                """,
+                (encoded_hash, user),
+            )
+            return cursor.rowcount == 1
 
 
 class PostgresSessionStore(_PostgresStoreBase):
@@ -503,6 +687,26 @@ class PostgresSessionStore(_PostgresStoreBase):
             row = self._fetchone(cursor)
         return self._record(row) if row else None
 
+    def update_authorization_snapshot(self, token: str, *, expected: dict, snapshot: dict) -> bool:
+        """Commit a legacy migration using the persisted snapshot as a fence."""
+        token = _required(token, maximum=4096)
+        updated = {**expected, **snapshot}
+        if (not legacy_snapshot(expected) or not _valid_authorization_snapshot(expected)
+                or snapshot.get("authorization_state") != "MIGRATED"
+                or not _valid_authorization_snapshot(updated)):
+            return False
+        with self._session(write=True) as (_connection, cursor):
+            self._execute(cursor, """
+                UPDATE rick_sessions
+                   SET authorization_snapshot = CAST(%s AS jsonb)
+                 WHERE token_hash = %s AND revoked_at IS NULL AND expires_at > NOW()
+                   AND authorization_snapshot = CAST(%s AS jsonb)
+                   AND password_version = %s AND role_version = %s
+            """, (_json_text(snapshot_payload(updated)), self._token_hash(token),
+                   _json_text(snapshot_payload(expected)), expected.get("password_version", 1),
+                   expected.get("role_version", 1)))
+            return cursor.rowcount == 1
+
     def delete(self, token: str) -> None:
         self.revoke(token, reason="manual_revoke")
 
@@ -541,16 +745,29 @@ class PostgresSessionStore(_PostgresStoreBase):
                 result.append(record)
         return result
 
-    def revoke_user(self, user_id: str, *, tenant_id: str | None = None, reason: str = "manual_revoke") -> int:
+    def revoke_user(
+        self,
+        user_id: str,
+        *,
+        tenant_id: str | None = None,
+        workspace_id: str | None = None,
+        reason: str = "manual_revoke",
+        connection: DbConnection | None = None,
+    ) -> int:
         user_id = _required(user_id)
         reason = _required(reason, maximum=128)
+        if tenant_id is None and workspace_id is not None:
+            raise PostgresIdentityError("invalid_input")
         if tenant_id is None:
             query = "UPDATE rick_sessions SET revoked_at = COALESCE(revoked_at, NOW()), revoke_reason = %s WHERE user_id = %s AND revoked_at IS NULL"
             params: tuple[object, ...] = (reason, user_id)
+        elif workspace_id is not None:
+            query = "UPDATE rick_sessions SET revoked_at = COALESCE(revoked_at, NOW()), revoke_reason = %s WHERE user_id = %s AND tenant_id = %s AND workspace_id = %s AND revoked_at IS NULL"
+            params = (reason, user_id, _required(tenant_id, maximum=128), _required(workspace_id, maximum=128))
         else:
             query = "UPDATE rick_sessions SET revoked_at = COALESCE(revoked_at, NOW()), revoke_reason = %s WHERE user_id = %s AND tenant_id = %s AND revoked_at IS NULL"
             params = (reason, user_id, _required(tenant_id, maximum=128))
-        with self._session(write=True) as (_connection, cursor):
+        with self._session(write=True, connection=connection) as (_connection, cursor):
             self._execute(cursor, query, params)
             return max(0, int(getattr(cursor, "rowcount", 0) or 0))
 
@@ -651,10 +868,12 @@ class PostgresRecoveryStore(_PostgresStoreBase):
             )
         return token
 
-    def consume(self, token: str) -> dict[str, object] | None:
+    def consume(
+        self, token: str, *, connection: DbConnection | None = None
+    ) -> dict[str, object] | None:
         token = _required(token, maximum=512)
         token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
-        with self._session(write=True) as (_connection, cursor):
+        with self._session(write=True, connection=connection) as (_connection, cursor):
             self._execute(
                 cursor,
                 """
@@ -663,7 +882,7 @@ class PostgresRecoveryStore(_PostgresStoreBase):
                  WHERE token_hash = %s
                    AND consumed_at IS NULL
                    AND expires_at > NOW()
-                RETURNING tenant_id, user_id, expires_at
+                RETURNING tenant_id, user_id, workspace_id, expires_at
                 """,
                 (token_hash,),
             )

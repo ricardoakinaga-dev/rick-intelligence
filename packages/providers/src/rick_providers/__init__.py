@@ -18,6 +18,8 @@ from rick_contracts.providers import (
     ProviderToolCallFunction,
 )
 
+from rick_providers.sampling import USE_DEFAULT_TEMPERATURE
+
 from rick_providers.client import (
     MAX_RESPONSE_BYTES,
     AsyncOpenAICompatibleClient,
@@ -27,6 +29,7 @@ from rick_providers.client import (
     OpenAICompatibleProvider,
     OpenAIProvider,
 )
+from rick_providers.anthropic import AnthropicMessagesClient
 from rick_providers.config import (
     DEFAULT_BASE_URL,
     DEFAULT_CHAT_MODEL,
@@ -53,6 +56,7 @@ from rick_providers.protocols import AsyncProvider, Provider
 from rick_providers.resilience import ProviderBudgetError, ResilientProvider
 
 __all__ = [
+    "USE_DEFAULT_TEMPERATURE",
     "PROVIDER_CONTRACT_VERSION",
     "ProviderMessage",
     "ProviderErrorCode",
@@ -78,6 +82,7 @@ __all__ = [
     "ResilientProvider",
     "MAX_RESPONSE_BYTES",
     "OpenAICompatibleClient",
+    "AnthropicMessagesClient",
     "AsyncOpenAICompatibleClient",
     "AsyncOpenAIProvider",
     "OpenAICompatibleAsyncClient",

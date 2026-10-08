@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1.7
+# syntax=docker/dockerfile:1.7@sha256:a57df69d0ea827fb7266491f2813635de6f17269be881f696fbfdf2d83dda33e
 #
 # Build from the repository root. Both Node image arguments are intentionally
 # required and must be supplied as immutable image references with @sha256
@@ -33,6 +33,12 @@ ENV RICK_API_INTERNAL_URL=${RICK_API_INTERNAL_URL}
 
 RUN npm run build
 
+FROM ${NODE_BUILD_IMAGE} AS production_dependencies
+
+WORKDIR /opt/rick/apps/web
+COPY apps/web/package.json apps/web/package-lock.json ./
+RUN npm ci --omit=dev --ignore-scripts --no-audit --no-fund
+
 FROM ${NODE_RUNTIME_IMAGE} AS runtime
 
 ENV NODE_ENV=production \
@@ -44,11 +50,12 @@ WORKDIR /opt/rick/apps/web
 
 RUN addgroup --system --gid 10001 rick \
     && adduser --system --uid 10001 --ingroup rick --home /nonexistent \
-       --shell /sbin/nologin rick
+       --shell /sbin/nologin rick \
+    && rm -rf /usr/local/lib/node_modules/npm /opt/yarn-v* \
+    && rm -f /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/yarn /usr/local/bin/yarnpkg
 
 COPY apps/web/package.json apps/web/package-lock.json ./
-RUN npm ci --omit=dev --ignore-scripts --no-audit --no-fund \
-    && npm cache clean --force
+COPY --from=production_dependencies /opt/rick/apps/web/node_modules ./node_modules
 COPY --from=builder /opt/rick/apps/web/.next ./.next
 
 RUN chown -R 10001:10001 /opt/rick
@@ -60,4 +67,4 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:3000/login').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"
 
-ENTRYPOINT ["npm", "run", "start", "--", "--hostname", "0.0.0.0", "--port", "3000"]
+ENTRYPOINT ["node", "node_modules/next/dist/bin/next", "start", "--hostname", "0.0.0.0", "--port", "3000"]

@@ -30,6 +30,12 @@ import uuid
 
 
 ROOT = Path(__file__).resolve().parents[2]
+try:
+    from scripts.phase11.redis_runtime_gate import _reserve_output
+except ModuleNotFoundError:
+    sys.path.insert(0, str(ROOT))
+    from scripts.phase11.redis_runtime_gate import _reserve_output
+
 DEFAULT_OUTPUT = ".runtime/phase-3/redis-multi-replica-runtime-gate.json"
 WINDOW_SECONDS = 5.0
 BUCKET_LIMIT = 2
@@ -153,6 +159,30 @@ def _api_settings_for(settings_type: Any, *, api_key: str, bucket_limit: int) ->
     )
 
 
+def _seed_runtime_users(identity: Any, *, run_id: str, tenant_id: str) -> None:
+    """Seed identical dev principals in otherwise independent API processes.
+
+    The production create-user operation assigns a new UUID on each call;
+    those IDs describe different users and therefore different chat buckets.
+    This fixture uses the canonical in-memory store's explicit seed seam.
+    Collection grants remain explicitly empty, rather than assuming defaults.
+    """
+    from rick_identity import InMemoryUserStore
+
+    store = getattr(identity, "_users", None)
+    if getattr(identity, "mode", None) not in {"dev", "test"} or not isinstance(store, InMemoryUserStore):
+        raise _InvalidConfiguration()
+    for purpose in ("login", "chat"):
+        store.seed({
+            "user_id": f"runtime-{purpose}-{run_id}",
+            "email": f"runtime-{purpose}-{run_id}@example.test",
+            "role": "VETERINARIAN", "tenant_id": tenant_id, "workspace_id": "default",
+            "password_plain": "password123", "status": "active", "membership_status": "active",
+            "permission_overrides": {"add": [], "remove": []}, "authorized_collection_ids": [],
+            "password_version": 1, "role_version": 1,
+        })
+
+
 def _api_bucket_key(limiter: Any, *, route_key: str) -> str:
     """Derive the package-owned bucket key without exposing its material."""
 
@@ -261,18 +291,7 @@ async def _api_replica_process(
         providers.rate_limiter = limiter
         identity = providers.identity
         tenant_id = f"runtime-tenant-{run_id}"
-        identity.create_user(
-            email=f"runtime-login-{run_id}@example.test",
-            role="VETERINARIAN",
-            tenant_id=tenant_id,
-            password="password123",
-        )
-        identity.create_user(
-            email=f"runtime-chat-{run_id}@example.test",
-            role="VETERINARIAN",
-            tenant_id=tenant_id,
-            password="password123",
-        )
+        _seed_runtime_users(identity, run_id=run_id, tenant_id=tenant_id)
         if getattr(providers, "rate_limiter", None) is not limiter:
             _send(channel, {"kind": "error", "error": "redis_limiter_not_bound"})
             return
@@ -925,13 +944,26 @@ def run_gate(
     return _run_two_replicas(url, require_tls=require_tls, run_id=uuid.uuid4().hex[:12])
 
 
-def main(argv: list[str] | None = None) -> int:
+def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--redis-url", default=os.environ.get("RICK_TEST_REDIS_URL", ""))
     parser.add_argument("--require-tls", action="store_true")
     parser.add_argument("--allow-nonlocal", action="store_true")
     parser.add_argument("--output", default=DEFAULT_OUTPUT)
-    args = parser.parse_args(sys.argv[1:] if argv is None else argv)
+    return parser.parse_args(argv)
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = _parse_args(sys.argv[1:] if argv is None else argv)
+    try:
+        with _reserve_output(ROOT, args.output) as (stream, output):
+            return _execute(args, stream, output)
+    except Exception:
+        print(json.dumps({"status": "FAIL", "report": "output_or_runtime_failed"}, sort_keys=True))
+        return 1
+
+
+def _execute(args: argparse.Namespace, stream, output: Path) -> int:
 
     if not args.redis_url.strip():
         status = "BLOCKED_EXTERNAL"
@@ -970,11 +1002,9 @@ def main(argv: list[str] | None = None) -> int:
         "runtime_claim": status == "PASS",
         "production_safe": bool(production_safe),
     }
-    output = (ROOT / args.output).resolve()
-    output.relative_to(ROOT.resolve())
-    output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(json.dumps(payload, ensure_ascii=False, sort_keys=True, indent=2) + "\n", encoding="utf-8")
-    print(json.dumps({"output": args.output, "status": status, "production_safe": production_safe}, sort_keys=True))
+    stream.write(json.dumps(payload, ensure_ascii=False, sort_keys=True, indent=2) + "\n")
+    stream.flush()
+    print(json.dumps({"output": str(output.relative_to(ROOT.resolve())), "status": status, "production_safe": production_safe}, sort_keys=True))
     return 0 if status == "PASS" else (2 if status == "BLOCKED_EXTERNAL" else 1)
 
 

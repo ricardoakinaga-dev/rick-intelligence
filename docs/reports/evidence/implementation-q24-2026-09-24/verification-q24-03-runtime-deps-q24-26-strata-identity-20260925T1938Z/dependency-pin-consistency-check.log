@@ -1,0 +1,8 @@
+fastapi==0.141.1: project/runtime.in/runtime.lock/uv.lock=PASS; explicit CI pins=PASS
+pydantic==2.13.5: project/runtime.in/runtime.lock/uv.lock=PASS; explicit CI pins=PASS
+python-multipart==0.0.32: project/runtime.in/runtime.lock/uv.lock=PASS; explicit CI pins=PASS
+starlette==1.7.0: project/runtime.in/runtime.lock/uv.lock=PASS; explicit CI pins=PASS
+uvicorn==0.54.0: project/runtime.in/runtime.lock/uv.lock=PASS; explicit CI pins=PASS
+quality.yml consumes runtime.lock: PASS
+errors: []
+result: PASS

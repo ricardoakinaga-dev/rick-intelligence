@@ -1,0 +1,17 @@
+{
+  "finding": "A03",
+  "retry_same_conversation": {
+    "status": 200,
+    "conversation_id": "conv-A",
+    "answer": "ANSWER_FOR::ALPHA",
+    "message_id": "msg-9fd6ef9938fd"
+  },
+  "other_conversation": {
+    "status": 200,
+    "conversation_id": "conv-A",
+    "answer": "ANSWER_FOR::ALPHA",
+    "message_id": "msg-9fd6ef9938fd"
+  },
+  "expected_other_conversation": "conv-B",
+  "cross_conversation_replay_defect": true
+}

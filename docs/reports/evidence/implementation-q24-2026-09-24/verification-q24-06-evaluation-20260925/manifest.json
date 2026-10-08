@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-09-25T16:49:41Z",
+  "scope": "Q24-06 local contract feasibility and synthetic offline evaluator verification; not a corpus, provider or release manifest.",
+  "checkout": {
+    "head": "b52f32c141916a2ea3af1a6b913bd91f380606e0",
+    "worktree": "dirty shared checkout; other changes are present"
+  },
+  "result": "PASS",
+  "procedure": {
+    "tests": "PYTHONPATH=scripts/state_of_art PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -q -p no:cacheprovider scripts/state_of_art/tests/test_evaluate_pack.py scripts/state_of_art/tests/test_evaluate_retrieval.py",
+    "evaluation": "PYTHONPATH=scripts/state_of_art PYTHONDONTWRITEBYTECODE=1 python3 scripts/state_of_art/evaluate_pack.py --pack docs/evaluation/packs/rec22-local-v2 --pretty",
+    "environment": "Linux; Python 3.12.3; recorded offline fixture; no provider, network, API or vector store invoked",
+    "tests_result": "22 passed in 0.09s",
+    "pack_status": "PASS",
+    "aggregate_status": "PASS",
+    "negative_scenarios": {
+      "no_evidence": "PASS",
+      "weak_evidence": "PASS",
+      "unsupported_assertion": "PASS"
+    },
+    "positive_fixture_cases": 2,
+    "k_values": [
+      1,
+      2,
+      3
+    ]
+  },
+  "files": {
+    "docs/evaluation/packs/rec22-local-v1/manifest.json": "cf287b9cd4d44e01a380f8d72a62e87dc9f8362f9aceda145430c9f20da909d5",
+    "docs/evaluation/packs/rec22-local-v2/manifest.json": "eaf88ffe512b26af923d8ae2ea810efd90b26a97d42f1363e1f84301fc4fec88",
+    "docs/evaluation/packs/rec22-local-v2/cases.json": "adb90cc36db83f0b69c1b1ac04d2e3108fd84a4ee6a36d99e684681defd036b7",
+    "scripts/state_of_art/evaluate_pack.py": "fef016f07d9ed9d3f1c2d0fe4044dc344c48969457f15b9dc332360a32ad9476",
+    "scripts/state_of_art/tests/test_evaluate_pack.py": "566f69c92a4e8ff0b251eb07ba0e25b443edd44bc79263771149ec1568426de7",
+    "scripts/state_of_art/tests/test_evaluate_retrieval.py": "47ea16b3cbb620aaef60079fd4d66187e71ecc33ac2bd3906639e5389851e333",
+    "scripts/state_of_art/requirements.txt": "edf8275be8f9e9aec4362e9cdc0ac86fad619d03b3463242a9d28a38361b680d",
+    "docs/evaluation/retrieval-evaluation.md": "52cdf3690e4ddfe626a67a1ba5b5589ef9721604f5326bf02a7cca4d141bda31",
+    "docs/evals/rag-evaluation.md": "3bc06199e0b548a681a815416c4609b8411f8a97291f8b706f1c8f474f500207",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-06-evaluation-20260925/evaluation-tests.log": "6f45adadadb62914ad2dd0541c5cff79ba38974082fd288d78048736adff7866",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-06-evaluation-20260925/rec22-local-v2-result.json": "abd58bf606b914de9bd02193ac456eaea43c7c44718abaebbfe33e3b91d74e99"
+  },
+  "limitations": "Synthetic/offline recorded observations only. Two positive cases do not establish representativeness, statistical significance, domain acceptance, licensed-corpus suitability, provider/runtime quality, production latency or release readiness. live_provider remains NOT_RUN. The prior v1 pack and its failing history are preserved."
+}

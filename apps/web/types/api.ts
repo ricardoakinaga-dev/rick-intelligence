@@ -31,6 +31,7 @@ export type AdminUser = {
   tenant_id: string;
   workspace_id: string;
   status: string;
+  membership_status?: string | null;
   authorized_collection_ids?: string[] | null;
   permission_overrides?: Record<string, unknown> | null;
 };

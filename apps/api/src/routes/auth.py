@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import hashlib
 import inspect
+import logging
+import secrets
 
 from fastapi import APIRouter, Depends, Header, Request, Response
 from pydantic import BaseModel, Field
@@ -17,6 +19,7 @@ from dependencies.services import get_providers
 from services.audit import emit_required
 
 router = APIRouter(tags=["Auth"])
+_logger = logging.getLogger(__name__)
 
 
 class LoginRequest(BaseModel):
@@ -66,26 +69,73 @@ def _recovery_response(request: Request):
     )
 
 
-def _deliver_password_reset(providers, payload: RecoveryRequest, token: str | None) -> None:
-    """Hand a reset token to an injected delivery port without returning it."""
-    delivery = getattr(providers, "password_reset_delivery", None)
-    if delivery is None or token is None:
+def _deliver_password_reset(
+    providers,
+    payload: RecoveryRequest,
+    token: str | None,
+    *,
+    request_id: str | None = None,
+) -> None:
+    """Best-effort handoff that never turns account resolution into an oracle."""
+    if token is None:
         return
-    method = getattr(delivery, "deliver_password_reset", None)
-    if not callable(method):
-        raise ApiError("provider_unavailable")
     try:
+        delivery = getattr(providers, "password_reset_delivery", None)
+        if delivery is None:
+            return
+        method = getattr(delivery, "deliver_password_reset", None)
+        if not callable(method):
+            raise TypeError("password reset delivery port is unavailable")
         accepted = method(
             email=payload.email,
             tenant_id=payload.tenant_id,
             token=token,
         )
-        if inspect.isawaitable(accepted) or accepted is False:
-            raise ApiError("provider_unavailable")
-    except ApiError:
-        raise
+        if inspect.isawaitable(accepted):
+            close = getattr(accepted, "close", None)
+            if callable(close):
+                close()
+            raise TypeError("password reset delivery must complete synchronously")
+        if accepted is False:
+            raise RuntimeError("password reset delivery rejected the handoff")
     except Exception as exc:
-        raise ApiError("provider_unavailable") from exc
+        # Recovery responses stay identical for resolvable and unresolvable
+        # accounts, including when an injected delivery port is unhealthy.
+        # Do not log the email, tenant, reset token, or exception text.
+        _logger.warning(
+            "password reset delivery failed request_id=%s error_type=%s",
+            request_id if isinstance(request_id, str) and request_id else "unknown",
+            type(exc).__name__,
+        )
+
+
+def _issue_password_reset_neutrally(
+    identity: object,
+    payload: RecoveryRequest,
+    *,
+    request_id: str | None = None,
+) -> str | None:
+    """Hide identity-resolution and token-store failures behind the neutral API response."""
+
+    try:
+        issue = getattr(identity, "issue_password_reset", None)
+        if not callable(issue):
+            return None
+        token = issue(email=payload.email, tenant_id=payload.tenant_id)
+        if token is None:
+            return None
+        if not isinstance(token, str) or not token.strip() or len(token) > 512:
+            raise TypeError("password reset issuer returned an invalid token")
+        return token
+    except Exception as exc:
+        # A lookup/write error for a resolvable account must not distinguish
+        # it from an unknown or ambiguous address at this public boundary.
+        _logger.warning(
+            "password reset issuance failed request_id=%s error_type=%s",
+            request_id if isinstance(request_id, str) and request_id else "unknown",
+            type(exc).__name__,
+        )
+        return None
 
 
 def _public_session(snapshot) -> dict:
@@ -153,6 +203,15 @@ async def login(payload: LoginRequest, request: Request, response: Response):
         httponly=True, secure=providers.settings.session_cookie_secure,
         samesite=providers.settings.session_cookie_samesite, path="/",
     )
+    # Per-session CSRF nonce (double-submit). This cookie is intentionally
+    # NOT HttpOnly so the browser can read it and echo it back in the CSRF
+    # header; it is bound to the session lifetime and SameSite=strict.
+    csrf_nonce = secrets.token_urlsafe(32)
+    response.set_cookie(
+        key=providers.settings.csrf_cookie_name, value=csrf_nonce, max_age=8 * 3600,
+        httponly=False, secure=providers.settings.session_cookie_secure,
+        samesite="strict", path="/",
+    )
     snapshot = identity.validate_token(token)  # type: ignore[union-attr]
     _audit(
         "auth.login",
@@ -170,8 +229,16 @@ def _audit(action: str, actor: str | None, request: Request, *, tenant_id: str |
             providers.audit_sink.emit({"action": action, "actor_user_id": actor,  # type: ignore[union-attr]
                                        "request_id": getattr(request.state, "request_id", None),
                                        "tenant_id": tenant_id})  # type: ignore[union-attr]
-    except Exception:
-        pass
+    except Exception as exc:
+        # Audit failures are operationally significant, but logging must not
+        # capture payloads, credentials, tokens, or exception text supplied by
+        # an identity/audit backend.
+        _logger.warning(
+            "auth audit emission failed action=%s request_id=%s error_type=%s",
+            action,
+            getattr(request.state, "request_id", None),
+            type(exc).__name__,
+        )
 
 
 @router.post("/api/v1/auth/logout")
@@ -189,6 +256,7 @@ def logout(request: Request, response: Response, session=Depends(get_current_ses
     })
     providers.identity.logout(token)  # type: ignore[union-attr]
     response.delete_cookie(key=providers.settings.session_cookie_name, path="/")
+    response.delete_cookie(key=providers.settings.csrf_cookie_name, path="/")
     return {"status": "signed_out"}
 
 
@@ -207,10 +275,11 @@ async def recovery(payload: RecoveryRequest, request: Request):
     providers = get_providers(request)
     if not await _recovery_rate_allowed(providers, request, payload):
         return _recovery_response(request)
-    issue = getattr(providers.identity, "issue_password_reset", None)
-    if callable(issue):
-        token = issue(email=payload.email, tenant_id=payload.tenant_id)
-        _deliver_password_reset(providers, payload, token)
+    request_id = getattr(request.state, "request_id", None)
+    token = _issue_password_reset_neutrally(
+        providers.identity, payload, request_id=request_id,
+    )
+    _deliver_password_reset(providers, payload, token, request_id=request_id)
     # Neutral response whether or not the identity exists.
     return {"status": "queued"}
 
@@ -220,10 +289,11 @@ async def request_reset(payload: RecoveryRequest, request: Request):
     providers = get_providers(request)
     if not await _recovery_rate_allowed(providers, request, payload):
         return _recovery_response(request)
-    issue = getattr(providers.identity, "issue_password_reset", None)
-    if callable(issue):
-        token = issue(email=payload.email, tenant_id=payload.tenant_id)
-        _deliver_password_reset(providers, payload, token)
+    request_id = getattr(request.state, "request_id", None)
+    token = _issue_password_reset_neutrally(
+        providers.identity, payload, request_id=request_id,
+    )
+    _deliver_password_reset(providers, payload, token, request_id=request_id)
     return {"status": "queued"}
 
 

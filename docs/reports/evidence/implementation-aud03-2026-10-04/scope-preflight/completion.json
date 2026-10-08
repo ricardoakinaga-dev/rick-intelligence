@@ -1,0 +1,110 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-10-04T10:34:03.866037+00:00",
+  "scope": "AUD03-27 local preparation: executable 0008 aggregate preflight",
+  "scope_verdict": "PASS_LOCAL",
+  "global_verdict": "NO-GO",
+  "head": "b52f32c141916a2ea3af1a6b913bd91f380606e0",
+  "worktree_dirty": true,
+  "review_kind": "SELF_REVIEW",
+  "independent_review": "NOT_RUN: no subagent capability available",
+  "criteria": {
+    "P1": "Real PostgreSQL rejects UPDATE with SQLSTATE 25006; observed transaction is READ ONLY/REPEATABLE READ",
+    "P2": "Exact aggregate checks, source digests and declared snapshot; clean/blocked JSON archived; no row content or DSN emitted",
+    "P3": "Real CLI exit 0 for four zeros, 1 for four conflicts, 2 for missing schema/lock timeout; malformed results tested offline",
+    "P4": "Connection timeout=5 tested; SET LOCAL statement_timeout=15s; actual lock wait ends with SQLSTATE 55P03 within test budget; diagnostics redacted",
+    "P5": "Six PostgreSQL probes compare data, constraints, triggers and history before/after; original migrations preserved; owned resource teardown observed"
+  },
+  "validation": [
+    {
+      "record": "docs/reports/evidence/implementation-aud03-2026-10-03/lead/continuation-20261004-scope-preflight-unit.command.json",
+      "result": "20 passed"
+    },
+    {
+      "record": "docs/reports/evidence/implementation-aud03-2026-10-03/lead/continuation-20261004-scope-preflight-regression.command.json",
+      "result": "154 passed; one existing Starlette deprecation warning"
+    },
+    {
+      "record": "docs/reports/evidence/implementation-aud03-2026-10-03/lead/continuation-20261004-scope-preflight-static.command.json",
+      "result": "PASS ops-static; 297 passed"
+    },
+    {
+      "record": "docs/reports/evidence/implementation-aud03-2026-10-03/lead/continuation-20261004-scope-preflight-final.command.json",
+      "result": "27 passed; 118 deselected; 17 stable source hashes"
+    }
+  ],
+  "final_source_hashes": {
+    "Makefile": "8dc87fcfb22f3574aa05140352ca6b6e5517474f57d0e2dd9d083c2e0df30d6e",
+    "docs/operations/0008-scope-migration-preflight.md": "4ee2309f68ddd263b683ca3e851b603854103c28025d06e16e67a602c6f71079",
+    "docs/operations/0008-scope-preflight.sql": "01595696249ca38f77942a59c941907dcff336a071eff45e6314a752f95b1b3b",
+    "infrastructure/migrations/0001_control_plane.sql": "07113ff4a5e00e9986b1584864eb097e67a6daa66285895b9d6993f6bf116195",
+    "infrastructure/migrations/0002_product_schema.sql": "0bd4a31e3a821de3efcdaad621674aafc9215b0acb84a55fb681fc9fd6054312",
+    "infrastructure/migrations/0003_product_contract_extensions.sql": "d6d6413a45f93a5a65146d20221721bc60d5131f86ec29c0fd848cac351ae14a",
+    "infrastructure/migrations/0004_durable_jobs_contract.sql": "0621c726c6eaae17fba0a72a209452964eb6320c38f2ebc60966b1d562731274",
+    "infrastructure/migrations/0004_operation_guard.sql.inc": "9691a200e4746e0cc69b035c7a81ac1ede8cab3053ab24b354294d9725afa1e2",
+    "infrastructure/migrations/0005_rewrite_legacy_jobs.sql": "58878320223f9f30d42aea840c7e58795eb5c448daf90a0877adedc781cc9774",
+    "infrastructure/migrations/0006_document_lineage_contract.sql": "2d35f6e5a784258150baf68c0e88cbdb1f7b733034af662d694a45956eb8ffdd",
+    "infrastructure/migrations/0007_admin_audit_reconciliation.sql": "4af11b3250c3b5f3d2ea1e3a1042883ccf3cb703370daa6011cd4c2c748ae6e2",
+    "infrastructure/migrations/0008_composite_scope_constraints.sql": "94f1ede25b4c849f6b70fec6e19dcb97662b7f213e6523d832e27bb6109db0fe",
+    "infrastructure/migrations/README.md": "333aaedd7bdf8077e9071270b4ee60b34adf937170aa1d04db7d75729395f132",
+    "infrastructure/scripts/migrate.py": "a76c5a53889234c889422e0796709e5804765b6fe19f3e70472cdfcc43a0efcb",
+    "infrastructure/scripts/scope_preflight.py": "3c03c631a51ffcbd5173c5603d1356d7db951f7c4b9c594a974cd0014fdef6fe",
+    "infrastructure/scripts/tests/test_migrate.py": "46412d97bb34e958841f75d921ced8c1ffb9077576e06ec43cdc31312bafd892",
+    "infrastructure/scripts/tests/test_scope_preflight.py": "0a202868b8f765085bd42c39e5cc549e6488294c9f6a29586aa7da88b64ef2d9"
+  },
+  "runtime": [
+    {
+      "resource": "docs/reports/evidence/implementation-aud03-2026-10-04/scope-preflight/runtime/rick-q24-migration-0a33fd5e60864b3ab554beaf8e51e4ff/resource.json",
+      "teardown": "docs/reports/evidence/implementation-aud03-2026-10-04/scope-preflight/runtime/rick-q24-migration-0a33fd5e60864b3ab554beaf8e51e4ff/teardown.json",
+      "run_id": "rick-q24-migration-0a33fd5e60864b3ab554beaf8e51e4ff",
+      "image_id": "sha256:3c5c8892d184f738f4fe282d14ddaa613a38f00f4189d2d94725ebe6f2909ddb",
+      "server_version": "16.15"
+    },
+    {
+      "resource": "docs/reports/evidence/implementation-aud03-2026-10-04/scope-preflight/runtime/rick-q24-migration-75dee99789aa4c6b826608bc8666bf00/resource.json",
+      "teardown": "docs/reports/evidence/implementation-aud03-2026-10-04/scope-preflight/runtime/rick-q24-migration-75dee99789aa4c6b826608bc8666bf00/teardown.json",
+      "run_id": "rick-q24-migration-75dee99789aa4c6b826608bc8666bf00",
+      "image_id": "sha256:3c5c8892d184f738f4fe282d14ddaa613a38f00f4189d2d94725ebe6f2909ddb",
+      "server_version": "16.15"
+    },
+    {
+      "resource": "docs/reports/evidence/implementation-aud03-2026-10-04/scope-preflight/runtime/rick-q24-migration-7f69a05e0de84191b7eab6ad0c4b97ee/resource.json",
+      "teardown": "docs/reports/evidence/implementation-aud03-2026-10-04/scope-preflight/runtime/rick-q24-migration-7f69a05e0de84191b7eab6ad0c4b97ee/teardown.json",
+      "run_id": "rick-q24-migration-7f69a05e0de84191b7eab6ad0c4b97ee",
+      "image_id": "sha256:3c5c8892d184f738f4fe282d14ddaa613a38f00f4189d2d94725ebe6f2909ddb",
+      "server_version": "16.15"
+    }
+  ],
+  "example_outputs": {
+    "clean": {
+      "path": "docs/reports/evidence/implementation-aud03-2026-10-04/scope-preflight/runtime/rick-q24-migration-7f69a05e0de84191b7eab6ad0c4b97ee/scope-preflight-clean.json",
+      "sha256": "27bb1fba027937ae7a3cae2af3a2efe784ca3aef161d5b2abf1b5c89cb965c08"
+    },
+    "blocked": {
+      "path": "docs/reports/evidence/implementation-aud03-2026-10-04/scope-preflight/runtime/rick-q24-migration-7f69a05e0de84191b7eab6ad0c4b97ee/scope-preflight-blocked.json",
+      "sha256": "cfd31e1e4a7c5171b2f27479f530e29dc8465982e5ba7968dcc06cfc66921ca5"
+    }
+  },
+  "self_review_findings": [
+    {
+      "finding": "Initial evidence scope omitted migration runner and repair sidecar",
+      "resolution": "Final command explicitly hashes both plus all local migrations; 27 checks passed with stable sources"
+    },
+    {
+      "finding": "Aggregate zeros could be confused with installed migration compatibility",
+      "resolution": "Status uses NO_CONFLICTS; runbook and report limit it to four counts and keep installed history/constraint checks pending"
+    },
+    {
+      "finding": "Regression evidence predates archiving clean/blocked outputs in tests",
+      "resolution": "Only test artifact writes changed after 154-case regression; final 27-case run validates their current source"
+    }
+  ],
+  "limitations": [
+    "No installed database inventory or external credential use",
+    "No migration, repair or backfill applied by the preflight",
+    "Snapshot identity/authorization is declared by operator, not attested",
+    "No independent review or global acceptance",
+    "Only this bounded scope and migration regressions verified; unrelated worktree changes remain"
+  ],
+  "next_action": "Obtain D02-authorized snapshot history and constraints, then run the preflight against that same snapshot"
+}

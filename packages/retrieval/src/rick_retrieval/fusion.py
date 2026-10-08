@@ -13,7 +13,13 @@ _SCORE_FIELDS = frozenset({"score", "dense_score", "sparse_score"})
 
 def _has_value(value: object) -> bool:
     """Treat null/empty provenance as absent while retaining valid zeroes."""
-    return value is not None and value != "" and value != {} and value != []
+    if value is None:
+        return False
+    if isinstance(value, str):
+        return value != ""
+    if isinstance(value, (dict, list)):
+        return len(value) > 0
+    return True
 
 
 def _merge_provenance(target: dict, result: dict) -> None:
@@ -27,16 +33,20 @@ def _merge_provenance(target: dict, result: dict) -> None:
 
 def _finalize_provenance(item: dict) -> None:
     """Keep canonical and compatibility citation fields mutually useful."""
-    if not _has_value(item.get("page_start")):
-        item["page_start"] = item.get("page_hint")
-    if not _has_value(item.get("page_end")):
-        item["page_end"] = item.get("page_start")
-    if not _has_value(item.get("source")):
-        item["source"] = item.get("source_title") or item.get("document_filename") or ""
-    if not _has_value(item.get("document_filename")):
-        item["document_filename"] = item.get("source") or ""
-    if not _has_value(item.get("title")):
-        item["title"] = item.get("source_title") or item.get("source") or ""
+    get = item.get
+    value = get("page_start")
+    if not _has_value(value):
+        item["page_start"] = value = get("page_hint")
+    if not _has_value(get("page_end")):
+        item["page_end"] = value
+    value = get("source")
+    if not _has_value(value):
+        value = get("source_title") or get("document_filename") or ""
+        item["source"] = value
+    if not _has_value(get("document_filename")):
+        item["document_filename"] = value or ""
+    if not _has_value(get("title")):
+        item["title"] = get("source_title") or value or ""
 
 
 def rrf_fusion(dense_results: list[dict], sparse_results: list[dict], k: int = RRF_K) -> list[dict]:
@@ -68,21 +78,22 @@ def rrf_fusion(dense_results: list[dict], sparse_results: list[dict], k: int = R
 
 
 def _blank(result: dict, chunk_id: str) -> dict:
-    return {
-        **result,
-        "chunk_id": chunk_id,
-        "document_id": result.get("document_id"),
-        "workspace_id": result.get("workspace_id"),
-        "text": result.get("text", ""),
-        "page_start": result.get("page_start", result.get("page_hint")),
-        "page_end": result.get("page_end"),
-        "source": result.get("source"),
-        "title": result.get("title"),
-        "document_filename": result.get("document_filename"),
-        "section": result.get("section"),
-        "checksum": result.get("checksum"),
-        "collection_id": result.get("collection_id") or "rag_phase0",
-        "score": 0.0,
-        "dense_score": 0.0,
-        "sparse_score": 0.0,
-    }
+    item = dict(result)
+    item["chunk_id"] = chunk_id
+    item.setdefault("document_id", None)
+    item.setdefault("workspace_id", None)
+    item.setdefault("text", "")
+    if "page_start" not in item:
+        item["page_start"] = item.get("page_hint")
+    item.setdefault("page_end", None)
+    item.setdefault("source", None)
+    item.setdefault("title", None)
+    item.setdefault("document_filename", None)
+    item.setdefault("section", None)
+    item.setdefault("checksum", None)
+    if not item.get("collection_id"):
+        item["collection_id"] = "rag_phase0"
+    item["score"] = 0.0
+    item["dense_score"] = 0.0
+    item["sparse_score"] = 0.0
+    return item

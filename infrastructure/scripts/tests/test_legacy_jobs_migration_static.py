@@ -43,3 +43,14 @@ def test_legacy_rewrite_keeps_running_rows_owner_bound() -> None:
     assert "lease_until > COALESCE(job_row.lease_acquired_at, job_row.created_at)" in sql
     assert "lease_worker_id = lease_worker" in sql
     assert "lease_owner = CASE WHEN target_state = 'RUNNING'" in sql
+
+
+def test_postgres_expression_fixes_retain_both_metadata_bounds() -> None:
+    sql = MIGRATION.read_text()
+    assert "jsonb_object_length" not in sql
+    assert "{0,511}" not in sql
+    assert "(SELECT count(*) FROM jsonb_object_keys(target_payload)) > 32" in sql
+    assert "(SELECT count(*) FROM jsonb_object_keys(target_result -> 'output_refs')) > 32" in sql
+    for name in ("payload_item", "result_item"):
+        assert f"length({name}.value) = 0" in sql
+        assert f"length({name}.value) > 512" in sql

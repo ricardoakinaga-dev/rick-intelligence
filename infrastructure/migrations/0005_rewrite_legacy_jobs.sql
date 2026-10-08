@@ -145,7 +145,7 @@ BEGIN
         IF target_payload ->> 'document_id' = '' THEN
             target_payload := target_payload - 'document_id';
         END IF;
-        IF jsonb_object_length(target_payload) > 32
+        IF (SELECT count(*) FROM jsonb_object_keys(target_payload)) > 32
            OR EXISTS (
                SELECT 1
                FROM jsonb_each_text(target_payload) AS payload_item(key, value)
@@ -168,7 +168,7 @@ BEGIN
                   )
                   OR length(payload_item.value) = 0
                   OR length(payload_item.value) > 512
-                  OR payload_item.value !~ '^[A-Za-z0-9][A-Za-z0-9_.:/@?=&%+~,\-]{0,511}$'
+                  OR payload_item.value !~ '^[A-Za-z0-9][A-Za-z0-9_.:/@?=&%+~,\-]*$'
                   OR payload_item.value ~* '(^|[^a-z0-9])(sk|pk|rk|ghp|glpat|xox[baprs])_[a-z0-9_-]*($|[^a-z0-9])'
                   OR payload_item.value ~* '(bearer|basic)[[:space:]]+[a-z0-9._~+/=-]{8,}'
                   OR payload_item.value ~* '(api[_-]?key|authorization|password|secret|token|private[_[:space:]-]?key)[[:space:]]*[:=]'
@@ -224,7 +224,7 @@ BEGIN
             END IF;
             IF target_result ? 'output_refs'
                AND (
-                   jsonb_object_length(target_result -> 'output_refs') > 32
+                   (SELECT count(*) FROM jsonb_object_keys(target_result -> 'output_refs')) > 32
                    OR EXISTS (
                        SELECT 1
                        FROM jsonb_each_text(target_result -> 'output_refs') AS result_item(key, value)
@@ -247,7 +247,7 @@ BEGIN
                           )
                           OR length(result_item.value) = 0
                           OR length(result_item.value) > 512
-                          OR result_item.value !~ '^[A-Za-z0-9][A-Za-z0-9_.:/@?=&%+~,\-]{0,511}$'
+                          OR result_item.value !~ '^[A-Za-z0-9][A-Za-z0-9_.:/@?=&%+~,\-]*$'
                           OR result_item.value ~* '(^|[^a-z0-9])(sk|pk|rk|ghp|glpat|xox[baprs])_[a-z0-9_-]*($|[^a-z0-9])'
                           OR result_item.value ~* '(bearer|basic)[[:space:]]+[a-z0-9._~+/=-]{8,}'
                           OR result_item.value ~* '(api[_-]?key|authorization|password|secret|token|private[_[:space:]-]?key)[[:space:]]*[:=]'

@@ -58,6 +58,24 @@ class BM25FReranker:
                 new_cand["score"] = max(quality, bm25f)
             scored.append(new_cand)
         scored.sort(key=lambda x: (x.get("score", 0.0), x.get("original_score", 0.0)), reverse=True)
+        # BM25F may reorder candidates with different fused scores, but it
+        # must preserve the sparse-leg precedence already established for
+        # candidates tied by RRF. Reorder only the tied candidates' existing
+        # slots so their BM25 order relative to other RRF groups is retained.
+        tied_slots: dict[float, list[int]] = {}
+        for index, candidate in enumerate(scored):
+            original_score = float(candidate.get("original_score", 0.0) or 0.0)
+            tied_slots.setdefault(original_score, []).append(index)
+        for slots in tied_slots.values():
+            if len(slots) < 2:
+                continue
+            tied = [scored[index] for index in slots]
+            tied.sort(
+                key=lambda candidate: float(candidate.get("sparse_score", 0.0) or 0.0) > 0,
+                reverse=True,
+            )
+            for index, candidate in zip(slots, tied):
+                scored[index] = candidate
         return scored
 
     def _field_score(self, terms, field_text, idf, doc_len, weight, pos_decay) -> float:

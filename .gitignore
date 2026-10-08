@@ -18,7 +18,7 @@ id_rsa*
 **/venv/
 **/dist/
 **/.next/
-**/.next-phase3-*/
+**/.next-*/
 **/coverage/
 **/.pytest_cache/
 **/.mypy_cache/
@@ -26,6 +26,8 @@ id_rsa*
 **/test-results/
 **/.playwright/
 **/*.tsbuildinfo
+.coverage
+**/.coverage
 
 # Local agent orchestration and generated verification evidence
 .gauntlet/
@@ -57,3 +59,15 @@ docs/progress/release-evidence.json
 
 # OS noise
 .DS_Store
+
+# Evidence kept by the AUD07-18 policy (docs/reports/evidence/README.md) is
+# report proof, not noise: the `*.log` rule above must not hide the 248 kept
+# *.log files from `git status`/`git add`.
+!docs/reports/evidence/**/*.log
+
+# Local tool state, never an input (AUD07-19): opencode session data and the
+# control-plane writer locks. Note that `uv.lock` is deliberately NOT here:
+# `apps/api/uv.lock` is named by verification records in `.agent/verification.jsonl`
+# (VER-Q24-03-*), so hiding it makes `check_control_plane` fail in a clean checkout.
+.opencode/
+.agent/*.lock

@@ -1,0 +1,54 @@
+[WebServer] (node:504977) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+[WebServer] (node:505022) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+[WebServer] INFO:     Started server process [505799]
+
+[WebServer] INFO:     Waiting for application startup.
+[WebServer] INFO:     Application startup complete.
+
+[WebServer] INFO:     Uvicorn running on http://127.0.0.1:8001 (Press CTRL+C to quit)
+
+
+Running 1 test using 1 worker
+
+(node:505845) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1/1] [desktop] › tests/document-state.spec.ts:36:5 › upload targets the user-selected authorized collection
+  1) [desktop] › tests/document-state.spec.ts:36:5 › upload targets the user-selected authorized collection 
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    - Expected  - 1
+    + Received  + 2
+
+    - a
+    +     
+    +
+
+      58 |   await expect(page.getByText("Documento publicado pelo servidor.")).toBeVisible();
+      59 |   await expect.poll(() => uploads.length).toBe(1);
+    > 60 |   expect(uploads[0].collection).toBe("a");
+         |                                 ^
+      61 |   await selector.selectOption("b");
+      62 |   await page.setInputFiles("#document-upload-input", { name: "fonte-b.md", mimeType: "text/markdown", buffer: Buffer.from("segunda fonte") });
+      63 |   await expect.poll(() => uploads.length).toBe(2);
+        at /home/ricardo/rick-intelligence/apps/web/tests/document-state.spec.ts:60:33
+
+    Error Context: ../../../../../tmp/rick-audit-20260924/browser/document-state-upload-targ-3ccdd-ected-authorized-collection-desktop/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    ../../../../../tmp/rick-audit-20260924/browser/document-state-upload-targ-3ccdd-ected-authorized-collection-desktop/trace.zip
+    Usage:
+
+        npx playwright show-trace ../../../../../tmp/rick-audit-20260924/browser/document-state-upload-targ-3ccdd-ected-authorized-collection-desktop/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+  1 failed
+    [desktop] › tests/document-state.spec.ts:36:5 › upload targets the user-selected authorized collection 

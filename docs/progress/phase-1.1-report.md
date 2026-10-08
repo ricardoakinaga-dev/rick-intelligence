@@ -128,7 +128,7 @@ with no caller switch until dual verification is available.
 ## Promotion Decision
 
 `VERIFIED_CANDIDATE` for the bounded Phase 1.1 root-only scope. The final gate
-is [`GATE-PH11-VERIFIED-001`](../../.agent/gates/phase-1.1-verified.json), bound
+is [`GATE-PH11-VERIFIED-001`](../../.agent/legacy-v1/gates/phase-1.1-verified.json), bound
 to `VER-PH11-FINAL-CURRENT`. The generic engineering-framework audit still
 reports pre-existing Phase 0/0.5/0.6 ledger incompatibilities; the
 phase-aware Phase 1.1 control check is green and those historical records were

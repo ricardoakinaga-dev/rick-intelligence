@@ -1,28 +1,37 @@
 {
   "legacy_chunk_ms": {
-    "p50_ms": 1.2,
-    "p95_ms": 1.507
+    "min_ms": 1.0485,
+    "p50_ms": 1.166,
+    "p95_ms": 1.955
   },
   "root_chunk_ms": {
-    "p50_ms": 0.489,
-    "p95_ms": 0.76
+    "min_ms": 1.1127,
+    "p50_ms": 1.175,
+    "p95_ms": 1.946
   },
   "legacy_rrf_ms": {
-    "p50_ms": 0.05,
-    "p95_ms": 749.516
+    "min_ms": 0.0267,
+    "p50_ms": 0.029,
+    "p95_ms": 0.052
   },
   "root_rrf_ms": {
-    "p50_ms": 0.027,
-    "p95_ms": 0.038
+    "min_ms": 0.049,
+    "p50_ms": 0.05,
+    "p95_ms": 0.088
   },
   "legacy_rerank_ms": {
-    "p50_ms": 0.129,
-    "p95_ms": 0.27
+    "min_ms": 0.1191,
+    "p50_ms": 0.122,
+    "p95_ms": 0.242
   },
   "root_rerank_ms": {
-    "p50_ms": 0.132,
-    "p95_ms": 0.156
+    "min_ms": 0.1299,
+    "p50_ms": 0.134,
+    "p95_ms": 0.24
   },
   "budget": "root must stay within 2x legacy (no unjustified doubling)",
-  "note": "fixture-scoped, hermetic; live Qdrant/OpenAI excluded"
+  "note": "fixture-scoped, hermetic; live Qdrant/OpenAI excluded; both sides measured in the same run",
+  "chunk_min_ratio": 1.061,
+  "rrf_min_ratio": 1.835,
+  "rerank_min_ratio": 1.091
 }

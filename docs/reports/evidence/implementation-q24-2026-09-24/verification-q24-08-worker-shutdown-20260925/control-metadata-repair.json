@@ -1,0 +1,34 @@
+{
+  "scope": "Two newly authored malformed metadata fields only",
+  "changes": [
+    {
+      "path": ".agent/execution-log.jsonl",
+      "record_id": "EVT-Q24-08-WORKER-SHUTDOWN-REVIEW-20260926T021657Z",
+      "field": "active_action_id",
+      "before": "Q17-01.A:VERIFY-Q17-19A-DEPLOYED-INVENTORY",
+      "after": "Q17-23.A:VERIFY-API-PROCESS-SHUTDOWN",
+      "rejected_record_archive": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-08-worker-shutdown-20260925/control-rejected-event.jsonl",
+      "rejected_record_sha256": "b6eee58198de970b9e2c0bc185acf963da1b36c1d27af72d83512273a540bf1a",
+      "normalized_record_sha256": "ab9aa09c0833b981eb65a276c9070dd84464ef43e480a24d51d0d97b66e1c8f0"
+    },
+    {
+      "path": ".agent/verification.jsonl",
+      "record_id": "VER-Q24-08-WORKER-SHUTDOWN-REVIEW-20260926T021657Z",
+      "field": "timestamp",
+      "before": "2026-09-26T02:16:57.353615Z",
+      "after": "2026-09-26T02:19:00.922094Z",
+      "rejected_record_archive": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-08-worker-shutdown-20260925/control-rejected-verification.jsonl",
+      "rejected_record_sha256": "4f1fa5157ddc66e9a809b038e0b34e8d2b03881e22db0bbf594cd3636e7c53d9",
+      "normalized_record_sha256": "ae8f3943fa22eecf452f23ce4e0d4dd803b35ee24b60e4a42efa6740fdcc554c"
+    }
+  ],
+  "historical_prefixes_unchanged": true,
+  "previous_state_revision": 379,
+  "state_revision": 380,
+  "failure_verification": "VER-Q17-01A-WORKER-SHUTDOWN-METADATA-REPAIR-20260926T021900Z-REJECTED-CONTROL",
+  "recovery_event": "EVT-Q17-01A-WORKER-SHUTDOWN-METADATA-REPAIR-20260926T021900Z",
+  "observed_at": "2026-09-26T02:19:00.939207Z",
+  "validation": "PASS",
+  "policy_note": "Original rejected rows are archived, not erased. Existing schema and validators are unchanged; outcome and authority histories are not reinterpreted.",
+  "validation_results": "final-control-repaired-results.json"
+}

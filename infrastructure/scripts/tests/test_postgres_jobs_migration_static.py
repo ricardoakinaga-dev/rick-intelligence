@@ -34,3 +34,11 @@ def test_canonical_jobs_migration_has_scope_cas_attempt_and_outbox_guards() -> N
     )
     for fragment in required_fragments:
         assert fragment in sql
+
+
+def test_historical_operation_repair_only_adds_the_stricter_guard() -> None:
+    sql = (MIGRATION.parent / "0004_operation_guard.sql.inc").read_text()
+    assert "ADD CONSTRAINT rick_ingestion_jobs_operation_v2_ck" in sql
+    assert "CHECK (operation ~ '^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$')" in sql
+    for forbidden in ("DROP ", "UPDATE ", "DELETE ", "DISABLE ", "NOT VALID"):
+        assert forbidden not in sql.upper()

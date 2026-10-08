@@ -468,7 +468,7 @@ async def _run_checks(
                 and decoded_arguments.get("status") == "ok"
                 and not stream_tool_conflict
                 and not stream_tool_extra
-                and stream_finish_reason in {"stop", "length", "content_filter", "unknown"}
+                and stream_finish_reason == "tool_calls"
             )
             assertions.append(
                 _Assertion(

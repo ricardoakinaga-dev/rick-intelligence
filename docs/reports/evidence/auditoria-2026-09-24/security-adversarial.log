@@ -1,0 +1,2 @@
+PYTHONDONTWRITEBYTECODE=1 python3 "/home/ricardo/rick-intelligence/scripts/phase11/check_adversarial_corpus.py"
+PASS: 8 bounded adversarial records across 8 categories

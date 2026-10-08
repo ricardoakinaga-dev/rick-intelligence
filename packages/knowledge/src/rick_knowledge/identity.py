@@ -1,13 +1,13 @@
-"""Canonical knowledge identity — byte-identical derivation to rag-contract-v1.
+"""Canonical identity with an unambiguous v2 tuple and explicit v1 lookups.
 
-document:{workspace}:{collection}:{sha256} UUIDv5 under the frozen namespace;
-point:{chunk_id} UUIDv5; version sha256:{16}; legacy physical-name aliases.
-No Python hash(). Stable across restarts and reindexes of unchanged content.
+Safe default-tenant scopes retain the frozen v1 bytes. Persisted IDs are never
+rewritten. Point derivation, content versions and collection aliases are stable.
 """
 
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 from uuid import NAMESPACE_URL, uuid5
 
@@ -46,8 +46,9 @@ def content_checksum(content: bytes | str) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 
-def document_id_for_content(*, workspace_id: str, collection_id: str, checksum: str,
-                            tenant_id: str) -> str:
+def legacy_document_id_for_content(*, workspace_id: str, collection_id: str, checksum: str,
+                                  tenant_id: str) -> str:
+    """Read-only v1 lookup. Never use this ambiguous encoding for new rows."""
     tenant = normalize_tenant_id(tenant_id)
     resolved = normalize_collection_id(collection_id)
     # The default tenant keeps the frozen Phase 0/1 contract byte-identical to
@@ -57,6 +58,31 @@ def document_id_for_content(*, workspace_id: str, collection_id: str, checksum: 
     name = f"document:{workspace_id}:{resolved}:{checksum}"
     if tenant != "default":
         name = f"document:tenant:{tenant}:{workspace_id}:{resolved}:{checksum}"
+    return str(uuid5(_IDENTITY_NAMESPACE, name))
+
+
+def document_id_for_content(*, workspace_id: str, collection_id: str, checksum: str,
+                            tenant_id: str) -> str:
+    """Versioned, unambiguous tuple encoding for new document identities.
+
+Persisted v1 IDs remain authoritative: ingestion explicitly resolves the old
+ID in the requested scope before creating a v2 row. No stored ID is rewritten.
+"""
+    if not isinstance(workspace_id, str) or not workspace_id.strip():
+        raise ValueError("workspace_id is required")
+    if not isinstance(checksum, str) or not checksum:
+        raise ValueError("checksum is required")
+    tenant = normalize_tenant_id(tenant_id)
+    # The frozen default-tenant names without separators are unambiguous and
+    # retain byte parity for deployed Phase 0/1 callers. Separator-bearing
+    # workspaces and every non-default tenant use the disjoint v2 tuple domain.
+    if tenant == "default" and ":" not in workspace_id:
+        return legacy_document_id_for_content(workspace_id=workspace_id,
+            collection_id=collection_id, checksum=checksum, tenant_id=tenant)
+    name = "document:v2:" + json.dumps(
+        [tenant, workspace_id, normalize_collection_id(collection_id), checksum],
+        ensure_ascii=True, separators=(",", ":"),
+    )
     return str(uuid5(_IDENTITY_NAMESPACE, name))
 
 

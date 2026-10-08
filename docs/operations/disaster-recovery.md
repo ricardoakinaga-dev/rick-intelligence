@@ -1,10 +1,10 @@
 # Disaster recovery plan
 
-Status: `RUNBOOK READY / RESTORE DRILL NOT_RUN`.
+Status: `RUNBOOK READY / OWNED LOCAL JOINT DRILL PASS / PRODUCTION DRILL NOT_RUN`.
 
 ## Recovery objectives
 
-The initial targets are RPO ≤15 minutes for PostgreSQL/object metadata and
+The proposed initial targets, pending operator approval, are RPO ≤15 minutes for PostgreSQL/object metadata and
 RTO ≤60 minutes for the canonical API/worker path. Qdrant is a rebuildable
 read model but should have a verified snapshot no older than 24 hours. Redis
 ephemeral coordination may be lost; durable jobs and authoritative metadata
@@ -31,3 +31,13 @@ The existing `infrastructure/scripts/backup_restore.py` reconciles exported
 file-level artifacts and semantic scope claims. It does not pretend to perform
 a live service restore. A real drill must produce service-derived counts,
 ACL checksums and recovery timings for every component.
+
+
+The owned local [restore18 rehearsal](../reports/evidence/production-2026-10-04/joint-restore18.json)
+restored an offline consistent export into fresh isolated volumes with identical
+images and compared SQL, database grants, object content and scoped vectors.
+It then verified internal login, search, tenant denial and logout revocation.
+Snapshot age was 13.529s at restore start; creation-to-verified-flow took 19.255s.
+These timings describe a small quiesced lab, not approved production RPO/RTO
+under representative writes. Both disposable targets were removed and the
+original test program resumed with its credentials/configuration unchanged.

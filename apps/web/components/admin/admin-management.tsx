@@ -14,8 +14,8 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { useSession } from "@/components/session-provider";
-import { Button, EmptyState, Panel, Spinner, StatusPill } from "@/components/ui";
-import { api, ApiError } from "@/lib/api";
+import { Button, ConfirmDialog, EmptyState, Panel, Spinner, StatusPill } from "@/components/ui";
+import { api, ApiError, errorMessage } from "@/lib/api";
 import { hasPermission } from "@/lib/permissions";
 import { presentRole } from "@/lib/presentation";
 import type {
@@ -47,11 +47,6 @@ type Confirmation =
   | { kind: "revoke-session"; session: AdminSession }
   | { kind: "revoke-user-sessions"; session: AdminSession };
 
-function errorMessage(cause: unknown, fallback: string) {
-  if (cause instanceof ApiError && cause.status === 403) return "O servidor recusou esta operação para a sessão atual.";
-  return cause instanceof ApiError ? cause.message : fallback;
-}
-
 function isForbidden(cause: unknown) {
   return cause instanceof ApiError && cause.status === 403;
 }
@@ -66,6 +61,10 @@ function userStatusTone(status: string): "success" | "warning" | "danger" {
   if (status === "active" || status === "enabled") return "success";
   if (status === "disabled" || status === "deactivated") return "danger";
   return "warning";
+}
+
+function effectiveMembershipStatus(user: AdminUser) {
+  return user.status === "active" ? user.membership_status || user.status : user.status;
 }
 
 function formatDate(value: string | number | null | undefined) {
@@ -104,98 +103,6 @@ function editFormFor(user: AdminUser): EditForm {
     authorized_collection_ids: collectionIdsText(user.authorized_collection_ids),
     permission_overrides: overridesText(user.permission_overrides),
   };
-}
-
-function AdminConfirmDialog({
-  open,
-  title,
-  description,
-  confirmLabel,
-  busy,
-  onCancel,
-  onConfirm,
-}: {
-  open: boolean;
-  title: string;
-  description: string;
-  confirmLabel: string;
-  busy: boolean;
-  onCancel: () => void;
-  onConfirm: () => void;
-}) {
-  const dialogRef = useRef<HTMLElement>(null);
-  const cancelRef = useRef<HTMLButtonElement>(null);
-  const previousFocusRef = useRef<HTMLElement | null>(null);
-  const onCancelRef = useRef(onCancel);
-
-  useEffect(() => {
-    onCancelRef.current = onCancel;
-  }, [onCancel]);
-
-  useEffect(() => {
-    if (!open) return;
-    previousFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    const frame = window.requestAnimationFrame(() => cancelRef.current?.focus());
-    return () => {
-      window.cancelAnimationFrame(frame);
-      const previous = previousFocusRef.current;
-      previousFocusRef.current = null;
-      if (previous?.isConnected && !previous.hasAttribute("disabled")) previous.focus();
-    };
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-    const dialog = dialogRef.current;
-    if (!dialog) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !busy) {
-        event.preventDefault();
-        onCancelRef.current();
-        return;
-      }
-      if (event.key !== "Tab") return;
-      const focusable = Array.from(dialog.querySelectorAll<HTMLElement>("button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled)"));
-      if (!focusable.length) return;
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [busy, open]);
-
-  if (!open) return null;
-
-  return (
-    <div className="dialog-backdrop" role="presentation">
-      <section
-        ref={dialogRef}
-        className="confirm-dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="admin-confirm-title"
-        aria-describedby="admin-confirm-description"
-      >
-        <span className="eyebrow">Confirmação necessária</span>
-        <h2 id="admin-confirm-title">{title}</h2>
-        <p id="admin-confirm-description">{description}</p>
-        <div className="dialog-actions">
-          <Button ref={cancelRef} variant="secondary" onClick={onCancel} disabled={busy}>Cancelar</Button>
-          <Button variant="danger" onClick={onConfirm} disabled={busy} aria-busy={busy}>
-            {busy ? <Spinner label="Confirmando ação" /> : null}
-            {busy ? "Confirmando…" : confirmLabel}
-          </Button>
-        </div>
-      </section>
-    </div>
-  );
 }
 
 function ResourceFailure({
@@ -486,7 +393,7 @@ export function AdminManagement() {
   return (
     <>
       {feedback ? <div className={`form-feedback ${feedback.tone}`} role={feedback.tone === "danger" ? "alert" : "status"}><span className="feedback-icon">{feedback.tone === "success" ? <CheckCircle2 size={16} /> : feedback.tone === "danger" ? <XCircle size={16} /> : <AlertTriangle size={16} />}</span><span>{feedback.message}</span></div> : null}
-      <div className="admin-grid" aria-label="Gestão de usuários e sessões">
+      <section className="admin-grid" aria-label="Gestão de usuários e sessões">
         <Panel className="admin-card">
           <div className="admin-icon teal"><UserRound size={19} /></div>
           <span className="eyebrow">Novo usuário</span>
@@ -530,7 +437,7 @@ export function AdminManagement() {
               <div className="dialog-actions"><Button type="button" variant="secondary" onClick={cancelEdit} disabled={editBusy}>Cancelar</Button><Button type="submit" disabled={editBusy}>{editBusy ? <><Spinner label="Salvando usuário" />Salvando…</> : <><CheckCircle2 size={15} />Salvar alterações</>}</Button></div>
             </form> : null}
             {resetTarget ? <form className="documents-toolbar login-form" onSubmit={requestReset} aria-labelledby="admin-reset-title"><div><span className="eyebrow">Redefinir senha</span><strong id="admin-reset-title">{resetTarget.email}</strong></div><label htmlFor="admin-reset-password">Nova senha<input id="admin-reset-password" type="password" autoComplete="new-password" required minLength={8} value={resetPassword} onChange={(event) => setResetPassword(event.target.value)} placeholder="Mínimo de 8 caracteres" /></label>{resetError ? <div className="form-alert" role="alert"><AlertTriangle size={15} /><span>{resetError}</span></div> : null}<div className="dialog-actions"><Button type="button" variant="secondary" onClick={() => { setResetTarget(null); setResetPassword(""); setResetError(null); }}>Cancelar</Button><Button type="submit"><KeyRound size={15} />Continuar</Button></div></form> : null}
-            <div className="document-list">{users.items.map((user) => <article className="document-row" key={user.user_id}><div className="document-type" aria-hidden="true">USR</div><div className="document-main"><strong>{user.email}</strong><span>{user.user_id} · tenant {user.tenant_id} · workspace {user.workspace_id}</span></div><div className="document-meta"><StatusPill tone={userStatusTone(user.status)}>{userStatusLabel(user.status)}</StatusPill><span>{presentRole(user.canonical_role || user.role)}</span><span>{user.authorized_collection_ids?.length ?? 0} coleção(ões)</span></div><div className="document-actions"><Button variant="ghost" onClick={() => beginEdit(user)} disabled={Boolean(editingUser || resetTarget || confirmationBusy)} aria-label={`Editar ${user.email}`}><Edit3 size={15} />Editar</Button><Button variant="ghost" onClick={() => beginReset(user)} disabled={Boolean(editingUser || resetTarget || confirmationBusy)} aria-label={`Redefinir senha de ${user.email}`}><KeyRound size={15} />Redefinir senha</Button>{user.status !== "disabled" && user.status !== "deactivated" ? <Button variant="ghost" className="document-delete-button" onClick={() => requestDeactivate(user)} disabled={Boolean(editingUser || resetTarget || confirmationBusy)} aria-label={`Desativar ${user.email}`}><UserX size={15} />Desativar</Button> : null}</div></article>)}</div>
+            <div className="document-list">{users.items.map((user) => { const membershipStatus = effectiveMembershipStatus(user); return <article className="document-row" key={user.user_id}><div className="document-type" aria-hidden="true">USR</div><div className="document-main"><strong>{user.email}</strong><span>{user.user_id} · tenant {user.tenant_id} · workspace {user.workspace_id}</span></div><div className="document-meta"><StatusPill tone={userStatusTone(membershipStatus)}>{userStatusLabel(membershipStatus)}</StatusPill><span>{presentRole(user.canonical_role || user.role)}</span><span>{user.authorized_collection_ids?.length ?? 0} coleção(ões)</span></div><div className="document-actions"><Button variant="ghost" onClick={() => beginEdit(user)} disabled={Boolean(editingUser || resetTarget || confirmationBusy)} aria-label={`Editar ${user.email}`}><Edit3 size={15} />Editar</Button><Button variant="ghost" onClick={() => beginReset(user)} disabled={Boolean(editingUser || resetTarget || confirmationBusy)} aria-label={`Redefinir senha de ${user.email}`}><KeyRound size={15} />Redefinir senha</Button>{membershipStatus !== "disabled" && membershipStatus !== "deactivated" ? <Button variant="ghost" className="document-delete-button" onClick={() => requestDeactivate(user)} disabled={Boolean(editingUser || resetTarget || confirmationBusy)} aria-label={`Desativar ${user.email}`}><UserX size={15} />Desativar</Button> : null}</div></article>; })}</div>
           </> : <EmptyState title="Nenhum usuário encontrado" description="A API não retornou identidades para o tenant confirmado pela sessão." />}
         </section>
 
@@ -538,8 +445,8 @@ export function AdminManagement() {
           <div className="panel-heading"><div><div className="admin-icon ink"><Clock3 size={19} /></div><span className="eyebrow">Sessões administrativas</span><h2>Sessões ativas</h2></div><span className="panel-index">{sessions?.total ?? "—"}</span></div>
           {!canRevokeSessions ? <p>Sem permissão para consultar ou revogar sessões.</p> : sessionsLoading && !sessions ? <div className="admin-state-panel"><Spinner label="Carregando sessões" /><p>Lendo sessões do tenant confirmado.</p></div> : sessionsForbidden ? <ResourceFailure title="Sem acesso às sessões" description="O servidor recusou o escopo de sessões para esta sessão." onRetry={() => void loadSessions()} /> : sessionsError ? <ResourceFailure title="Sessões indisponíveis" description={sessionsError} onRetry={() => void loadSessions()} /> : sessions?.items.length ? <div className="document-list">{sessions.items.map((sessionItem) => <article className="document-row" key={sessionItem.session_id}><div className="document-type" aria-hidden="true">SES</div><div className="document-main"><strong>{sessionItem.email}</strong><span>{sessionItem.session_id} · usuário {sessionItem.user_id}</span></div><div className="document-meta"><StatusPill tone={sessionItem.revoked ? "danger" : "success"}>{sessionItem.revoked ? "Revogada" : "Ativa"}</StatusPill><span>{sessionItem.workspace_id}</span><span>Último acesso: {formatDate(sessionItem.last_seen_at)}</span></div><div className="document-actions">{!sessionItem.revoked ? <><Button variant="ghost" onClick={() => requestRevokeSession(sessionItem)} disabled={confirmationBusy} aria-label={`Revogar sessão de ${sessionItem.email}`}><XCircle size={15} />Revogar</Button><Button variant="ghost" onClick={() => requestRevokeUserSessions(sessionItem)} disabled={confirmationBusy} aria-label={`Revogar todas as sessões de ${sessionItem.email}`}><UserX size={15} />Todas</Button></> : null}</div></article>)}</div> : <EmptyState title="Nenhuma sessão encontrada" description="A API não retornou sessões administrativas para o tenant confirmado." />}
         </section>
-      </div>
-      <AdminConfirmDialog open={Boolean(confirmation)} title={confirmationCopy.title} description={confirmationCopy.description} confirmLabel={confirmationCopy.confirmLabel} busy={confirmationBusy} onCancel={() => setConfirmation(null)} onConfirm={() => void confirmAction()} />
+      </section>
+      <ConfirmDialog open={Boolean(confirmation)} title={confirmationCopy.title} description={confirmationCopy.description} confirmLabel={confirmationCopy.confirmLabel} busyLabel="Confirmando…" busy={confirmationBusy} onCancel={() => setConfirmation(null)} onConfirm={() => void confirmAction()} />
     </>
   );
 }

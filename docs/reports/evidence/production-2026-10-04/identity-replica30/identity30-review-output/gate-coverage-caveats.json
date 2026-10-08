@@ -1,0 +1,24 @@
+[
+  {
+    "gate": "verify-identity30.py",
+    "case": "old_session_401_changed_to_200_and_expected_200",
+    "result": "ACCEPTED_INVALID_DATA",
+    "actual_packet": "Correct; fixed I1 checks pass and reject this mutation."
+  },
+  {
+    "gate": "verify-identity30-visual-retest.py",
+    "case": "peer_patch_targets_foreign_fixture",
+    "result": "ACCEPTED_INVALID_DATA",
+    "actual_packet": "Correct; fixed I1 checks pass and reject this mutation."
+  },
+  {
+    "case": "run1_semantic_report_recomputed",
+    "result": "MATCH",
+    "assertions": 445
+  },
+  {
+    "case": "run2_semantic_report_recomputed",
+    "result": "MATCH",
+    "assertions": 156
+  }
+]

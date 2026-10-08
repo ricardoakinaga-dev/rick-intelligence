@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import Any
 
 try:  # Package import for tests; script-directory fallback for direct execution.
+    from scripts.state_of_art.release_evidence_paths import CURRENT_RELEASE_EVIDENCE
     from scripts.state_of_art.json_boundary import load_json
     from scripts.state_of_art.release_manifest import (
         MANIFEST_SCHEMA,
@@ -32,13 +33,14 @@ try:  # Package import for tests; script-directory fallback for direct execution
     )
     from scripts.state_of_art.runtime_preflight import load_preflight
 except ImportError:  # pragma: no cover - exercised by the workflow's direct script call.
+    from release_evidence_paths import CURRENT_RELEASE_EVIDENCE
     from json_boundary import load_json
     from release_manifest import MANIFEST_SCHEMA, ManifestValidationError, REQUIRED_GATES, ReleaseEvidenceManifest
     from runtime_preflight import load_preflight
 
 
 ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_EVIDENCE = ("docs/progress/release-evidence.json",)
+DEFAULT_EVIDENCE = (CURRENT_RELEASE_EVIDENCE,)
 DEFAULT_TIMEOUT_SECONDS = 120
 SHA1_RE = re.compile(r"^[0-9a-f]{40}$", re.IGNORECASE)
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$", re.IGNORECASE)

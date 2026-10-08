@@ -1,0 +1,11 @@
+/tmp/rick-intelligence-api-test-env/bin/python "/home/ricardo/rick-intelligence/scripts/phase11/runner.py" typecheck
+==> Professor TypeScript compiler: npm run build
+
+> rick-professor@1.0.0 build
+> tsc
+
+<== Professor TypeScript compiler: exit 0
+==> CVG frontend TypeScript compiler (compatibility override): npm exec -- tsc --noEmit --ignoreDeprecations 5.0
+<== CVG frontend TypeScript compiler (compatibility override): exit 0
+==> CVG Python compilation (no Python type checker configured): /home/ricardo/rick-intelligence/.runtime/venvs/cvg/bin/python -m compileall -q src
+<== CVG Python compilation (no Python type checker configured): exit 0

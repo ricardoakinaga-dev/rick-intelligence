@@ -1,0 +1,162 @@
+{
+  "date": "2026-09-24",
+  "overall": 72,
+  "items": [
+    {
+      "id": 1,
+      "item": "Arquitetura e separação de responsabilidades",
+      "previous": 85,
+      "current": 85
+    },
+    {
+      "id": 2,
+      "item": "Documentação e aderência ao estado atual",
+      "previous": 65,
+      "current": 64
+    },
+    {
+      "id": 3,
+      "item": "Identidade e sessões",
+      "previous": 80,
+      "current": 80
+    },
+    {
+      "id": 4,
+      "item": "Autorização e isolamento",
+      "previous": 83,
+      "current": 83
+    },
+    {
+      "id": 5,
+      "item": "Kernel HTTP e controles defensivos",
+      "previous": 84,
+      "current": 76
+    },
+    {
+      "id": 6,
+      "item": "Contratos e compatibilidade",
+      "previous": 65,
+      "current": 82
+    },
+    {
+      "id": 7,
+      "item": "Knowledge: documentos, versões e proveniência",
+      "previous": 81,
+      "current": 81
+    },
+    {
+      "id": 8,
+      "item": "Ingestão e reindexação",
+      "previous": 76,
+      "current": 85
+    },
+    {
+      "id": 9,
+      "item": "Retrieval e busca híbrida",
+      "previous": 69,
+      "current": 74
+    },
+    {
+      "id": 10,
+      "item": "Evidence: fontes e citações",
+      "previous": 81,
+      "current": 84
+    },
+    {
+      "id": 11,
+      "item": "Decision: responder, abster e escalar",
+      "previous": 70,
+      "current": 45
+    },
+    {
+      "id": 12,
+      "item": "Professor e geração fundamentada",
+      "previous": 70,
+      "current": 80
+    },
+    {
+      "id": 13,
+      "item": "Integração com providers",
+      "previous": 83,
+      "current": 86
+    },
+    {
+      "id": 14,
+      "item": "Avaliação da qualidade RAG",
+      "previous": 63,
+      "current": 55
+    },
+    {
+      "id": 15,
+      "item": "Chat, histórico e apresentação das evidências",
+      "previous": 72,
+      "current": 82
+    },
+    {
+      "id": 16,
+      "item": "Documentos, busca e ingestão pela interface",
+      "previous": 68,
+      "current": 64
+    },
+    {
+      "id": 17,
+      "item": "Administração, auditoria e casos",
+      "previous": 71,
+      "current": 73
+    },
+    {
+      "id": 18,
+      "item": "Containers e composição do ambiente",
+      "previous": 52,
+      "current": 68
+    },
+    {
+      "id": 19,
+      "item": "Jobs, PostgreSQL e migrações",
+      "previous": 66,
+      "current": 68
+    },
+    {
+      "id": 20,
+      "item": "Worker e ciclo de vida",
+      "previous": 65,
+      "current": 73
+    },
+    {
+      "id": 21,
+      "item": "Redis e coordenação distribuída",
+      "previous": 71,
+      "current": 71
+    },
+    {
+      "id": 22,
+      "item": "Storage e inicialização persistente",
+      "previous": 66,
+      "current": 66
+    },
+    {
+      "id": 23,
+      "item": "Observabilidade e SLO",
+      "previous": 55,
+      "current": 67
+    },
+    {
+      "id": 24,
+      "item": "Recuperação, capacidade e tolerância a falhas",
+      "previous": 45,
+      "current": 45
+    },
+    {
+      "id": 25,
+      "item": "CI e promoção de release",
+      "previous": 63,
+      "current": 60
+    },
+    {
+      "id": 26,
+      "item": "Qualidade global dos testes",
+      "previous": 74,
+      "current": 80
+    }
+  ]
+}

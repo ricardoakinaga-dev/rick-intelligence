@@ -28,14 +28,26 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4.2.2
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
-      - uses: actions/setup-python@v5.6.0
+      - uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.6.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Install bounded test dependencies
-        run: python -m pip install --disable-pip-version-check --no-cache-dir "pytest==8.0.2" "pytest-asyncio==0.23.5" "pydantic==2.6.1" "httpx==0.27.0" "fastapi==0.109.2" "python-multipart==0.0.9" "psycopg[binary]==3.2.3" "redis==5.2.1"
+        run: |
+          python -m pip install --disable-pip-version-check --no-cache-dir --require-hashes --only-binary=:all: -r requirements/test.lock
+          python -m pip check
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Install pinned TypeScript boundary parser
+        working-directory: apps/web
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Restore versioned control inputs
+        run: make control-inputs-restore
       - name: Execute and record architecture CI gate
         run: |
           python3 scripts/state_of_art/ci_lane_evidence.py \
@@ -46,11 +58,11 @@ jobs:
             --command "make validate" \
             --command "make ops-static" \
             --command "make compose-static" \
-            --command "python3 -c \"import subprocess,sys; sys.exit(1 if subprocess.check_output(['git','status','--porcelain','--','cvg-master-rag-v2','rick-professor','modulo-redis-locker']).strip() else 0)\"" \
+            --command "python3 scripts/phase15/check_boundaries.py --retired-only" \
             --command "git diff --check"
       - name: Upload architecture CI envelope
         if: always()
-        uses: actions/upload-artifact@v4.6.2
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: ci-architecture-${{ github.run_id }}
           path: .runtime/ci
@@ -64,12 +76,14 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4.2.2
-      - uses: actions/setup-python@v5.6.0
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.6.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Install pinned root dependencies
-        run: python -m pip install --disable-pip-version-check --no-cache-dir "pytest==8.0.2" "pytest-asyncio==0.23.5" "pydantic==2.6.1" "httpx==0.27.0" "fastapi==0.109.2" "python-multipart==0.0.9" "psycopg[binary]==3.2.3" "redis==5.2.1"
+        run: |
+          python -m pip install --disable-pip-version-check --no-cache-dir --require-hashes --only-binary=:all: -r requirements/test.lock
+          python -m pip check
       - name: Execute and record unit CI gate
         run: |
           python3 scripts/state_of_art/ci_lane_evidence.py \
@@ -82,14 +96,25 @@ jobs:
             --command "make api15-lock" \
             --command "make api15-professor" \
             --command "make api16-domain" \
-            --command "make api16-worker" \
-            --command "python -m pytest -q -p no:cacheprovider packages/evidence/tests packages/decision/tests"
+            --command "make worker-coverage" \
+            --command "python -m pytest -q -p no:cacheprovider packages/evidence/tests packages/decision/tests" \
+            --command "make jobs-test" \
+            --command "make storage-test" \
+            --command "env -u RICK_MIGRATION_POSTGRES_TESTS python3 -m pytest -q -p no:cacheprovider infrastructure/scripts/tests"
       - name: Upload unit CI envelope
         if: always()
-        uses: actions/upload-artifact@v4.6.2
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: ci-unit-${{ github.run_id }}
           path: .runtime/ci
+          if-no-files-found: warn
+          include-hidden-files: true
+      - name: Upload worker coverage summary
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: qa-worker-summary-${{ github.run_id }}
+          path: .runtime/qa/worker-summary.json
           if-no-files-found: warn
           include-hidden-files: true
 
@@ -100,12 +125,14 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4.2.2
-      - uses: actions/setup-python@v5.6.0
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.6.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Install API test dependencies
-        run: python -m pip install --disable-pip-version-check --no-cache-dir "pytest==8.0.2" "pytest-asyncio==0.23.5" "pydantic==2.6.1" "httpx==0.27.0" "fastapi==0.109.2" "python-multipart==0.0.9"
+        run: |
+          python -m pip install --disable-pip-version-check --no-cache-dir --require-hashes --only-binary=:all: -r requirements/test.lock
+          python -m pip check
       - name: Execute and record contracts CI gate
         run: |
           python3 scripts/state_of_art/ci_lane_evidence.py \
@@ -114,13 +141,22 @@ jobs:
             --output .runtime/ci/contracts.json \
             --log-output .runtime/ci/contracts.log \
             --command "make api-contract" \
-            --command "make api16-root"
+            --command "git diff --exit-code -- apps/api/openapi.json" \
+            --command "make api-coverage"
       - name: Upload contracts CI envelope
         if: always()
-        uses: actions/upload-artifact@v4.6.2
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: ci-contracts-${{ github.run_id }}
           path: .runtime/ci
+          if-no-files-found: warn
+          include-hidden-files: true
+      - name: Upload API coverage summary
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: qa-api-summary-${{ github.run_id }}
+          path: .runtime/qa/api-summary.json
           if-no-files-found: warn
           include-hidden-files: true
 
@@ -131,12 +167,14 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4.2.2
-      - uses: actions/setup-python@v5.6.0
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.6.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Install pinned security-test dependencies
-        run: python -m pip install --disable-pip-version-check --no-cache-dir "pytest==8.0.2" "pytest-asyncio==0.23.5" "pydantic==2.6.1" "httpx==0.27.0" "fastapi==0.109.2" "python-multipart==0.0.9"
+        run: |
+          python -m pip install --disable-pip-version-check --no-cache-dir --require-hashes --only-binary=:all: -r requirements/test.lock
+          python -m pip check
       - name: Execute and record security CI gate
         run: |
           python3 scripts/state_of_art/ci_lane_evidence.py \
@@ -148,7 +186,7 @@ jobs:
             --command "make security-adversarial"
       - name: Upload security CI envelope
         if: always()
-        uses: actions/upload-artifact@v4.6.2
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: ci-security-${{ github.run_id }}
           path: .runtime/ci
@@ -162,12 +200,14 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4.2.2
-      - uses: actions/setup-python@v5.6.0
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.6.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Install evaluation dependencies
-        run: python -m pip install --disable-pip-version-check --no-cache-dir "pytest==8.0.2" "pydantic==2.6.1" "httpx==0.27.0"
+        run: |
+          python -m pip install --disable-pip-version-check --no-cache-dir --require-hashes --only-binary=:all: -r requirements/test.lock
+          python -m pip check
       - name: Execute and record RAG evaluation CI gate
         run: |
           python3 scripts/state_of_art/ci_lane_evidence.py \
@@ -181,7 +221,7 @@ jobs:
             --command "make security-adversarial"
       - name: Upload RAG evaluation CI envelope
         if: always()
-        uses: actions/upload-artifact@v4.6.2
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: ci-integration-${{ github.run_id }}
           path: .runtime/ci
@@ -195,8 +235,8 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4.2.2
-      - uses: actions/setup-node@v4.4.0
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -213,15 +253,24 @@ jobs:
             --log-output .runtime/ci/frontend.log \
             --command "make web-lint" \
             --command "make web-typecheck" \
+            --command "make web-coverage" \
             --command "make web-build"
       - name: Record browser gate boundary
         run: echo "Browser E2E at 375/768/1440 is a separate runtime lane; no skip is converted to PASS here."
       - name: Upload frontend CI envelope
         if: always()
-        uses: actions/upload-artifact@v4.6.2
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: ci-frontend-${{ github.run_id }}
           path: .runtime/ci
+          if-no-files-found: warn
+          include-hidden-files: true
+      - name: Upload web coverage summary
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: qa-web-summary-${{ github.run_id }}
+          path: .runtime/qa/web-summary.json
           if-no-files-found: warn
           include-hidden-files: true
 
@@ -232,14 +281,16 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4.2.2
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
-      - uses: actions/setup-python@v5.6.0
+      - uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.6.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Install matrix verification dependency
-        run: python -m pip install --disable-pip-version-check --no-cache-dir "pytest==8.0.2"
+        run: |
+          python -m pip install --disable-pip-version-check --no-cache-dir --require-hashes --only-binary=:all: -r requirements/test.lock
+          python -m pip check
       - name: Generate the current fail-closed capability matrix
         run: make phase3-evidence
       - name: Validate matrix binding and status semantics
@@ -248,7 +299,7 @@ jobs:
         run: make triple-aaa-capability-matrix
       - name: Upload raw Phase 3 matrix
         if: always()
-        uses: actions/upload-artifact@v4.6.2
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: phase3-capability-matrix-${{ github.run_id }}
           path: .runtime/phase-3
@@ -262,13 +313,15 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4.2.2
-      - uses: actions/setup-python@v5.6.0
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.6.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Install pinned scanner
-        run: python -m pip install --disable-pip-version-check --no-cache-dir "pip-audit==2.9.0"
-      - uses: actions/setup-node@v4.4.0
+        run: |
+          python -m pip install --disable-pip-version-check --no-cache-dir --require-hashes --only-binary=:all: -r requirements/test.lock
+          python -m pip check
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: ${{ env.NODE_VERSION }}
       - name: Execute and record supply-chain CI gate
@@ -278,20 +331,15 @@ jobs:
             --gate supply-chain \
             --output .runtime/ci/supply-chain.json \
             --log-output .runtime/ci/supply-chain.log \
-            --command "pip-audit -r cvg-master-rag-v2/src/requirements.txt --strict" \
+            --command "pip-audit -r requirements/test.lock --strict" \
             --command "pip-audit -r scripts/state_of_art/requirements.txt --strict" \
-            --command "npm --prefix rick-professor ci --ignore-scripts --no-audit --no-fund" \
-            --command "npm --prefix rick-professor audit --audit-level=high" \
-            --command "npm --prefix modulo-redis-locker ci --ignore-scripts --no-audit --no-fund" \
-            --command "npm --prefix modulo-redis-locker audit --audit-level=high" \
-            --command "npm --prefix cvg-master-rag-v2/frontend ci --ignore-scripts --no-audit --no-fund" \
-            --command "npm --prefix cvg-master-rag-v2/frontend audit --audit-level=high" \
+            --command "pip-audit -r requirements/runtime.lock --strict" \
             --command "npm --prefix apps/web ci --ignore-scripts --no-audit --no-fund" \
             --command "npm --prefix apps/web audit --audit-level=high" \
             --command "python infrastructure/docker/check_release.py --mode prepared"
       - name: Upload supply-chain CI envelope
         if: always()
-        uses: actions/upload-artifact@v4.6.2
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: ci-supply-chain-${{ github.run_id }}
           path: .runtime/ci
@@ -323,10 +371,10 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4.2.2
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
-      - uses: actions/setup-python@v5.6.0
+      - uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.6.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Refuse promotion without a live-runtime event
@@ -336,79 +384,79 @@ jobs:
           exit 2
       - name: Download architecture CI envelope from this workflow run
         if: needs.fast.result == 'success'
-        uses: actions/download-artifact@v4.3.0
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: ci-architecture-${{ github.run_id }}
           path: .runtime/ci
       - name: Download unit CI envelope from this workflow run
         if: needs.unit.result == 'success'
-        uses: actions/download-artifact@v4.3.0
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: ci-unit-${{ github.run_id }}
           path: .runtime/ci
       - name: Download contracts CI envelope from this workflow run
         if: needs.contract.result == 'success'
-        uses: actions/download-artifact@v4.3.0
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: ci-contracts-${{ github.run_id }}
           path: .runtime/ci
       - name: Download security CI envelope from this workflow run
         if: needs.security.result == 'success'
-        uses: actions/download-artifact@v4.3.0
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: ci-security-${{ github.run_id }}
           path: .runtime/ci
       - name: Download RAG evaluation CI envelope from this workflow run
         if: needs.rag-eval.result == 'success'
-        uses: actions/download-artifact@v4.3.0
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: ci-integration-${{ github.run_id }}
           path: .runtime/ci
       - name: Download frontend CI envelope from this workflow run
         if: needs.frontend.result == 'success'
-        uses: actions/download-artifact@v4.3.0
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: ci-frontend-${{ github.run_id }}
           path: .runtime/ci
       - name: Download supply-chain CI envelope from this workflow run
         if: needs.supply-chain.result == 'success'
-        uses: actions/download-artifact@v4.3.0
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: ci-supply-chain-${{ github.run_id }}
           path: .runtime/ci
       - name: Download runtime packet from this workflow run
         if: needs.runtime.result == 'success'
-        uses: actions/download-artifact@v4.3.0
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: phase3-runtime-${{ github.run_id }}
           path: .runtime/phase-3
       - name: Download frontend runtime diagnostics from this workflow run
         if: needs.frontend-runtime.result == 'success'
-        uses: actions/download-artifact@v4.3.0
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: phase3-frontend-runtime-${{ github.run_id }}
           path: .runtime/phase-3/supplemental/frontend-runtime
       - name: Download performance diagnostics from this workflow run
         if: needs.performance.result == 'success'
-        uses: actions/download-artifact@v4.3.0
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: phase3-performance-${{ github.run_id }}
           path: .runtime/phase-3/supplemental/performance
       - name: Download chaos diagnostics from this workflow run
         if: needs.chaos.result == 'success'
-        uses: actions/download-artifact@v4.3.0
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: phase3-chaos-${{ github.run_id }}
           path: .runtime/phase-3/supplemental/chaos
       - name: Download soak diagnostics from this workflow run
         if: needs.soak.result == 'success'
-        uses: actions/download-artifact@v4.3.0
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: phase3-soak-${{ github.run_id }}
           path: .runtime/phase-3/supplemental/soak
       - name: Download the exact Phase 3 matrix from this workflow run
         if: needs.phase3-evidence.result == 'success'
-        uses: actions/download-artifact@v4.3.0
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: phase3-capability-matrix-${{ github.run_id }}
           path: .runtime/phase-3
@@ -453,7 +501,7 @@ jobs:
       - name: Generate truthful release evidence
         run: make release-evidence
       - name: Reject incomplete or stale promotion evidence
-        run: python scripts/state_of_art/release_integrity.py --require-clean --evidence docs/progress/release-evidence.json
+        run: python scripts/state_of_art/release_integrity.py --require-clean --evidence .runtime/release/release-evidence.json
 
   runtime:
     name: RUNTIME / disposable State-of-Art packet
@@ -463,14 +511,16 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4.2.2
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
-      - uses: actions/setup-python@v5.6.0
+      - uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.6.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Install real runtime clients
-        run: python -m pip install --disable-pip-version-check --no-cache-dir "pytest==8.0.2" "pydantic==2.6.1" "httpx==0.27.0" "psycopg[binary]==3.2.3" "redis==5.2.1" -r scripts/state_of_art/requirements.txt
+        run: |
+          python -m pip install --disable-pip-version-check --no-cache-dir --require-hashes --only-binary=:all: -r requirements/test.lock
+          python -m pip check
       - name: Run the integrated fail-closed verification packet
         run: make triple-aaa-verify
       - name: Export the current prompt matrix bound to this runtime packet
@@ -482,7 +532,7 @@ jobs:
             --output .runtime/phase-3/current-triple-aaa-runtime-capability-matrix.json
       - name: Upload runtime packet and diagnostics
         if: always()
-        uses: actions/upload-artifact@v4.6.2
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: phase3-runtime-${{ github.run_id }}
           path: .runtime/phase-3
@@ -497,10 +547,10 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4.2.2
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
-      - uses: actions/setup-node@v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -512,7 +562,7 @@ jobs:
         run: make phase3-frontend-supply-runtime
       - name: Upload frontend runtime envelope and diagnostics
         if: always()
-        uses: actions/upload-artifact@v4.6.2
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: phase3-frontend-runtime-${{ github.run_id }}
           path: |
@@ -532,14 +582,14 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4.2.2
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
       - name: Run the performance gate
         run: make phase3-performance
       - name: Upload performance envelope and diagnostics
         if: always()
-        uses: actions/upload-artifact@v4.6.2
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: phase3-performance-${{ github.run_id }}
           path: .runtime/phase-3
@@ -554,14 +604,14 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4.2.2
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
       - name: Run the chaos gate
         run: make phase3-chaos
       - name: Upload chaos envelope and diagnostics
         if: always()
-        uses: actions/upload-artifact@v4.6.2
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: phase3-chaos-${{ github.run_id }}
           path: .runtime/phase-3
@@ -576,14 +626,14 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4.2.2
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
       - name: Run the soak gate
         run: make phase3-soak
       - name: Upload soak envelope and diagnostics
         if: always()
-        uses: actions/upload-artifact@v4.6.2
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: phase3-soak-${{ github.run_id }}
           path: .runtime/phase-3
@@ -599,10 +649,10 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4.2.2
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
-      - uses: actions/setup-python@v5.6.0
+      - uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.6.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Require every scheduled runtime lane
@@ -619,27 +669,27 @@ jobs:
             fi
           done
       - name: Download the exact scheduled runtime artifacts
-        uses: actions/download-artifact@v4.3.0
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: phase3-runtime-${{ github.run_id }}
           path: .runtime/phase-3
       - name: Download the exact scheduled frontend runtime artifacts
-        uses: actions/download-artifact@v4.3.0
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: phase3-frontend-runtime-${{ github.run_id }}
           path: .runtime/phase-3/supplemental/frontend-runtime
       - name: Download the exact scheduled performance artifacts
-        uses: actions/download-artifact@v4.3.0
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: phase3-performance-${{ github.run_id }}
           path: .runtime/phase-3/supplemental/performance
       - name: Download the exact scheduled chaos artifacts
-        uses: actions/download-artifact@v4.3.0
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: phase3-chaos-${{ github.run_id }}
           path: .runtime/phase-3/supplemental/chaos
       - name: Download the exact scheduled soak artifacts
-        uses: actions/download-artifact@v4.3.0
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: phase3-soak-${{ github.run_id }}
           path: .runtime/phase-3/supplemental/soak
@@ -652,7 +702,7 @@ jobs:
             --packet .runtime/phase-3/triple-aaa-verify.json
       - name: Upload strict-nightly diagnostic
         if: always()
-        uses: actions/upload-artifact@v4.6.2
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: phase3-nightly-${{ github.run_id }}
           path: .runtime/phase-3

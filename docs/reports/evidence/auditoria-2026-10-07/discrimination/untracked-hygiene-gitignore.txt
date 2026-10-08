@@ -1,0 +1,51 @@
+# Discriminacao AUD07-19 - higiene do worktree / cobertura do .gitignore
+# A=estado novo (regras .opencode/, .agent/*.lock, uv.lock) | B=revertido
+# shell: reverter = remover as 3 regras | repor = repor .gitignore
+
+== D1: reverter (remover as 3 regras de AUD07-19) ==
+--- git check-ignore (tem de falhar) ---
+.opencode/session.json         NÃO-IGNORADO (correto: regra ausente)
+.agent/.writer.lock            NÃO-IGNORADO (correto: regra ausente)
+apps/api/uv.lock               NÃO-IGNORADO (correto: regra ausente)
+--- unittest AUD07-19 (tem de falhar) ---
+----------------------------------------------------------------------
+Ran 2 tests in 0.031s
+
+FAILED (failures=3)
+unittest_exit=1  (exit real do unittest; a linha 'exit=0' acima era do tail)
+--- git status (volta a mostrar o lixo) ---
+A  docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/uv-lock-check.log
+?? .agent/.writer.lock
+?? .opencode/
+?? apps/api/uv.lock
+
+== D2: repor (.gitignore restaurado) ==
+--- git check-ignore (tem de casar) ---
+.opencode/session.json         .gitignore:72:.opencode/	.opencode/session.json
+.agent/.writer.lock            .gitignore:73:.agent/*.lock	.agent/.writer.lock
+apps/api/uv.lock               .gitignore:74:uv.lock	apps/api/uv.lock
+--- unittest AUD07-19 (tem de passar) ---
+Ran 2 tests in 0.037s
+
+OK
+--- git status (sem essas entradas) ---
+0
+(0 = correto)
+
+== D3: teste de crescimento (make ci nao deve mudar o status) ==
+1380
+
+== D4: regressao da propria tarefa (regra uv.lock) ==
+Motivo: o experimento E4 (checkout limpo com staged+unstaged+nao-rastreados+restore) deu
+make validate exit 2 com 3 falhas identicas:
+  [FAIL] VERIFY_ARTIFACT_REF: VER-Q24-03-RUNTIME-DEPS-LOCAL-20260925.artifacts[14]
+         does not resolve to an existing path: apps/api/uv.lock
+  [FAIL] VERIFY_ARTIFACT_REF: VER-Q24-03-API-REGRESSION-LOCAL-20260925T2006Z.artifacts[4] ...
+  [FAIL] VERIFY_ARTIFACT_REF: VER-Q24-03-CI-PIN-PARITY-LOCAL-20260925T2034Z.artifacts[3] ...
+A regra `uv.lock` (escrita nesta tarefa) escondia o ficheiro dos `ls-files -o --exclude-standard`,
+logo ele nao chegava ao checkout novo. A=regra removida, ficheiro staged; B=regra no gitignore.
+  A (regra removida): git check-ignore -> nao-ignorado; make validate em E4 -> exit 0
+                      (RESULT PASS (pass=12 warn=0 fail=0)); regressao inclui-o como
+                      prova negativa (NOT_IGNORED_PROBES).
+  B (regra presente): git check-ignore casa `uv.lock`; E4 -> exit 2 com os 3 FAIL acima;
+                      unittest AUD07-19 -> FAILED (o probe negativo de uv.lock casa).

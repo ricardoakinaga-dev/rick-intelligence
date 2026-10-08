@@ -209,19 +209,26 @@ def _rendered_service(*, read_only: bool = True) -> dict[str, object]:
     }
 
 
-def test_rendered_compose_requires_hardening_and_resource_limits() -> None:
-    payload = {
-        "services": {
-            name: _rendered_service(read_only=name not in check_compose.STATEFUL_SERVICES)
-            for name in check_compose.REQUIRED_SERVICES
-        }
+def _rendered_payload() -> dict[str, dict[str, dict[str, object]]]:
+    services = {
+        name: _rendered_service(read_only=name not in check_compose.STATEFUL_SERVICES)
+        for name in check_compose.REQUIRED_SERVICES
     }
+    services["object-store-init"] = {
+        "environment": {"OBJECT_STORE_ACCESS_KEY_ID": "scoped", "OBJECT_STORE_SECRET_ACCESS_KEY": "synthetic"}
+    }
+    services["jaeger"]["environment"] = {"SPAN_STORAGE_TYPE": "memory"}
+    return {"services": services}
 
-    assert check_compose._validate_rendered_services("fixture.yml", payload) == []
+
+def test_rendered_compose_requires_hardening_and_resource_limits() -> None:
+    payload = _rendered_payload()
+
+    assert check_compose._validate_rendered_services("docker-compose.staging.yml", payload) == []
 
 
 def test_rendered_compose_rejects_unbounded_or_privileged_services() -> None:
-    payload = {"services": {name: _rendered_service() for name in check_compose.REQUIRED_SERVICES}}
+    payload = _rendered_payload()
     api = payload["services"]["api"]
     assert isinstance(api, dict)
     api["privileged"] = True
@@ -233,54 +240,43 @@ def test_rendered_compose_rejects_unbounded_or_privileged_services() -> None:
     assert "fixture.yml:api: deploy.resources.limits.memory must be finite" in errors
 
 
-def test_missing_cvg_approved_corpus_is_explicitly_blocked(tmp_path) -> None:
-    missing = runner._missing_cvg_approved_corpus(tmp_path)
+def test_rendered_compose_rejects_root_bootstrap_and_false_staging_persistence() -> None:
+    payload = _rendered_payload()
+    init = payload["services"]["object-store-init"]
+    environment = init["environment"]
+    assert isinstance(environment, dict)
+    environment["MINIO_ROOT_PASSWORD"] = "synthetic-root"
+    jaeger = payload["services"]["jaeger"]
+    jaeger["environment"] = {"SPAN_STORAGE_TYPE": "badger"}
+    jaeger["volumes"] = ["trace-data:/data"]
 
-    assert [path.relative_to(tmp_path).as_posix() for path in missing] == [
-        "src/data/default/dataset.json"
-    ]
+    errors = check_compose._validate_rendered_services("docker-compose.staging.yml", payload)
 
-    dataset = tmp_path / "src/data/default/dataset.json"
-    dataset.parent.mkdir(parents=True)
-    dataset.write_text("{}", encoding="utf-8")
-
-    assert runner._missing_cvg_approved_corpus(tmp_path) == []
+    assert "docker-compose.staging.yml:object-store-init: root credentials are forbidden" in errors
+    assert "docker-compose.staging.yml:jaeger: staging tracing must declare ephemeral memory storage" in errors
+    assert "docker-compose.staging.yml:jaeger: staging memory tracing must not claim a persistent volume" in errors
 
 
-def test_full_test_mode_skips_only_blocked_cvg_lane(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_full_test_mode_runs_only_canonical_lanes(monkeypatch: pytest.MonkeyPatch) -> None:
+    """AUD07-02: the retired CVG/Professor/Locker lanes must not come back."""
     calls: list[tuple[str, list[str], object, object, int]] = []
 
     monkeypatch.setattr(
         runner,
-        "_missing_cvg_approved_corpus",
-        lambda: [runner.CVG / "src/data/default/dataset.json"],
-    )
-    monkeypatch.setattr(
-        runner,
-        "run_preserving_generated_artifacts",
-        lambda cases: calls.extend(cases) or True,
-    )
-
-    assert runner.mode_test() == 2
-    labels = [case[0] for case in calls]
-    assert labels == [
-        "current root boundary validator",
-        "Professor complete tests",
-        "Locker complete tests",
-        "CVG frontend lint and browser smoke",
-    ]
-
-
-def test_full_test_mode_runs_cvg_lane_when_corpus_is_available(monkeypatch: pytest.MonkeyPatch) -> None:
-    calls: list[tuple[str, list[str], object, object, int]] = []
-
-    monkeypatch.setattr(runner, "_missing_cvg_approved_corpus", lambda: [])
-    monkeypatch.setattr(
-        runner,
-        "run_preserving_generated_artifacts",
+        "run_cases",
         lambda cases: calls.extend(cases) or True,
     )
 
     assert runner.mode_test() == 0
     labels = [case[0] for case in calls]
-    assert "CVG complete preserved suite" in labels
+    expected = [
+        "current root boundary validator",
+        "canonical Python suites (packages, API, differential)",
+        "canonical worker suite",
+    ]
+    assert labels[: len(expected)] == expected
+    retired = ("cvg-master-rag-v2", "rick-professor", "modulo-redis-locker")
+    for case in calls:
+        assert not any(component in case[0] for component in retired)
+        command_text = " ".join(str(part) for part in case[1])
+        assert not any(component in command_text for component in retired)

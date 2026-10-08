@@ -1,0 +1,13 @@
+# Baseline do type checking gradual — AUD07-17 (2026-10-08)
+#
+# Formato: <diretório-fonte> = <número máximo de erros mypy aceitos>
+# Regras:
+#   * esta lista é a ÚNICA decisão explícita de cobertura: um pacote só é
+#     verificado se estiver aqui e em `files` no mypy.ini;
+#   * erros acima do limite quebram o CI (make typecheck / make ci);
+#   * erros abaixo do limite só geram aviso — o limite é para ser rebaixado,
+#     nunca inflado: acrescentar erro aceito exige decisão registrada nesta
+#     linha, com comentário, em revisão.
+# Cobertura inicial: contratos e autorização, conforme o plano AUD07-17.
+packages/contracts/src = 0
+packages/authorization/src = 0

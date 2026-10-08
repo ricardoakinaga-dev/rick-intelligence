@@ -7,6 +7,11 @@ real transactional store while the Postgres/object-storage rollout is gated.
 
 from __future__ import annotations
 
+from rick_knowledge.publication import PublicationStore
+from rick_knowledge.fencing import OwnershipLostError
+from asyncio import CancelledError
+import json
+
 from contextlib import contextmanager
 from pathlib import Path
 import sqlite3
@@ -14,6 +19,7 @@ from threading import RLock
 from typing import Iterable, Iterator
 
 from rick_knowledge.json_boundary import decode_metadata, encode_metadata
+from rick_knowledge.fencing import catalog_collection_ids, select_catalog_collection, collection_guard_key, collection_mutation, document_mutation, file_gate, file_mutation_guard, require_deleted_snapshot, require_unchanged_tombstone
 from rick_knowledge.models import (
     DOCUMENT_STATUSES,
     Chunk,
@@ -35,7 +41,7 @@ def _metadata_value(value: object) -> dict | None:
     return decode_metadata(value)
 
 
-class SQLiteKnowledgeStore:
+class SQLiteKnowledgeStore(PublicationStore):
     """Transactional file-backed implementation of :class:`KnowledgeStore`."""
 
     def __init__(self, path: str | Path) -> None:
@@ -46,6 +52,8 @@ class SQLiteKnowledgeStore:
             if location.exists() and location.is_dir():
                 raise ValueError("SQLite store path must be a file")
         self._lock = RLock()
+        self._effect_lock = RLock()
+        self._guard_path, self._file_gate = file_gate(self.path) if self.path != ":memory:" else (None, None)
         self._connection = sqlite3.connect(self.path, check_same_thread=False)
         self._connection.row_factory = sqlite3.Row
         self._connection.execute("PRAGMA foreign_keys = ON")
@@ -53,6 +61,142 @@ class SQLiteKnowledgeStore:
             self._connection.execute("PRAGMA journal_mode = WAL")
             self._connection.execute("PRAGMA synchronous = NORMAL")
         self._initialize()
+        with self._transaction():
+            self._connection.execute("""CREATE TABLE IF NOT EXISTS ingestion_checkpoints (
+                tenant_id TEXT NOT NULL, workspace_id TEXT NOT NULL,
+                collection_id TEXT NOT NULL, job_id TEXT NOT NULL,
+                record TEXT NOT NULL CHECK(length(CAST(record AS BLOB)) <= 67108864),
+                PRIMARY KEY(tenant_id, workspace_id, collection_id, job_id))""")
+            self._connection.execute("""CREATE TABLE IF NOT EXISTS publication_receipts (
+                tenant_id TEXT NOT NULL CHECK(length(trim(tenant_id, char(9,10,11,12,13,28,29,30,31,32,133,160,5760,8192,8193,8194,8195,8196,8197,8198,8199,8200,8201,8202,8232,8233,8239,8287,12288))) BETWEEN 1 AND 256),
+                workspace_id TEXT NOT NULL CHECK(length(trim(workspace_id, char(9,10,11,12,13,28,29,30,31,32,133,160,5760,8192,8193,8194,8195,8196,8197,8198,8199,8200,8201,8202,8232,8233,8239,8287,12288))) BETWEEN 1 AND 256),
+                collection_id TEXT NOT NULL CHECK(length(trim(collection_id, char(9,10,11,12,13,28,29,30,31,32,133,160,5760,8192,8193,8194,8195,8196,8197,8198,8199,8200,8201,8202,8232,8233,8239,8287,12288))) BETWEEN 1 AND 256),
+                job_id TEXT NOT NULL CHECK(length(trim(job_id, char(9,10,11,12,13,28,29,30,31,32,133,160,5760,8192,8193,8194,8195,8196,8197,8198,8199,8200,8201,8202,8232,8233,8239,8287,12288))) BETWEEN 1 AND 256),
+                document_id TEXT NOT NULL CHECK(length(trim(document_id, char(9,10,11,12,13,28,29,30,31,32,133,160,5760,8192,8193,8194,8195,8196,8197,8198,8199,8200,8201,8202,8232,8233,8239,8287,12288))) BETWEEN 1 AND 256),
+                attempt_id TEXT NOT NULL CHECK(length(trim(attempt_id, char(9,10,11,12,13,28,29,30,31,32,133,160,5760,8192,8193,8194,8195,8196,8197,8198,8199,8200,8201,8202,8232,8233,8239,8287,12288))) BETWEEN 1 AND 256),
+                document_attempt TEXT NOT NULL CHECK(length(trim(document_attempt, char(9,10,11,12,13,28,29,30,31,32,133,160,5760,8192,8193,8194,8195,8196,8197,8198,8199,8200,8201,8202,8232,8233,8239,8287,12288))) BETWEEN 1 AND 256),
+                outcome TEXT NOT NULL CHECK(outcome IN ('pending','committed','failed','cancelled')),
+                cancel_requested INTEGER NOT NULL DEFAULT 0,
+                ready_count INTEGER NOT NULL DEFAULT 0 CHECK(ready_count BETWEEN 0 AND 100000),
+                job_snapshot TEXT NOT NULL DEFAULT '{}',
+                PRIMARY KEY (tenant_id, workspace_id, collection_id, job_id))""")
+            columns = {row[1] for row in self._connection.execute('PRAGMA table_info(publication_receipts)')}
+            if 'ready_count' not in columns:
+                self._connection.execute('ALTER TABLE publication_receipts ADD COLUMN ready_count INTEGER NOT NULL DEFAULT 0')
+            if 'job_snapshot' not in columns:
+                self._connection.execute("ALTER TABLE publication_receipts ADD COLUMN job_snapshot TEXT NOT NULL DEFAULT '{}'")
+            # Triggers also protect pre-existing receipt tables with the old schema.
+            invalid = ' OR '.join("length(trim(NEW." + key + ", char(9,10,11,12,13,28,29,30,31,32,133,160,5760,8192,8193,8194,8195,8196,8197,8198,8199,8200,8201,8202,8232,8233,8239,8287,12288)))=0 OR length(NEW." + key + ")>256" for key in
+                ('tenant_id','workspace_id','collection_id','job_id','document_id','attempt_id','document_attempt'))
+            for operation in ('INSERT','UPDATE'):
+                self._connection.execute(f"CREATE TRIGGER IF NOT EXISTS publication_identity_{operation.lower()} BEFORE {operation} ON publication_receipts WHEN {invalid} BEGIN SELECT RAISE(ABORT, 'invalid publication identity'); END")
+            self._connection.execute("""CREATE INDEX IF NOT EXISTS publication_pending_document
+                ON publication_receipts(document_id) WHERE outcome='pending'""")
+
+    def ingestion_checkpoint_guard(self, job):
+        return self._transaction()
+
+    def _read_ingestion_checkpoint(self, job_id, tenant_id, workspace_id, collection_id):
+        with self._read() as connection:
+            row = connection.execute("""SELECT record FROM ingestion_checkpoints
+                WHERE tenant_id=? AND workspace_id=? AND collection_id=? AND job_id=?""",
+                (tenant_id, workspace_id, collection_id, job_id)).fetchone()
+            return json.loads(row['record']) if row else None
+
+    def _write_ingestion_checkpoint(self, record):
+        from rick_knowledge.publication import encode_checkpoint
+        encoded = encode_checkpoint(record)
+        with self._transaction():
+            self._connection.execute("""INSERT INTO ingestion_checkpoints
+                (tenant_id, workspace_id, collection_id, job_id, record) VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(tenant_id, workspace_id, collection_id, job_id)
+                DO UPDATE SET record=excluded.record""",
+                (*[record[k] for k in ('tenant_id', 'workspace_id', 'collection_id', 'job_id')], encoded))
+
+    def _read_publication(self, job_id, tenant_id, workspace_id, collection_id):
+        with self._read() as connection:
+            row = connection.execute("""SELECT * FROM publication_receipts
+                WHERE tenant_id=? AND workspace_id=? AND collection_id=? AND job_id=?""",
+                (tenant_id, workspace_id, collection_id, job_id)).fetchone()
+            if row is None:
+                return None
+            record = dict(row)
+            record['job_snapshot'] = _metadata_value(record['job_snapshot'])
+            if record['job_snapshot'] is None:
+                raise ValueError('corrupt publication snapshot')
+            return record
+
+    def _write_publication(self, record):
+        keys = ('tenant_id', 'workspace_id', 'collection_id', 'job_id', 'document_id',
+                'attempt_id', 'document_attempt', 'outcome', 'cancel_requested', 'ready_count', 'job_snapshot')
+        with self._transaction():
+            self._connection.execute("""INSERT INTO publication_receipts
+                (tenant_id, workspace_id, collection_id, job_id, document_id, attempt_id,
+                 document_attempt, outcome, cancel_requested, ready_count, job_snapshot)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(tenant_id, workspace_id, collection_id, job_id) DO UPDATE SET
+                document_id=excluded.document_id, attempt_id=excluded.attempt_id,
+                document_attempt=excluded.document_attempt, ready_count=excluded.ready_count, job_snapshot=excluded.job_snapshot,
+                outcome=CASE WHEN publication_receipts.attempt_id=excluded.attempt_id AND publication_receipts.outcome<>'pending'
+                    THEN publication_receipts.outcome WHEN publication_receipts.attempt_id=excluded.attempt_id
+                    AND publication_receipts.cancel_requested AND excluded.outcome='failed'
+                    THEN 'cancelled' ELSE excluded.outcome END,
+                cancel_requested=excluded.cancel_requested OR
+                    (publication_receipts.attempt_id=excluded.attempt_id AND publication_receipts.cancel_requested)""",
+                tuple(_metadata(record[k]) if k == 'job_snapshot' else record[k] for k in keys))
+
+    def publication_decision_guard(self, record):
+        return self._transaction()
+
+    def _mark_publication_cancel(self, job):
+        with self._transaction():
+            self._connection.execute("""UPDATE publication_receipts SET cancel_requested=1
+                WHERE tenant_id=? AND workspace_id=? AND collection_id=? AND job_id=?
+                AND attempt_id=? AND outcome='pending'""",
+                (job.tenant_id, job.workspace_id, job.collection_id, job.job_id,
+                 job.metadata['publication_attempt']))
+
+    def mutation_guard(self, key: str):
+        # A database-wide local gate is deliberate: it also coordinates
+        # collection creation with document effects through separate handles.
+        if self._guard_path is None:
+            return self._effect_lock
+        return file_mutation_guard(self._guard_path, self._file_gate)
+
+    def collection_guard(self, *, tenant_id: str, workspace_id: str, collection_id: str):
+        return self.mutation_guard(collection_guard_key(tenant_id=tenant_id,
+            workspace_id=workspace_id, collection_id=collection_id))
+
+    def restore_deleted_document(self, snapshot: Document, chunks: list[Chunk]) -> None:
+        with self.mutation_guard("document:" + snapshot.document_id), self._transaction():
+            snapshot = require_deleted_snapshot(self.get_document(snapshot.document_id), snapshot)
+            self._connection.execute("UPDATE documents SET status=? WHERE document_id=?",
+                                     (snapshot.status, snapshot.document_id))
+            self.replace_document_chunks(snapshot.document_id, chunks)
+
+    @collection_mutation
+    def ensure_collection(self, collection: Collection) -> Collection:
+        if collection.status not in {"active", "archived"}:
+            raise ValueError("unknown collection status")
+        metadata = dict(collection.metadata)
+        metadata.update(__rick_status=collection.status, __rick_version=collection.version)
+        with self._transaction():
+            self._connection.execute(
+                """INSERT INTO collections
+                   (workspace_id, collection_id, tenant_id, title, description, metadata_json)
+                   VALUES (?, ?, ?, ?, ?, ?)
+                   ON CONFLICT(tenant_id, workspace_id, collection_id) DO NOTHING""",
+                (collection.workspace_id, collection.collection_id, collection.tenant_id,
+                 collection.title, collection.description, _metadata(metadata)),
+            )
+            row = self._connection.execute(
+                "SELECT * FROM collections WHERE tenant_id=? AND workspace_id=? AND collection_id=?",
+                (collection.tenant_id, collection.workspace_id, collection.collection_id),
+            ).fetchone()
+            result = self._collection(row)
+            if result is None:
+                raise ValueError("invalid collection metadata")
+            return result
 
     def _initialize(self) -> None:
         with self._transaction():
@@ -181,10 +325,15 @@ class SQLiteKnowledgeStore:
     @contextmanager
     def _transaction(self) -> Iterator[None]:
         with self._lock:
+            if self._connection.in_transaction:
+                # Explicit maintenance composes status, row and chunks in the
+                # outer transaction. The outer scope owns commit/rollback.
+                yield
+                return
             self._connection.execute("BEGIN IMMEDIATE")
             try:
                 yield
-            except Exception:
+            except BaseException:
                 self._connection.rollback()
                 raise
             else:
@@ -256,6 +405,7 @@ class SQLiteKnowledgeStore:
             metadata=metadata,
         )
 
+    @collection_mutation
     def upsert_collection(self, collection: Collection) -> None:
         if collection.status not in {"active", "archived"}:
             raise ValueError("unknown collection status")
@@ -285,14 +435,14 @@ class SQLiteKnowledgeStore:
     ) -> Collection | None:
         if not isinstance(tenant_id, str) or not tenant_id.strip():
             raise ValueError("tenant_id is required")
-        query = "SELECT * FROM collections WHERE workspace_id = ? AND collection_id = ?"
-        params: list[object] = [workspace_id, collection_id]
+        keys = catalog_collection_ids(collection_id)
+        query = "SELECT * FROM collections WHERE workspace_id = ? AND collection_id IN (" + ",".join("?" for _ in keys) + ")"
+        params: list[object] = [workspace_id, *keys]
         query += " AND tenant_id = ?"
         params.append(tenant_id.strip())
-        query += " LIMIT 2"
         with self._read() as connection:
             rows = connection.execute(query, params).fetchall()
-        return self._collection(rows[0]) if rows else None
+        return select_catalog_collection([self._collection(row) for row in rows], collection_id)
 
     def list_collections(self, workspace_id: str, *, tenant_id: str) -> list[Collection]:
         if not isinstance(tenant_id, str) or not tenant_id.strip():
@@ -304,13 +454,14 @@ class SQLiteKnowledgeStore:
             rows = connection.execute(query, params).fetchall()
         return [item for row in rows if (item := self._collection(row)) is not None]
 
+    @document_mutation
     def upsert_document(self, document: Document) -> None:
         if document.status not in DOCUMENT_STATUSES:
             raise ValueError(f"unknown document status: {document.status}")
         materialize_lineage(document, published=document.status == "published")
         with self._transaction():
             previous = self._connection.execute(
-                "SELECT tenant_id, workspace_id, collection_id, status, published_at "
+                "SELECT * "
                 "FROM documents WHERE document_id = ?",
                 (document.document_id,),
             ).fetchone()
@@ -322,6 +473,9 @@ class SQLiteKnowledgeStore:
                 raise ValueError("document scope cannot change")
             if previous and previous["status"] == "deleted" and document.status != "deleted":
                 raise ValueError("deleted documents cannot transition; ingest a new version")
+            if previous and previous["status"] == "deleted":
+                require_unchanged_tombstone(self._document(previous), document)
+                return
             self._connection.execute(
                 """INSERT INTO documents
                 (document_id, workspace_id, collection_id, tenant_id, document_version,
@@ -416,6 +570,7 @@ class SQLiteKnowledgeStore:
             rows = connection.execute(query, params).fetchall()
         return [item for row in rows if (item := self._document(row)) is not None]
 
+    @document_mutation
     def set_document_status(self, document_id: str, status: str) -> None:
         if status not in DOCUMENT_STATUSES:
             raise ValueError(f"unknown document status: {status}")
@@ -425,6 +580,11 @@ class SQLiteKnowledgeStore:
                 raise KeyError(document_id)
             if row["status"] == "deleted" and status != "deleted":
                 raise ValueError("deleted documents cannot transition; ingest a new version")
+            if status == 'published':
+                document = self.get_document(document_id)
+                pending = self._connection.execute("SELECT * FROM publication_receipts WHERE document_id=? AND outcome='pending'", (document_id,)).fetchall()
+                if any(r['cancel_requested'] and self._publication_matches(dict(r), document) for r in pending):
+                    raise OwnershipLostError('publication cancelled before commit')
             published_at = utc_timestamp() if status == "published" else None
             self._connection.execute(
                 """UPDATE documents
@@ -437,6 +597,17 @@ class SQLiteKnowledgeStore:
                 (status, status, published_at, document_id),
             )
 
+            if status == 'published':
+                document = self.get_document(document_id)
+                rows = self._connection.execute("""SELECT * FROM publication_receipts
+                    WHERE document_id=? AND outcome='pending'""", (document_id,)).fetchall()
+                for row in rows:
+                    record = dict(row)
+                    record['job_snapshot'] = _metadata_value(record['job_snapshot'])
+                    if self._publication_matches(record, document):
+                        self._write_publication(self._committed_publication(record))
+
+    @document_mutation
     def delete_document(self, document_id: str) -> int:
         with self._transaction():
             count = int(self._connection.execute("SELECT COUNT(*) FROM chunks WHERE document_id = ?", (document_id,)).fetchone()[0])
@@ -444,13 +615,16 @@ class SQLiteKnowledgeStore:
             self._connection.execute("UPDATE documents SET status = 'deleted' WHERE document_id = ?", (document_id,))
         return count
 
+    @document_mutation
     def replace_document_chunks(self, document_id: str, chunks: list[Chunk]) -> None:
         with self._transaction():
             document = self._connection.execute(
-                "SELECT tenant_id FROM documents WHERE document_id = ?", (document_id,)
+                "SELECT tenant_id, status FROM documents WHERE document_id = ?", (document_id,)
             ).fetchone()
             if document is None:
                 raise KeyError(document_id)
+            if document["status"] == "deleted" and chunks:
+                raise ValueError("deleted documents cannot receive chunks")
             self._connection.execute("DELETE FROM chunks WHERE document_id = ?", (document_id,))
             for chunk in chunks:
                 if chunk.document_id != document_id:

@@ -6,14 +6,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AdminManagement } from "@/components/admin/admin-management";
 import { useSession } from "@/components/session-provider";
 import { Button, EmptyState, Panel, Spinner, StatusPill } from "@/components/ui";
-import { api, ApiError } from "@/lib/api";
+import { api, ApiError, errorMessage } from "@/lib/api";
 import { hasAdminReadAccess, hasPermission } from "@/lib/permissions";
 import { presentAdminStatus } from "@/lib/presentation";
 import type { AdminHealthResponse, AuditEvent, AuditListResponse } from "@/types/api";
-
-function errorMessage(cause: unknown, fallback: string) {
-  return cause instanceof ApiError ? cause.message : fallback;
-}
 
 function statusTone(status: string | undefined): "success" | "warning" | "danger" | "accent" {
   if (status === "ready") return "success";

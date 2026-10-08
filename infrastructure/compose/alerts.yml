@@ -11,7 +11,13 @@ groups:
           summary: RICK API SLO is breaching
           description: The bounded API SLO evaluator has reported a breach for five minutes.
       - alert: RickApiSloNoData
-        expr: max by (environment) (rick_api_slo_status{status="no_data"}) == 1 or absent(rick_api_slo_status)
+        # Preserve job/instance: a healthy peer must never hide a missing SLO.
+        # Retain recently discovered replicas for one hour after DNS removal.
+        expr: |
+          rick_api_slo_status{job="rick-api",status="no_data"} == 1
+          or (max_over_time(up{job="rick-api"}[1h])
+              unless on (job, instance) rick_api_slo_status{job="rick-api"})
+          or absent(up{job="rick-api"})
         for: 10m
         labels:
           severity: critical
@@ -19,3 +25,26 @@ groups:
         annotations:
           summary: RICK API SLO has no usable data
           description: Missing telemetry is not healthy and must be investigated before promotion.
+      # Proposed local defaults; these are not operator-approved production SLAs.
+      - alert: RickApiUnavailable
+        expr: |
+          up{job="rick-api"} == 0
+          or (max_over_time(up{job="rick-api"}[1h])
+              unless on (job, instance) up{job="rick-api"})
+          or absent(up{job="rick-api"})
+        for: 5m
+        labels:
+          severity: critical
+          service: rick-api
+        annotations:
+          summary: RICK API replica is unavailable
+          description: An API scrape failed or a discovered replica disappeared for five minutes.
+      - alert: RickCollectorUnavailable
+        expr: up{job="otel-collector-self"} == 0 or absent(up{job="otel-collector-self"})
+        for: 5m
+        labels:
+          severity: critical
+          service: otel-collector
+        annotations:
+          summary: RICK Collector is unavailable
+          description: Collector self telemetry is unavailable for five minutes; inspect trace and metric export.

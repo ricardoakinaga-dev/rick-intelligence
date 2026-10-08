@@ -1,0 +1,10 @@
+0001 0001_control_plane.sql: applied
+0002 0002_product_schema.sql: applied
+0003 0003_product_contract_extensions.sql: applied
+0004 0004_durable_jobs_contract.sql: applied
+0005 0005_rewrite_legacy_jobs.sql: applied
+0006 0006_document_lineage_contract.sql: applied
+0007 0007_admin_audit_reconciliation.sql: applied
+migration execution: PASS
+.
+1 passed in 4.54s

@@ -1,0 +1,31 @@
+{
+  "command": [
+    "/tmp/rick-aud03-lockenv-qzj0r3mc/venv/bin/python",
+    "docs/reports/evidence/implementation-aud03-2026-10-03/lead/run_continuation_pg.py"
+  ],
+  "cwd": "/home/ricardo/rick-intelligence",
+  "pythonpath": "/home/ricardo/rick-intelligence:/home/ricardo/rick-intelligence/apps/api/src:/home/ricardo/rick-intelligence/apps/api/tests:/home/ricardo/rick-intelligence/apps/worker:/home/ricardo/rick-intelligence/packages/authorization/src:/home/ricardo/rick-intelligence/packages/contracts/src:/home/ricardo/rick-intelligence/packages/decision/src:/home/ricardo/rick-intelligence/packages/evidence/src:/home/ricardo/rick-intelligence/packages/identity/src:/home/ricardo/rick-intelligence/packages/ingestion/src:/home/ricardo/rick-intelligence/packages/jobs/src:/home/ricardo/rick-intelligence/packages/knowledge/src:/home/ricardo/rick-intelligence/packages/locking/src:/home/ricardo/rick-intelligence/packages/observability/src:/home/ricardo/rick-intelligence/packages/professor/src:/home/ricardo/rick-intelligence/packages/providers/src:/home/ricardo/rick-intelligence/packages/retrieval/src:/home/ricardo/rick-intelligence/packages/storage/src",
+  "started_at": "2026-10-03T13:31:12.498149+00:00",
+  "finished_at": "2026-10-03T13:31:20.388423+00:00",
+  "exit_code": 0,
+  "before_hashes": {
+    "apps/api/src/routes/admin.py": "8199ad99401c3e62bbddb6d53ab1a0adf8611b3047acadd6d2456eab10e6fe6f",
+    "apps/api/src/services/audit_operations.py": "d319843c5da75a5971e0c2894c7f59e816a805b8b7349ab7d2ab7d1c2d13d86b",
+    "apps/api/src/services/postgres_audit.py": "33e66c14537449d0a4983ff7ac210532519b13360aadc0b2cd3dd6434a66fc33",
+    "apps/api/src/services/postgres_identity.py": "004de824f06f59c030ec766e9a68944a047a3c92dda3f7dc29a976229ddc4d55",
+    "apps/api/tests/test_aud03_audit_postgres_live.py": "098dc9a6b6b8300ff0886639a99e89c762f277fe755e3ea67e0338ad901b51bc",
+    "docs/reports/evidence/implementation-aud03-2026-10-03/lead/run_continuation_pg.py": "500ac5285c0ed994e22d20d919be53569cb71450c7973a075251ca2ff2735cfa",
+    "docs/reports/evidence/implementation-aud03-2026-10-03/lead/test_continuation_admin_pg.py": "4f1e532e4de7ededa223bc1ad3d0812206b107d5ff00c28e0e31896780507d8f"
+  },
+  "after_hashes": {
+    "apps/api/src/routes/admin.py": "8199ad99401c3e62bbddb6d53ab1a0adf8611b3047acadd6d2456eab10e6fe6f",
+    "apps/api/src/services/audit_operations.py": "d319843c5da75a5971e0c2894c7f59e816a805b8b7349ab7d2ab7d1c2d13d86b",
+    "apps/api/src/services/postgres_audit.py": "33e66c14537449d0a4983ff7ac210532519b13360aadc0b2cd3dd6434a66fc33",
+    "apps/api/src/services/postgres_identity.py": "004de824f06f59c030ec766e9a68944a047a3c92dda3f7dc29a976229ddc4d55",
+    "apps/api/tests/test_aud03_audit_postgres_live.py": "098dc9a6b6b8300ff0886639a99e89c762f277fe755e3ea67e0338ad901b51bc",
+    "docs/reports/evidence/implementation-aud03-2026-10-03/lead/run_continuation_pg.py": "500ac5285c0ed994e22d20d919be53569cb71450c7973a075251ca2ff2735cfa",
+    "docs/reports/evidence/implementation-aud03-2026-10-03/lead/test_continuation_admin_pg.py": "4f1e532e4de7ededa223bc1ad3d0812206b107d5ff00c28e0e31896780507d8f"
+  },
+  "source_unchanged": true,
+  "log": "continuation-20261003-audit-postgres-sealed.log"
+}

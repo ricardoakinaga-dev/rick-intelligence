@@ -1,5 +1,15 @@
 # `apps/worker`
 
+From the repository root, run `uv venv .venv --python python3.12`,
+`uv pip sync --python .venv/bin/python --require-hashes requirements/test.lock`,
+then `make worker-coverage PYTHON=.venv/bin/python`. CI installs the same
+`requirements/test.lock` with pip's `--require-hashes`. The worker suite
+must cover at least 74% of statements in `apps/worker/*.py`; `apps/worker/tests`
+is excluded because test code is the measurement input. The health test runs
+with the worker suite but is outside its coverage denominator. The sanitized
+summary is `.runtime/qa/worker-summary.json`; the full local report stays in
+`.runtime/qa/worker-coverage.json`.
+
 This directory exposes two explicit worker seams. `LocalJobRunner` is a bounded
 process-local seam for API integration. It has explicit `max_pending` and
 `max_workers` limits, safe submission rejection, status/cancellation/shutdown
@@ -50,3 +60,41 @@ authority after that migration. Disposable PostgreSQL concurrency, crash and
 SIGTERM evidence is still required before this runtime is called production
 ready. Python handlers remain cooperative; process isolation for a handler that
 ignores cancellation is an external deployment gate.
+
+`run_once()` reports outcomes for jobs started in that call. `run_forever()`
+reports all outcomes observed during its invocation, including completions
+from earlier nonwaiting cycles and its final monitor pass. It consumes
+monotonic outcome counters once so delayed queue errors reach the configured
+stop threshold even after completed executions have been reaped. Poisoned
+claims validate returned canonical job identity, scope and recovery state
+before counting their outcome; the poison marker is independent of that state.
+
+Polling cycles serialize admission across capacity observation and claiming.
+A running daemon owns polling until it returns: other cycle/daemon callers
+receive `RuntimeConfigurationError`. Reentrant polling within a cycle is
+also rejected. Cancellation, health and cooperative shutdown remain available
+independently. Timeout detection is counted once regardless of the recovered
+job state; claimed counts jobs, and invalid claims contribute to poison counts
+in both cycle results and cumulative metrics. Callable mutation ports must
+return canonical confirmations; missing/non-Job and PENDING confirmations
+are queue errors. FAILED/RETRYING/QUEUED/DEAD_LETTER remain valid failed-attempt
+results, and an absent optional cancellation capability retains its fallback.
+
+Duplicate/currently active claim identities are invalid admissions and never
+replace an existing execution. A failed thread launch rolls back its reserved
+slot and does not count as started. Handler result readiness is separate from
+thread termination: capacity remains reserved through tracing/context cleanup
+until the worker thread exits, including after logical completion.
+
+Exceptions after a confirmed thread launch preserve the admitted execution
+instead of poisoning a live job. A supervisor interrupt still propagates after
+counting that launch. Trace entry failures finish through the safe handler
+failure boundary; trace exit/recording failures preserve an already obtained
+handler result and never escape to the thread exception hook. Tracing cleanup
+continues to occupy physical capacity until thread termination.
+
+A reserved claim has one finalization owner even if thread launch fails while
+a timeout or shutdown is finalizing it. Failed launches report started=0 and
+poison detection without a second mutation. Threads confirmed after a pending
+cancellation check the token before invoking the handler. Finalization stays
+owned until its outcome and counters have been published atomically.

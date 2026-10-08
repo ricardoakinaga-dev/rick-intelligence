@@ -1,0 +1,29 @@
+
+| Frente | Pendência concreta | Critério para fechar |
+|---|---|---|
+| **Candidato e CI** | Consolidar as alterações e repetir a validação conjunta. Hoje há **343 entradas no `git status`**. | Versão revisada e identificada; checkout limpo; CI completa, locks, contrato, build e testes vinculados à mesma versão. |
+| **Dados e migrações — AUD03-27** | Inventariar versões, checksums, constraints e referências da base instalada, incluindo compatibilidade com 0007/0008. | Snapshot autorizado identificado, incompatibilidades documentadas e preflight executado nele. A ferramenta local já está pronta. |
+| **Integração completa — AUD03-28** | Exercitar API → objeto → fila → worker → vetores → retrieval → resposta com todos os serviços reais juntos. | Upload, publicação, retry, reinício, delete/reindex e auditoria coerentes, sem duplicação ou perda de dados. |
+| **Identidade e isolamento — AUD03-30** | Validar IdP real, revogação e permissões entre réplicas e stores. | Tenant A não observa dados de B; revogações funcionam consistentemente, inclusive no navegador. |
+| **Qualidade RAG — AUD03-29** | Executar avaliação com provider e corpus representativo autorizado. | Limiares previamente aprovados; métricas de retrieval, citações, respostas sem suporte e vazamento, com revisão de domínio. |
+| **Observabilidade — AUD03-31** | Comprovar collector, métricas, traces e entrega de alertas. | Request, job e provider correlacionados; falhas detectadas; alertas recebidos; dados sensíveis redigidos. |
+| **Backup e recuperação — AUD03-32** | Restaurar banco, objetos, vetores e projeções conjuntamente. | Dados e permissões reconciliados; **RPO/RTO medidos** e dentro dos limites aprovados. |
+| **Capacidade — AUD03-33** | Medir carga representativa na topologia pretendida. | Latência, throughput, erros, filas, recursos e custo dentro de budgets definidos. |
+| **Falhas e estabilidade — AUD03-34/35** | Ensaiar quedas, timeouts, reconexões e carga prolongada. | Recuperação sem corrupção, duplicação, tempestade de retries ou crescimento indevido de recursos. |
+| **Release — AUD03-36** | Reauditar o candidato, verificar imagens e concluir revisão e decisão de promoção. | Digests, scans, assinaturas e evidências coincidem; canary e recuperação preparados; Go/No-Go aprovado pela autoridade responsável. |
+
+Os critérios completos estão no backlog de produção (docs/backlog-auditoria-2026-10-03.md:292).
+
+**Dois pontos exigem atenção específica**
+
+- **Recuperação de ingestão após reinício:** a reconciliação atual tem validação local no serviço, mas não há garantia demonstrada de recuperação após restart. Esse comportamento precisa ser validado ou completado na integração.
+- **Módulo clínico:** falta decidir a política de feedback em casos de outro proprietário. Pode permanecer desabilitado durante a produção dos demais módulos; sua habilitação exige essa decisão e os testes correspondentes.
+
+**Ordem recomendada**
+
+1. Consolidar o candidato e obter o inventário autorizado da base.
+2. Validar a instalação completa em homologação, incluindo identidade, provider e navegador com API real.
+3. Executar avaliação RAG, observabilidade, restore, carga, falhas e estabilidade.
+4. Selar as evidências, concluir a revisão independente e decidir a promoção.
+
+Para avançar nesses gates, faltam principalmente ambiente e snapshot autorizados, IdP/provider, corpus e limiares, budgets operacionais e responsáveis por operação e release. Sem esses insumos e as execuções correspondentes, não há base para estimar uma data confiável de produção.

@@ -1,0 +1,117 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_____ test_postgres_sparse_admin_update_serializes_with_password_recovery ______
+
+postgres_db = "user=postgres connect_timeout=2 dbname=q24_9ccf45ba62d54dd5b93bcf1c71906df1 host=127.0.0.1 port=32947 options='-c statement_timeout=10000 -c lock_timeout=5000'"
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7088a7957f80>
+
+    def test_postgres_sparse_admin_update_serializes_with_password_recovery(postgres_db, monkeypatch):
+        from concurrent.futures import ThreadPoolExecutor
+        import threading
+        from types import SimpleNamespace
+    
+        for relative in (
+            "apps/api/src",
+            "packages/authorization/src",
+            "packages/contracts/src",
+            "packages/identity/src",
+            "packages/observability/src",
+        ):
+            monkeypatch.syspath_prepend(str(ROOT / relative))
+    
+        from rick_identity.passwords import hash_password, verify_password_hash
+        from services.postgres_identity import PostgresIdentityProvider
+    
+        migrate.apply(MIGRATIONS, postgres_db)
+        tenant_id = "tenant-sparse-recovery-race"
+        admin_id = "admin-sparse-recovery-race"
+        target_id = "target-sparse-recovery-race"
+        target_email = "target-sparse-recovery-race@example.test"
+        query(postgres_db, "INSERT INTO rick_tenants(tenant_id,display_name) VALUES (%s,%s)",
+              (tenant_id, tenant_id))
+        query(postgres_db, "INSERT INTO rick_users(user_id,email) VALUES (%s,%s)",
+              (admin_id, "admin-sparse-recovery-race@example.test"))
+        query(postgres_db, """
+            INSERT INTO rick_memberships(tenant_id,user_id,workspace_id,role,status)
+            VALUES (%s,%s,'workspace','PLATFORM_ADMIN','active')
+        """, (tenant_id, admin_id))
+        old_password_hash = hash_password("password-before-recovery")
+        query(postgres_db, """
+            INSERT INTO rick_users(user_id,email,password_hash,password_version)
+            VALUES (%s,%s,%s,1)
+        """, (target_id, target_email, old_password_hash))
+        query(postgres_db, """
+            INSERT INTO rick_memberships(tenant_id,user_id,workspace_id,role,status)
+            VALUES (%s,%s,'workspace','VETERINARIAN','active')
+        """, (tenant_id, target_id))
+    
+        def connect():
+            import psycopg
+            return psycopg.connect(postgres_db, connect_timeout=2)
+    
+        identity = PostgresIdentityProvider(connect, production_safe=True)
+        admin = SimpleNamespace(
+            user_id=admin_id, tenant_id=tenant_id, workspace_id="workspace",
+            role="PLATFORM_ADMIN", canonical_role="PLATFORM_ADMIN", permissions=["users.manage"],
+        )
+        recovery_token = identity.issue_password_reset(email=target_email, tenant_id=tenant_id)
+        assert isinstance(recovery_token, str)
+    
+        original_lookup = identity._users.get_by_id_for_tenant_workspace
+        stale_row_loaded = threading.Event()
+        allow_admin_update_to_save = threading.Event()
+        recovery_finished = threading.Event()
+        paused_once = threading.Event()
+    
+        def pause_after_admin_read(user_id, tenant, workspace, *, connection=None):
+            row = original_lookup(user_id, tenant, workspace, connection=connection)
+            if row is not None and not paused_once.is_set():
+                paused_once.set()
+                stale_row_loaded.set()
+                if not allow_admin_update_to_save.wait(timeout=10):
+                    raise AssertionError("timed out waiting to resume sparse admin update")
+            return row
+    
+        identity._users.get_by_id_for_tenant_workspace = pause_after_admin_read
+    
+        def empty_admin_patch():
+            return identity.admin_update_user(
+                actor=admin, user_id=target_id, request_id="request-empty-patch-during-recovery",
+            )
+    
+        def recover_password():
+            try:
+                return identity.consume_password_reset(
+                    token=recovery_token, new_password="password-after-recovery",
+                )
+            finally:
+                recovery_finished.set()
+    
+        try:
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                update_future = pool.submit(empty_admin_patch)
+                recovery_future = None
+                try:
+                    assert stale_row_loaded.wait(timeout=10), "empty admin PATCH did not read the target row"
+                    recovery_future = pool.submit(recover_password)
+>                   assert not recovery_finished.wait(timeout=1), (
+                        "password recovery passed the account lock while the full-row admin update was paused"
+                    )
+E                   AssertionError: password recovery passed the account lock while the full-row admin update was paused
+E                   assert not True
+E                    +  where True = wait(timeout=1)
+E                    +    where wait = <threading.Event at 0x7088a6de39e0: set>.wait
+
+infrastructure/scripts/tests/test_migrate.py:2011: AssertionError
+----------------------------- Captured stdout call -----------------------------
+0001 0001_control_plane.sql: applied
+0002 0002_product_schema.sql: applied
+0003 0003_product_contract_extensions.sql: applied
+0004 0004_durable_jobs_contract.sql: applied
+0005 0005_rewrite_legacy_jobs.sql: applied
+0006 0006_document_lineage_contract.sql: applied
+0007 0007_admin_audit_reconciliation.sql: applied
+migration execution: PASS
+=========================== short test summary info ============================
+FAILED infrastructure/scripts/tests/test_migrate.py::test_postgres_sparse_admin_update_serializes_with_password_recovery
+1 failed in 3.39s

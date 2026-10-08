@@ -320,7 +320,7 @@ class SQLiteAuditSink:
             self._connection.execute("BEGIN IMMEDIATE")
             try:
                 yield
-            except Exception:
+            except BaseException:
                 try:
                     self._connection.rollback()
                 except sqlite3.Error:
@@ -350,6 +350,10 @@ class SQLiteAuditSink:
             WHERE id NOT IN (
                 SELECT id FROM audit_events ORDER BY id DESC LIMIT ?
             )
+            AND CASE WHEN json_valid(event_json)
+                THEN COALESCE(json_extract(event_json, '$.status'), '') NOT IN
+                     ('pending_completion', 'manual_review_required')
+                ELSE 1 END
             """,
             (self._max_events,),
         )
@@ -387,8 +391,8 @@ class SQLiteAuditSink:
 
     def health_check(self) -> bool:
         try:
-            with self._read() as connection:
-                connection.execute("SELECT 1").fetchone()
+            with self._lock:
+                self._connection.execute("SELECT 1").fetchone()
             return True
         except Exception:
             return False
@@ -459,7 +463,7 @@ class SQLiteAuditSink:
         parameters: tuple[object, ...] = tuple(parameters_list)
         if limit is not None:
             query += " LIMIT ?"
-            parameters = (limit,)
+            parameters = (*parameters, limit)
         with self._lock:
             rows = self._connection.execute(query, parameters).fetchall()
 

@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-09-25T09:20:00Z",
+  "scope": "Provenance for the C6 local implementation review packet; not a release manifest.",
+  "checkout": {
+    "head": "b52f32c141916a2ea3af1a6b913bd91f380606e0",
+    "branch": "main",
+    "worktree": "dirty shared checkout; preserved baseline and unrelated worktree changes remain present"
+  },
+  "frozen_quality_bar": {
+    "path": ".gauntlet/bar.json",
+    "sha256": "f1ea9aa44d0d66e00bb47e75e30ad616ff575897de7d2a40bb5bc8e1f4936310"
+  },
+  "results": {
+    "api": "726 passed; full apps/api suite",
+    "worker": "116 passed; worker and phase-1.6 health suite",
+    "postgresql": "108 passed; opt-in disposable PostgreSQL 16.15 migration suite",
+    "postgres_admin_concurrency": "1 passed; named verbose disposable-PostgreSQL integration test",
+    "identity": "26 passed; complete packages/identity suite",
+    "admin_mutation_unit": "12 passed",
+    "static": "make lint, make typecheck and make ops-static passed",
+    "control": "10/10 controller checks; 35 backlog items, 355 execution events, 357 verification records and 28 gates; 30 historical files and 11 derived views passed; make validate and git diff --check passed"
+  },
+  "files": {
+    "apps/api/src/routes/admin.py": "34d7d0eeb82ecd6592c11fc196233098e35270b0d345583e82518230c9a8774b",
+    "apps/api/src/services/identity_service.py": "d8d085c30661fdbef6a5f88b32891d2c1eaec4eea7a5d2d54b59b2ab9d6b8c4f",
+    "apps/api/src/services/postgres_identity.py": "802109f9e0ae5046d67f4693593c72ddfa2df619051f07b9c3b93c11db5abd02",
+    "packages/identity/src/rick_identity/postgres.py": "439802769984d6099d4d7645580da303a62203a7e7997cdeb5f791e12efbde26",
+    "apps/api/tests/test_audit_factory.py": "ff36b1705d8236f695239ec4e7e2aebbf3fd6492dc4aca8ab27cd29945de6830",
+    "apps/api/tests/test_postgres_admin_mutations.py": "dcb86d2cd2b2e7fde812e1d7d5fb1194ca2942188c544b1b13de61483cc16023",
+    "packages/identity/tests/test_postgres.py": "2535be66657d2bd90da4dc0975f179397838b3e935821686657d61bf3dfdaf21",
+    "apps/worker/admin_audit_outbox.py": "046595f9da759a3fc3f08eff1233cb5d53665d444301c053932124b51d76ee3a",
+    "apps/worker/deployment_composition.py": "09b8ebae1d2f869226789b013050b2ffb2cf9e7c96f5b2a7556e1a46189cf818",
+    "apps/worker/tests/test_admin_audit_outbox.py": "a6d47c7ba1172a701ac012a8652287da05aba74814ca75bcb1b9259dc6317de2",
+    "apps/worker/tests/test_deployment_composition.py": "e390ff5f01232a233ec803daf2cceb1c85e58c2f97cd0e60e11401b50a5afc12",
+    "infrastructure/migrations/0007_admin_audit_reconciliation.sql": "4af11b3250c3b5f3d2ea1e3a1042883ccf3cb703370daa6011cd4c2c748ae6e2",
+    "infrastructure/scripts/tests/test_migrate.py": "11c608aff346ac6e6023993aad2a21cbee4777774b6466e3f66908b5c85bc652",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0903Z-c5-fixes/api16-root-final.log": "f49f0a94340c3c0e65db08f0970f8ea52fb910f561e0f60d38c4c4d347700312",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0903Z-c5-fixes/api16-worker-final.log": "07ecda9141212ae3d67d56d86b38b609e6c8facdc405f81ffc462bc2e4f84195",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0903Z-c5-fixes/postgres-migrations.log": "486ebd41e28ea5271bdeb746b31f96e50c037167106c4019697e02febe7465c7",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0903Z-c5-fixes/postgres-admin-concurrency-verbose.log": "8e8a9af9718246f27f4206a29a4ba03988992b1c6f6f8bcaa9ebb50b402a7ade",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0903Z-c5-fixes/identity-tests-final.log": "86818eb90d2f5bacee4597fb46dbf452282b7c7ac738ffc3a2e4446688cfc619",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0903Z-c5-fixes/admin-mutation-unit.log": "51df5353d5400760178a0d2599794e3b904adea6a65db87e2c647bf477b174b0",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0903Z-c5-fixes/lint.log": "a7a5650dee62a2a315b1b3413dc05105661cd0c4bd71ec25608e7101f4d1dd63",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0903Z-c5-fixes/typecheck.log": "f4e2482bfa89fd0a34aa7a5fab375fdbb03747d3941dd8fecfa8bdb1bc77c92d",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0903Z-c5-fixes/ops-static.log": "fe2e5b2d7c8fc442d97df5d04bb70b2ac92fc920fa45ded651e2162606088dce",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0903Z-c5-fixes/control-plane-pre-review.log": "b031748ac848188a3cecd07a71132ad7d84e867c67b1b0fd1196fea4db13eca9",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0903Z-c5-fixes/canonical-state-pre-review.log": "8dcbf806f044d4b590fd1981426f9522dfa99ae3f6c9f7196e79a53a775ef99f",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0903Z-c5-fixes/make-validate-pre-review.log": "9696c1ee8cd28e54935dfdd7484423d409aeccfc854a79e92fb992b2d62dad12",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0903Z-c5-fixes/review-views-pre-review.log": "df270bed12e28fcfea0d301ac95cf995b7bb454b6047284bff50ce0f7ab08914",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0903Z-c5-fixes/diff-check-pre-review.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    ".gauntlet/bar.json": "f1ea9aa44d0d66e00bb47e75e30ad616ff575897de7d2a40bb5bc8e1f4936310"
+  },
+  "limitations": "Local scoped evidence only. The HTTP integration uses a synthetic SessionSnapshot dependency override; it does not prove authentication or full external-service runtime acceptance. Product/domain, operations, visual/accessibility, release and promotion acceptance remain open."
+}

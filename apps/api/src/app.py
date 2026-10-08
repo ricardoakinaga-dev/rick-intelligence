@@ -11,6 +11,8 @@ from itertools import islice
 from threading import Event, RLock, Thread
 import time
 
+import httpx
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -164,6 +166,7 @@ def _composition_owned_resources(providers: Providers) -> tuple[object, ...]:
         getattr(providers, "_embedding_adapter", None),
         providers.provider,
         providers.lease,
+        getattr(inputs, "provider_client", None),
         getattr(inputs, "redis_client", None),
     )
     result: list[object] = []
@@ -176,84 +179,108 @@ def _composition_owned_resources(providers: Providers) -> tuple[object, ...]:
     return tuple(result)
 
 
-async def _close_owned_resource(resource: object, *, timeout: float | None = None) -> bool:
-    """Close one factory-owned resource with a real wall-clock bound."""
+class _LifecycleInvocation:
+    """One synchronous call, retained until its result is reconciled.
 
-    deadline = None if timeout is None else time.monotonic() + max(0.0, timeout)
+    A Python thread cannot be forcibly stopped. Cancelling/timing out its
+    caller leaves this obligation pending; retries wait on the same call.
+    """
 
-    def invoke(callable_object, **kwargs):
-        return callable_object(**kwargs)
+    def __init__(self, callable_object, kwargs):
+        self.finished = Event()
+        self.result = None
+        self.error = None
 
-    async def invoke_bounded(callable_object, **kwargs):
-        if timeout is None:
-            return invoke(callable_object, **kwargs)
-        finished = Event()
-        result_box: dict[str, object] = {}
-
-        def run() -> None:
+        def run():
             try:
-                result_box["result"] = invoke(callable_object, **kwargs)
-            except BaseException as exc:  # pragma: no cover - adapter boundary
-                result_box["error"] = exc
+                self.result = callable_object(**kwargs)
+            except BaseException as exc:
+                self.error = exc
             finally:
-                finished.set()
+                self.finished.set()
 
+        Thread(target=run, name="rick-lifecycle-close", daemon=True).start()
+
+
+async def _invoke_lifecycle_port(callable_object, *, deadline, obligations, key, **kwargs):
+    if deadline is not None and time.monotonic() >= deadline:
+        raise TimeoutError
+    invocation = None
+    if inspect.iscoroutinefunction(callable_object):
+        result = callable_object(**kwargs)
+    else:
+        invocation = obligations.get(key)
+        if invocation is None:
+            invocation = _LifecycleInvocation(callable_object, kwargs)
+            obligations[key] = invocation
+        # Poll without an executor waiter that survives caller cancellation.
+        # No thread touches the loop, and only lifecycle admission starts calls.
+        while not invocation.finished.is_set():
+            remaining = None if deadline is None else deadline - time.monotonic()
+            if remaining is not None and remaining <= 0:
+                raise TimeoutError
+            await asyncio.sleep(.005 if remaining is None else min(.005, remaining))
+        if invocation.error is not None:
+            obligations.pop(key, None)
+            raise invocation.error
+        result = invocation.result
+    if inspect.isawaitable(result):
+        # Invocation succeeded but returned asynchronous work. Execute it on
+        # the owning loop; cancellation drains cooperative finalizers. A failed
+        # coroutine cannot be reused, so a subsequent retry invokes the port.
         try:
-            Thread(
-                target=run,
-                name="rick-lifecycle-close",
-                daemon=True,
-            ).start()
-        except RuntimeError:  # pragma: no cover - interpreter boundary
-            return False
-        remaining = max(0.0, deadline - time.monotonic()) if deadline is not None else None
-        await asyncio.to_thread(finished.wait, remaining)
-        if not finished.is_set():
-            return False
-        error = result_box.get("error")
-        if isinstance(error, BaseException):
-            raise error
-        return result_box.get("result")
+            remaining = None if deadline is None else max(0.0, deadline - time.monotonic())
+            limit = asyncio.timeout(remaining)
+            async with limit:
+                result = await result
+            if limit.expired():
+                raise TimeoutError
+        finally:
+            if invocation is not None:
+                obligations.pop(key, None)
+    if result is False or getattr(result, "timed_out", False) is True:
+        obligations.pop(key, None)
+    elif invocation is not None:
+        # Retain successful returns even if the caller is interrupted before
+        # it records lifecycle_closed_resources/lifecycle_stopped_resources.
+        invocation.result = result
+    return result
 
-    async def await_bounded(result: object) -> object:
-        if not inspect.isawaitable(result):
-            return result
-        if deadline is None:
-            return await result
-        remaining = max(0.0, deadline - time.monotonic())
-        if remaining <= 0:
-            return False
-        try:
-            return await asyncio.wait_for(result, timeout=remaining)
-        except asyncio.TimeoutError:
-            return False
 
-    async_closer = getattr(resource, "aclose", None)
-    if callable(async_closer):
-        result = await invoke_bounded(async_closer)
-        result = await await_bounded(result)
-        return result is not False
-    closer = getattr(resource, "close", None)
-    if callable(closer):
+async def _close_owned_resource(resource: object, *, timeout: float | None = None,
+                                obligations: dict | None = None, key=None) -> bool:
+    """Close within a cooperative budget, retaining synchronous obligations."""
+    deadline = None if timeout is None else time.monotonic() + max(0.0, timeout)
+    obligations = {} if obligations is None else obligations
+    key = (id(resource), "close") if key is None else key
+    closer = getattr(resource, "aclose", None)
+    kwargs = {}
+    if not callable(closer):
+        closer = getattr(resource, "close", None)
+        if not callable(closer):
+            return True
         if timeout is not None:
             try:
                 parameters = inspect.signature(closer).parameters.values()
-                accepts_timeout = any(
-                    parameter.name == "timeout"
-                    or parameter.kind is inspect.Parameter.VAR_KEYWORD
-                    for parameter in parameters
-                )
+                if any(parameter.name == "timeout" or parameter.kind is inspect.Parameter.VAR_KEYWORD
+                       for parameter in parameters):
+                    kwargs["timeout"] = timeout
             except (TypeError, ValueError):
-                accepts_timeout = False
-        else:
-            accepts_timeout = False
-        result = await invoke_bounded(
-            closer,
-            **({"timeout": timeout} if accepts_timeout else {}),
-        )
-        result = await await_bounded(result)
-        return result is not False
-    return True
+                pass
+    try:
+        result = await _invoke_lifecycle_port(closer, deadline=deadline,
+                                             obligations=obligations, key=key, **kwargs)
+    except TimeoutError:
+        return False
+    return result is not False and getattr(result, "timed_out", False) is not True
+
+
+def _raise_pending_lifecycle_cancellation() -> None:
+    # A collaborator may finish cleanup after catching CancelledError. Only
+    # the caller can acknowledge cancellation; never clear its count here.
+    task = asyncio.current_task()
+    if task is not None and task.cancelling():
+        raise asyncio.CancelledError
 
 
 async def _shutdown_owned_resources(app: FastAPI) -> None:
@@ -270,90 +297,139 @@ async def _shutdown_owned_resources(app: FastAPI) -> None:
             return
         app.state.lifecycle_shutdown_started = True
         app.state.lifecycle_shutdown_in_progress = True
-    deadline = time.monotonic() + APP_LIFESPAN_SHUTDOWN_TIMEOUT_SECONDS
-    errors: list[str] = []
+    try:
+        deadline = time.monotonic() + APP_LIFESPAN_SHUTDOWN_TIMEOUT_SECONDS
+        errors: list[str] = []
+        closed_resources = getattr(app.state, "lifecycle_closed_resources", None)
+        if closed_resources is None:
+            closed_resources = app.state.lifecycle_closed_resources = set()
+        stopped_resources = getattr(app.state, "lifecycle_stopped_resources", None)
+        if stopped_resources is None:
+            stopped_resources = app.state.lifecycle_stopped_resources = set()
+        client_obligations = getattr(app.state, "lifecycle_client_close_obligations", None)
+        if client_obligations is None:
+            client_obligations = app.state.lifecycle_client_close_obligations = {}
 
-    shutdown_resources: list[object] = []
-    seen_shutdown: set[int] = set()
-    for resource in (
-        *getattr(app.state, "owned_shutdown_resources", ()),
-        getattr(app.state, "owned_ingestion", None),
-        *getattr(app.state, "owned_runtime_resources", ()),
-    ):
-        if resource is None or id(resource) in seen_shutdown:
-            continue
-        seen_shutdown.add(id(resource))
-        shutdown_resources.append(resource)
+        invocations = getattr(app.state, "lifecycle_port_invocations", None)
+        if invocations is None:
+            invocations = app.state.lifecycle_port_invocations = {}
 
-    for resource in shutdown_resources:
-        shutdown = getattr(resource, "shutdown", None)
-        if not callable(shutdown):
-            continue
-        try:
-            # A clean app stop must join the local worker before SQLite or
-            # other local stores are closed. The service cancels queued
-            # futures and running work remains cooperatively cancellable. A
-            # resistant worker is bounded and leaves dependent resources open
-            # rather than creating a use-after-close race.
-            remaining = max(0.0, deadline - time.monotonic())
-            try:
-                parameters = inspect.signature(shutdown).parameters.values()
-                names = {parameter.name for parameter in parameters}
-            except (TypeError, ValueError):
-                names = set()
-            shutdown_kwargs = {}
-            if "wait" in names:
-                shutdown_kwargs["wait"] = True
-            if "timeout" in names:
-                shutdown_kwargs["timeout"] = remaining
-            completed = shutdown(**shutdown_kwargs)
-            if completed is False or getattr(completed, "timed_out", False) is True:
-                errors.append("ingestion_shutdown_timeout")
-        except Exception as exc:  # pragma: no cover - defensive boundary
-            errors.append(type(exc).__name__)
+        _raise_pending_lifecycle_cancellation()
 
-    # Never close a store if an owned worker failed to stop. The worker may
-    # still hold references to it; the lifecycle result remains explicitly
-    # incomplete for the host/supervisor to observe.
-    if errors:
-        app.state.lifecycle_shutdown_errors = tuple(errors)
-        app.state.lifecycle_shutdown_complete = False
-        app.state.lifecycle_shutdown_in_progress = False
-        return
-
-    close_resources: list[object] = []
-    seen_close: set[int] = set()
-    for resource in (
-        *shutdown_resources,
-        *getattr(app.state, "owned_resources", ()),
-    ):
-        if resource is None or id(resource) in seen_close:
-            continue
-        seen_close.add(id(resource))
-        close_resources.append(resource)
-
-    for resource in close_resources:
-        try:
-            remaining = max(0.0, deadline - time.monotonic())
-            if remaining <= 0:
-                errors.append("lifecycle_shutdown_timeout")
+        shutdown_resources: list[object] = []
+        seen_shutdown: set[int] = set()
+        for resource in (
+            *getattr(app.state, "owned_shutdown_resources", ()),
+            getattr(app.state, "owned_ingestion", None),
+            *getattr(app.state, "owned_runtime_resources", ()),
+        ):
+            if resource is None or id(resource) in seen_shutdown:
                 continue
-            if not await _close_owned_resource(resource, timeout=remaining):
-                errors.append("resource_close_incomplete")
-                # A bounded close may still be running in a daemon adapter
-                # thread. Do not close later resources behind an incomplete
-                # dependency, and leave the lifecycle explicitly retryable.
-                break
-            if time.monotonic() > deadline:
-                errors.append("lifecycle_shutdown_timeout")
-                break
-        except Exception as exc:  # pragma: no cover - defensive boundary
-            errors.append(type(exc).__name__)
-            break
+            seen_shutdown.add(id(resource))
+            shutdown_resources.append(resource)
 
-    app.state.lifecycle_shutdown_errors = tuple(errors)
-    app.state.lifecycle_shutdown_complete = not errors
-    app.state.lifecycle_shutdown_in_progress = False
+        for resource in shutdown_resources:
+            if id(resource) in stopped_resources:
+                continue
+            shutdown = getattr(resource, "shutdown", None)
+            if not callable(shutdown):
+                continue
+            try:
+                # A clean app stop must join the local worker before SQLite or
+                # other local stores are closed. The service cancels queued
+                # futures and running work remains cooperatively cancellable. A
+                # resistant worker is bounded and leaves dependent resources open
+                # rather than creating a use-after-close race.
+                remaining = max(0.0, deadline - time.monotonic())
+                try:
+                    parameters = inspect.signature(shutdown).parameters.values()
+                    names = {parameter.name for parameter in parameters}
+                except (TypeError, ValueError):
+                    names = set()
+                shutdown_kwargs = {}
+                if "wait" in names:
+                    shutdown_kwargs["wait"] = True
+                if "timeout" in names:
+                    shutdown_kwargs["timeout"] = remaining
+                completed = await _invoke_lifecycle_port(
+                    shutdown, deadline=deadline, obligations=invocations,
+                    key=(id(resource), "shutdown"), **shutdown_kwargs,
+                )
+                if completed is False or getattr(completed, "timed_out", False) is True:
+                    errors.append("ingestion_shutdown_timeout")
+                else:
+                    stopped_resources.add(id(resource))
+            except Exception as exc:  # pragma: no cover - defensive boundary
+                errors.append(type(exc).__name__)
+            finally:
+                # Reconcile a completed stop before propagating caller cancel.
+                _raise_pending_lifecycle_cancellation()
+
+        # Never close a store if an owned worker failed to stop. The worker may
+        # still hold references to it; the lifecycle result remains explicitly
+        # incomplete for the host/supervisor to observe.
+        if errors:
+            app.state.lifecycle_shutdown_errors = tuple(errors)
+            app.state.lifecycle_shutdown_complete = False
+            return
+
+        close_resources: list[object] = []
+        seen_close: set[int] = set()
+        for resource in (
+            *shutdown_resources,
+            *getattr(app.state, "owned_resources", ()),
+        ):
+            if resource is None or id(resource) in seen_close:
+                continue
+            seen_close.add(id(resource))
+            close_resources.append(resource)
+
+        for resource in close_resources:
+            if id(resource) in closed_resources:
+                continue
+            try:
+                remaining = max(0.0, deadline - time.monotonic())
+                if remaining <= 0:
+                    errors.append("lifecycle_shutdown_timeout")
+                    continue
+                close_target = resource
+                if isinstance(resource, httpx.AsyncClient):
+                    from rick_providers.cleanup import ClientCloseObligation
+                    if id(resource) not in client_obligations:
+                        client_obligations[id(resource)] = ClientCloseObligation(resource)
+                    close_target = client_obligations[id(resource)]
+                if not await _close_owned_resource(
+                    close_target, timeout=remaining, obligations=invocations,
+                    key=(id(resource), "close"),
+                ):
+                    errors.append("resource_close_incomplete")
+                    # A bounded close may still be running in a daemon adapter
+                    # thread. Do not close later resources behind an incomplete
+                    # dependency, and leave the lifecycle explicitly retryable.
+                    break
+                closed_resources.add(id(resource))
+                if time.monotonic() > deadline:
+                    errors.append("lifecycle_shutdown_timeout")
+                    break
+            except Exception as exc:  # pragma: no cover - defensive boundary
+                errors.append(type(exc).__name__)
+                break
+            finally:
+                # Completed closes stay completed even when cancellation was
+                # suppressed by the port. Later resources remain retryable.
+                _raise_pending_lifecycle_cancellation()
+
+        app.state.lifecycle_shutdown_errors = tuple(errors)
+        app.state.lifecycle_shutdown_complete = not errors
+    except asyncio.CancelledError:
+        app.state.lifecycle_shutdown_complete = False
+        app.state.lifecycle_shutdown_errors = (*errors, "shutdown_cancelled")
+        raise
+    finally:
+        # Cancellation releases admission without discarding successful closes
+        # or unfinished HTTPX transport obligations needed by the next retry.
+        with lifecycle_lock:
+            app.state.lifecycle_shutdown_in_progress = False
 
 
 @asynccontextmanager
@@ -374,6 +450,11 @@ async def _application_lifespan(app: FastAPI):
         yield
     finally:
         await _shutdown_owned_resources(app)
+        if not getattr(app.state, "lifecycle_shutdown_complete", False):
+            # Starlette emits shutdown.failed when the lifespan raises. Keep
+            # the host-visible reason generic; retained state owns the bounded
+            # retry, including pending calls and already completed closes.
+            raise RuntimeError("Application shutdown incomplete.") from None
 
 
 def create_app(settings: ApiSettings | None = None, providers: Providers | None = None) -> FastAPI:
@@ -406,6 +487,12 @@ def create_app(settings: ApiSettings | None = None, providers: Providers | None 
                 "Production API composition incomplete; required external components missing: "
                 + ", ".join(missing)
             )
+        if settings.selected_chat_backend == "professor":
+            gate = getattr(providers.chat_backend, "evidence_gate", None)
+            if not callable(getattr(gate, "authorization_revalidator", None)):
+                raise RuntimeError(
+                    "Production Professor chat requires a live authorization revalidator."
+                )
         from core.rate_limit import is_production_rate_limiter
         from rick_locking import RedisConfigurationError, validate_production_capability
 
@@ -523,6 +610,14 @@ def create_app(settings: ApiSettings | None = None, providers: Providers | None 
                 timeout_ms=settings.provider_timeout_ms,
                 environment=settings.environment,
                 provider_kind=provider_kind,
+                embedding_provider_kind=settings.embedding_provider_kind or None,
+                embedding_base_url=settings.embedding_base_url or None,
+                embedding_api_key=settings.embedding_api_key or None,
+                anthropic_version=settings.provider_anthropic_version,
+                max_output_tokens=settings.provider_max_output_tokens,
+                max_attempts=settings.provider_max_attempts,
+                retry_delay_ms=settings.provider_retry_delay_ms,
+                max_backoff_ms=settings.provider_max_backoff_ms,
             )
             provider = ResilientProvider(
                 create_provider(provider_config),
@@ -539,6 +634,7 @@ def create_app(settings: ApiSettings | None = None, providers: Providers | None 
                 provider=provider,
                 lease=lease,
                 knowledge=knowledge,
+                authorization_revalidator=getattr(identity, "refresh_authorization_context", None),
             )
             backend = professor
         elif selected_mode == "legacy":
@@ -581,6 +677,18 @@ def create_app(settings: ApiSettings | None = None, providers: Providers | None 
                 setattr(providers, attribute, dict(checks))
         if not providers.health_checks:
             providers.health_checks = _default_health_checks(settings)
+
+    if providers is not None:
+        gate = getattr(providers.chat_backend, "evidence_gate", None)
+        current_revalidator = getattr(gate, "authorization_revalidator", None)
+        if callable(current_revalidator):
+            from services.authorization_service import make_authorization_revalidator
+
+            gate.authorization_revalidator = make_authorization_revalidator(
+                current_revalidator,
+                compatibility_workspace_id=settings.compat_workspace_id,
+                compatibility_collection_ids=settings.compat_allowed_collection_ids,
+            )
 
     app = _TransportObservedFastAPI(
         title="RICK Intelligence API",
@@ -666,6 +774,7 @@ def create_app(settings: ApiSettings | None = None, providers: Providers | None 
         session_cookie_name=settings.session_cookie_name,
         csrf_token=settings.csrf_token,
         csrf_header_name=settings.csrf_header_name,
+        csrf_cookie_name=settings.csrf_cookie_name,
     )
     app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(RequestIdMiddleware)

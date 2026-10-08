@@ -1,0 +1,131 @@
+{
+  "schema_version": 1,
+  "observed_at": "2026-09-25T08:41:15Z",
+  "source_head": "b52f32c141916a2ea3af1a6b913bd91f380606e0",
+  "worktree_state": "Dirty shared checkout; HEAD is a baseline only. Hashes bind listed scoped source, tests and evidence, not a clean release candidate.",
+  "scope": "Q24-19/Q24-20 local verification after C4: tenant deactivation updates membership only; direct PostgreSQL creation requires actor and delegates atomically; fallback is limited to explicit dev/test identity and deployment modes; API success is exercised through a PostgreSQL provider.",
+  "frozen_bar_sha256": "f1ea9aa44d0d66e00bb47e75e30ad616ff575897de7d2a40bb5bc8e1f4936310",
+  "checks": [
+    {
+      "artifact": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0830Z/api16-root.log",
+      "command": "Initial make api16-root attempt before correcting a test fixture",
+      "exit_status": 2,
+      "summary": "Superseded setup failure: 725 passed; one staging test tried to construct an invalid ApiSettings instance before reaching the fallback guard",
+      "freshness": "SUPERSEDED",
+      "sha256": "4fef7e303f40d7199ed671948f7f055b4c05583b6108fba358f7c2e2024b5026"
+    },
+    {
+      "artifact": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0830Z/api16-root-final.log",
+      "command": "PYTHONDONTWRITEBYTECODE=1 make api16-root",
+      "exit_status": 0,
+      "summary": "726 passed; 407 dependency deprecation warnings",
+      "freshness": "CURRENT",
+      "sha256": "712eadb23064c8a0f40f83fad736706bd96546d1f319d87c23a1cf67b3e9a257"
+    },
+    {
+      "artifact": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0830Z/api16-worker-final.log",
+      "command": "PYTHONDONTWRITEBYTECODE=1 make api16-worker",
+      "exit_status": 0,
+      "summary": "116 passed; 7 deprecation warnings",
+      "freshness": "CURRENT",
+      "sha256": "f4a43a79bcc99d6266505356d1a434570f71d3f8c9bd2e4f0486db257ea5234d"
+    },
+    {
+      "artifact": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0830Z/postgres-migrations-final.log",
+      "command": "RICK_MIGRATION_POSTGRES_TESTS=1 PYTHONPATH=/tmp/rick-intelligence-q24-psycopg PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -q -p no:cacheprovider infrastructure/scripts/tests/test_migrate.py",
+      "exit_status": 0,
+      "summary": "108 passed against disposable PostgreSQL 16.15",
+      "freshness": "CURRENT",
+      "sha256": "5bbb5dcf3fdf8925a084cbd4a344e61390ae395ee0f15c7e56f745293d9569fb"
+    },
+    {
+      "artifact": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0830Z/postgres-admin-api-integration.log",
+      "command": "Opt-in verbose disposable PostgreSQL integration test: test_postgres_admin_mutation_outbox_projection_and_last_admin_serialization",
+      "exit_status": 0,
+      "summary": "1 passed; exercises HTTP admin route with PostgresIdentityProvider, real database outbox, reconciliation, direct create and tenant deactivation",
+      "freshness": "CURRENT",
+      "sha256": "f9623a302299399c1c6d68e3182f879367022e26681c6125ecae42fd3ae04d47"
+    },
+    {
+      "artifact": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0830Z/identity-postgres-final.log",
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=apps/api/src:packages/identity/src:packages/authorization/src:packages/contracts/src python3 -m pytest -q -vv -p no:cacheprovider packages/identity/tests/test_postgres.py",
+      "exit_status": 0,
+      "summary": "11 passed",
+      "freshness": "CURRENT",
+      "sha256": "c8640adbc29ec469f07af3603c6fbeea92e63790adc56c6d8b8429d12a5e6bc2"
+    },
+    {
+      "artifact": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0830Z/lint-final.log",
+      "command": "PYTHONDONTWRITEBYTECODE=1 make lint",
+      "exit_status": 0,
+      "summary": "Configured boundary, syntax and frontend lint checks passed",
+      "freshness": "CURRENT",
+      "sha256": "a7a5650dee62a2a315b1b3413dc05105661cd0c4bd71ec25608e7101f4d1dd63"
+    },
+    {
+      "artifact": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0830Z/typecheck-final.log",
+      "command": "PYTHONDONTWRITEBYTECODE=1 make typecheck",
+      "exit_status": 0,
+      "summary": "Configured TypeScript and Python compilation passed; no Python type checker is configured",
+      "freshness": "CURRENT",
+      "sha256": "f4e2482bfa89fd0a34aa7a5fab375fdbb03747d3941dd8fecfa8bdb1bc77c92d"
+    },
+    {
+      "artifact": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0830Z/ops-static-final.log",
+      "command": "PYTHONDONTWRITEBYTECODE=1 make ops-static",
+      "exit_status": 0,
+      "summary": "Migration checksum/order and operational static checks passed",
+      "freshness": "CURRENT",
+      "sha256": "fe2e5b2d7c8fc442d97df5d04bb70b2ac92fc920fa45ded651e2162606088dce"
+    },
+    {
+      "artifact": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0830Z/review-views-c4-final.log",
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 scripts/state_of_art/review_control_views.py --write",
+      "exit_status": 0,
+      "summary": "Derived views pass; 11 preserved review history files verify",
+      "freshness": "CURRENT",
+      "sha256": "df270bed12e28fcfea0d301ac95cf995b7bb454b6047284bff50ce0f7ab08914"
+    },
+    {
+      "artifact": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0830Z/control-plane-c4-final.log",
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 docs/ci/check_control_plane.py",
+      "exit_status": 0,
+      "summary": "10/10 checks; 35 backlog items, 350 events, 352 verifications and 28 gates",
+      "freshness": "CURRENT",
+      "sha256": "1919fedc58ef6da3db1b52a095cb4bc271bffcd80d5ceb39fdfbacfa87129f00"
+    },
+    {
+      "artifact": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0830Z/make-validate-c4-final.log",
+      "command": "PYTHONDONTWRITEBYTECODE=1 make validate",
+      "exit_status": 0,
+      "summary": "Boundary, controller, derived-view, frozen quality-bar and repository validation passed",
+      "freshness": "CURRENT",
+      "sha256": "2a17e660bd2051fa60b543b0f1f2c81abd2d7c686d92ca1cfb81fa1c1e3d4fda"
+    },
+    {
+      "artifact": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0830Z/diff-check-c4-final.log",
+      "command": "git diff --check",
+      "exit_status": 0,
+      "summary": "No whitespace or patch-format errors",
+      "freshness": "CURRENT",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "files": {
+    "apps/api/src/routes/admin.py": "34d7d0eeb82ecd6592c11fc196233098e35270b0d345583e82518230c9a8774b",
+    "apps/api/src/services/identity_service.py": "d8d085c30661fdbef6a5f88b32891d2c1eaec4eea7a5d2d54b59b2ab9d6b8c4f",
+    "apps/api/src/services/postgres_identity.py": "82d70b7536320bee37ed378100168efa463d9b6ac7b6811f558d1361e26db0d6",
+    "packages/identity/src/rick_identity/postgres.py": "188331a28e4076e3e6bbbb839b0740400c08be2b1fe41ceb617df57bca62b77a",
+    "apps/api/tests/test_audit_factory.py": "ff36b1705d8236f695239ec4e7e2aebbf3fd6492dc4aca8ab27cd29945de6830",
+    "apps/api/tests/test_postgres_admin_mutations.py": "5437c6dda920e7dedbc8b83214e5aa2b9dfbdbd4f808410cb9ea6a8f8cf55e4d",
+    "packages/identity/tests/test_postgres.py": "ac4a43a32fe6cf30f9a7c106554966ced54cdd93a65e6821b6e9cc4165a01b6a",
+    "apps/worker/admin_audit_outbox.py": "046595f9da759a3fc3f08eff1233cb5d53665d444301c053932124b51d76ee3a",
+    "apps/worker/deployment_composition.py": "09b8ebae1d2f869226789b013050b2ffb2cf9e7c96f5b2a7556e1a46189cf818",
+    "apps/worker/tests/test_admin_audit_outbox.py": "a6d47c7ba1172a701ac012a8652287da05aba74814ca75bcb1b9259dc6317de2",
+    "apps/worker/tests/test_deployment_composition.py": "e390ff5f01232a233ec803daf2cceb1c85e58c2f97cd0e60e11401b50a5afc12",
+    "infrastructure/migrations/0007_admin_audit_reconciliation.sql": "4af11b3250c3b5f3d2ea1e3a1042883ccf3cb703370daa6011cd4c2c748ae6e2",
+    "infrastructure/scripts/tests/test_migrate.py": "c677ce27d3575a18fca4c7ece6f0d670cf196859f9881ad296cc2e82ca2ef4f8",
+    "docs/reports/review-q24-19-20-critic-c4-2026-09-25.md": "4d7c1a885ba65626becb5de53b41607f433d44e3805069d547cd89ae3964956f"
+  },
+  "limitations": "Scoped local evidence only. The TestClient integration supplies a test SessionSnapshot dependency override and exercises the route/provider/database path; it is not full session-authentication acceptance. Fresh C5 review, external services, approved domain/provider/corpus, production runtime, operations, release and promotion remain open."
+}

@@ -212,7 +212,7 @@ class PostgresIngestionApplicationService:
             last_error = "recovery_required"
         attempts = _field(record, "attempts", 0)
         try:
-            attempt = min(64, max(1, int(attempts)))
+            attempt = min(64, max(0, int(attempts)))
         except (TypeError, ValueError):
             attempt = 1
         created_at = _field(record, "created_at", time.time())
@@ -234,8 +234,8 @@ class PostgresIngestionApplicationService:
             "workspace_id": _field(record, "workspace_id"),
             "collection_id": _field(record, "collection_id"),
             "created_at": created_at,
-            "started_at": None,
-            "finished_at": created_at if status in {"published", "failed", "cancelled"} else None,
+            "started_at": _field(record, "started_at"),
+            "finished_at": _field(record, "finished_at") if status in {"published", "failed", "cancelled"} else None,
             "metadata": {
                 "execution": "external-worker",
                 "durability": "postgres-s3",
@@ -249,11 +249,15 @@ class PostgresIngestionApplicationService:
         if not callable(getter):
             return None
         try:
-            return getter(job_id, tenant_id=tenant_id, workspace_id=workspace_id)
+            record = getter(job_id, tenant_id=tenant_id, workspace_id=workspace_id)
         except TypeError:
             # A durable queue without the scoped read contract cannot be
             # queried through this boundary. Never widen to a global lookup.
             return None
+        if record is not None and (_field(record, "job_id"), _field(record, "tenant_id"), _field(record, "workspace_id")) != (
+                job_id, tenant_id, workspace_id):
+            return None
+        return record
 
     def submit_upload(
         self,
@@ -305,16 +309,16 @@ class PostgresIngestionApplicationService:
         # baggage, tenant metadata, prompts or document content.
         trace_carrier = dict(trace_context or current_trace_context())
         if trace_carrier:
-            for key, value in trace_carrier.items():
+            for carrier_key, carrier_value in trace_carrier.items():
                 if (
-                    key in {"traceparent", "tracestate"}
-                    and isinstance(value, str)
-                    and value
-                    and len(value) <= 512
+                    carrier_key in {"traceparent", "tracestate"}
+                    and isinstance(carrier_value, str)
+                    and carrier_value
+                    and len(carrier_value) <= 512
                 ):
                     # Flat string fields preserve the canonical JobPayload
                     # contract; nested arbitrary metadata is rejected.
-                    payload[key] = value
+                    payload[carrier_key] = carrier_value
         try:
             lookup = getattr(self.queue, "get_by_idempotency", None)
             existing = None
@@ -416,7 +420,39 @@ class PostgresIngestionApplicationService:
         allowed = set(allowed_collection_ids or [])
         if not isinstance(collection, str) or ("*" not in allowed and collection not in allowed):
             return None
-        return self._public_job(record)
+        reconcile = getattr(self.queue, "reconcile_publication", None)
+        if callable(reconcile) and _field(record, "status") in {"leased", "processing", "published"}:
+            record = reconcile(job_id, tenant_id=tenant_id, workspace_id=workspace_id,
+                               collection_id=collection) or record
+            if (_field(record, "job_id"), _field(record, "tenant_id"), _field(record, "workspace_id"), _field(record, "collection_id")) != (
+                    job_id, tenant_id, workspace_id, collection):
+                return None
+        result = self._public_job(record)
+        if result["status"] == "processing":
+            getter = getattr(self.knowledge, "get_publication", None)
+            if callable(getter):
+                try:
+                    receipt = getter(job_id, tenant_id=tenant_id, workspace_id=workspace_id,
+                                     collection_id=collection)
+                except Exception:
+                    receipt = {"outcome": "pending"}
+                if receipt is not None and receipt["outcome"] in {"pending", "committed"}:
+                    result.update(status="verifying", stage="verifying", recovery_required=True)
+                    result["metadata"]["publication_outcome"] = "unknown" if receipt["outcome"] == "pending" else "committed"
+                    result['cancel_requested'] = bool(receipt.get('cancel_requested'))
+            checkpoint_getter = getattr(self.knowledge, 'get_ingestion_checkpoint', None)
+            if callable(checkpoint_getter):
+                try:
+                    checkpoint = checkpoint_getter(job_id, tenant_id=tenant_id,
+                        workspace_id=workspace_id, collection_id=collection)
+                    if (checkpoint is not None and checkpoint['job_snapshot']['attempt'] == result['attempt']
+                            and checkpoint['job_snapshot']['started_at'] == result['started_at']
+                            and checkpoint['cancel_requested']):
+                        result.update(status='verifying', stage='verifying', cancel_requested=True,
+                                      recovery_required=True)
+                except Exception:
+                    result.update(status='verifying', stage='verifying', recovery_required=True)
+        return result
 
     status = get_status
 
@@ -479,7 +515,8 @@ class PostgresIngestionApplicationService:
             result = dict(record)
             result["cancelled"] = False
             return result
-        result = self._public_job(after)
+        result = self.get_status(job_id, tenant_id=tenant, workspace_id=workspace,
+            allowed_collection_ids=allowed_collection_ids) or self._public_job(after)
         result["cancelled"] = result.get("status") == "cancelled"
         return result
 

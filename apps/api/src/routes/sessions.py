@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from core.security import resolve_session_cookie
 from dependencies.identity import get_current_session, require_authenticated
 from dependencies.services import get_providers
-from services.audit import emit_required
+from services.audit_operations import run_operation
 
 router = APIRouter(tags=["Auth"])
 _PUBLIC_SESSION_FIELDS = ("session_id", "user_id", "created_at", "revoked")
@@ -64,13 +64,17 @@ def revoke_sessions(payload: RevokeRequest, request: Request, session=Depends(re
         auth = request.headers.get("authorization")
         if auth and auth.startswith("Bearer "):
             current = auth[len("Bearer "):].strip() or None
-    revoked = providers.identity.revoke(  # type: ignore[union-attr]
-        actor=session, target_token=payload.session_token or current,
-        target_session_id=payload.session_id, target_user_id=payload.user_id, revoke_all=payload.revoke_all,
-    )
-    emit_required(providers.audit_sink, {
-        "action": "auth.session_revoked", "actor_user_id": session.user_id,
-        "request_id": getattr(request.state, "request_id", None),
-        "tenant_id": session.tenant_id, "workspace_id": session.workspace_id,
-    })
-    return {"revoked": revoked}
+    identity = providers.identity
+    transaction = getattr(identity, "audit_transaction", None)
+    revoke = getattr(identity, "revoke_in_transaction", None)
+    atomic = callable(transaction) and callable(revoke)
+    legacy_revoke = getattr(identity, "revoke", None)
+    if not atomic and not callable(legacy_revoke):
+        raise ApiError("provider_unavailable")
+    arguments = dict(actor=session, target_token=payload.session_token or current,
+        target_session_id=payload.session_id, target_user_id=payload.user_id, revoke_all=payload.revoke_all)
+    return run_operation(request=request, session=session, action="auth.session_revoked",
+        target_id=payload.user_id or session.user_id, inputs={**payload.model_dump(),
+            "target_token": arguments["target_token"] if not payload.revoke_all and not payload.session_id else None},
+        owner=identity, transaction=(lambda: transaction(session)) if atomic else None,
+        callback=lambda connection: {"revoked": revoke(connection=connection, **arguments) if atomic else legacy_revoke(**arguments)})

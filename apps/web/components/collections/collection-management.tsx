@@ -1,14 +1,17 @@
 "use client";
 
-import { Archive, FolderPlus, Pencil, Save, X } from "lucide-react";
+import { Archive, Folder, FolderPlus, Pencil, Save, X } from "lucide-react";
 import { useState, type FormEvent } from "react";
-import { api, ApiError } from "@/lib/api";
-import { Button, ConfirmDialog, EmptyState, Panel, Spinner, StatusPill } from "@/components/ui";
+import { api, errorMessage } from "@/lib/api";
+import { Button, ConfirmDialog, Panel, Spinner, StatusPill } from "@/components/ui";
 import type { CollectionItem } from "@/types/api";
 
 type CollectionManagementProps = {
   collections: CollectionItem[];
   workspaceId: string;
+  loadingCollections: boolean;
+  collectionsError: string | null;
+  showCollectionsError: boolean;
   onChanged: () => void | Promise<void>;
 };
 
@@ -20,11 +23,7 @@ type FormState = {
 
 const EMPTY_FORM: FormState = { collection_id: "", title: "", description: "" };
 
-function errorMessage(cause: unknown, fallback: string) {
-  return cause instanceof ApiError ? cause.message : cause instanceof Error ? cause.message : fallback;
-}
-
-export function CollectionManagement({ collections, workspaceId, onChanged }: CollectionManagementProps) {
+export function CollectionManagement({ collections, workspaceId, loadingCollections, collectionsError, showCollectionsError, onChanged }: CollectionManagementProps) {
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -121,13 +120,14 @@ export function CollectionManagement({ collections, workspaceId, onChanged }: Co
           <h2>Coleções autorizadas</h2>
         </div>
         <div className="collection-heading-actions">
-          <span className="panel-index">{collections.length}</span>
+          <span className="panel-index">{collections.length === 0 && (loadingCollections || collectionsError) ? "—" : collections.length}</span>
           <Button onClick={openCreate} disabled={busy} aria-expanded={formOpen}>
             <FolderPlus size={15} />Nova coleção
           </Button>
         </div>
       </div>
       <p className="collection-management-intro">Organize documentos por domínio e mantenha o escopo de consulta claro para cada equipe.</p>
+      {collectionsError && showCollectionsError ? <div className="form-alert collection-load-error" role="alert"><span>{collectionsError}</span><Button variant="secondary" onClick={() => void onChanged()}>Tentar novamente</Button></div> : null}
       {error ? <div className="form-alert" role="alert">{error}</div> : null}
       {feedback ? <div className="form-feedback success" role="status">{feedback}</div> : null}
 
@@ -147,11 +147,11 @@ export function CollectionManagement({ collections, workspaceId, onChanged }: Co
       ) : null}
 
       {collections.length ? <div className="collection-list">{collections.map((collection) => <article className="collection-row" key={collection.collection_id}>
-        <div className="collection-mark" aria-hidden="true">◈</div>
+        <div className="collection-mark" aria-hidden="true"><Folder size={17} /></div>
         <div className="collection-main"><strong>{collection.title || collection.collection_id}</strong><span>{collection.collection_id}{collection.description ? ` · ${collection.description}` : ""}</span></div>
         <div className="collection-meta"><StatusPill tone={collection.status === "archived" ? "warning" : "success"}>{collection.status === "archived" ? "Arquivada" : "Ativa"}</StatusPill>{collection.version ? <span>v{collection.version}</span> : null}</div>
         <div className="collection-actions"><Button variant="ghost" onClick={() => openEdit(collection)} disabled={busy} aria-label={`Editar ${collection.title || collection.collection_id}`}><Pencil size={14} />Editar</Button><Button variant="ghost" className="collection-archive-button" onClick={() => setArchiveTarget(collection)} disabled={busy} aria-label={`Arquivar ${collection.title || collection.collection_id}`}><Archive size={14} />Arquivar</Button></div>
-      </article>)}</div> : <EmptyState title="Nenhuma coleção ativa" description="Crie uma coleção para separar documentos, permissões e consultas por domínio." action={<Button onClick={openCreate}><FolderPlus size={15} />Nova coleção</Button>} />}
+      </article>)}</div> : collectionsError ? null : loadingCollections ? <div className="collection-state-row" role="status" aria-busy="true"><Spinner label="Carregando coleções" /><span>Consultando as coleções autorizadas.</span></div> : <div className="collection-state-row collection-empty-state"><div><strong>Nenhuma coleção ativa</strong><span>Crie uma coleção para separar documentos, permissões e consultas por domínio.</span></div><Button onClick={openCreate}><FolderPlus size={15} />Nova coleção</Button></div>}
 
       <ConfirmDialog open={Boolean(archiveTarget)} title="Arquivar esta coleção?" description={`Novos uploads deixam de usar “${archiveTarget?.title || archiveTarget?.collection_id || "esta coleção"}”. Os documentos já publicados permanecem preservados no catálogo.`} confirmLabel="Arquivar coleção" busy={busy} onCancel={() => setArchiveTarget(null)} onConfirm={() => void archive()} />
     </Panel>

@@ -17,10 +17,12 @@ import sys
 from typing import Any
 
 try:
+    from scripts.state_of_art.release_evidence_paths import CURRENT_RELEASE_EVIDENCE
     from scripts.state_of_art.json_boundary import load_json
     from scripts.state_of_art import packet_seal, promotion_engine
     from scripts.state_of_art.release_integrity import capture_checkout
 except ImportError:  # pragma: no cover
+    from release_evidence_paths import CURRENT_RELEASE_EVIDENCE
     from json_boundary import load_json
     import packet_seal
     import promotion_engine
@@ -46,7 +48,7 @@ def _sha256_file(path: Path) -> str | None:
 
 def _manifest_artifact_hash(root: Path) -> str | None:
     try:
-        payload = load_json(root / "docs/progress/release-evidence.json")
+        payload = load_json(root / CURRENT_RELEASE_EVIDENCE)
     except (OSError, UnicodeDecodeError, ValueError, TypeError, RecursionError):
         return None
     binding = payload.get("commit_binding") if isinstance(payload, dict) else None

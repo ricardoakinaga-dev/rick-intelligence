@@ -1,0 +1,336 @@
+{
+  "schema": 1,
+  "reviewer": "sole fresh I1 critic; no descendants",
+  "criterion": "AUD03-30",
+  "candidate_commit": "874a123667d5906b0a8d286c6ca211faf8584033",
+  "verdict": "APPROVE_BOUNDED_EVIDENCE",
+  "blocking_findings": [],
+  "summary": "The sealed packet supports its specifically recorded local functional claims, with run1 HTTP evidence and run2 settled browser evidence kept separate. Two nonblocking supplied-gate coverage defects were demonstrated and covered by stronger I1 checks of actual data. No broad release/security/production approval.",
+  "scope": {
+    "read_root": "/tmp/rick-production-20261004/identity30-review-packet",
+    "write_root": "/tmp/rick-production-20261004/identity30-review-output",
+    "packet_mutated": false,
+    "application_execution": false,
+    "network_calls": 0,
+    "docker_calls": 0,
+    "live_database_calls": 0,
+    "browser_driver_execution": false,
+    "home_workspace_access": false,
+    "descendants": 0,
+    "production_approved": false,
+    "seal_authority": "Parent verifies before/after; I1 independently recomputed supplied manifest entries but did not alter packet."
+  },
+  "runs": [
+    {
+      "run": "run1",
+      "owner": "rick-identity30-32a297dd5e39",
+      "role_fixture": {
+        "user_id": "user-009c6a0d614443f7",
+        "email": "roles-rick-identity30-32a297dd5e39@example.invalid",
+        "role": "KNOWLEDGE_MANAGER",
+        "tenant_id": "default",
+        "workspace_id": "default",
+        "status": "active",
+        "membership_status": "active",
+        "authorized_collection_ids": [],
+        "permission_overrides": {
+          "add": [],
+          "remove": []
+        }
+      },
+      "credential_fixture": {
+        "user_id": "user-716e9c9031954026",
+        "email": "credentials-rick-identity30-32a297dd5e39@example.invalid",
+        "role": "VETERINARIAN",
+        "tenant_id": "default",
+        "workspace_id": "default",
+        "status": "active",
+        "membership_status": "active",
+        "authorized_collection_ids": [],
+        "permission_overrides": {
+          "add": [],
+          "remove": []
+        }
+      },
+      "recorded_http_rows": 176,
+      "recorded_browser_check_rows": 72,
+      "http_matrix_repeated": null,
+      "interpretation": "Full recorded HTTP matrix plus first functional browser sequence; first responsive images not settled acceptance."
+    },
+    {
+      "run": "run2",
+      "owner": "rick-identity30-eed13c4ecb8e",
+      "role_fixture": {
+        "user_id": "user-1692970fb65e43a2",
+        "email": "roles-rick-identity30-eed13c4ecb8e@example.invalid",
+        "role": "KNOWLEDGE_MANAGER",
+        "tenant_id": "default",
+        "workspace_id": "default",
+        "status": "active",
+        "membership_status": "active",
+        "authorized_collection_ids": [],
+        "permission_overrides": {
+          "add": [],
+          "remove": []
+        }
+      },
+      "credential_fixture": null,
+      "recorded_http_rows": 4,
+      "recorded_browser_check_rows": 86,
+      "http_matrix_repeated": false,
+      "interpretation": "Separate fixture preparation and settled browser-only retest; no second HTTP matrix."
+    }
+  ],
+  "requirement_assessments": [
+    {
+      "requirement": "Recorded public two-replica account/session/permission/reset/recovery behaviours agree with supplied implementation and exact images.",
+      "assessment": "SUPPORTED_AS_RECORDED_BOUNDED_BEHAVIOR",
+      "evidence": [
+        "evidence/run1/result.json",
+        "source/packages/identity/src/rick_identity/provider.py:138",
+        "source/apps/api/src/services/postgres_identity.py:594",
+        "source/apps/api/src/services/postgres_identity.py:721",
+        "source/apps/api/src/services/postgres_identity.py:877",
+        "source/packages/identity/src/rick_identity/postgres.py:871",
+        "source/apps/api/src/dependencies/identity.py:76",
+        "source/apps/api/src/routes/knowledge.py:614"
+      ],
+      "basis": "Named fixed old-cookie grids, fresh exact policy-derived grants, neutral recovery, replay rejection, one race winner, revoked counts, disabled logins, last-admin conflicts and ten matching published audit events agree with version validation, scoped writes, transactional recovery and single-use UPDATE semantics. No contradiction found in inspected implementation."
+    },
+    {
+      "requirement": "Recorded browser 200,401,403,401,200 sequence clears prior document data; mobile375/tablet768/desktop1440 settled denial captures and fresh access match observations.",
+      "assessment": "SUPPORTED_WITH_CAPTURE_AND_MEASUREMENT_LIMITS",
+      "evidence": [
+        "evidence/run1/browser/result.json",
+        "evidence/run2/browser/result.json",
+        "evidence/run2/browser",
+        "source/apps/web/app/app/documents/page.tsx:70",
+        "probes/identity30-browser.cjs"
+      ],
+      "basis": "Both document sequences independently matched 200,401,403,401,200 with context, action/request/response ordering and completion records. All 14 PNGs inspected; use second run only for settled layouts. No prior document rows/count in denial captures; fresh screenshots restore three published documents."
+    },
+    {
+      "requirement": "Each separate run binds its own fixture and owner; browser-only run is not full HTTP replay.",
+      "assessment": "SUPPORTED",
+      "evidence": [
+        "evidence/run1/result.json",
+        "evidence/run2/result.json",
+        "evidence/run1/actual-runtime-binding.json",
+        "evidence/run2/actual-runtime-binding.json",
+        "probes/run-identity30-visual-retest.py:132"
+      ],
+      "basis": "Owners, role fixture IDs/emails and container graphs differ. Each command/runtime fixture binds to its own run. Run1 also has a separate credential fixture; run2 has four preparation responses and expressly http_matrix_repeated=false."
+    },
+    {
+      "requirement": "Probe/command hashes and PNG dimensions/hashes recompute; important semantic gates reject supplied known-bad mutations.",
+      "assessment": "SUPPORTED_FOR_SPECIFIED_CONTROLS_WITH_ADDITIONAL_GATE_GAPS",
+      "evidence": [
+        "manifest.json",
+        "review-contract.json",
+        "probes/verify-identity30.py",
+        "probes/verify-identity30-visual-retest.py",
+        "evidence/run1/browser-command.json",
+        "evidence/run2/browser-command.json"
+      ],
+      "basis": "122 manifest entries and 79 frozen source hashes/sizes recomputed. 14 PNG containers/hashes/CRC/data sizes and geometry agree. Both executed script hashes/logs/timelines bind; supplied semantic reports match recomputation and reject their ten supplied mutations. Ten I1 controls reject; two further supplied-gate blind spots documented separately."
+    },
+    {
+      "requirement": "Owned teardown preserves original seven service IDs/images/configuration and health.",
+      "assessment": "SUPPORTED_BY_RECORDED_GUARDS_AND_PARENT_OBSERVATIONS_WITH_PRIVATE_BASELINE_LIMIT",
+      "evidence": [
+        "evidence/run1/teardown-and-original-health.json",
+        "evidence/run2/teardown-and-original-health.json",
+        "probes/finish-identity30.py",
+        "probes/finish-identity30-visual-retest.py"
+      ],
+      "basis": "Recorded original seven graph is identical across runs, disjoint from owned clone graphs, consistent with build images and successful readiness statuses. Deletion guards and unchanged-file comparisons are present in probe source. Parent confirms live preservation; I1 performed no live teardown/health/config check."
+    }
+  ],
+  "independent_checks": {
+    "manifest_files": 122,
+    "frozen_source_files": 79,
+    "pngs_hash_geometry_crc_decoded_sizes": 14,
+    "all_pngs_visually_inspected": true,
+    "supplied_known_bad_controls_rejected": 10,
+    "additional_I1_known_bad_controls_rejected": 10,
+    "probe_totals_are_recorded_only": true,
+    "independent_live_checks": 0,
+    "artifacts": [
+      "independent-check.py",
+      "independent-recomputed.json",
+      "run1-semantic-recomputed.json",
+      "run2-semantic-recomputed.json",
+      "gate-coverage-check.py",
+      "gate-coverage-caveats.json"
+    ]
+  },
+  "findings": [
+    {
+      "id": "GATE01",
+      "severity": "nonblocking_gate_coverage_gap",
+      "references": [
+        "probes/verify-identity30.py:10",
+        "probes/verify-identity30.py:12",
+        "evidence/run1/result.json#/checks[name=downgrade_old_cookie1_api1_documents]"
+      ],
+      "finding": "Supplied gate accepts changing that 401 to 200 together with expected_status=[200], passed=true. It checks a recorded expected_status instead of freezing every old-session status by name.",
+      "independent_resolution": "Actual evidence is 401 unauthorized. I1 checker enforces all ten 2-cookie x 2-API x 2-endpoint invalidation grids (80 named responses), and rejects this alteration.",
+      "impact": "Supplied PASS alone is insufficient for the full matrix claim; actual sealed matrix passes stronger independent checks."
+    },
+    {
+      "id": "GATE02",
+      "severity": "nonblocking_gate_coverage_gap",
+      "references": [
+        "probes/verify-identity30-visual-retest.py:15",
+        "probes/verify-identity30-visual-retest.py:16",
+        "evidence/run2/browser/result.json#/checks[id=peer_remove_documents_read]"
+      ],
+      "finding": "Supplied retest gate accepts changing the browser peer PATCH path to a foreign fixture, because browser PATCH target paths are not bound to fixture identity.",
+      "independent_resolution": "Actual checks and recorded node_peer events target user-1692970fb65e43a2 (run2), and user-009c6a0d614443f7 (run1). I1 checker fixes expected PATCH paths and rejects the alteration.",
+      "impact": "No actual cross-fixture evidence mismatch; supplemental binding checks needed beyond supplied gate."
+    },
+    {
+      "id": "VIS01",
+      "severity": "resolved_historical_evidence_defect",
+      "references": [
+        "evidence/visual-settlement-failure.json",
+        "evidence/run1/browser/denied-375.png",
+        "evidence/run1/browser/denied-768.png",
+        "evidence/run2/browser/denied-375.png",
+        "evidence/run2/browser/denied-768.png",
+        "probes/identity30-browser.cjs:185"
+      ],
+      "finding": "I1 visually confirms mobile375 first-run navigation rail overlays content mid-transition; tablet768 also has a small left-edge rail artifact. These images do not support settled layout acceptance.",
+      "independent_resolution": "Second-run mobile/tablet images show the rail offscreen, with recorded rail_right=0, zero finite running animations, zero scroll offsets; PNG geometry and hashes independently match. Corrected script hash matches command and visual correction record.",
+      "impact": "Use run1 for its functional observations and run2 for settled responsive evidence."
+    },
+    {
+      "id": "MEAS01",
+      "severity": "measurement_caveat",
+      "references": [
+        "probes/identity30-browser.cjs:30",
+        "probes/identity30-browser.cjs:31",
+        "probes/identity30-browser.cjs:66",
+        "probes/identity30-browser.cjs:149",
+        "evidence/run1/browser/result.json",
+        "evidence/run2/browser/result.json"
+      ],
+      "finding": "Browser records contain allowlisted status/method/path events and predicate outcomes, not response bodies or full DOM dumps. Candidate version is probe metadata; embedded source_image_binding remains PENDING_LEAD. Companion actual-runtime-binding and build records supply the recorded image association.",
+      "impact": "PNG byte geometry is recomputed; live DOM dimensions, hidden attributes, completed response identity and absence of the known synthetic filename remain recorded observations. No independent live rendering or image-layer source verification."
+    },
+    {
+      "id": "MEAS02",
+      "severity": "measurement_caveat",
+      "references": [
+        "source/apps/web/app/app/documents/page.tsx:70",
+        "source/apps/web/app/app/documents/page.tsx:287",
+        "evidence/run2/browser/active-after-revoke-desktop1440.png",
+        "evidence/run2/browser/old-denied-after-restore-desktop1440.png",
+        "evidence/run1/result.json#/concurrent_release_gap_seconds"
+      ],
+      "finding": "Document rows and the prior document count clear after a real refresh/denied response. Existing account badge, collection metadata and other permitted controls remain visible. This establishes the tested document-catalog behavior, not spontaneous invalidation of every UI field/cache. Recorded concurrent dispatch gap is about 3.08 ms; it does not independently measure overlapping server transactions or sustained race reliability.",
+      "impact": "No timing SLA, general session-wide erasure, load/soak or exhaustive concurrency claim is supported."
+    },
+    {
+      "id": "TEARDOWN01",
+      "severity": "provenance_limit",
+      "references": [
+        "probes/finish-identity30.py:10",
+        "probes/finish-identity30.py:23",
+        "probes/finish-identity30-visual-retest.py:10",
+        "evidence/run1/teardown-and-original-health.json",
+        "evidence/run2/teardown-and-original-health.json"
+      ],
+      "finding": "Both teardown records agree on all seven original container IDs/images/running and reported health, and record removal of 8 owned containers/4 volumes/networks. The private initial baseline, credentials/config hashes, runtime manifest and capture-delivery factory bytes are absent; unchanged-config and adapter hash claims cannot be independently recomputed from this packet. Some infrastructure health fields are null.",
+      "impact": "I1 validates record consistency and guarded teardown source. Parent separately reports both owned teardowns complete and original seven healthy with unchanged credentials/runtime inputs. Parent observations are not I1 live execution."
+    }
+  ],
+  "parent_observations": {
+    "provenance": "Parent user message during this review; explicitly not I1 independent live execution.",
+    "observations": [
+      "Parent independently verified all 122 packet hashes/modes and known browser credentials/cookies absent.",
+      "Parent independently confirmed both owned clone teardowns complete.",
+      "Parent independently confirmed original seven services healthy with unchanged credentials/runtime inputs."
+    ]
+  },
+  "limitations": [
+    "No independent live program/HTTP/browser/database execution; review of sanitized recorded synthetic runs only.",
+    "No second full HTTP matrix: run2 is separate browser-only fixture retest.",
+    "No browser response bodies/full DOM archive; PNGs corroborate visible catalog states, predicate assertions cover a known synthetic filename and absent document articles/count.",
+    "Private initial preservation baselines, config/credential hashes, factory bytes and image layers excluded; Parent/live provenance is distinct from I1 recomputation.",
+    "No independent measurement of DOM sizes, propagation latency or server-side concurrent overlap.",
+    "Browser console has six error messages in each run and one warning in run2; zero page errors/failed requests reported. Console contents omitted, so causes cannot independently be assigned.",
+    "No production, deployment, security, real email/TLS, load/soak or exhaustive tenant/membership acceptance."
+  ],
+  "actual_execution_commands": [
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 /tmp/rick-production-20261004/identity30-review-packet/probes/verify-identity30.py /tmp/rick-production-20261004/identity30-review-packet/evidence/run1/result.json /tmp/rick-production-20261004/identity30-review-packet/evidence/run1/browser/result.json /tmp/rick-production-20261004/identity30-review-packet/evidence/run1/actual-runtime-binding.json /tmp/rick-production-20261004/identity30-review-packet/inputs/build-results.json /tmp/rick-production-20261004/identity30-review-packet/source/packages/authorization/src/rick_authorization/policy.py /tmp/rick-production-20261004/identity30-review-output/run1-semantic-recomputed.json",
+      "exit_code": 0,
+      "result": "445 recorded-data assertions; five supplied controls rejected"
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 /tmp/rick-production-20261004/identity30-review-packet/probes/verify-identity30-visual-retest.py /tmp/rick-production-20261004/identity30-review-packet/evidence/run2 /tmp/rick-production-20261004/identity30-review-packet/inputs/build-results.json /tmp/rick-production-20261004/identity30-review-packet/probes/identity30-browser.cjs /tmp/rick-production-20261004/identity30-review-output/run2-semantic-recomputed.json",
+      "exit_code": 0,
+      "result": "156 recorded-data assertions; five supplied controls rejected"
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 /tmp/rick-production-20261004/identity30-review-output/independent-check.py",
+      "exit_code": 0,
+      "result": "1933 recorded-data assertions; ten I1 controls rejected; all 14 PNGs checked"
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 /tmp/rick-production-20261004/identity30-review-output/gate-coverage-check.py",
+      "exit_code": 0,
+      "result": "Two supplied gates accept additional invalid mutations; actual packet passes fixed I1 expectations; both recorded semantic reports match"
+    },
+    {
+      "command": "diff -u /tmp/rick-production-20261004/identity30-review-packet/probes/run-identity30.py /tmp/rick-production-20261004/identity30-review-packet/probes/run-identity30-visual-retest.py",
+      "exit_code": 1,
+      "result": "Expected diff: run2 removes full functional HTTP matrix, retains fixture preparation and declares browser-only scope"
+    },
+    {
+      "command": "rg --files /tmp/rick-production-20261004/identity30-review-packet",
+      "exit_code": 0,
+      "result": "Packet inventory"
+    },
+    {
+      "command": "cat /tmp/rick-production-20261004/identity30-review-packet/review-contract.json",
+      "exit_code": 0,
+      "result": "Frozen scope, source identities and limitations read"
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 python - (inline packet JSON inspection)",
+      "exit_code": 127,
+      "result": "python executable unavailable; subsequent inspections and checks used python3"
+    }
+  ],
+  "manual_inspection": {
+    "methods": [
+      "Packet-only cat/sed/nl/rg reads of implementation and probes; no application imports.",
+      "Packet JSON inspection via inline standard-library Python.",
+      "view_image on all seven supplied PNGs for each run."
+    ],
+    "source_references": [
+      "source/packages/identity/src/rick_identity/provider.py:138",
+      "source/apps/api/src/services/postgres_identity.py:594",
+      "source/apps/api/src/services/postgres_identity.py:721",
+      "source/apps/api/src/services/postgres_identity.py:877",
+      "source/packages/identity/src/rick_identity/postgres.py:871",
+      "source/apps/api/src/dependencies/identity.py:76",
+      "source/apps/api/src/routes/knowledge.py:614",
+      "source/apps/web/app/app/documents/page.tsx:70"
+    ],
+    "probe_references": [
+      "probes/run-identity30.py",
+      "probes/run-identity30-visual-retest.py",
+      "probes/run-identity30-browser.py",
+      "probes/identity30-browser.cjs",
+      "probes/browser-before-settlement.cjs",
+      "probes/bind-identity30-retest.py",
+      "probes/finish-identity30.py",
+      "probes/finish-identity30-visual-retest.py",
+      "probes/verify-identity30.py",
+      "probes/verify-identity30-visual-retest.py"
+    ]
+  }
+}

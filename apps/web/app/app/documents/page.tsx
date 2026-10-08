@@ -4,7 +4,7 @@ import { AlertTriangle, CheckCircle2, FileUp, LoaderCircle, RefreshCw, ShieldChe
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
 import { useSession } from "@/components/session-provider";
 import { CollectionManagement } from "@/components/collections/collection-management";
-import { api, ApiError } from "@/lib/api";
+import { api, ApiError, errorMessage } from "@/lib/api";
 import { hasPermission } from "@/lib/permissions";
 import { Button, ConfirmDialog, EmptyState, Panel, Spinner, StatusPill } from "@/components/ui";
 import type { CollectionItem, DocumentItem, DocumentListResponse, JobEnvelope } from "@/types/api";
@@ -39,10 +39,6 @@ function jobLabel(status: string) {
   return labels[status] || status;
 }
 
-function errorMessage(cause: unknown, fallback: string) {
-  return cause instanceof ApiError ? cause.message : cause instanceof Error ? cause.message : fallback;
-}
-
 export default function DocumentsPage() {
   const { session } = useSession();
   const canUpload = hasPermission(session, "documents.upload") && hasPermission(session, "ingestion.run");
@@ -53,7 +49,10 @@ export default function DocumentsPage() {
   const retryInputRef = useRef<HTMLInputElement>(null);
   const [data, setData] = useState<DocumentListResponse | null>(null);
   const [collections, setCollections] = useState<CollectionItem[]>([]);
+  const [collectionsLoading, setCollectionsLoading] = useState(true);
+  const [collectionsError, setCollectionsError] = useState<string | null>(null);
   const [collectionId, setCollectionId] = useState("");
+  const [uploadCollectionId, setUploadCollectionId] = useState("");
   const [filterText, setFilterText] = useState("");
   const [job, setJob] = useState<JobEnvelope | null>(null);
   const [loading, setLoading] = useState(true);
@@ -86,14 +85,21 @@ export default function DocumentsPage() {
   }, [collectionId, invalidateCatalog, workspaceId]);
 
   const loadCollections = useCallback(async () => {
-    if (!workspaceId) return;
+    if (!workspaceId) {
+      setCollectionsLoading(false);
+      return;
+    }
+    setCollectionsLoading(true);
+    setCollectionsError(null);
     try {
       const response = await api.collections(workspaceId);
       setCollections(response.items);
     } catch {
-      // The document catalog remains usable when the optional collection
-      // index is unavailable; the server still enforces the caller scope.
-      setCollections([]);
+      // Preserve last-known collection options; an unavailable collection
+      // index must not be presented as a confirmed empty result.
+      setCollectionsError("Não foi possível consultar as coleções. Tente novamente.");
+    } finally {
+      setCollectionsLoading(false);
     }
   }, [workspaceId]);
 
@@ -154,7 +160,8 @@ export default function DocumentsPage() {
     setError(null);
     setFeedback(null);
     try {
-      const submitted = await api.upload(file, "rag_phase0");
+      if (!uploadCollectionValue) throw new Error("Selecione uma coleção de destino antes do upload.");
+      const submitted = await api.upload(file, uploadCollectionValue);
       setRetrySource({ jobId: submitted.job_id, file });
       await trackJob(submitted, "upload");
     } catch (cause) {
@@ -228,9 +235,8 @@ export default function DocumentsPage() {
     setError(null);
     setFeedback(null);
     try {
-      const content = await file.text();
-      if (!content.trim()) throw new Error("A fonte escolhida está vazia.");
-      const submitted = await api.retryJob(job.job_id, { filename: file.name, content });
+      if (!file.size) throw new Error("A fonte escolhida está vazia.");
+      const submitted = await api.retryJob(job.job_id, file);
       setRetrySource({ jobId: submitted.job_id, file });
       await trackJob(submitted, "retry");
     } catch (cause) {
@@ -252,6 +258,18 @@ export default function DocumentsPage() {
 
   const canCancel = Boolean(canRunJobs && job && !TERMINAL_JOB_STATES.has(job.job.status) && !job.job.cancel_requested);
   const canRetry = Boolean(canRunJobs && job?.job.retryable);
+  const uploadCollections = collections.filter((collection) => collection.status !== "archived");
+  const uploadCollectionUnavailable = collectionsLoading || Boolean(collectionsError) || uploadCollections.length === 0;
+  const uploadCollectionState = collectionsError
+    ? "A lista de coleções está indisponível. O envio está pausado até a lista atualizar."
+    : collectionsLoading
+      ? "Carregando coleções autorizadas."
+      : uploadCollections.length === 0
+        ? "Nenhuma coleção ativa. Crie ou solicite uma coleção antes de enviar."
+        : "";
+  const uploadCollectionValue = uploadCollections.some((collection) => collection.collection_id === uploadCollectionId)
+    ? uploadCollectionId
+    : uploadCollections[0]?.collection_id || "";
   const normalizedFilter = filterText.trim().toLowerCase();
   const visibleDocuments = (data?.items || []).filter((document) => {
     if (!normalizedFilter) return true;
@@ -260,5 +278,11 @@ export default function DocumentsPage() {
       .some((value) => value.toLowerCase().includes(normalizedFilter));
   });
 
-  return <div className="page"><div className="page-heading"><div><span className="eyebrow">Corpus · {session?.workspace_id}</span><h1>Documentos que sustentam decisões.</h1><p>O catálogo mostra apenas conteúdo publicado dentro do seu escopo. Uploads passam por validação, ingestão e verificação.</p></div><div className="heading-actions"><Button variant="secondary" onClick={() => void load()} disabled={loading || Boolean(busyAction)}><RefreshCw size={16} className={loading ? "spin" : ""} />Atualizar</Button>{canUpload ? <Button aria-controls="document-upload-input" onClick={() => inputRef.current?.click()} disabled={Boolean(busyAction)}><FileUp size={16} />Adicionar documento</Button> : null}<input id="document-upload-input" ref={inputRef} className="sr-only" aria-label="Selecionar documento para upload" disabled={!canUpload} type="file" accept=".pdf,.docx,.md,.txt" onChange={(event) => void upload(event)} /></div></div>{error ? <div className="form-alert" role="alert"><AlertTriangle size={16} /><span>{error}</span></div> : null}{feedback ? <div className={`form-feedback ${feedback.tone}`} role={feedback.tone === "danger" ? "alert" : "status"}><span className="feedback-icon">{feedback.tone === "success" ? <CheckCircle2 size={16} /> : feedback.tone === "danger" ? <XCircle size={16} /> : <AlertTriangle size={16} />}</span>{feedback.message}</div> : null}{canManage ? <CollectionManagement collections={collections} workspaceId={workspaceId || ""} onChanged={loadCollections} /> : null}<div className="documents-toolbar"><div className="documents-filter-group"><label htmlFor="collection-filter"><span className="eyebrow">Coleção</span><select id="collection-filter" aria-label="Filtrar coleção" value={collectionId} disabled={Boolean(busyAction)} onChange={(event) => setCollectionId(event.target.value)}><option value="">Todas as coleções</option>{collections.map((collection) => <option key={collection.collection_id} value={collection.collection_id}>{collection.title || collection.collection_id}</option>)}</select></label><label htmlFor="document-filter"><span className="eyebrow">Filtro rápido</span><input id="document-filter" value={filterText} onChange={(event) => setFilterText(event.target.value)} placeholder="Título ou ID" /></label></div><StatusPill tone="success"><ShieldCheck size={13} />Acesso conforme permissões</StatusPill></div>{job ? <Panel className="job-banner"><div className="job-icon">{job.job.status === "published" ? <CheckCircle2 size={19} /> : job.job.status === "failed" || job.job.status === "cancelled" ? <XCircle size={19} /> : <LoaderCircle size={19} className="spin" />}</div><div><strong>Ingestão {jobLabel(job.job.status)}</strong><span>{job.job.document_id || "Preparando identidade do documento"}</span></div><div className="job-progress" role="progressbar" aria-label={`Progresso da ingestão: ${Math.round((job.job.progress || 0) * 100)}%`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round((job.job.progress || 0) * 100)}><span style={{ width: `${Math.round((job.job.progress || 0) * 100)}%` }} /></div><strong aria-live="polite">{Math.round((job.job.progress || 0) * 100)}%</strong><div className="job-actions"><StatusPill tone={jobTone(job.job.status)}>{jobLabel(job.job.status)}</StatusPill>{canCancel ? <Button variant="ghost" onClick={() => void cancelJob()} disabled={Boolean(busyAction)}><XCircle size={15} />Cancelar</Button> : null}{canRetry ? <Button variant="ghost" onClick={requestRetry} disabled={Boolean(busyAction)}><RefreshCw size={15} />{retrySource?.jobId === job.job_id ? "Tentar novamente" : "Escolher fonte para uma nova tentativa"}</Button> : null}</div><input ref={retryInputRef} className="sr-only" aria-label="Selecionar fonte para uma nova tentativa" type="file" accept=".md,.txt" onChange={(event) => { const file = event.target.files?.[0]; if (file) void retryWithFile(file); }} /></Panel> : null}<Panel className="documents-panel"><div className="panel-heading"><div><span className="eyebrow">Publicado</span><h2>Biblioteca de documentos</h2></div><span className="panel-index">{loading || catalogError ? "—" : visibleDocuments.length}</span></div>{loading ? <div className="list-loading"><Spinner label="Carregando documentos" /><span>Buscando o catálogo autorizado.</span></div> : catalogError ? <div className="catalog-failure"><h3>{catalogError.code === 403 ? "Sem acesso aos documentos" : "Catálogo não disponível"}</h3><p>A lista não foi carregada. Isso não significa que o espaço esteja vazio.</p><Button variant="secondary" onClick={() => void load()} disabled={loading}>Tentar novamente</Button></div> : visibleDocuments.length ? <div className="document-list">{visibleDocuments.map((document) => <article className="document-row" key={document.document_id}><div className="document-type">{(document.source_type || "doc").slice(0, 4).toUpperCase()}</div><div className="document-main"><strong>{document.title || "Documento sem título"}</strong><span>{document.document_id}</span></div><div className="document-meta"><StatusPill tone={document.status === "published" ? "success" : "warning"}>{jobLabel(document.status)}</StatusPill><span>{document.collection_id}</span></div><div className="document-actions">{canReindex && document.status !== "deleted" ? <Button variant="ghost" onClick={() => void reindexDocument(document)} disabled={Boolean(busyAction)} aria-label={`Reindexar ${document.title || document.document_id}`}><RefreshCw size={15} />Reindexar</Button> : null}{canManage ? <Button variant="ghost" className="document-delete-button" onClick={() => setDocumentToDelete(document)} disabled={Boolean(busyAction)} aria-label={`Excluir ${document.title || document.document_id}`}><Trash2 size={15} />Excluir</Button> : null}</div></article>)}</div> : <EmptyState title={filterText ? "Nenhum documento corresponde ao filtro" : "Nenhum documento publicado"} description={filterText ? "Ajuste o título, ID ou coleção para ampliar a busca local." : canUpload ? "Adicione PDF, DOCX, Markdown ou texto para iniciar o corpus." : "Nenhum documento foi publicado no escopo autorizado."} action={filterText ? <Button variant="secondary" onClick={() => setFilterText("")}>Limpar filtro</Button> : canUpload ? <Button onClick={() => inputRef.current?.click()}><FileUp size={16} />Adicionar documento</Button> : undefined} />}{data?.next_cursor && !filterText ? <div className="load-more-row"><Button variant="secondary" onClick={() => void loadMore()} disabled={Boolean(busyAction)}>{busyAction === "more" ? <Spinner label="Carregando mais documentos" /> : <RefreshCw size={15} />}Carregar mais</Button></div> : null}</Panel><p className="surface-footnote"><ShieldCheck size={14} />O andamento e a publicação dos documentos são confirmados pelo servidor.</p><ConfirmDialog open={Boolean(documentToDelete)} title="Excluir este documento?" description={`A remoção de “${documentToDelete?.title || documentToDelete?.document_id || "este documento"}” retira o registro do catálogo e os pontos indexados. Esta ação não pode ser desfeita pela interface.`} confirmLabel="Excluir documento" busy={Boolean(documentToDelete && busyAction === `delete:${documentToDelete.document_id}`)} onCancel={() => setDocumentToDelete(null)} onConfirm={() => void deleteDocument()} /></div>;
+  return <div className="page documents-page"><div className="page-heading documents-page-heading"><div><span className="eyebrow">Corpus · {session?.workspace_id}</span><h1>Documentos que sustentam decisões.</h1><p>O catálogo mostra apenas conteúdo publicado dentro do seu escopo. Uploads passam por validação, ingestão e verificação.</p></div><div className="heading-actions documents-page-actions"><Button variant="secondary" onClick={() => void load()} disabled={loading || Boolean(busyAction)}><RefreshCw size={16} className={loading ? "spin" : ""} />Atualizar</Button>{canUpload ? <label htmlFor="upload-collection-select" className="documents-filter-group upload-collection-select">
+          <span className="eyebrow">Coleção de destino</span>
+        <select id="upload-collection-select" aria-label="Coleção de destino do upload" aria-describedby="upload-collection-state" value={uploadCollectionValue} disabled={Boolean(busyAction) || uploadCollectionUnavailable} title={uploadCollections.find((collection) => collection.collection_id === uploadCollectionValue)?.title || (uploadCollectionUnavailable ? uploadCollectionState : uploadCollectionValue)} onChange={(event) => setUploadCollectionId(event.target.value)}>
+            {uploadCollections.length ? uploadCollections.map((collection) => <option key={collection.collection_id} value={collection.collection_id}>{collection.title || collection.collection_id}</option>) : <option value="">{collectionsLoading ? "Carregando coleções…" : collectionsError ? "Coleções indisponíveis" : "Nenhuma coleção ativa"}</option>}
+          </select>
+          <span id="upload-collection-state" className="sr-only" role="status" aria-live="polite">{uploadCollectionState}</span>
+        </label> : null}{canUpload ? <Button className="upload-trigger" aria-controls="document-upload-input" onClick={() => inputRef.current?.click()} disabled={Boolean(busyAction) || uploadCollectionUnavailable || !uploadCollectionValue}><FileUp size={16} />Adicionar documento</Button> : null}<input id="document-upload-input" ref={inputRef} className="sr-only" aria-label="Selecionar documento para upload" disabled={!canUpload || uploadCollectionUnavailable || !uploadCollectionValue} type="file" accept=".pdf,.docx,.md,.txt" onChange={(event) => void upload(event)} /></div></div>{collectionsError && canUpload ? <div className="form-alert upload-collections-alert" role="alert"><AlertTriangle size={16} /><span>{collectionsError} O envio fica pausado até a lista atualizar.</span><Button variant="secondary" onClick={() => void loadCollections()} disabled={collectionsLoading || Boolean(busyAction)}>Tentar novamente</Button></div> : null}{error ? <div className="form-alert" role="alert"><AlertTriangle size={16} /><span>{error}</span></div> : null}{feedback ? <div className={`form-feedback ${feedback.tone}`} role={feedback.tone === "danger" ? "alert" : "status"}><span className="feedback-icon">{feedback.tone === "success" ? <CheckCircle2 size={16} /> : feedback.tone === "danger" ? <XCircle size={16} /> : <AlertTriangle size={16} />}</span>{feedback.message}</div> : null}{canManage ? <CollectionManagement collections={collections} workspaceId={workspaceId || ""} loadingCollections={collectionsLoading} collectionsError={collectionsError} showCollectionsError={!canUpload} onChanged={loadCollections} /> : null}<div className="documents-toolbar"><div className="documents-filter-group"><label htmlFor="collection-filter"><span className="eyebrow">Coleção</span><select id="collection-filter" aria-label="Filtrar coleção" value={collectionId} disabled={Boolean(busyAction)} onChange={(event) => setCollectionId(event.target.value)}><option value="">Todas as coleções</option>{collections.map((collection) => <option key={collection.collection_id} value={collection.collection_id}>{collection.title || collection.collection_id}</option>)}</select></label><label htmlFor="document-filter"><span className="eyebrow">Filtro rápido</span><input id="document-filter" value={filterText} onChange={(event) => setFilterText(event.target.value)} placeholder="Título ou ID" /></label></div><StatusPill tone="success"><ShieldCheck size={13} />Acesso conforme permissões</StatusPill></div>{job ? <Panel className="job-banner"><div className="job-icon">{job.job.status === "published" ? <CheckCircle2 size={19} /> : job.job.status === "failed" || job.job.status === "cancelled" ? <XCircle size={19} /> : <LoaderCircle size={19} className="spin" />}</div><div><strong>{job.job.status === "published" ? "Documento publicado" : job.job.status === "cancelled" ? "Ingestão cancelada" : `Ingestão ${jobLabel(job.job.status)}`}</strong><span>{job.job.document_id || "Preparando identidade do documento"}</span></div><div className="job-progress" role="progressbar" aria-label={`Progresso da ingestão: ${Math.round((job.job.progress || 0) * 100)}%`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round((job.job.progress || 0) * 100)}><span style={{ width: `${Math.round((job.job.progress || 0) * 100)}%` }} /></div><strong aria-live="polite">{Math.round((job.job.progress || 0) * 100)}%</strong><div className="job-actions"><StatusPill tone={jobTone(job.job.status)}>{jobLabel(job.job.status)}</StatusPill>{canCancel ? <Button variant="ghost" onClick={() => void cancelJob()} disabled={Boolean(busyAction)}><XCircle size={15} />Cancelar</Button> : null}{canRetry ? <Button variant="ghost" onClick={requestRetry} disabled={Boolean(busyAction)}><RefreshCw size={15} />{retrySource?.jobId === job.job_id ? "Tentar novamente" : "Escolher fonte para uma nova tentativa"}</Button> : null}</div><input ref={retryInputRef} className="sr-only" aria-label="Selecionar fonte para uma nova tentativa" type="file" accept=".pdf,.docx,.md,.txt" onChange={(event) => { const file = event.target.files?.[0]; if (file) void retryWithFile(file); }} /></Panel> : null}<Panel className="documents-panel"><div className="panel-heading"><div><span className="eyebrow">Publicado</span><h2>Biblioteca de documentos</h2></div><span className="panel-index">{loading || catalogError ? "—" : visibleDocuments.length}</span></div>{loading ? <div className="list-loading"><Spinner label="Carregando documentos" /><span>Buscando o catálogo autorizado.</span></div> : catalogError ? <div className="catalog-failure"><h3>{catalogError.code === 403 ? "Sem acesso aos documentos" : "Catálogo não disponível"}</h3><p>A lista não foi carregada. Isso não significa que o espaço esteja vazio.</p><Button variant="secondary" onClick={() => void load()} disabled={loading}>Tentar novamente</Button></div> : visibleDocuments.length ? <div className="document-list">{visibleDocuments.map((document) => <article className="document-row" key={document.document_id}><div className="document-type">{(document.source_type || "doc").slice(0, 4).toUpperCase()}</div><div className="document-main"><strong>{document.title || "Documento sem título"}</strong><span>{document.document_id}</span></div><div className="document-meta"><StatusPill tone={document.status === "published" ? "success" : "warning"}>{jobLabel(document.status)}</StatusPill><span>{document.collection_id}</span></div><div className="document-actions">{canReindex && document.status !== "deleted" ? <Button variant="ghost" onClick={() => void reindexDocument(document)} disabled={Boolean(busyAction)} aria-label={`Reindexar ${document.title || document.document_id}`}><RefreshCw size={15} />Reindexar</Button> : null}{canManage ? <Button variant="ghost" className="document-delete-button" onClick={() => setDocumentToDelete(document)} disabled={Boolean(busyAction)} aria-label={`Excluir ${document.title || document.document_id}`}><Trash2 size={15} />Excluir</Button> : null}</div></article>)}</div> : <EmptyState title={filterText ? "Nenhum documento corresponde ao filtro" : "Nenhum documento publicado"} description={filterText ? "Ajuste o título, ID ou coleção para ampliar a busca local." : canUpload ? "Adicione PDF, DOCX, Markdown ou texto para iniciar o corpus." : "Nenhum documento foi publicado no escopo autorizado."} action={filterText ? <Button variant="secondary" onClick={() => setFilterText("")}>Limpar filtro</Button> : canUpload && !uploadCollectionUnavailable && uploadCollectionValue ? <Button onClick={() => inputRef.current?.click()}><FileUp size={16} />Adicionar documento</Button> : undefined} />}{data?.next_cursor && !filterText ? <div className="load-more-row"><Button variant="secondary" onClick={() => void loadMore()} disabled={Boolean(busyAction)}>{busyAction === "more" ? <Spinner label="Carregando mais documentos" /> : <RefreshCw size={15} />}Carregar mais</Button></div> : null}</Panel><p className="surface-footnote"><ShieldCheck size={14} />O andamento e a publicação dos documentos são confirmados pelo servidor.</p><ConfirmDialog open={Boolean(documentToDelete)} title="Excluir este documento?" description={`A remoção de “${documentToDelete?.title || documentToDelete?.document_id || "este documento"}” retira o registro do catálogo e os pontos indexados. Esta ação não pode ser desfeita pela interface.`} confirmLabel="Excluir documento" busy={Boolean(documentToDelete && busyAction === `delete:${documentToDelete.document_id}`)} onCancel={() => setDocumentToDelete(null)} onConfirm={() => void deleteDocument()} /></div>;
 }

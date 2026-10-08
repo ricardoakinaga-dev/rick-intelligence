@@ -47,6 +47,48 @@ def test_login_snapshot_is_authoritative():
                                   required="documents.read", authoritative=True)
 
 
+def test_login_issues_the_single_active_tenant_membership_with_its_workspace():
+    provider, _ = make_provider(tenant_id="tenant-a", workspace_id="workspace-a")
+
+    issued = provider.login(
+        email="u1@example.com", password="secret-pw", tenant_id="tenant-a", ip=None, user_agent=None,
+    )
+
+    session = provider.sessions.get(issued["session_token"])
+    assert session is not None
+    assert session["tenant_id"] == "tenant-a"
+    assert session["workspace_id"] == "workspace-a"
+    assert session["allowed_collection_ids"] == ["rag_phase0"]
+
+
+def test_login_fails_closed_when_tenant_membership_resolver_is_missing():
+    user = {
+        "user_id": "u1", "email": "u1@example.com", "role": "PLATFORM_ADMIN",
+        "tenant_id": "tenant-a", "workspace_id": "workspace-a", "status": "active",
+        "password_plain": "secret-pw", "authorized_collection_ids": ["sibling-collection"],
+    }
+
+    class EmailOnlyUsers:
+        def __init__(self):
+            self.global_lookups = 0
+
+        def get_by_email(self, _email):
+            self.global_lookups += 1
+            return user
+
+    users = EmailOnlyUsers()
+    sessions = InMemorySessionStore()
+    provider = IdentityProviderImpl(users=users, sessions=sessions, verifier=PlainTestVerifier())
+
+    with pytest.raises(IdentityError):
+        provider.login(
+            email="u1@example.com", password="secret-pw", tenant_id="tenant-a", ip=None, user_agent=None,
+        )
+
+    assert users.global_lookups == 0
+    assert sessions.records() == []
+
+
 def test_wrong_password_and_disabled():
     provider, users = make_provider()
     with pytest.raises(IdentityError):
@@ -56,6 +98,20 @@ def test_wrong_password_and_disabled():
     users.save(user)
     with pytest.raises(IdentityError):
         provider.login(email="u1@example.com", password="secret-pw", tenant_id="default", ip=None, user_agent=None)
+
+
+def test_disabled_tenant_membership_blocks_login_and_existing_sessions():
+    provider, users = make_provider(tenant_id="tenant-a")
+    token = provider.login(
+        email="u1@example.com", password="secret-pw", tenant_id="tenant-a", ip=None, user_agent=None
+    )["session_token"]
+    user = users.get_by_id("u1")
+    user["membership_status"] = "disabled"
+    users.save(user)
+
+    with pytest.raises(IdentityError):
+        provider.login(email="u1@example.com", password="secret-pw", tenant_id="tenant-a", ip=None, user_agent=None)
+    assert provider.validate_session(token)["authenticated"] is False
 
 
 def test_logout_expiry_revoke():
@@ -178,3 +234,105 @@ def test_session_tenant_binding_is_revalidated_on_every_refresh():
     users.save(user)
 
     assert not provider.validate_session(token)["authenticated"]
+
+
+def test_session_workspace_binding_is_revalidated_on_every_refresh():
+    provider, _users = make_provider(tenant_id="tenant-a", workspace_id="workspace-a")
+    token = provider.login(
+        email="u1@example.com", password="secret-pw", tenant_id="tenant-a", ip=None, user_agent=None
+    )["session_token"]
+    session = provider.sessions.get(token)
+    assert session is not None
+    session["workspace_id"] = "workspace-b"
+    assert provider.validate_session(token)["authenticated"] is False
+
+    provider2, users2 = make_provider(tenant_id="tenant-a", workspace_id="workspace-a")
+    token2 = provider2.login(
+        email="u1@example.com", password="secret-pw", tenant_id="tenant-a", ip=None, user_agent=None
+    )["session_token"]
+    user = users2.get_by_id("u1")
+    assert user is not None
+    user["workspace_id"] = "workspace-b"
+    users2.save(user)
+    assert provider2.validate_session(token2)["authenticated"] is False
+
+
+def test_session_validation_resolves_the_exact_membership_for_each_workspace():
+    base = {
+        "user_id": "u1",
+        "email": "u1@example.com",
+        "role": "VETERINARIAN",
+        "tenant_id": "tenant-a",
+        "status": "active",
+        "membership_status": "active",
+        "password_version": 1,
+        "role_version": 1,
+        "permission_overrides": {"add": [], "remove": []},
+        "authorized_collection_ids": [],
+    }
+    memberships = [
+        {**base, "workspace_id": "workspace-a"},
+        {**base, "workspace_id": "workspace-b"},
+    ]
+
+    class MultiWorkspaceUsers:
+        def __init__(self):
+            self.exact_lookups = []
+
+        def get_by_id_for_tenant(self, user_id, tenant_id):
+            # A tenant-only resolver has no way to distinguish these memberships.
+            return memberships[0]
+
+        def get_by_id_for_tenant_workspace(self, user_id, tenant_id, workspace_id):
+            self.exact_lookups.append((user_id, tenant_id, workspace_id))
+            return next((
+                member for member in memberships
+                if member["user_id"] == user_id
+                and member["tenant_id"] == tenant_id
+                and member["workspace_id"] == workspace_id
+            ), None)
+
+    users = MultiWorkspaceUsers()
+    sessions = InMemorySessionStore()
+    provider = IdentityProviderImpl(users=users, sessions=sessions, verifier=PlainTestVerifier())
+    tokens = {}
+    for workspace_id in ("workspace-a", "workspace-b"):
+        tokens[workspace_id] = sessions.create({
+            "user_id": "u1",
+            "email": "u1@example.com",
+            "role": "VETERINARIAN",
+            "canonical_role": "VETERINARIAN",
+            "permissions": [],
+            "authorization_state": "AUTHORITATIVE",
+            "authorization_snapshot_version": 1,
+            "allowed_collection_ids": [],
+            "tenant_id": "tenant-a",
+            "workspace_id": workspace_id,
+            "password_version": 1,
+            "role_version": 1,
+        })
+
+    for workspace_id, token in tokens.items():
+        snapshot = provider.validate_session(token)
+        assert snapshot["authenticated"] is True
+        assert snapshot["workspace_id"] == workspace_id
+
+    assert users.exact_lookups == [
+        ("u1", "tenant-a", "workspace-a"),
+        ("u1", "tenant-a", "workspace-b"),
+    ]
+
+
+def test_legacy_session_without_workspace_uses_default_membership_scope():
+    provider, _users = make_provider()
+    token = provider.login(
+        email="u1@example.com", password="secret-pw", tenant_id="default", ip=None, user_agent=None
+    )["session_token"]
+    record = provider.sessions.get(token)
+    assert record is not None
+    record.pop("workspace_id")
+
+    snapshot = provider.validate_session(token)
+
+    assert snapshot["authenticated"] is True
+    assert snapshot["workspace_id"] == "default"

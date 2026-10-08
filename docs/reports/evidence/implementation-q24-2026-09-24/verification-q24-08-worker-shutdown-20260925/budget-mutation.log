@@ -1,0 +1,152 @@
+test_process_drain_uses_fixed_budget_and_preserves_operational_outcome (budget_contract_probe.WorkerEntrypointTests.test_process_drain_uses_fixed_budget_and_preserves_operational_outcome) ... 
+  test_process_drain_uses_fixed_budget_and_preserves_operational_outcome (budget_contract_probe.WorkerEntrypointTests.test_process_drain_uses_fixed_budget_and_preserves_operational_outcome) (operational_outcome=0, delivery_outcome=True) ... FAIL
+  test_process_drain_uses_fixed_budget_and_preserves_operational_outcome (budget_contract_probe.WorkerEntrypointTests.test_process_drain_uses_fixed_budget_and_preserves_operational_outcome) (operational_outcome=0, delivery_outcome=False) ... FAIL
+  test_process_drain_uses_fixed_budget_and_preserves_operational_outcome (budget_contract_probe.WorkerEntrypointTests.test_process_drain_uses_fixed_budget_and_preserves_operational_outcome) (operational_outcome=0, delivery_outcome=RuntimeError('synthetic-sensitive-marker')) ... FAIL
+  test_process_drain_uses_fixed_budget_and_preserves_operational_outcome (budget_contract_probe.WorkerEntrypointTests.test_process_drain_uses_fixed_budget_and_preserves_operational_outcome) (operational_outcome=1, delivery_outcome=True) ... FAIL
+  test_process_drain_uses_fixed_budget_and_preserves_operational_outcome (budget_contract_probe.WorkerEntrypointTests.test_process_drain_uses_fixed_budget_and_preserves_operational_outcome) (operational_outcome=1, delivery_outcome=False) ... FAIL
+  test_process_drain_uses_fixed_budget_and_preserves_operational_outcome (budget_contract_probe.WorkerEntrypointTests.test_process_drain_uses_fixed_budget_and_preserves_operational_outcome) (operational_outcome=1, delivery_outcome=RuntimeError('synthetic-sensitive-marker')) ... FAIL
+  test_process_drain_uses_fixed_budget_and_preserves_operational_outcome (budget_contract_probe.WorkerEntrypointTests.test_process_drain_uses_fixed_budget_and_preserves_operational_outcome) (operational_outcome=SystemExit(78), delivery_outcome=True) ... FAIL
+  test_process_drain_uses_fixed_budget_and_preserves_operational_outcome (budget_contract_probe.WorkerEntrypointTests.test_process_drain_uses_fixed_budget_and_preserves_operational_outcome) (operational_outcome=SystemExit(78), delivery_outcome=False) ... FAIL
+  test_process_drain_uses_fixed_budget_and_preserves_operational_outcome (budget_contract_probe.WorkerEntrypointTests.test_process_drain_uses_fixed_budget_and_preserves_operational_outcome) (operational_outcome=SystemExit(78), delivery_outcome=RuntimeError('synthetic-sensitive-marker')) ... FAIL
+
+======================================================================
+FAIL: test_process_drain_uses_fixed_budget_and_preserves_operational_outcome (budget_contract_probe.WorkerEntrypointTests.test_process_drain_uses_fixed_budget_and_preserves_operational_outcome) (operational_outcome=0, delivery_outcome=True)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/ricardo/rick-intelligence/infrastructure/docker/tests/test_worker_entrypoint.py", line 193, in test_process_drain_uses_fixed_budget_and_preserves_operational_outcome
+    drain.assert_called_once_with(timeout=2.0)
+  File "/usr/lib/python3.12/unittest/mock.py", line 956, in assert_called_once_with
+    return self.assert_called_with(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/unittest/mock.py", line 944, in assert_called_with
+    raise AssertionError(_error_message()) from cause
+AssertionError: expected call not found.
+Expected: mock(timeout=2.0)
+  Actual: mock(timeout=3.0)
+
+======================================================================
+FAIL: test_process_drain_uses_fixed_budget_and_preserves_operational_outcome (budget_contract_probe.WorkerEntrypointTests.test_process_drain_uses_fixed_budget_and_preserves_operational_outcome) (operational_outcome=0, delivery_outcome=False)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/ricardo/rick-intelligence/infrastructure/docker/tests/test_worker_entrypoint.py", line 193, in test_process_drain_uses_fixed_budget_and_preserves_operational_outcome
+    drain.assert_called_once_with(timeout=2.0)
+  File "/usr/lib/python3.12/unittest/mock.py", line 956, in assert_called_once_with
+    return self.assert_called_with(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/unittest/mock.py", line 944, in assert_called_with
+    raise AssertionError(_error_message()) from cause
+AssertionError: expected call not found.
+Expected: mock(timeout=2.0)
+  Actual: mock(timeout=3.0)
+
+======================================================================
+FAIL: test_process_drain_uses_fixed_budget_and_preserves_operational_outcome (budget_contract_probe.WorkerEntrypointTests.test_process_drain_uses_fixed_budget_and_preserves_operational_outcome) (operational_outcome=0, delivery_outcome=RuntimeError('synthetic-sensitive-marker'))
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/ricardo/rick-intelligence/infrastructure/docker/tests/test_worker_entrypoint.py", line 193, in test_process_drain_uses_fixed_budget_and_preserves_operational_outcome
+    drain.assert_called_once_with(timeout=2.0)
+  File "/usr/lib/python3.12/unittest/mock.py", line 956, in assert_called_once_with
+    return self.assert_called_with(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/unittest/mock.py", line 944, in assert_called_with
+    raise AssertionError(_error_message()) from cause
+AssertionError: expected call not found.
+Expected: mock(timeout=2.0)
+  Actual: mock(timeout=3.0)
+
+======================================================================
+FAIL: test_process_drain_uses_fixed_budget_and_preserves_operational_outcome (budget_contract_probe.WorkerEntrypointTests.test_process_drain_uses_fixed_budget_and_preserves_operational_outcome) (operational_outcome=1, delivery_outcome=True)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/ricardo/rick-intelligence/infrastructure/docker/tests/test_worker_entrypoint.py", line 193, in test_process_drain_uses_fixed_budget_and_preserves_operational_outcome
+    drain.assert_called_once_with(timeout=2.0)
+  File "/usr/lib/python3.12/unittest/mock.py", line 956, in assert_called_once_with
+    return self.assert_called_with(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/unittest/mock.py", line 944, in assert_called_with
+    raise AssertionError(_error_message()) from cause
+AssertionError: expected call not found.
+Expected: mock(timeout=2.0)
+  Actual: mock(timeout=3.0)
+
+======================================================================
+FAIL: test_process_drain_uses_fixed_budget_and_preserves_operational_outcome (budget_contract_probe.WorkerEntrypointTests.test_process_drain_uses_fixed_budget_and_preserves_operational_outcome) (operational_outcome=1, delivery_outcome=False)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/ricardo/rick-intelligence/infrastructure/docker/tests/test_worker_entrypoint.py", line 193, in test_process_drain_uses_fixed_budget_and_preserves_operational_outcome
+    drain.assert_called_once_with(timeout=2.0)
+  File "/usr/lib/python3.12/unittest/mock.py", line 956, in assert_called_once_with
+    return self.assert_called_with(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/unittest/mock.py", line 944, in assert_called_with
+    raise AssertionError(_error_message()) from cause
+AssertionError: expected call not found.
+Expected: mock(timeout=2.0)
+  Actual: mock(timeout=3.0)
+
+======================================================================
+FAIL: test_process_drain_uses_fixed_budget_and_preserves_operational_outcome (budget_contract_probe.WorkerEntrypointTests.test_process_drain_uses_fixed_budget_and_preserves_operational_outcome) (operational_outcome=1, delivery_outcome=RuntimeError('synthetic-sensitive-marker'))
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/ricardo/rick-intelligence/infrastructure/docker/tests/test_worker_entrypoint.py", line 193, in test_process_drain_uses_fixed_budget_and_preserves_operational_outcome
+    drain.assert_called_once_with(timeout=2.0)
+  File "/usr/lib/python3.12/unittest/mock.py", line 956, in assert_called_once_with
+    return self.assert_called_with(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/unittest/mock.py", line 944, in assert_called_with
+    raise AssertionError(_error_message()) from cause
+AssertionError: expected call not found.
+Expected: mock(timeout=2.0)
+  Actual: mock(timeout=3.0)
+
+======================================================================
+FAIL: test_process_drain_uses_fixed_budget_and_preserves_operational_outcome (budget_contract_probe.WorkerEntrypointTests.test_process_drain_uses_fixed_budget_and_preserves_operational_outcome) (operational_outcome=SystemExit(78), delivery_outcome=True)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/ricardo/rick-intelligence/infrastructure/docker/tests/test_worker_entrypoint.py", line 193, in test_process_drain_uses_fixed_budget_and_preserves_operational_outcome
+    drain.assert_called_once_with(timeout=2.0)
+  File "/usr/lib/python3.12/unittest/mock.py", line 956, in assert_called_once_with
+    return self.assert_called_with(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/unittest/mock.py", line 944, in assert_called_with
+    raise AssertionError(_error_message()) from cause
+AssertionError: expected call not found.
+Expected: mock(timeout=2.0)
+  Actual: mock(timeout=3.0)
+
+======================================================================
+FAIL: test_process_drain_uses_fixed_budget_and_preserves_operational_outcome (budget_contract_probe.WorkerEntrypointTests.test_process_drain_uses_fixed_budget_and_preserves_operational_outcome) (operational_outcome=SystemExit(78), delivery_outcome=False)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/ricardo/rick-intelligence/infrastructure/docker/tests/test_worker_entrypoint.py", line 193, in test_process_drain_uses_fixed_budget_and_preserves_operational_outcome
+    drain.assert_called_once_with(timeout=2.0)
+  File "/usr/lib/python3.12/unittest/mock.py", line 956, in assert_called_once_with
+    return self.assert_called_with(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/unittest/mock.py", line 944, in assert_called_with
+    raise AssertionError(_error_message()) from cause
+AssertionError: expected call not found.
+Expected: mock(timeout=2.0)
+  Actual: mock(timeout=3.0)
+
+======================================================================
+FAIL: test_process_drain_uses_fixed_budget_and_preserves_operational_outcome (budget_contract_probe.WorkerEntrypointTests.test_process_drain_uses_fixed_budget_and_preserves_operational_outcome) (operational_outcome=SystemExit(78), delivery_outcome=RuntimeError('synthetic-sensitive-marker'))
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/ricardo/rick-intelligence/infrastructure/docker/tests/test_worker_entrypoint.py", line 193, in test_process_drain_uses_fixed_budget_and_preserves_operational_outcome
+    drain.assert_called_once_with(timeout=2.0)
+  File "/usr/lib/python3.12/unittest/mock.py", line 956, in assert_called_once_with
+    return self.assert_called_with(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/unittest/mock.py", line 944, in assert_called_with
+    raise AssertionError(_error_message()) from cause
+AssertionError: expected call not found.
+Expected: mock(timeout=2.0)
+  Actual: mock(timeout=3.0)
+
+----------------------------------------------------------------------
+Ran 1 test in 0.004s
+
+FAILED (failures=9)
+
+PASS: all nine outcome combinations rejected the in-memory 3.0-second mutation; source unchanged at SHA-256 95f66e89ff3d09422b4db59e504d7b5183e37233925eaa53824f1795b8f7f5d4.

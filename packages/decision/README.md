@@ -50,3 +50,47 @@ Professor composition point that creates the bundle with `rick-evidence`,
 supplies observed metrics when available, and invokes this package before
 committing to a response. A bundle alone is never treated as claim-level
 support by a strict gate.
+
+## Server-owned request classification
+
+The canonical API uses `NonClinicalRequestPolicy` before making this decision.
+`rick-nonclinical-request-v1` recognizes a finite set of standalone English and
+Portuguese product-help questions: document upload, collections, citations and
+upload retry/status. It applies whole-question matching, with normalization for
+case, whitespace, accents and a final question mark. It does not infer safety
+from a retrieval score or accept a request-supplied risk label.
+
+```python
+from rick_decision import NonClinicalRequestPolicy, classify_request
+
+classification = classify_request(
+    NonClinicalRequestPolicy(), "How do I upload a document?"
+)
+assert classification.allows_answer
+assert classification.policy_version == "rick-nonclinical-request-v1"
+assert not classify_request(None, "How do I upload a document?").allows_answer
+```
+
+Clinical and injection indicators require review. Unknown or contextual requests
+remain unreviewed; short recognized product topics ask for clarification, while
+known unsupported creative requests abstain. Prior conversation content cannot
+silently give a standalone allow rule broader clinical meaning. Version one
+deliberately does not authorize multi-turn/domain reasoning.
+
+Classification grants eligibility only. ANSWER additionally requires a canonical
+source authority and the existing evidence thresholds. A weak eligible query gets
+at most one additional retrieval using policy-owned topic terms, preserving the
+original classification and ACL. A failed retry abstains. Structural citation
+validation and live source re-resolution are separate from semantic support;
+`NOT_EVALUATED` is never a claim of clinical or semantic approval.
+
+The API's final publication callback rereads every prompt source and rejects
+changed document/chunk identity, version, checksum, content, scope or publication
+status, including archived collections. An optional server-supplied authorization
+refresher can narrow grants at delivery; without it, metadata explicitly records
+`request_scope_and_collection` rather than live user-grant validation. Cancellation,
+incomplete provider termination and exhausted budgets never approve a final answer.
+
+See [the Q24 design and integration contract](../../docs/architecture/domain-decision-policy-2026-09-24.md).
+D04 domain acceptance, live-provider evaluation, atomic persistence authorization
+and independent release review remain outside this technical policy.

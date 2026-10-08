@@ -1,0 +1,4 @@
+PASS: all 29 C6 packet file hashes match.
+PASS: all 28 manifest source/log hashes match.
+PASS: frozen quality bar hash matches (f1ea9aa44d0d66e00bb47e75e30ad616ff575897de7d2a40bb5bc8e1f4936310).
+Packet SHA-256: ecd2108ab2785c46244748cfa3c7c4b35e2ee992d4caa5a1e1d789dd2eb21851

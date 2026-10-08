@@ -1,0 +1,42 @@
+{
+  "recorded_at": "2026-10-05T01:51:35.186783+00:00",
+  "status": "LOCAL_SIGKILL_RECOVERY_PASS",
+  "candidate_commit": "88caec5ce6258159f7c42d01ccc801438771e74c",
+  "artifacts": {
+    "docs/reports/evidence/production-2026-10-04/crash20/barrier-composition.py": "d302a98ed6e1baff9ddbc477cc5043e691e2c6bbd3d770d81ad6508eeaff7dee",
+    "docs/reports/evidence/production-2026-10-04/crash20/first-schema-FAIL-probe.py": "dc7b4b58fb6f9b5b7394db9560d4062c09e97c0f89c6892d349e0dcaf74fd304",
+    "docs/reports/evidence/production-2026-10-04/crash20/first-schema-FAIL-result.json": "0bbe7adfb9ca2b6e78903757523d21b9bde661b603dcbf7ba0927b3aa51678c6",
+    "docs/reports/evidence/production-2026-10-04/crash20/parent-critic-sentinel.json": "ba748b610e84c83dbaf2593d0899bf713762d7bd1860c20d75a928876026570b",
+    "docs/reports/evidence/production-2026-10-04/crash20/parent-private-sql-invariant-verification.json": "d1679647587afaaa4ecb15d8b7e2d8c00537cadbf02e8fcb49901c51d9079422",
+    "docs/reports/evidence/production-2026-10-04/crash20/parent-source-teardown-health.json": "fadf4c227e098ef87b3f1b3c4d332a87d4f635beaa42055d2b8acb58a8b32434",
+    "docs/reports/evidence/production-2026-10-04/crash20/plan.json": "868538c5a8ba6e856b43da19f226d40eca6c953fe6f06f69ed8edb66b8cd5138",
+    "docs/reports/evidence/production-2026-10-04/crash20/result.json": "e5df03e76b7d48264edd3c0262079908e1c4a5a84d2094d04a07e376daaadd7b",
+    "docs/reports/evidence/production-2026-10-04/crash20/run-crash20.py": "567e7f4aaec67935f304de92915fadcee410eb50f6b5554ef6b06f61f7986bf2",
+    "docs/reports/evidence/production-2026-10-04/crash20/source-critic-manifest.json": "a9477bdde2ac6873716fc550c1d0a4982bed2167a08e873a83513e6d42c56a17",
+    "docs/reports/evidence/production-2026-10-04/crash20/source-critic-result.json": "f44a6fa3ecc9d913129101df969ef2080e8a4a8827223c19be5abf9b8301f0db",
+    "docs/reports/evidence/production-2026-10-04/crash20/source-critic-review.md": "4e6cdee02fdf65a4a9b37538d27158bbeb5c8a0dab01338d5ad4ba93e5f94ad6",
+    "docs/reports/evidence/production-2026-10-04/crash20/sql-read-only-probe.py": "58e167af7dd89ab318aeed725bd38e688b592a55976e07491966fee6db08680a",
+    "docs/reports/evidence/production-2026-10-04/crash20/parent-event-expiry-verification.json": "36a838eea3626a6a3a92996014e58ef7f21c9a03af1758d45aa255f343559457",
+    "docs/reports/evidence/production-2026-10-04/crash20/parent-expiry-timestamp-assumption.json": "a3610c7dd0d974370a3f9b9eace9084ed905257648e89d27dc344edaa3ba146b"
+  },
+  "cases": {
+    "during_handler": {
+      "status": "PASS",
+      "recovery_seconds": 29.105,
+      "exit_code": 137
+    },
+    "before_result": {
+      "status": "PASS",
+      "recovery_seconds": 22.746,
+      "exit_code": 137
+    }
+  },
+  "original_services_preserved": true,
+  "disposable_owners_removed": 2,
+  "public_api_not_used_to_drive_recovery": true,
+  "private_sql_and_snapshot_not_copied": true,
+  "independent_review": "limited source review found P2 reporting defect; separate ack-deferred21 correction under verification",
+  "production_approved": false,
+  "AUD03_34": "OPEN: two local fault windows only; no component partitions, load/alerts/approved budgets or production target proof",
+  "event_expiry_proof": "SQL-only samples held RUNNING before lease expiry; events preserve existing IDs/rows and append expected expiry/retry or single publication_recovered; no clock/lease rewrite"
+}

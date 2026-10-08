@@ -1,0 +1,34 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-9.1.1, pluggy-1.6.0 -- /tmp/rick-intelligence-api-test-env/bin/python3
+rootdir: /home/ricardo/rick-intelligence/apps/api
+configfile: pyproject.toml
+plugins: asyncio-1.4.0, anyio-4.15.0
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 14 items
+
+apps/api/tests/test_postgres_admin_mutations.py::test_admin_create_commits_identity_and_sanitized_audit_outbox_together PASSED [  7%]
+apps/api/tests/test_postgres_admin_mutations.py::test_legacy_postgres_create_entrypoint_fails_closed_without_actor_and_uses_atomic_outbox_with_actor PASSED [ 14%]
+apps/api/tests/test_postgres_admin_mutations.py::test_admin_deactivation_rolls_back_user_and_sessions_if_outbox_write_fails PASSED [ 21%]
+apps/api/tests/test_postgres_admin_mutations.py::test_admin_deactivation_disables_only_the_tenant_membership PASSED [ 28%]
+apps/api/tests/test_postgres_admin_mutations.py::test_admin_deactivation_repairs_active_membership_for_globally_disabled_user PASSED [ 35%]
+apps/api/tests/test_postgres_admin_mutations.py::test_inactive_platform_admin_can_be_demoted_or_deactivated_again PASSED [ 42%]
+apps/api/tests/test_postgres_admin_mutations.py::test_admin_demotion_protects_last_platform_admin_in_actor_workspace PASSED [ 50%]
+apps/api/tests/test_postgres_admin_mutations.py::test_last_active_admin_cannot_be_deactivated PASSED [ 57%]
+apps/api/tests/test_postgres_admin_mutations.py::test_admin_reset_rejects_accounts_with_memberships_in_another_tenant PASSED [ 64%]
+apps/api/tests/test_postgres_admin_mutations.py::test_admin_reset_commits_for_a_single_tenant_account PASSED [ 71%]
+apps/api/tests/test_postgres_admin_mutations.py::test_admin_email_update_rejects_a_global_profile_change_for_another_tenant PASSED [ 78%]
+apps/api/tests/test_postgres_admin_mutations.py::test_admin_membership_edit_rejects_shared_account_version_change[changes0] PASSED [ 85%]
+apps/api/tests/test_postgres_admin_mutations.py::test_admin_membership_edit_rejects_shared_account_version_change[changes1] PASSED [ 92%]
+apps/api/tests/test_postgres_admin_mutations.py::test_admin_membership_edit_rejects_shared_account_version_change[changes2] PASSED [100%]
+
+=============================== warnings summary ===============================
+../../../tmp/rick-intelligence-api-test-env/lib/python3.12/site-packages/fastapi/testclient.py:1
+  /tmp/rick-intelligence-api-test-env/lib/python3.12/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+../../../tmp/rick-intelligence-api-test-env/lib/python3.12/site-packages/starlette/testclient.py:53
+  /tmp/rick-intelligence-api-test-env/lib/python3.12/site-packages/starlette/testclient.py:53: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    _PortalFactoryType = Callable[[], AbstractContextManager[anyio.abc.BlockingPortal]]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================== 14 passed, 2 warnings in 0.18s ========================

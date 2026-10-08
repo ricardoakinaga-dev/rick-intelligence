@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 import re
+from threading import RLock
 from urllib.parse import urlsplit, urlunsplit
 
 from core.errors import ApiError
@@ -118,6 +119,8 @@ class InMemoryAuditSink:
             raise ValueError("audit retention must be a positive integer")
         self.max_events = max_events
         self.events: list[dict] = []
+        self._operation_lock = RLock()
+        self._operation_records: dict[str, dict] = {}
 
     def emit(self, event: dict) -> bool:
         try:
@@ -147,9 +150,10 @@ class InMemoryAuditSink:
                 safe[key] = value
             if not safe.get("action"):
                 return False
-            self.events.append(safe)
-            if len(self.events) > self.max_events:
-                del self.events[:-self.max_events]
+            with self._operation_lock:
+                self.events.append(safe)
+                if len(self.events) > self.max_events:
+                    del self.events[:-self.max_events]
             return True
         except Exception:
             return False

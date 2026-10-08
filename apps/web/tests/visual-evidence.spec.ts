@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
 
 const session = {
@@ -54,8 +55,10 @@ test("captures the grounded chat evidence state at the canonical viewports", asy
   expect((await answer.boundingBox())!.y).toBeLessThan((await sources.boundingBox())!.y);
   expect((await sources.boundingBox())!.y).toBeLessThan((await confidence.boundingBox())!.y);
 
+  const evidenceDirectory = process.env.RICK_VISUAL_EVIDENCE_DIR ?? testInfo.outputPath("visual-evidence");
+  await mkdir(evidenceDirectory, { recursive: true });
   await page.screenshot({
-    path: resolve(process.cwd(), `../../artifacts/visual/state-of-art/chat-${testInfo.project.name}.png`),
+    path: resolve(evidenceDirectory, `chat-${testInfo.project.name}.png`),
     fullPage: true,
   });
 

@@ -5,50 +5,50 @@
   "samples": 30,
   "runtime": {
     "python": "3.12.3",
-    "platform": "Linux-7.0.0-31-generic-x86_64-with-glibc2.39"
+    "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.39"
   },
   "retrieval_ms": {
     "n": 30,
-    "p50": 0.521,
-    "p95": 0.725,
-    "p99": 0.754,
-    "min": 0.478,
-    "max": 0.754
+    "p50": 0.452,
+    "p95": 0.661,
+    "p99": 0.702,
+    "min": 0.406,
+    "max": 0.702
   },
   "professor_ms": {
     "n": 30,
-    "p50": 1.261,
-    "p95": 1.557,
-    "p99": 1.56,
-    "min": 1.169,
-    "max": 1.56
+    "p50": 1.797,
+    "p95": 3.055,
+    "p99": 3.065,
+    "min": 1.496,
+    "max": 3.065
   },
   "ttft_ms": {
     "status": "OBSERVED",
     "n": 30,
-    "p50": 1.491,
-    "p95": 2.098,
-    "p99": 2.485,
-    "min": 1.28,
-    "max": 2.485
+    "p50": 1.564,
+    "p95": 2.191,
+    "p99": 5.704,
+    "min": 1.349,
+    "max": 5.704
   },
   "completion_ms": {
     "status": "OBSERVED",
     "n": 30,
-    "p50": 1.662,
-    "p95": 2.336,
-    "p99": 2.708,
-    "min": 1.426,
-    "max": 2.708
+    "p50": 1.986,
+    "p95": 2.776,
+    "p99": 6.54,
+    "min": 1.71,
+    "max": 6.54
   },
   "memory": {
     "status": "OBSERVED",
     "unit": "bytes",
     "method": "procfs_rss_and_vmhwm_or_resource_maxrss",
-    "rss_before_bytes": 51400704,
-    "rss_after_bytes": 53678080,
-    "rss_delta_bytes": 2277376,
-    "peak_rss_bytes": 53678080,
+    "rss_before_bytes": 52264960,
+    "rss_after_bytes": 54374400,
+    "rss_delta_bytes": 2109440,
+    "peak_rss_bytes": 54374400,
     "scope": "entire benchmark process; not an isolated request allocation"
   },
   "cost": {
@@ -83,7 +83,7 @@
     "iterations": 10,
     "iterations_completed": 10,
     "failures": 0,
-    "duration_ms": 15.654,
+    "duration_ms": 19.963,
     "invariants": [
       "all completions retained APPROVED_EVIDENCE",
       "no external dependency was contacted"
@@ -110,6 +110,6 @@
     "professor_max_prompt_chars": 20000,
     "professor_max_answer_chars": 8000
   },
-  "fixture_query_sha256": "b614197d056058ebd8496e05c490f71b0778caa8015538aafaa52123de785ca5",
+  "fixture_query_sha256": "e9dccc7640db57f8171b5ac9bc0f92ff302144fd58a33477e32737696866bd00",
   "note": "Local hermetic observation only; no live provider, Qdrant, Redis or Locker latency claim."
 }

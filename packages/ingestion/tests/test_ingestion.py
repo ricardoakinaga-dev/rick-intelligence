@@ -99,7 +99,7 @@ def test_cancel_duplicate_after_identity_preserves_publication(tmp_path):
     assert service.knowledge.get_document(first.document_id).status == "published"
 
 
-def test_failed_reindex_to_existing_target_preserves_both_documents(tmp_path):
+def test_committed_reindex_to_existing_target_preserves_both_documents_on_retirement_failure(tmp_path):
     service = _service()
     original = _doc(tmp_path / "a.txt", "Documento original. " * 400)
     target = _doc(tmp_path / "b.txt", "Outro documento publicado. " * 400)
@@ -123,7 +123,8 @@ def test_failed_reindex_to_existing_target_preserves_both_documents(tmp_path):
     failed = service.reindex(
         first.document_id, target, workspace_id="w", collection_id="rag_phase0", tenant_id="default"
     )
-    assert failed.status == "failed"
+    assert failed.status == "published"
+    assert failed.metadata['retirement_pending'] is True
     assert failed.document_id == second.document_id
     assert sorted(delegate.all_points(), key=lambda p: p["point_id"]) == sorted(points, key=lambda p: p["point_id"])
     assert service.knowledge.get_chunks(second.document_id) == chunks
@@ -233,7 +234,7 @@ def test_failed_reindex_preserves_the_current_published_version(tmp_path):
     assert vectors.count_for_document(first.document_id, "rag_phase0") == old_count
 
 
-def test_reindex_retirement_failure_rolls_back_new_version_and_restores_old_index(tmp_path):
+def test_reindex_retirement_failure_preserves_committed_new_version_and_restores_old_index(tmp_path):
     knowledge = InMemoryKnowledgeStore()
     base_vectors = InMemoryVectorStore()
     service = IngestionService(
@@ -270,12 +271,131 @@ def test_reindex_retirement_failure_rolls_back_new_version_and_restores_old_inde
         first.document_id, target, workspace_id="w", collection_id="rag_phase0", tenant_id="default"
     )
 
-    assert failed.status == "failed"
-    assert failed.error_code == "storage_unavailable"
+    assert failed.status == "published" and failed.error_code is None
+    assert failed.metadata['retirement_pending'] is True
     assert knowledge.get_document(first.document_id).status == "published"
     assert base_vectors.count_for_document(first.document_id, "rag_phase0") == old_count
-    assert knowledge.get_document(failed.document_id).status == "failed"
-    assert base_vectors.count_for_document(failed.document_id, "rag_phase0") == 0
+    assert knowledge.get_document(failed.document_id).status == "published"
+    assert base_vectors.count_for_document(failed.document_id, "rag_phase0") > 0
+
+
+def test_http_qdrant_reindex_restores_old_vectors_after_mutating_delete_failure(tmp_path):
+    import copy
+    import json
+
+    import httpx
+
+    from rick_retrieval import QdrantHttpVectorStore
+
+    knowledge = InMemoryKnowledgeStore()
+    embeddings = DeterministicHashEmbedding()
+    points: dict[str, dict] = {}
+    requests: list[tuple[str, str, dict | None]] = []
+    control = {"old_document_id": None, "fail_retirement": False}
+
+    def matches(payload, filters):
+        for condition in filters:
+            key = condition["key"]
+            match = condition["match"]
+            if "any" in match:
+                if payload.get(key) not in match["any"]:
+                    return False
+            elif payload.get(key) != match.get("value"):
+                return False
+        return True
+
+    def handle(request):
+        body = json.loads(request.content) if request.content else None
+        requests.append((request.method, request.url.path, body))
+        if request.method == "GET":
+            return httpx.Response(200, json={"result": {"status": "green", "config": {"params": {
+                "vectors": {"dense": {"size": embeddings.dimensions, "distance": "Cosine"}},
+                "sparse_vectors": {"sparse": {}},
+            }}}})
+        if request.method == "PUT" and request.url.path.endswith("/points"):
+            for point in body["points"]:
+                points[point["id"]] = copy.deepcopy(point)
+            return httpx.Response(200, json={"result": {"status": "completed"}})
+        if request.method == "POST" and request.url.path.endswith("/points/count"):
+            count = sum(matches(point["payload"], body["filter"]["must"]) for point in points.values())
+            return httpx.Response(200, json={"result": {"count": count}})
+        if request.method == "POST" and request.url.path.endswith("/points/scroll"):
+            filters = body["filter"]["must"]
+            selected = sorted(
+                (point for point in points.values() if matches(point["payload"], filters)),
+                key=lambda point: point["id"],
+            )
+            offset = body.get("offset")
+            start = next((index + 1 for index, point in enumerate(selected) if point["id"] == offset), 0)
+            page = selected[start:start + body["limit"]]
+            next_offset = page[-1]["id"] if page and start + len(page) < len(selected) else None
+            return httpx.Response(200, json={"result": {
+                "points": page, "next_page_offset": next_offset,
+            }})
+        if request.method == "POST" and request.url.path.endswith("/points/delete"):
+            filters = body["filter"]["must"]
+            document_id = next(item["match"]["value"] for item in filters if item["key"] == "document_id")
+            selected = [point_id for point_id, point in points.items()
+                        if matches(point["payload"], filters)]
+            for point_id in selected:
+                del points[point_id]
+            if document_id == control["old_document_id"] and control["fail_retirement"]:
+                control["fail_retirement"] = False
+                # Qdrant applied the delete but the acknowledgement was lost.
+                return httpx.Response(503, json={"status": "injected_lost_ack"})
+            return httpx.Response(200, json={"result": {"status": "completed"}})
+        raise AssertionError(f"unexpected Qdrant request: {request.method} {request.url.path}")
+
+    store = QdrantHttpVectorStore(
+        "http://qdrant.test",
+        "rag_phase0",
+        transport=httpx.MockTransport(handle),
+        max_attempts=1,
+        retry_backoff_seconds=0,
+    )
+    service = IngestionService(knowledge=knowledge, vectors=store, embeddings=embeddings)
+    target = _doc(tmp_path / "http-reindex.txt", "Published HTTP Qdrant version. " * 40)
+    first = service.ingest(target, workspace_id="w", collection_id="rag_phase0", tenant_id="default")
+    assert first.status == "published"
+    old_points = {
+        point_id: copy.deepcopy(point)
+        for point_id, point in points.items()
+        if point["payload"]["document_id"] == first.document_id
+    }
+    assert old_points
+
+    control.update(old_document_id=first.document_id, fail_retirement=True)
+    target.write_text("Replacement HTTP Qdrant version. " * 40)
+    failed = service.reindex(
+        first.document_id,
+        target,
+        workspace_id="w",
+        collection_id="rag_phase0",
+        tenant_id="default",
+    )
+
+    assert failed.status == "published" and failed.error_code is None
+    assert failed.metadata['retirement_pending'] is True
+    assert knowledge.get_document(first.document_id).status == "published"
+    assert knowledge.get_document(failed.document_id).status == "published"
+    restored = {
+        point_id: point
+        for point_id, point in points.items()
+        if point["payload"]["document_id"] == first.document_id
+    }
+    assert restored == old_points
+    assert any(point["payload"]["document_id"] == failed.document_id for point in points.values())
+
+    scroll_requests = [body for method, path, body in requests
+                       if method == "POST" and path.endswith("/points/scroll")]
+    assert scroll_requests
+    for body in scroll_requests:
+        conditions = body["filter"]["must"]
+        assert {condition["key"] for condition in conditions} == {
+            "tenant_id", "workspace_id", "collection_id", "document_id",
+        }
+        assert body["limit"] == 1 and body["with_payload"] and body["with_vector"]
+    store.close()
 
 
 def test_reindex_failed_compensation_never_republishes_missing_vectors(tmp_path):
@@ -307,9 +427,11 @@ def test_reindex_failed_compensation_never_republishes_missing_vectors(tmp_path)
     failed = service.reindex(
         first.document_id, target, workspace_id="w", collection_id="rag_phase0", tenant_id="default"
     )
-    assert failed.status == "failed"
+    assert failed.status == "published"
+    assert failed.metadata['retirement_pending'] is True
     assert service.knowledge.get_document(first.document_id).status == "unpublished"
-    assert service.knowledge.get_document(failed.document_id).status == "failed"
+    assert service.knowledge.get_document(failed.document_id).status == "published"
+    assert delegate.count_for_document(failed.document_id, "rag_phase0") > 0
     assert delegate.count_for_document(first.document_id, "rag_phase0") == 0
 
 
@@ -380,6 +502,293 @@ def test_invalid_embedding_response_writes_nothing(tmp_path, response):
     assert job.status == "failed"
     assert knowledge.list_documents("w", tenant_id="default") == []
     assert vectors.all_points() == []
+
+
+class _BatchEmbedding:
+    model = "batch-fixture"
+    dimensions = 2
+
+    def __init__(self, fault=None):
+        self.calls = []
+        self.fault = fault
+        self.on_batch = None
+
+    def embed(self, texts):
+        offset = sum(len(batch) for batch in self.calls)
+        self.calls.append(list(texts))
+        if len(texts) > 256:
+            raise ValueError("embedding batch is out of range")
+        if self.on_batch is not None:
+            self.on_batch()
+        if len(self.calls) == 2 and self.fault is not None:
+            if isinstance(self.fault, Exception):
+                raise self.fault
+            return self.fault(texts)
+        return [[float(offset + index), 1.0] for index in range(len(texts))]
+
+
+class _BatchEvents:
+    def __init__(self):
+        self.events = []
+
+    def emit(self, event):
+        self.events.append(event)
+
+
+def _batch_ingestion(tmp_path, count, fault=None):
+    target = _doc(
+        tmp_path / "batches.txt",
+        "\n\n".join(f"Paragraph {index:04d} " + "x" * 980 for index in range(count)),
+    )
+    embeddings = _BatchEmbedding(fault)
+    events = _BatchEvents()
+    service = IngestionService(
+        knowledge=InMemoryKnowledgeStore(), vectors=InMemoryVectorStore(),
+        embeddings=embeddings, events=events,
+    )
+    return target, service, embeddings, events
+
+
+@pytest.mark.parametrize("count", [255, 256, 257, 513])
+def test_embedding_batches_preserve_order_and_replay(tmp_path, count):
+    target, service, embeddings, events = _batch_ingestion(tmp_path, count)
+
+    def assert_no_partial_writes():
+        assert service.knowledge.list_documents("w", tenant_id="default") == []
+        assert service.vectors.all_points() == []
+
+    embeddings.on_batch = assert_no_partial_writes
+    job = service.ingest(target, workspace_id="w", collection_id="rag_phase0", tenant_id="default")
+
+    assert job.status == "published"
+    assert [len(batch) for batch in embeddings.calls] == [
+        min(256, count - offset) for offset in range(0, count, 256)
+    ]
+    points = sorted(service.vectors.all_points(), key=lambda point: point["payload"]["chunk_index"])
+    assert len(points) == count
+    assert [point["vector"] for point in points] == [[float(index), 1.0] for index in range(count)]
+    chunks = service.knowledge.get_chunks(job.document_id)
+    assert [chunk.text for chunk in chunks] == [text for batch in embeddings.calls for text in batch]
+    assert [point["payload"]["chunk_id"] for point in points] == [chunk.chunk_id for chunk in chunks]
+    calls = list(embeddings.calls)
+    replay = service.ingest(target, workspace_id="w", collection_id="rag_phase0", tenant_id="default")
+    assert replay.status == "published"
+    assert replay.document_id == job.document_id
+    assert embeddings.calls == calls
+
+
+@pytest.mark.parametrize(
+    "fault, error_code",
+    [
+        (RuntimeError("private provider failure"), "provider_unavailable"),
+        (ValueError("private invalid input"), "validation_error"),
+        (lambda texts: [[0.0, 1.0]] * (len(texts) - 1), "validation_error"),
+        (lambda texts: [[0.0, 1.0]] * (len(texts) + 1), "validation_error"),
+        (lambda texts: [[0.0]] * len(texts), "validation_error"),
+        (lambda texts: [[float("nan"), 1.0]] * len(texts), "validation_error"),
+        (lambda texts: [[float("inf"), 1.0]] * len(texts), "validation_error"),
+        (lambda texts: [[True, 1.0]] * len(texts), "validation_error"),
+    ],
+    ids=["unavailable", "input", "missing", "extra", "dimension", "nan", "inf", "bool"],
+)
+def test_embedding_batches_intermediate_failure_writes_nothing(tmp_path, fault, error_code):
+    target, service, embeddings, events = _batch_ingestion(tmp_path, 513, fault)
+    job = service.ingest(target, workspace_id="w", collection_id="rag_phase0", tenant_id="default")
+
+    assert job.status == "failed"
+    assert job.error_code == error_code
+    assert [len(batch) for batch in embeddings.calls] == [256, 256]
+    assert service.knowledge.list_documents("w", tenant_id="default") == []
+    assert service.knowledge.get_chunks(job.document_id) == []
+    assert service.vectors.all_points() == []
+    assert events.events[-1]["retryable"] is is_retryable(error_code)
+    assert "private" not in repr(events.events) + repr(job)
+    assert not any(event["type"] == "ingestion.completed" for event in events.events)
+
+    embeddings.calls.clear()
+    embeddings.fault = None
+    retry = service.ingest(target, workspace_id="w", collection_id="rag_phase0", tenant_id="default")
+    assert retry.status == "published"
+    assert retry.document_id == job.document_id
+    assert len(service.vectors.all_points()) == 513
+
+
+@pytest.mark.parametrize("cancel_after", [1, 2, 3])
+@pytest.mark.parametrize("cancellation", ["callback", "operator"])
+def test_embedding_batches_cancel_before_next_call_or_publication(tmp_path, cancel_after, cancellation):
+    target, service, embeddings, events = _batch_ingestion(tmp_path, 513)
+    if cancellation == "operator":
+        def cancel_on_batch():
+            if len(embeddings.calls) == cancel_after:
+                assert service.cancel("batch-cancel")
+        embeddings.on_batch = cancel_on_batch
+
+    job = service.ingest(
+        target, workspace_id="w", collection_id="rag_phase0", tenant_id="default",
+        job_id="batch-cancel",
+        cancel_check=(lambda: len(embeddings.calls) >= cancel_after) if cancellation == "callback" else None,
+    )
+
+    assert job.status == "cancelled"
+    assert len(embeddings.calls) == cancel_after
+    assert service.knowledge.list_documents("w", tenant_id="default") == []
+    assert service.knowledge.get_chunks(job.document_id) == []
+    assert service.vectors.all_points() == []
+    assert not any(event["type"] == "ingestion.completed" for event in events.events)
+
+
+@pytest.mark.parametrize(
+    "code, retryable",
+    [("invalid_model", False), ("malformed_response", False),
+     ("embedding_dimension_mismatch", False), ("invalid_configuration", False),
+     ("unavailable", True), ("timeout", True)],
+)
+def test_embedding_batches_preserve_typed_provider_retryability(tmp_path, code, retryable):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "providers" / "src"))
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "contracts" / "src"))
+    from rick_providers.errors import ProviderError
+
+    fault = ProviderError(code, "embeddings", "batch-failure", 1)
+    target, service, embeddings, events = _batch_ingestion(tmp_path, 513, fault)
+    job = service.ingest(target, workspace_id="w", collection_id="rag_phase0", tenant_id="default")
+
+    assert job.status == "failed"
+    assert [len(batch) for batch in embeddings.calls] == [256, 256]
+    assert is_retryable(job.error_code) is retryable
+    assert events.events[-1]["retryable"] is retryable
+    assert service.knowledge.list_documents("w", tenant_id="default") == []
+    assert service.vectors.all_points() == []
+
+
+@pytest.mark.parametrize("fault", [None, "raise", "short", "bool", "cancel"])
+def test_vector_batches_preserve_order_and_compensate(tmp_path, fault):
+    target, service, embeddings, events = _batch_ingestion(tmp_path, 257)
+
+    class BoundedVectors(InMemoryVectorStore):
+        def __init__(self):
+            super().__init__()
+            self.calls = []
+
+        def upsert_points(self, points):
+            self.calls.append(list(points))
+            assert len(points) <= 256
+            count = super().upsert_points(points)
+            if len(self.calls) == 2:
+                if fault == "raise":
+                    raise RuntimeError("second batch failed after write")
+                if fault == "short":
+                    return 0
+                if fault == "bool":
+                    return True
+            return count
+
+    vectors = BoundedVectors()
+    service.vectors = vectors
+    job = service.ingest(
+        target, workspace_id="w", collection_id="rag_phase0", tenant_id="default",
+        cancel_check=lambda: fault == "cancel" and len(vectors.calls) == 1,
+    )
+
+    assert [len(batch) for batch in vectors.calls] == ([256] if fault == "cancel" else [256, 1])
+    written = [point for batch in vectors.calls for point in batch]
+    assert [point["payload"]["chunk_index"] for point in written] == list(range(len(written)))
+    assert [point["vector"] for point in written] == [[float(index), 1.0] for index in range(len(written))]
+    if fault is None:
+        assert job.status == "published"
+        assert len(vectors.all_points()) == 257
+        assert events.events[-1]["points"] == 257
+    else:
+        assert job.status == ("cancelled" if fault == "cancel" else "failed")
+        assert vectors.all_points() == []
+        documents = service.knowledge.list_documents("w", tenant_id="default")
+        assert len(documents) == 1
+        assert documents[0].status == "failed"
+        assert service.knowledge.get_chunks(documents[0].document_id) == []
+        assert not any(event["type"] == "ingestion.completed" for event in events.events)
+
+
+@pytest.mark.parametrize("max_points, max_bytes, count", [(256, 4 * 1024 * 1024, 257), (2, 4096, 5), (256, 3500, 5)])
+@pytest.mark.parametrize("fault", [None, "status", "transport", "ack", "cancel"])
+@pytest.mark.parametrize("hybrid", [False, True])
+def test_qdrant_planned_ingestion_batches(tmp_path, max_points, max_bytes, count, fault, hybrid):
+    import json
+    import httpx
+    from rick_retrieval.qdrant import QdrantHttpVectorStore, QdrantLimits
+
+    target, service, embeddings, events = _batch_ingestion(tmp_path, count)
+    if max_bytes > 4096:
+        embeddings.dimensions = 1536
+        embeddings.embed = lambda texts: [[(index + 1) / 1537 for index in range(1536)] for _ in texts]
+    requests, upserts, stored = [], [], {}
+
+    def handler(request):
+        requests.append(request)
+        if request.method == "GET":
+            return httpx.Response(200, json={"result": {"config": {"params": {
+                "vectors": {"dense": {"size": embeddings.dimensions, "distance": "Cosine"}},
+                "sparse_vectors": {"sparse": {}} if hybrid else None,
+            }}}})
+        body = json.loads(request.content)
+        if request.method == "PUT":
+            upserts.append(request)
+            for point in body["points"]:
+                stored[point["id"]] = point
+            if len(upserts) == 2:
+                if fault == "status":
+                    return httpx.Response(400, text="private failure")
+                if fault == "transport":
+                    raise RuntimeError("private transport failure")
+                if fault == "ack":
+                    return httpx.Response(200, json={"result": False})
+            return httpx.Response(200, json={"result": {"status": "completed", "operation_id": 1}})
+        if request.url.path.endswith("/count"):
+            return httpx.Response(200, json={"result": {"count": len(stored)}})
+        assert request.url.path.endswith("/delete")
+        assert [entry["key"] for entry in body["filter"]["must"]] == [
+            "tenant_id", "workspace_id", "collection_id", "document_id",
+        ]
+        stored.clear()
+        return httpx.Response(200, json={"result": True})
+
+    with QdrantHttpVectorStore(
+        "http://qdrant.test", "rag_phase0", max_attempts=1,
+        limits=QdrantLimits(max_points=max_points, max_request_bytes=max_bytes),
+        transport=httpx.MockTransport(handler),
+    ) as store:
+        service.vectors = store
+        job = service.ingest(
+            target, workspace_id="w", collection_id="rag_phase0", tenant_id="default",
+            cancel_check=lambda: fault == "cancel" and len(upserts) == 1,
+        )
+    if fault:
+        assert len(upserts) == (1 if fault == "cancel" else 2)
+    else:
+        assert 1 < len(upserts) <= count
+    assert all(len(request.content) <= max_bytes for request in upserts)
+    assert all(0 < len(json.loads(request.content)["points"]) <= max_points for request in upserts)
+    written = [point for request in upserts for point in json.loads(request.content)["points"]]
+    assert all(("sparse" in point["vector"]) is hybrid for point in written)
+    assert [point["payload"]["chunk_index"] for point in written] == list(range(len(written)))
+    assert all(request.url.params["wait"] == "true" for request in upserts)
+    assert "private" not in repr(job) + repr(events.events)
+    if fault is None:
+        assert job.status == "published"
+        assert len(stored) == count
+        assert events.events[-1]["points"] == count
+    else:
+        assert job.status == ("cancelled" if fault == "cancel" else "failed")
+        assert stored == {}
+        # Cancellation additionally confirms scoped cleanup before removing
+        # its durable checkpoint from the recovery queue.
+        assert len(requests) == len(upserts) + (3 if fault == "cancel" else 2)
+        if fault == "cancel":
+            assert requests[-1].url.path.endswith("/count")
+            assert [entry["key"] for entry in json.loads(requests[-1].content)["filter"]["must"]] == [
+                "tenant_id", "workspace_id", "collection_id", "document_id",
+            ]
+        assert service.knowledge.get_document(job.document_id).status == "failed"
+        assert service.knowledge.get_chunks(job.document_id) == []
+        assert not any(event["type"] == "ingestion.completed" for event in events.events)
 
 
 class _PartialVectorStore(InMemoryVectorStore):

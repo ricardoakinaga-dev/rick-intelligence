@@ -1,0 +1,121 @@
+{
+  "schema_version": 1,
+  "observed_at": "2026-09-25T08:09:15Z",
+  "source_head": "b52f32c141916a2ea3af1a6b913bd91f380606e0",
+  "worktree_state": "Dirty shared checkout; HEAD is a baseline only. Listed hashes bind the scoped implementation and evidence, not a clean release candidate.",
+  "scope": "Local Q24-19/Q24-20 verification after all C1-C3 findings: operation-specific atomic capability, fail-closed durable-provider behavior, tenant protection for global identity and role_version changes, PostgreSQL outbox atomicity, reconciliation, consumer concurrency and restart recovery.",
+  "frozen_bar_sha256": "f1ea9aa44d0d66e00bb47e75e30ad616ff575897de7d2a40bb5bc8e1f4936310",
+  "checks": [
+    {
+      "artifact": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0757Z/api16-root.log",
+      "command": "PYTHONDONTWRITEBYTECODE=1 make api16-root",
+      "exit_status": 0,
+      "summary": "721 passed; 403 deprecation warnings",
+      "freshness": "CURRENT",
+      "sha256": "30fdbf1246e7c0bb25605ec7c2a17980101f257d718b90f5f1ffead378d913a3"
+    },
+    {
+      "artifact": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0757Z/api16-worker.log",
+      "command": "PYTHONDONTWRITEBYTECODE=1 make api16-worker",
+      "exit_status": 0,
+      "summary": "116 passed; 7 deprecation warnings",
+      "freshness": "CURRENT",
+      "sha256": "e3e846abacf47b0271e323ec9de3489f34ea68a249b1fb4eeb723171159022b9"
+    },
+    {
+      "artifact": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0757Z/postgres-migrations.log",
+      "command": "RICK_MIGRATION_POSTGRES_TESTS=1 PYTHONPATH=/tmp/rick-intelligence-q24-psycopg PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -q -p no:cacheprovider infrastructure/scripts/tests/test_migrate.py",
+      "exit_status": 0,
+      "summary": "108 passed against disposable PostgreSQL 16.15",
+      "freshness": "CURRENT",
+      "sha256": "5efc78c19a9ec39e60f83f05c64bcc48c65199c521578930e6aacca68930ae5c"
+    },
+    {
+      "artifact": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0757Z/postgres-admin-focused.log",
+      "command": "Focused disposable PostgreSQL 16 admin mutation/outbox integration test",
+      "exit_status": 0,
+      "summary": "1 passed; rollback, cross-tenant guard and outbox behavior",
+      "freshness": "CURRENT",
+      "sha256": "36badbfc2b74d81a7c37c354c72b428a237c825b545b166b670948018ea5d5ad"
+    },
+    {
+      "artifact": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0757Z/identity-postgres.log",
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=apps/api/src:packages/identity/src:packages/authorization/src:packages/contracts/src python3 -m pytest -q -p no:cacheprovider packages/identity/tests/test_postgres.py",
+      "exit_status": 0,
+      "summary": "11 passed",
+      "freshness": "CURRENT",
+      "sha256": "4f05c9b1aa112c113ec335fb41548c0a32e72401b73a84cf887d1eed2bdd0c9a"
+    },
+    {
+      "artifact": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0757Z/lint.log",
+      "command": "PYTHONDONTWRITEBYTECODE=1 make lint",
+      "exit_status": 0,
+      "summary": "Configured boundary, syntax and frontend lint checks passed",
+      "freshness": "CURRENT",
+      "sha256": "a7a5650dee62a2a315b1b3413dc05105661cd0c4bd71ec25608e7101f4d1dd63"
+    },
+    {
+      "artifact": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0757Z/typecheck.log",
+      "command": "PYTHONDONTWRITEBYTECODE=1 make typecheck",
+      "exit_status": 0,
+      "summary": "Configured TypeScript and Python compilation passed; no Python type checker is configured",
+      "freshness": "CURRENT",
+      "sha256": "f4e2482bfa89fd0a34aa7a5fab375fdbb03747d3941dd8fecfa8bdb1bc77c92d"
+    },
+    {
+      "artifact": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0757Z/ops-static.log",
+      "command": "PYTHONDONTWRITEBYTECODE=1 make ops-static",
+      "exit_status": 0,
+      "summary": "Migration checksum/order and operational static checks passed",
+      "freshness": "CURRENT",
+      "sha256": "fe2e5b2d7c8fc442d97df5d04bb70b2ac92fc920fa45ded651e2162606088dce"
+    },
+    {
+      "artifact": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0757Z/review-views-c3-fixes.log",
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 scripts/state_of_art/review_control_views.py --write",
+      "exit_status": 0,
+      "summary": "Derived views passed; 11 historical sidecar files preserved",
+      "freshness": "CURRENT",
+      "sha256": "df270bed12e28fcfea0d301ac95cf995b7bb454b6047284bff50ce0f7ab08914"
+    },
+    {
+      "artifact": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0757Z/control-plane-c3-fixes.log",
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 docs/ci/check_control_plane.py",
+      "exit_status": 0,
+      "summary": "10/10 checks; 35 backlog items, 345 events, 347 verification records and 28 gates",
+      "freshness": "CURRENT",
+      "sha256": "26cff586e0304e7c79957fdcf3188b0abc62880c60c28310d27e97070f95de75"
+    },
+    {
+      "artifact": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0757Z/make-validate-c3-fixes.log",
+      "command": "PYTHONDONTWRITEBYTECODE=1 make validate",
+      "exit_status": 0,
+      "summary": "Boundary, controller, derived views, frozen quality bar and repository validation passed",
+      "freshness": "CURRENT",
+      "sha256": "59bb54cdd74cb6cd5398fb0ba4e67093f64150faa29d8174501a46444894de94"
+    },
+    {
+      "artifact": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0757Z/diff-check-c3-fixes.log",
+      "command": "git diff --check",
+      "exit_status": 0,
+      "summary": "No whitespace or patch-format errors",
+      "freshness": "CURRENT",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "files": {
+    "apps/api/src/routes/admin.py": "f243df745fdabfbc37c4f58f2bc8e163b17b935e41c42df99651522f81320507",
+    "apps/api/src/services/identity_service.py": "d8d085c30661fdbef6a5f88b32891d2c1eaec4eea7a5d2d54b59b2ab9d6b8c4f",
+    "apps/api/src/services/postgres_identity.py": "0bba801aef264867f042a35987515fdf5436b9a6b0b74c9d1759d8c5c660ca7c",
+    "packages/identity/src/rick_identity/postgres.py": "cb8e2bca5d73412c3f41815fc342591c87675396bc3719583ab40e28f2d278bb",
+    "apps/api/tests/test_audit_factory.py": "ece01e8b432a5de9864c78130e422babf85363d120097937182cf5529e90856c",
+    "apps/api/tests/test_postgres_admin_mutations.py": "2965486deddc75bb09434e534d8cd6608650812f3335ee1b04b9fcfb4c7366ce",
+    "apps/worker/admin_audit_outbox.py": "046595f9da759a3fc3f08eff1233cb5d53665d444301c053932124b51d76ee3a",
+    "apps/worker/deployment_composition.py": "09b8ebae1d2f869226789b013050b2ffb2cf9e7c96f5b2a7556e1a46189cf818",
+    "apps/worker/tests/test_admin_audit_outbox.py": "a6d47c7ba1172a701ac012a8652287da05aba74814ca75bcb1b9259dc6317de2",
+    "apps/worker/tests/test_deployment_composition.py": "e390ff5f01232a233ec803daf2cceb1c85e58c2f97cd0e60e11401b50a5afc12",
+    "infrastructure/migrations/0007_admin_audit_reconciliation.sql": "4af11b3250c3b5f3d2ea1e3a1042883ccf3cb703370daa6011cd4c2c748ae6e2",
+    "infrastructure/scripts/tests/test_migrate.py": "417c55b1904ac5150a2f15882274e87123102eb300f7b5c2b5bdfe626f733205"
+  },
+  "limitations": "Local scoped verification only. C4 review is pending; full product/runtime/operational/release/promotion acceptance remains open."
+}

@@ -2,13 +2,20 @@ SHELL := /usr/bin/env bash
 
 ROOT := $(CURDIR)
 PYTHON ?= python3
+# Recipes that need the hash-locked environment (AUD07-08) run through
+# pyexec.py, which re-execs the same argv under scripts/phase13/pyenv's
+# interpreter and leaves PYTHONPATH untouched. PYTHON itself stays the literal
+# host launcher so docs/ci/check_canonical_ci.py can verify recipes statically.
+PYTEST := $(PYTHON) $(ROOT)/scripts/phase13/pyexec.py
 PHASE11_RUNNER := $(ROOT)/scripts/phase11/runner.py
 PHASE11_CHECK := $(ROOT)/scripts/phase11/check_skeleton.py
 PHASE13_RUNNER := $(ROOT)/scripts/phase13/phase13.py
 PHASE131_RUNNER := $(ROOT)/scripts/phase13/phase131.py
 PHASE14_RUNNER := $(ROOT)/scripts/phase13/phase14.py
 WEB_DIR := $(ROOT)/apps/web
-WEB_CURRENT_EVIDENCE_DIR := $(ROOT)/.gauntlet-state-of-art/evidence/visual-cycle5-current
+WEB_CURRENT_EVIDENCE_DIR ?= $(ROOT)/.runtime/qa/web-e2e
+
+.PHONY: ops-scope-preflight
 
 .DEFAULT_GOAL := help
 
@@ -33,6 +40,7 @@ help:
 	@printf '%s\n' '  make security-adversarial validate the bounded synthetic RAG attack corpus'
 	@printf '%s\n' '  make storage-test     local object-store security and restart tests'
 	@printf '%s\n' '  make ops-static       migration/env/runbook static checks (no services)'
+	@printf '%s\n' '  make ops-scope-preflight  read-only aggregate checks for an explicitly identified database snapshot'
 	@printf '%s\n' '  make compose-static   render both canonical Compose topologies without starting services'
 	@printf '%s\n' '  make postgres-runtime run the real PostgreSQL migration/queue gate from RICK_TEST_DATABASE_DSN'
 	@printf '%s\n' '  make phase3-postgres-runtime emit commit-bound PostgreSQL runtime evidence'
@@ -73,17 +81,29 @@ help:
 	@printf '%s\n' '  make api-benchmark    kernel-overhead p50/p95 observation (stub backend)'
 	@printf '%s\n' '  make api15-full        Phase 1.5 contracts/provider/locking/Professor/root checks'
 	@printf '%s\n' '  make api15-verify      Phase 1.5 sanitized full evidence matrix'
-	@printf '%s\n' '  make api16-full        Phase 1.6 ingestion/jobs/readiness/root checks'
+	@printf '%s\n' '  make api16-full        Phase 1.6 checks with API/worker coverage floors'
+	@printf '%s\n' '  make worker-coverage   worker suite with a 74%% line floor'
+	@printf '%s\n' '  make web-coverage      web unit suite with an 85%% line floor'
 	@printf '%s\n' '  make api16-verify      Phase 1.6 sanitized regression/evidence matrix'
-	@printf '%s\n' '  make web-validate      canonical web lint + typecheck + production build + browser matrix'
+	@printf '%s\n' '  make web-validate      web lint + typecheck + coverage + build + browser matrix'
 	@printf '%s\n' '  make web-e2e           browser smoke at 375/768/1440 with root API loopback'
 
-bootstrap:
+bootstrap: control-inputs-restore
 	$(PYTHON) "$(PHASE11_RUNNER)" bootstrap
 
-validate:
+.PHONY: control-inputs-restore control-inputs-check
+control-inputs-restore:
+	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) "$(ROOT)/docs/ci/restore_control_inputs.py"
+
+control-inputs-check:
+	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) "$(ROOT)/docs/ci/restore_control_inputs.py" --check
+
+validate: control-inputs-check
 	$(PYTHON) "$(ROOT)/scripts/phase15/check_boundaries.py"
+	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) "$(ROOT)/scripts/phase11/check_toolchain.py"
+	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) "$(ROOT)/scripts/phase11/check_workflow_actions.py"
 	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) "$(ROOT)/docs/ci/check_control_plane.py"
+	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) "$(ROOT)/scripts/phase11/evidence_store.py" check
 	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) "$(ROOT)/scripts/state_of_art/validate_quality_bar.py"
 
 quality-bar-static:
@@ -129,7 +149,7 @@ eval-retrieval:
 	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)" $(PYTHON) "$(ROOT)/scripts/state_of_art/evaluate_retrieval.py" --fixture "$(ROOT)/scripts/state_of_art/tests/fixtures/retrieval_fixture.json" --pretty
 
 eval-retrieval-pack:
-	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT):$(ROOT)/scripts/state_of_art" $(PYTHON) "$(ROOT)/scripts/state_of_art/evaluate_pack.py" --pack "$(ROOT)/docs/evaluation/packs/rec22-local-v1" --pretty
+	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT):$(ROOT)/scripts/state_of_art" $(PYTHON) "$(ROOT)/scripts/state_of_art/evaluate_pack.py" --pack "$(ROOT)/docs/evaluation/packs/rec22-local-v2" --pretty
 
 security-adversarial:
 	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) "$(ROOT)/scripts/phase11/check_adversarial_corpus.py"
@@ -140,9 +160,14 @@ storage-test:
 ops-migration-check:
 	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) "$(ROOT)/infrastructure/scripts/migrate.py" "$(ROOT)/infrastructure/migrations" --check
 
+ops-scope-preflight:
+	@PYTHONDONTWRITEBYTECODE=1 $(PYTHON) "$(ROOT)/infrastructure/scripts/scope_preflight.py" --snapshot-id "$${RICK_PREFLIGHT_SNAPSHOT_ID:?set RICK_PREFLIGHT_SNAPSHOT_ID}"
+
 ops-static: ops-migration-check
 	bash -n "$(ROOT)/infrastructure/scripts/validate-env.sh"
 	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) -m py_compile "$(ROOT)/infrastructure/scripts/backup-restore-check.py" "$(ROOT)/infrastructure/scripts/backup_restore.py"
+	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) "$(ROOT)/scripts/phase11/check_canonical_ci.py"
+	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) -m pytest -q -p no:cacheprovider "$(ROOT)/scripts/phase11/test_check_canonical_ci.py"
 
 compose-static:
 	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) "$(ROOT)/scripts/phase11/check_compose.py"
@@ -296,47 +321,60 @@ api14-benchmark:
 	$(PYTHON) "$(PHASE14_RUNNER)" benchmark
 
 api15-boundaries:
-	$(PYTHON) "$(ROOT)/scripts/phase15/check_boundaries.py"
+	$(PYTEST) "$(ROOT)/scripts/phase15/check_boundaries.py"
 
 api15-contracts:
-	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)/packages/contracts/src" $(PYTHON) -m pytest -q -p no:cacheprovider "$(ROOT)/packages/contracts/tests"
+	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)/packages/contracts/src" $(PYTEST) -m pytest -q -p no:cacheprovider "$(ROOT)/packages/contracts/tests"
 
 api15-provider:
-	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)/packages/contracts/src:$(ROOT)/packages/providers/src" $(PYTHON) -m pytest -q -p no:cacheprovider "$(ROOT)/packages/providers/tests"
+	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)/packages/contracts/src:$(ROOT)/packages/providers/src" $(PYTEST) -m pytest -q -p no:cacheprovider "$(ROOT)/packages/providers/tests"
 
 api15-lock:
-	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)/packages/contracts/src:$(ROOT)/packages/locking/src" $(PYTHON) -m pytest -q -p no:cacheprovider "$(ROOT)/packages/locking/tests"
+	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)/packages/contracts/src:$(ROOT)/packages/locking/src" $(PYTEST) -m pytest -q -p no:cacheprovider "$(ROOT)/packages/locking/tests"
 
 api15-professor:
-	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)/packages/contracts/src:$(ROOT)/packages/professor/src" $(PYTHON) -m pytest -q -p no:cacheprovider "$(ROOT)/packages/professor/tests"
+	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)/packages/contracts/src:$(ROOT)/packages/professor/src" $(PYTEST) -m pytest -q -p no:cacheprovider "$(ROOT)/packages/professor/tests"
 
 api15-root:
-	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)/apps/api/src:$(ROOT)/apps/worker:$(ROOT)/packages/jobs/src:$(ROOT)/packages/contracts/src:$(ROOT)/packages/authorization/src:$(ROOT)/packages/identity/src:$(ROOT)/packages/observability/src:$(ROOT)/packages/knowledge/src:$(ROOT)/packages/ingestion/src:$(ROOT)/packages/retrieval/src:$(ROOT)/packages/providers/src:$(ROOT)/packages/locking/src:$(ROOT)/packages/professor/src:$(ROOT)/packages/evidence/src:$(ROOT)/packages/decision/src" $(PYTHON) -m pytest -q -p no:cacheprovider "$(ROOT)/apps/api/tests"
+	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)/apps/api/src:$(ROOT)/apps/worker:$(ROOT)/packages/jobs/src:$(ROOT)/packages/contracts/src:$(ROOT)/packages/authorization/src:$(ROOT)/packages/identity/src:$(ROOT)/packages/observability/src:$(ROOT)/packages/knowledge/src:$(ROOT)/packages/ingestion/src:$(ROOT)/packages/retrieval/src:$(ROOT)/packages/providers/src:$(ROOT)/packages/locking/src:$(ROOT)/packages/professor/src:$(ROOT)/packages/evidence/src:$(ROOT)/packages/decision/src" $(PYTEST) -m pytest -q -p no:cacheprovider "$(ROOT)/apps/api/tests"
 
 api15-benchmark:
-	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)/apps/api/src:$(ROOT)/packages/contracts/src:$(ROOT)/packages/authorization/src:$(ROOT)/packages/identity/src:$(ROOT)/packages/observability/src:$(ROOT)/packages/knowledge/src:$(ROOT)/packages/ingestion/src:$(ROOT)/packages/retrieval/src:$(ROOT)/packages/providers/src:$(ROOT)/packages/locking/src:$(ROOT)/packages/professor/src:$(ROOT)/packages/evidence/src:$(ROOT)/packages/decision/src" $(PYTHON) "$(ROOT)/scripts/phase15/benchmark.py"
+	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)" $(PYTEST) -m unittest "$(ROOT)/scripts/phase15/test_phase15_benchmark.py"
+	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)/apps/api/src:$(ROOT)/packages/contracts/src:$(ROOT)/packages/authorization/src:$(ROOT)/packages/identity/src:$(ROOT)/packages/observability/src:$(ROOT)/packages/knowledge/src:$(ROOT)/packages/ingestion/src:$(ROOT)/packages/retrieval/src:$(ROOT)/packages/providers/src:$(ROOT)/packages/locking/src:$(ROOT)/packages/professor/src:$(ROOT)/packages/evidence/src:$(ROOT)/packages/decision/src" $(PYTEST) "$(ROOT)/scripts/phase15/benchmark.py"
 
 api15-verify:
-	$(PYTHON) "$(ROOT)/scripts/phase15/verify.py"
+	$(PYTEST) "$(ROOT)/scripts/phase15/verify.py"
 
 api15-full: api15-boundaries api15-contracts api15-provider api15-lock api15-professor api15-root api15-benchmark
 
 api16-domain:
-	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)/packages/knowledge/src:$(ROOT)/packages/ingestion/src:$(ROOT)/packages/retrieval/src" $(PYTHON) -m pytest -q -p no:cacheprovider "$(ROOT)/packages/knowledge/tests" "$(ROOT)/packages/ingestion/tests" "$(ROOT)/packages/retrieval/tests"
+	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)/apps/worker:$(ROOT)/packages/knowledge/src:$(ROOT)/packages/ingestion/src:$(ROOT)/packages/retrieval/src:$(ROOT)/packages/storage/src" $(PYTEST) -m pytest -q -p no:cacheprovider "$(ROOT)/packages/knowledge/tests" "$(ROOT)/packages/ingestion/tests" "$(ROOT)/packages/retrieval/tests"
 
 api16-worker:
-	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)/apps/worker:$(ROOT)/apps/api/src:$(ROOT)/packages/jobs/src:$(ROOT)/packages/contracts/src:$(ROOT)/packages/authorization/src:$(ROOT)/packages/identity/src:$(ROOT)/packages/observability/src:$(ROOT)/packages/knowledge/src:$(ROOT)/packages/ingestion/src:$(ROOT)/packages/retrieval/src:$(ROOT)/packages/providers/src:$(ROOT)/packages/locking/src:$(ROOT)/packages/professor/src:$(ROOT)/packages/evidence/src:$(ROOT)/packages/decision/src" $(PYTHON) -m pytest -q -p no:cacheprovider "$(ROOT)/apps/worker/tests" "$(ROOT)/apps/api/tests/test_phase16_health.py"
+	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)/apps:$(ROOT)/apps/worker:$(ROOT)/apps/api/src:$(ROOT)/packages/jobs/src:$(ROOT)/packages/contracts/src:$(ROOT)/packages/authorization/src:$(ROOT)/packages/identity/src:$(ROOT)/packages/observability/src:$(ROOT)/packages/knowledge/src:$(ROOT)/packages/ingestion/src:$(ROOT)/packages/retrieval/src:$(ROOT)/packages/providers/src:$(ROOT)/packages/locking/src:$(ROOT)/packages/professor/src:$(ROOT)/packages/evidence/src:$(ROOT)/packages/decision/src:$(ROOT)/packages/storage/src" $(PYTEST) -m pytest -q -p no:cacheprovider "$(ROOT)/apps/worker/tests" "$(ROOT)/apps/api/tests/test_phase16_health.py"
 
 api16-root:
-	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)/apps/api/src:$(ROOT)/apps/worker:$(ROOT)/packages/jobs/src:$(ROOT)/packages/contracts/src:$(ROOT)/packages/authorization/src:$(ROOT)/packages/identity/src:$(ROOT)/packages/observability/src:$(ROOT)/packages/knowledge/src:$(ROOT)/packages/ingestion/src:$(ROOT)/packages/retrieval/src:$(ROOT)/packages/providers/src:$(ROOT)/packages/locking/src:$(ROOT)/packages/professor/src:$(ROOT)/packages/evidence/src:$(ROOT)/packages/decision/src" $(PYTHON) -m pytest -q -p no:cacheprovider "$(ROOT)/apps/api/tests"
+	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)/apps/api/src:$(ROOT)/apps/worker:$(ROOT)/packages/jobs/src:$(ROOT)/packages/contracts/src:$(ROOT)/packages/authorization/src:$(ROOT)/packages/identity/src:$(ROOT)/packages/observability/src:$(ROOT)/packages/knowledge/src:$(ROOT)/packages/ingestion/src:$(ROOT)/packages/retrieval/src:$(ROOT)/packages/providers/src:$(ROOT)/packages/locking/src:$(ROOT)/packages/professor/src:$(ROOT)/packages/evidence/src:$(ROOT)/packages/decision/src:$(ROOT)/packages/storage/src" $(PYTEST) -m pytest -q -p no:cacheprovider "$(ROOT)/apps/api/tests"
+
+.PHONY: api-coverage worker-coverage web-coverage
+api-coverage:
+	mkdir -p "$(ROOT)/.runtime/qa"
+	PYTHONDONTWRITEBYTECODE=1 $(PYTEST) -m pytest -q -p no:cacheprovider "$(ROOT)/scripts/state_of_art/tests/test_summarize_coverage.py"
+	COVERAGE_FILE="$(ROOT)/.runtime/qa/.coverage-api" PYTEST_ADDOPTS="--cov=$(ROOT)/apps/api/src --cov-report=term --cov-report=json:$(ROOT)/.runtime/qa/api-coverage.json --cov-fail-under=75" $(MAKE) --no-print-directory api16-root PYTHON="$(PYTHON)"
+	$(PYTEST) "$(ROOT)/scripts/state_of_art/summarize_coverage.py" api "$(ROOT)/.runtime/qa/api-coverage.json" "$(ROOT)/.runtime/qa/api-summary.json" 75
+
+worker-coverage:
+	mkdir -p "$(ROOT)/.runtime/qa"
+	COVERAGE_FILE="$(ROOT)/.runtime/qa/.coverage-worker" PYTEST_ADDOPTS="--cov=$(ROOT)/apps/worker --cov-config=$(ROOT)/apps/worker/coverage.ini --cov-report=term --cov-report=json:$(ROOT)/.runtime/qa/worker-coverage.json --cov-fail-under=74" $(MAKE) --no-print-directory api16-worker PYTHON="$(PYTHON)"
+	$(PYTEST) "$(ROOT)/scripts/state_of_art/summarize_coverage.py" worker "$(ROOT)/.runtime/qa/worker-coverage.json" "$(ROOT)/.runtime/qa/worker-summary.json" 74
 
 api16-benchmark:
-	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)/apps/api/src:$(ROOT)/packages/contracts/src:$(ROOT)/packages/knowledge/src:$(ROOT)/packages/ingestion/src:$(ROOT)/packages/retrieval/src" $(PYTHON) "$(ROOT)/scripts/phase16/benchmark.py"
+	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)/apps/api/src:$(ROOT)/packages/contracts/src:$(ROOT)/packages/authorization/src:$(ROOT)/packages/knowledge/src:$(ROOT)/packages/ingestion/src:$(ROOT)/packages/retrieval/src" $(PYTEST) "$(ROOT)/scripts/phase16/benchmark.py"
 
-api16-full: validate api16-domain api16-worker api16-root api16-benchmark
+api16-full: validate api16-domain worker-coverage api-coverage api16-benchmark
 
 api16-verify:
-	$(PYTHON) "$(ROOT)/scripts/phase16/verify.py"
+	$(PYTEST) "$(ROOT)/scripts/phase16/verify.py"
 
 web-install:
 	cd "$(WEB_DIR)" && npm ci --no-audit --no-fund
@@ -347,6 +385,11 @@ web-lint:
 web-typecheck:
 	cd "$(WEB_DIR)" && npm run typecheck
 
+web-coverage:
+	mkdir -p "$(ROOT)/.runtime/qa"
+	cd "$(WEB_DIR)" && npm run test:coverage
+	$(PYTHON) "$(ROOT)/scripts/state_of_art/summarize_coverage.py" web "$(ROOT)/.runtime/qa/web/coverage-summary.json" "$(ROOT)/.runtime/qa/web-summary.json" 85
+
 web-build:
 	cd "$(WEB_DIR)" && RICK_API_INTERNAL_URL="http://127.0.0.1:$${RICK_API_TEST_PORT:-8001}" npm run build
 
@@ -355,4 +398,4 @@ web-e2e:
 	@printf '%s\n' 'viewport matrix: 375/768/1440; no planned or executable skips'
 	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) "$(ROOT)/scripts/state_of_art/summarize_web_performance.py" --input "$(WEB_CURRENT_EVIDENCE_DIR)/performance" --output "$(WEB_CURRENT_EVIDENCE_DIR)/performance-summary.json"
 
-web-validate: web-lint web-typecheck web-build web-e2e
+web-validate: web-lint web-typecheck web-coverage web-build web-e2e

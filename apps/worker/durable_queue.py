@@ -83,6 +83,8 @@ class QueueRecord:
     updated_at: float
     last_error: str | None = None
     document_id: str | None = None
+    started_at: float | None = None
+    finished_at: float | None = None
 
     @property
     def terminal(self) -> bool:
@@ -105,6 +107,8 @@ class QueueRecord:
             "updated_at": self.updated_at,
             "last_error": self.last_error,
             "document_id": self.document_id,
+            "started_at": self.started_at,
+            "finished_at": self.finished_at,
         }
 
 

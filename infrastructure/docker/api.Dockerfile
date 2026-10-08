@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1.7
+# syntax=docker/dockerfile:1.7@sha256:a57df69d0ea827fb7266491f2813635de6f17269be881f696fbfdf2d83dda33e
 #
 # Build from the repository root. PYTHON_IMAGE is intentionally required and
 # must be supplied as an immutable image reference with @sha256 digest.
@@ -12,13 +12,20 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /opt/rick
 
-RUN addgroup --system --gid 10001 rick \
-    && adduser --system --uid 10001 --ingroup rick --home /nonexistent \
-       --shell /usr/sbin/nologin rick
+COPY requirements/runtime.lock /opt/rick/requirements/runtime.lock
+
+RUN if [ -f /etc/alpine-release ]; then \
+      addgroup -S -g 10001 rick \
+      && adduser -S -D -H -u 10001 -G rick -h /nonexistent -s /sbin/nologin rick; \
+    else \
+      addgroup --system --gid 10001 rick \
+      && adduser --system --uid 10001 --ingroup rick --home /nonexistent \
+         --shell /usr/sbin/nologin rick; \
+    fi
 
 COPY apps/api/pyproject.toml /opt/rick/apps/api/pyproject.toml
 COPY apps/api/src /opt/rick/apps/api/src
-COPY apps/worker /opt/rick/apps/worker
+COPY apps/worker/*.py /opt/rick/apps/worker/
 COPY infrastructure/migrations /opt/rick/infrastructure/migrations
 COPY infrastructure/scripts/migrate.py /opt/rick/infrastructure/scripts/migrate.py
 COPY infrastructure/compose/bootstrap_qdrant.py /opt/rick/infrastructure/compose/bootstrap_qdrant.py
@@ -37,23 +44,11 @@ COPY packages/providers/src /opt/rick/packages/providers/src
 COPY packages/retrieval/src /opt/rick/packages/retrieval/src
 COPY packages/storage/src /opt/rick/packages/storage/src
 
-# Direct dependencies are pinned to the canonical app/package contracts. The
-# local packages stay on PYTHONPATH because the repository has no root wheel.
+# API, worker and CI consume the same resolved, hash-checked dependency set.
+# Local packages stay on PYTHONPATH because the repository has no root wheel.
 RUN python -m pip install --no-cache-dir --disable-pip-version-check \
-      "fastapi==0.109.2" \
-      "uvicorn==0.27.1" \
-      "pydantic==2.6.1" \
-      "python-multipart==0.0.9" \
-      "httpx==0.27.0" \
-      "anyio==4.15.0" \
-      "PyJWT==2.7.0" \
-      "pdfplumber==0.10.3" \
-      "python-docx==1.1.0" \
-      "psycopg[binary]==3.2.3" \
-      "redis==5.2.1" \
-      "opentelemetry-api==1.29.0" \
-      "opentelemetry-sdk==1.29.0" \
-      "opentelemetry-exporter-otlp-proto-grpc==1.29.0" \
+      --require-hashes --only-binary=:all: -r /opt/rick/requirements/runtime.lock \
+    && python -m pip check \
     && python -m compileall -q /opt/rick/apps/api/src /opt/rick/apps/worker /opt/rick/packages \
     && find /opt/rick -type d -name __pycache__ -prune -exec rm -rf {} + \
     && chown -R 10001:10001 /opt/rick

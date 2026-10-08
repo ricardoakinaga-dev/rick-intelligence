@@ -23,8 +23,24 @@ from rick_decision.layer import (
     DecisionLayerProtocol,
     DeterministicDecisionLayer,
 )
+from rick_decision.request_policy import (
+    CLINICAL_REQUEST_POLICY_VERSION,
+    REQUEST_POLICY_VERSION,
+    ClinicalDomainPolicy,
+    NonClinicalRequestPolicy,
+    RequestClassification,
+    RequestClassifier,
+    classify_request,
+)
 
 __all__ = [
+    "CLINICAL_REQUEST_POLICY_VERSION",
+    "REQUEST_POLICY_VERSION",
+    "ClinicalDomainPolicy",
+    "NonClinicalRequestPolicy",
+    "RequestClassification",
+    "RequestClassifier",
+    "classify_request",
     "CitationSupportMetrics",
     "CitationSupportStatus",
     "ConservativeDecisionLayer",

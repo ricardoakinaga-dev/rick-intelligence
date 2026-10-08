@@ -1,0 +1,7 @@
+# exp-a16 - 2026-10-07T16:37:59Z
+# command: PYTHONPATH=<canonical> .runtime/venvs/cvg/bin/python -m pytest -q packages/providers/tests/test_resilience.py apps/api/tests/test_external_composition.py
+# experiment: production_safe volta a defaultar True sem probe e health_check volta a cair para readiness_check()
+FAILED packages/providers/tests/test_resilience.py::test_resilient_provider_fails_closed_without_a_live_probe
+FAILED packages/providers/tests/test_resilience.py::test_production_safe_requires_a_probe_or_an_explicit_declaration
+FAILED packages/providers/::test_composition_refuses_a_provider_port_without_a_probe
+3 failed, 20 passed, 1 warning in 0.88s

@@ -107,3 +107,4 @@ class ChatStreamEvent(StrictContractModel):
     code: str | None = None
     message: str | None = None
     provisional: bool | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)

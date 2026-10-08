@@ -1,0 +1,18 @@
+# exp-a04 - 2026-10-07T16:09:19Z
+# command: PYTHONPATH=<canonical> .runtime/venvs/cvg/bin/python -m pytest -q -p no:cacheprovider apps/api/tests/test_route_policy.py
+FAILED apps/api/tests/test_route_policy.py::test_every_non_public_route_has_policy
+FAILED apps/api/tests/test_route_policy.py::test_declared_permission_is_what_the_handler_enforces[GET /api/v1/auth/me]
+FAILED apps/api/tests/test_route_policy.py::test_declared_permission_is_what_the_handler_enforces[GET /api/v1/session]
+FAILED apps/api/tests/test_route_policy.py::test_declared_permission_is_what_the_handler_enforces[GET /api/v1/auth/sessions]
+FAILED apps/api/tests/test_route_policy.py::test_declared_permission_is_what_the_handler_enforces[POST /api/v1/auth/sessions/revoke]
+FAILED apps/api/tests/test_route_policy.py::test_declared_permission_is_what_the_handler_enforces[POST /api/v1/conversations]
+FAILED apps/api/tests/test_route_policy.py::test_declared_permission_is_what_the_handler_enforces[GET /api/v1/audit/operations]
+FAILED apps/api/tests/test_route_policy.py::test_declared_permission_is_what_the_handler_enforces[GET /api/v1/audit/operations/{operation_id}]
+FAILED apps/api/tests/test_route_policy.py::test_declared_permission_is_what_the_handler_enforces[POST /api/v1/audit/operations/{operation_id}/reconcile]
+FAILED apps/api/tests/test_route_policy.py::test_session_route_denies_a_session_without_its_permission[GET /api/v1/auth/me]
+FAILED apps/api/tests/test_route_policy.py::test_session_route_denies_a_session_without_its_permission[GET /api/v1/session]
+FAILED apps/api/tests/test_route_policy.py::test_session_route_denies_a_session_without_its_permission[GET /api/v1/auth/sessions]
+FAILED apps/api/tests/test_route_policy.py::test_session_route_denies_a_session_without_its_permission[POST /api/v1/auth/sessions/revoke]
+FAILED apps/api/tests/test_route_policy.py::test_session_route_denies_a_session_without_its_permission[GET /api/v1/audit/operations]
+FAILED apps/api/tests/test_route_policy.py::test_session_route_denies_a_session_without_its_permission[GET /api/v1/audit/operations/{operation_id}]
+15 failed, 145 passed, 1 warning in 4.10s

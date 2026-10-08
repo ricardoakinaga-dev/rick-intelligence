@@ -11,17 +11,33 @@ from __future__ import annotations
 
 import math
 from collections.abc import Mapping
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol
 
-from rick_retrieval.sparse import sparse_overlap_score
+from rick_retrieval.sparse import sparse_overlap_score, sparse_vector
+
+
+@dataclass
+class BackendSearchResult:
+    """Unpacks as two legs while carrying request-local transport observations."""
+
+    dense: list[dict]
+    sparse: list[dict]
+    backend: str
+    fallback_used: bool = False
+    metadata: dict = field(default_factory=dict)
+
+    def __iter__(self):
+        yield self.dense
+        yield self.sparse
 
 
 class RetrievalBackend(Protocol):
     name: str
     def search(self, *, query: str, query_vector: list[float], workspace_id: str,
                allowed_collection_ids: list[str], chunks: list[dict], limit: int,
-               tenant_id: str) -> tuple[list[dict], list[dict]]: ...
+               tenant_id: str) -> tuple[list[dict], list[dict]] | BackendSearchResult: ...
 
 
 def _in_scope(chunk: dict, workspace_id: str, allowed: set[str], tenant_id: str) -> bool:
@@ -29,8 +45,8 @@ def _in_scope(chunk: dict, workspace_id: str, allowed: set[str], tenant_id: str)
         return False
     if chunk.get("workspace_id") != workspace_id:
         return False
-    collection = chunk.get("collection_id") or "rag_phase0"
-    return "*" in allowed or collection in allowed
+    collection = chunk.get("collection_id")
+    return isinstance(collection, str) and bool(collection) and ("*" in allowed or collection in allowed)
 
 
 def _cosine(a: list[float], b: list[float]) -> float:
@@ -89,6 +105,23 @@ class QdrantBackend:
 
     def search(self, *, query, query_vector, workspace_id, allowed_collection_ids, chunks, limit,
                tenant_id):
+        allowed = set(allowed_collection_ids or [])
+        if not allowed:
+            return [], []
+        hybrid_search = getattr(self.store, "search_hybrid", None)
+        if callable(hybrid_search):
+            result = hybrid_search(
+                query=query, query_vector=query_vector, tenant_id=tenant_id,
+                workspace_id=workspace_id, allowed_collection_ids=allowed_collection_ids,
+                limit=min(limit, self.store.limits.max_query_results),
+            )
+            dense = self._http_candidates(result.dense, workspace_id, allowed, tenant_id)
+            sparse = self._http_candidates(result.sparse, workspace_id, allowed, tenant_id, sparse=True)
+            return BackendSearchResult(
+                self._rank(dense, limit), self._rank(sparse, limit),
+                backend=f"qdrant-http-{result.mode}", fallback_used=result.degraded,
+                metadata=dict(result.metadata),
+            )
         # The canonical HTTP adapter already owns Qdrant request encoding and
         # ACL revalidation. Prefer it when present so the application does not
         # need qdrant-client objects just to perform a dense search. The older
@@ -140,19 +173,26 @@ class QdrantBackend:
                         "document_version": payload.get("document_version"),
                         "score": score,
                     })
-                return dense[:limit], []
+                dense = [item for item in dense if _in_scope(item, workspace_id, allowed, tenant_id)]
+                return self._rank(dense, limit), []
         try:
-            from qdrant_client.models import FieldCondition, Filter, MatchValue
+            from qdrant_client.models import FieldCondition, Filter, MatchValue, NamedSparseVector, SparseVector
         except ImportError as exc:
             raise RuntimeError("qdrant-client is not installed.") from exc
-        allowed = set(allowed_collection_ids or [])
-        if not allowed:
-            return [], []
+        client = self.store._client
+        info = client.get_collection(collection_name=self.store.collection)
+        sparse_config = getattr(info.config.params, "sparse_vectors", None) or {}
+        encoded = sparse_vector(query) if "sparse" in sparse_config else {}
+        indices = sorted(encoded)
+        sparse_query = NamedSparseVector(
+            name="sparse", vector=SparseVector(indices=indices, values=[encoded[index] for index in indices])
+        ) if indices else None
         # Use one scoped query per collection instead of selecting the first
         # grant. This is compatible with older qdrant-client versions and
         # preserves the same exact ACL when a user has several collections.
         scopes = [None] if "*" in allowed else sorted(allowed)
         dense: list[dict] = []
+        sparse: list[dict] = []
         for collection_id in scopes:
             must = [
                 FieldCondition(key="tenant_id", match=MatchValue(value=tenant_id)),
@@ -161,41 +201,75 @@ class QdrantBackend:
             if collection_id is not None:
                 must.append(FieldCondition(key="collection_id", match=MatchValue(value=collection_id)))
             flt = Filter(must=must)
-            dense_hits = self.store._client.search(
-                collection_name=self.store.collection, query_vector=("dense", query_vector),
-                query_filter=flt, limit=limit)
-            for hit in dense_hits:
-                payload = getattr(hit, "payload", None)
-                if not isinstance(payload, dict) or not isinstance(payload.get("chunk_id"), str):
-                    continue
-                try:
-                    score = float(hit.score)
-                except (TypeError, ValueError):
-                    continue
-                if not math.isfinite(score):
-                    continue
-                dense.append({"chunk_id": payload["chunk_id"], "document_id": payload.get("document_id"),
-                              "tenant_id": payload.get("tenant_id"),
-                              "workspace_id": payload.get("workspace_id"), "text": payload.get("text", ""),
-                              "collection_id": payload.get("collection_id"),
-                              "document_version": payload.get("document_version"),
-                              "source": payload.get("source", ""),
-                              "document_filename": payload.get("document_filename", payload.get("source", "")),
-                              "title": payload.get("title", ""),
-                              "page_start": payload.get("page_start"),
-                              "page_end": payload.get("page_end"),
-                              "section": payload.get("section"),
-                              "checksum": payload.get("checksum", ""),
-                              "score": score})
-        # A backend can return duplicate points across scoped calls; stable
-        # point identity wins, then score determines the final top-k.
+            legs = [(("dense", query_vector), dense)]
+            if sparse_query is not None:
+                legs.append((sparse_query, sparse))
+            for vector, candidates in legs:
+                hits = client.search(
+                    collection_name=self.store.collection, query_vector=vector,
+                    query_filter=flt, limit=limit, with_payload=True)
+                for hit in hits:
+                    payload = getattr(hit, "payload", None)
+                    if not isinstance(payload, Mapping) or not isinstance(payload.get("chunk_id"), str):
+                        continue
+                    if not payload["chunk_id"] or not _in_scope(payload, workspace_id, allowed, tenant_id):
+                        continue
+                    if collection_id is not None and (payload.get("collection_id") or "rag_phase0") != collection_id:
+                        continue
+                    try:
+                        score = float(hit.score)
+                    except (TypeError, ValueError):
+                        continue
+                    if not math.isfinite(score):
+                        continue
+                    item = {"chunk_id": payload["chunk_id"], "document_id": payload.get("document_id"),
+                            "tenant_id": payload.get("tenant_id"),
+                            "workspace_id": payload.get("workspace_id"), "text": payload.get("text", ""),
+                            "collection_id": payload.get("collection_id"),
+                            "document_version": payload.get("document_version"),
+                            "source": payload.get("source", ""),
+                            "document_filename": payload.get("document_filename", payload.get("source", "")),
+                            "title": payload.get("title", ""),
+                            "page_start": payload.get("page_start"),
+                            "page_end": payload.get("page_end"),
+                            "section": payload.get("section"),
+                            "checksum": payload.get("checksum", ""),
+                            "score": score}
+                    if candidates is sparse:
+                        item["sparse_score"] = score
+                    candidates.append(item)
+        return self._rank(dense, limit), self._rank(sparse, limit)
+
+    @staticmethod
+    def _http_candidates(hits, workspace_id, allowed, tenant_id, *, sparse=False) -> list[dict]:
+        candidates = []
+        for hit in hits:
+            payload = hit.get("payload") if isinstance(hit, Mapping) else getattr(hit, "payload", None)
+            if not isinstance(payload, Mapping) or not _in_scope(payload, workspace_id, allowed, tenant_id):
+                continue
+            chunk_id = payload.get("chunk_id")
+            if not isinstance(chunk_id, str) or not chunk_id:
+                continue
+            score = hit.get("score") if isinstance(hit, Mapping) else getattr(hit, "score", None)
+            if isinstance(score, bool):
+                continue
+            try:
+                score = float(score)
+            except (TypeError, ValueError, OverflowError):
+                continue
+            if not math.isfinite(score) or (sparse and score <= 0):
+                continue
+            item = {**payload, "score": score}
+            if sparse:
+                item["sparse_score"] = score
+            candidates.append(item)
+        return candidates
+
+    @staticmethod
+    def _rank(candidates: list[dict], limit: int) -> list[dict]:
         deduped: dict[str, dict] = {}
-        for item in dense:
+        for item in candidates:
             previous = deduped.get(item["chunk_id"])
             if previous is None or item["score"] > previous["score"]:
                 deduped[item["chunk_id"]] = item
-        dense = sorted(deduped.values(), key=lambda item: item["score"], reverse=True)[:limit]
-        # Post-filter: defense in depth on trusted fields.
-        allowed = set(allowed_collection_ids or [])
-        dense = [c for c in dense if _in_scope(c, workspace_id, allowed, tenant_id)]
-        return dense, []
+        return sorted(deduped.values(), key=lambda item: (-item["score"], item["chunk_id"]))[:limit]

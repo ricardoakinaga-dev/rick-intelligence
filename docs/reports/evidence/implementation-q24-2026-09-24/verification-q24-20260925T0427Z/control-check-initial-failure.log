@@ -1,0 +1,65 @@
+WARNING: Git worktree is DIRTY (209 entries); local dirty state is reported but not rejected
+Control-plane check failed:
+- Required controller check failed: check_state.py
+PASS: 30 historical files match their recorded SHA256
+[PASS] STATE_JSON: artifact parses (.agent/state.json)
+[PASS] BACKLOG_JSON: artifact parses (.agent/backlog.json)
+[PASS] EXECUTION_LOG: artifact parses (.agent/execution-log.jsonl)
+[PASS] VERIFICATION_LOG: artifact parses (.agent/verification.jsonl)
+[PASS] STATE_FIELDS: all canonical runtime fields are present
+[FAIL] STATE_ENUM: active_activity='BUILD' is not in canonical activity: ['DEFINE', 'DESIGN', 'IMPLEMENT', 'INSPECT', 'INTAKE', 'OPERATE', 'PLAN', 'RECOVER', 'RESEARCH', 'REVIEW', 'RUN', 'TEST', 'UNKNOWN', 'VERIFY']
+[FAIL] STATE_EXECPLAN_ACTION: active ExecPlan must contain exactly one current-action marker matching state.active_action_id (Q17-01.A:IMPLEMENT-Q24-19-20)
+[FAIL] STATE_EXECPLAN_ACTION: active ExecPlan first Concrete Step action ID must match state.active_action_id (Q17-01.A:IMPLEMENT-Q24-19-20)
+[FAIL] STATE_EXECPLAN_ACTION: active ExecPlan first Concrete Step references a different action ID for the active task
+[PASS] BACKLOG_CONTRACT: validated 35 backlog item(s)
+[PASS] LOG_CONTRACT: validated 333 append-oriented event(s)
+[FAIL] VERIFY_ENUM: VER-Q24-FINAL-LOCAL-20260925.evidence_kind='COMMAND_AND_ARTIFACT_REVIEW' is not in canonical evidence_kind: ['ARTIFACT_INSPECTION', 'COMMAND', 'EXPLANATION', 'EXTERNAL_RECORD', 'MANUAL_OBSERVATION', 'PREDICTION', 'RUNTIME_OBSERVATION', 'STATIC_INSPECTION']
+[FAIL] VERIFY_ENUM: VER-Q24-SCOPED-REVIEWS-20260925.evidence_kind='INDEPENDENT_REVIEW' is not in canonical evidence_kind: ['ARTIFACT_INSPECTION', 'COMMAND', 'EXPLANATION', 'EXTERNAL_RECORD', 'MANUAL_OBSERVATION', 'PREDICTION', 'RUNTIME_OBSERVATION', 'STATIC_INSPECTION']
+[FAIL] VERIFY_PASS_CLAIM: VER-Q24-SCOPED-REVIEWS-20260925: PASS evidence_kind='INDEPENDENT_REVIEW' does not allow null exit_status
+[FAIL] VERIFY_PASS_EVIDENCE_KIND: VER-Q24-SCOPED-REVIEWS-20260925: evidence_kind 'INDEPENDENT_REVIEW' cannot support PASS
+[PASS] GATE_HISTORY: validated 28 append-only gate record(s)
+[PASS] RECONCILE: state, backlog, log, and active pointers agree
+RESULT FAIL (pass=9 warn=0 fail=8)
+PASS: derived review views and 11 historical files verified; original acceptance preserved
+{
+  "valid": true,
+  "errors": []
+}
+Git: head=b52f32c141916a2ea3af1a6b913bd91f380606e0 branch=main worktree=DIRTY (209 entries) remote_main=b52f32c141916a2ea3af1a6b913bd91f380606e0 sync=HEAD_EQ_ORIGIN_MAIN
+PASS: derived review views and 11 historical files verified; original acceptance preserved
+python3 "/home/ricardo/rick-intelligence/scripts/phase15/check_boundaries.py"
+{
+  "status": "PASS",
+  "checked": "/home/ricardo/rick-intelligence",
+  "errors": []
+}
+PYTHONDONTWRITEBYTECODE=1 python3 "/home/ricardo/rick-intelligence/docs/ci/check_control_plane.py"
+WARNING: Git worktree is DIRTY (209 entries); local dirty state is reported but not rejected
+Control-plane check failed:
+- Required controller check failed: check_state.py
+PASS: 30 historical files match their recorded SHA256
+[PASS] STATE_JSON: artifact parses (.agent/state.json)
+[PASS] BACKLOG_JSON: artifact parses (.agent/backlog.json)
+[PASS] EXECUTION_LOG: artifact parses (.agent/execution-log.jsonl)
+[PASS] VERIFICATION_LOG: artifact parses (.agent/verification.jsonl)
+[PASS] STATE_FIELDS: all canonical runtime fields are present
+[FAIL] STATE_ENUM: active_activity='BUILD' is not in canonical activity: ['DEFINE', 'DESIGN', 'IMPLEMENT', 'INSPECT', 'INTAKE', 'OPERATE', 'PLAN', 'RECOVER', 'RESEARCH', 'REVIEW', 'RUN', 'TEST', 'UNKNOWN', 'VERIFY']
+[FAIL] STATE_EXECPLAN_ACTION: active ExecPlan must contain exactly one current-action marker matching state.active_action_id (Q17-01.A:IMPLEMENT-Q24-19-20)
+[FAIL] STATE_EXECPLAN_ACTION: active ExecPlan first Concrete Step action ID must match state.active_action_id (Q17-01.A:IMPLEMENT-Q24-19-20)
+[FAIL] STATE_EXECPLAN_ACTION: active ExecPlan first Concrete Step references a different action ID for the active task
+[PASS] BACKLOG_CONTRACT: validated 35 backlog item(s)
+[PASS] LOG_CONTRACT: validated 333 append-oriented event(s)
+[FAIL] VERIFY_ENUM: VER-Q24-FINAL-LOCAL-20260925.evidence_kind='COMMAND_AND_ARTIFACT_REVIEW' is not in canonical evidence_kind: ['ARTIFACT_INSPECTION', 'COMMAND', 'EXPLANATION', 'EXTERNAL_RECORD', 'MANUAL_OBSERVATION', 'PREDICTION', 'RUNTIME_OBSERVATION', 'STATIC_INSPECTION']
+[FAIL] VERIFY_ENUM: VER-Q24-SCOPED-REVIEWS-20260925.evidence_kind='INDEPENDENT_REVIEW' is not in canonical evidence_kind: ['ARTIFACT_INSPECTION', 'COMMAND', 'EXPLANATION', 'EXTERNAL_RECORD', 'MANUAL_OBSERVATION', 'PREDICTION', 'RUNTIME_OBSERVATION', 'STATIC_INSPECTION']
+[FAIL] VERIFY_PASS_CLAIM: VER-Q24-SCOPED-REVIEWS-20260925: PASS evidence_kind='INDEPENDENT_REVIEW' does not allow null exit_status
+[FAIL] VERIFY_PASS_EVIDENCE_KIND: VER-Q24-SCOPED-REVIEWS-20260925: evidence_kind 'INDEPENDENT_REVIEW' cannot support PASS
+[PASS] GATE_HISTORY: validated 28 append-only gate record(s)
+[PASS] RECONCILE: state, backlog, log, and active pointers agree
+RESULT FAIL (pass=9 warn=0 fail=8)
+PASS: derived review views and 11 historical files verified; original acceptance preserved
+{
+  "valid": true,
+  "errors": []
+}
+Git: head=b52f32c141916a2ea3af1a6b913bd91f380606e0 branch=main worktree=DIRTY (209 entries) remote_main=b52f32c141916a2ea3af1a6b913bd91f380606e0 sync=HEAD_EQ_ORIGIN_MAIN
+make: *** [Makefile:86: validate] Error 1

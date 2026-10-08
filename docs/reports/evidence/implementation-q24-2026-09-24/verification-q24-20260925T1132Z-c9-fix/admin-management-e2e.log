@@ -1,0 +1,96 @@
+
+> rick-intelligence-web@0.1.0 test:e2e
+> playwright test tests/admin-management.spec.ts
+
+[WebServer] (node:3613407) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+[WebServer] (node:3613474) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+[WebServer] INFO:     Started server process [3613675]
+
+[WebServer] INFO:     Waiting for application startup.
+[WebServer] INFO:     Application startup complete.
+
+[WebServer] INFO:     Uvicorn running on http://127.0.0.1:8001 (Press CTRL+C to quit)
+
+
+Running 15 tests using 8 workers
+
+(node:3613706) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+(node:3613712) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+(node:3613694) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+(node:3613700) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+(node:3613724) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+(node:3613693) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+(node:3613733) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+(node:3613718) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1/15] [tablet] › tests/admin-management.spec.ts:52:5 › uses only authoritative permissions and avoids unauthorized management requests
+[2/15] [mobile] › tests/admin-management.spec.ts:240:5 › keeps user 403 and session error states independently recoverable
+[3/15] [tablet] › tests/admin-management.spec.ts:73:5 › opens the management surface from users.manage without operational permission fallback
+[4/15] [mobile] › tests/admin-management.spec.ts:73:5 › opens the management surface from users.manage without operational permission fallback
+[5/15] [mobile] › tests/admin-management.spec.ts:52:5 › uses only authoritative permissions and avoids unauthorized management requests
+[6/15] [mobile] › tests/admin-management.spec.ts:100:5 › supports user and session lifecycle with tenant-bound create and confirmations
+[7/15] [mobile] › tests/admin-management.spec.ts:219:5 › renders empty management states and refetches after reload
+[8/15] [tablet] › tests/admin-management.spec.ts:100:5 › supports user and session lifecycle with tenant-bound create and confirmations
+(node:3615869) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+(node:3615831) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[9/15] [tablet] › tests/admin-management.spec.ts:240:5 › keeps user 403 and session error states independently recoverable
+[10/15] [tablet] › tests/admin-management.spec.ts:219:5 › renders empty management states and refetches after reload
+(node:3615948) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+(node:3615985) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+(node:3616006) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[11/15] [desktop] › tests/admin-management.spec.ts:52:5 › uses only authoritative permissions and avoids unauthorized management requests
+[12/15] [desktop] › tests/admin-management.spec.ts:100:5 › supports user and session lifecycle with tenant-bound create and confirmations
+[13/15] [desktop] › tests/admin-management.spec.ts:73:5 › opens the management surface from users.manage without operational permission fallback
+(node:3616934) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+(node:3616945) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[14/15] [desktop] › tests/admin-management.spec.ts:219:5 › renders empty management states and refetches after reload
+[15/15] [desktop] › tests/admin-management.spec.ts:240:5 › keeps user 403 and session error states independently recoverable
+  15 passed (19.3s)

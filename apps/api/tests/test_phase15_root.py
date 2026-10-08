@@ -59,18 +59,12 @@ def test_authenticated_root_chat_reaches_professor_and_returns_provenance() -> N
     assert response.status_code == 200, response.text
     body = response.json()
     assert body["metadata"]["backend"] == "professor"
-    assert body["metadata"]["evidence_status"] == "APPROVED_EVIDENCE"
-    assert body["citations"] == [
-        {
-            "document_id": "doc-stub-1",
-            "chunk_id": "chunk-stub-1",
-            "title": "Stub document",
-            "collection_id": "rag_phase0",
-            "page_start": 1,
-            "page_end": 1,
-            "checksum": "b614197d056058ebd8496e05c490f71b0778caa8015538aafaa52123de785ca5",
-        }
-    ]
+    assert body["metadata"]["evidence_status"] == "NO_EVIDENCE"
+    assert body["metadata"]["decision_action"] == "ESCALATE"
+    assert body["metadata"]["decision_reason"] == "human_review_required"
+    assert body["metadata"]["request_domain_risk"] == "HIGH"
+    assert body["metadata"]["request_policy_reason"] == "clinical_domain_review_required"
+    assert body["citations"] == []
     assert "stub" not in body["answer"].lower()
 
 
@@ -103,28 +97,31 @@ def test_compatibility_uses_same_root_backend_and_finite_server_scope() -> None:
     assert body["usage"] is None
 
 
-def test_professor_provider_failure_maps_to_safe_public_error() -> None:
-    client = _client()
-    _login(client)
-
+def test_root_chat_escalates_without_grounding_policy_and_never_exposes_secrets() -> None:
     class FailingProvider:
         async def chat_completion(self, *, messages, correlation_id):
             raise RuntimeError("provider secret and response body must not escape")
 
+    client = _client()
+    _login(client)
     backend = client.app.state.providers.chat_backend
     backend.provider.provider = FailingProvider()
+
     response = client.post("/api/v1/chat", json={"message": DEMO_QUERY})
 
-    assert response.status_code == 503
-    assert response.json()["error"]["code"] == "provider_unavailable"
-    assert "secret" not in response.text.lower()
-    assert "response body" not in response.text.lower()
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["metadata"]["backend"] == "professor"
+    assert body["metadata"]["evidence_status"] == "NO_EVIDENCE"
+    assert body["metadata"]["decision_action"] == "ESCALATE"
+    assert "provider secret" not in response.text
+    assert "response body" not in response.text
 
     stream = client.post("/api/v1/chat", json={"message": DEMO_QUERY, "stream": True})
     assert stream.status_code == 200
-    assert '"type": "error"' in stream.text or '"type":"error"' in stream.text
-    assert "provider_unavailable" in stream.text
     assert "[DONE]" in stream.text
+    assert "provider secret" not in stream.text
+    assert "response body" not in stream.text
 
 
 def test_production_rejects_stub_and_wildcard_compat_scope() -> None:

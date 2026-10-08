@@ -1,0 +1,20 @@
+{
+  "finding": "A02",
+  "search_before": [
+    200,
+    1
+  ],
+  "archive": [
+    200,
+    "archived"
+  ],
+  "search_after_scoped": [
+    200,
+    1
+  ],
+  "search_after_global": [
+    200,
+    1
+  ],
+  "still_searchable_after_archive": true
+}

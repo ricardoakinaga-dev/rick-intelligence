@@ -29,8 +29,11 @@ fi
 
 "$RUNTIME_DIR/bin/uv" pip install \
   --index-url https://pypi.org/simple \
+  --require-hashes \
   --python "$RUNTIME_DIR/venvs/cvg/bin/python" \
-  -r "$REPO_ROOT/cvg-master-rag-v2/src/requirements.txt"
+  -r "$REPO_ROOT/requirements/test.lock"
+
+"$RUNTIME_DIR/venvs/cvg/bin/python" -m pip check
 
 echo "Phase 0.5 runtime ready: Python ${PYTHON_VERSION}, uv ${UV_VERSION}, Qdrant ${QDRANT_VERSION} client/server target"
 echo "Next: $REPO_ROOT/scripts/phase05/start-local-services.sh"

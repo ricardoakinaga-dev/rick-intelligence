@@ -1,0 +1,4 @@
+packet_sha256=4ce14f0cd563d29c68c85fd81c8a6d06d111619978e2bd96c7e7d90cc8162de6
+listed_files=26
+manifest_checks=13
+PASS: all packet and manifest source/log hashes match

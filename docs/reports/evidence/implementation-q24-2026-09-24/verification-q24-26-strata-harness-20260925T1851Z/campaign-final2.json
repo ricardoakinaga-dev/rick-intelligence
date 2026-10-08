@@ -1,0 +1,298 @@
+{
+  "abstention_expectations": [
+    {
+      "case_id": "negative-no-evidence",
+      "evidence_type": "synthetic retrieval/citation structure only",
+      "expectation": "no_evidence",
+      "expected_disposition": "ABSTAIN",
+      "observed_response_disposition": "NOT_MEASURED",
+      "structural_fixture_status": "PASS"
+    },
+    {
+      "case_id": "negative-weak-evidence",
+      "evidence_type": "synthetic retrieval/citation structure only",
+      "expectation": "weak_evidence",
+      "expected_disposition": "ABSTAIN",
+      "observed_response_disposition": "NOT_MEASURED",
+      "structural_fixture_status": "PASS"
+    },
+    {
+      "case_id": "negative-unsupported-assertion",
+      "evidence_type": "synthetic retrieval/citation structure only",
+      "expectation": "unsupported_assertion",
+      "expected_disposition": "ABSTAIN",
+      "observed_response_disposition": "NOT_MEASURED",
+      "structural_fixture_status": "PASS"
+    }
+  ],
+  "blockers": [
+    "representative corpus rights and evaluation authorization are not approved",
+    "the corpus has not been approved as representative for the target population",
+    "an authorized retrieval/model provider has not been configured",
+    "domain review and acceptance thresholds are not approved",
+    "ambiguous-case policy and adjudication are not approved",
+    "domain risk acceptance is not approved",
+    "the recorded fixture is not an identified product candidate",
+    "product evaluation must declare risk and ambiguity strata: ambiguity, risk",
+    "train/calibration/reserved split is not assigned for an authorized campaign",
+    "positive model/corpus/dimension strata are below the declared minimum sample size: positive/offline-ranker-a/synthetic-corpus-a, positive/offline-ranker-b/synthetic-corpus-b"
+  ],
+  "campaign_id": "rec22-local-synthetic-v1",
+  "campaign_status": "NOT_RUN",
+  "candidate": {
+    "candidate_id": "offline-recorded-observations-fixture",
+    "configuration_sha256": "d05c2be585a2de573d9464970c4879d2e43189710c1a1b1e6a839ec9fe1dd2c1",
+    "is_product_candidate": false,
+    "source_revision": "b52f32c141916a2ea3af1a6b913bd91f380606e0",
+    "worktree_status": "DIRTY_SHARED_WORKTREE"
+  },
+  "corpus": {
+    "authorized_for_product_evaluation": false,
+    "corpus_id": "synthetic-corpus",
+    "rights_status": "SYNTHETIC_ONLY",
+    "version": "2026-09-08"
+  },
+  "domain_review_status": "NOT_APPROVED",
+  "eligibility_status": "BLOCKED",
+  "evaluation_design": {
+    "minimum_cases_per_positive_stratum": 30,
+    "strata_dimensions": []
+  },
+  "limitations": [
+    "PASS means the local synthetic-pack harness ran successfully; campaign_status remains NOT_RUN.",
+    "No product retrieval candidate, licensed corpus, live provider or generated answer was evaluated.",
+    "No corpus representativeness, independent domain review, statistical power, production quality or release claim is made."
+  ],
+  "offline_fixture_checks": {
+    "citation_support": {
+      "completeness": {
+        "aggregation": "micro_over_claims",
+        "denominator": 3,
+        "numerator": 3,
+        "status": "PASS",
+        "value": 1.0
+      },
+      "faithfulness": {
+        "aggregation": "mean_over_reviewed_claims",
+        "denominator": 3,
+        "numerator": 3.0,
+        "source": "reviewed_annotation",
+        "status": "PASS",
+        "value": 1.0
+      },
+      "precision": {
+        "aggregation": "micro_over_claim_citations",
+        "denominator": 3,
+        "numerator": 3,
+        "status": "PASS",
+        "value": 1.0
+      },
+      "recall": {
+        "aggregation": "micro_over_reference_citations",
+        "denominator": 3,
+        "numerator": 3,
+        "status": "PASS",
+        "value": 1.0
+      },
+      "status": "PASS",
+      "unsupported_claim_rate": {
+        "aggregation": "micro_over_claims",
+        "denominator": 3,
+        "numerator": 0,
+        "status": "PASS",
+        "value": 0.0
+      }
+    },
+    "interpretation": "checked-in synthetic recorded observations only; these are not product runtime measurements",
+    "ranking": {
+      "hit_at_1": {
+        "denominator": 2,
+        "numerator": 2,
+        "status": "PASS",
+        "value": 1.0
+      },
+      "recall_at_2": {
+        "aggregation": "macro_over_queries",
+        "denominator": 3,
+        "numerator": 3,
+        "status": "PASS",
+        "value": 1.0
+      }
+    },
+    "source_support": {
+      "checksum_coverage": {
+        "denominator": 3,
+        "numerator": 3,
+        "status": "PASS",
+        "value": 1.0
+      },
+      "citation_coverage": {
+        "cases_with_citations": 2,
+        "cases_without_citations": [],
+        "denominator": 3,
+        "numerator": 3,
+        "retrieved_match_coverage": 1.0,
+        "source_mismatches": [],
+        "status": "PASS",
+        "unresolved": [],
+        "value": 1.0
+      },
+      "status": "PASS"
+    },
+    "tenant_isolation": {
+      "cases_evaluated": 2,
+      "cases_with_context": 2,
+      "cases_with_unobservable_scope": 0,
+      "denied_assertions": 2,
+      "leakage_count": 0,
+      "returned_items": 3,
+      "status": "PASS",
+      "unobservable": [],
+      "violations": []
+    }
+  },
+  "pack": {
+    "case_count": 5,
+    "negative_case_count": 3,
+    "pack_id": "rec22-local-synthetic-v2",
+    "positive_case_count": 2,
+    "status": "PASS",
+    "version": "2.0.0"
+  },
+  "provider_status": "NOT_RUN",
+  "quality_by_strata": [],
+  "schema_version": "retrieval-campaign-result.v2",
+  "split": {
+    "case_counts": {
+      "calibration": 0,
+      "reserved": 0,
+      "train": 0,
+      "unassigned": 5
+    },
+    "case_ids": {
+      "calibration": [],
+      "reserved": [],
+      "train": [],
+      "unassigned": [
+        "alpha-positive",
+        "beta-positive",
+        "negative-no-evidence",
+        "negative-weak-evidence",
+        "negative-unsupported-assertion"
+      ]
+    },
+    "interpretation": "case bookkeeping only; it does not establish an authorized or statistically powered sample",
+    "status": "NOT_ASSIGNED"
+  },
+  "status": "PASS",
+  "strata": [
+    {
+      "case_count": 1,
+      "case_ids": [
+        "negative-no-evidence"
+      ],
+      "expectation": "no_evidence",
+      "interpretation": "descriptive fixture coverage; not a population estimate",
+      "role": "negative",
+      "stratum_id": "negative/no_evidence",
+      "structural_fixture_status": "PASS"
+    },
+    {
+      "case_count": 1,
+      "case_ids": [
+        "negative-unsupported-assertion"
+      ],
+      "expectation": "unsupported_assertion",
+      "interpretation": "descriptive fixture coverage; not a population estimate",
+      "role": "negative",
+      "stratum_id": "negative/unsupported_assertion",
+      "structural_fixture_status": "PASS"
+    },
+    {
+      "case_count": 1,
+      "case_ids": [
+        "negative-weak-evidence"
+      ],
+      "expectation": "weak_evidence",
+      "interpretation": "descriptive fixture coverage; not a population estimate",
+      "role": "negative",
+      "stratum_id": "negative/weak_evidence",
+      "structural_fixture_status": "PASS"
+    },
+    {
+      "case_count": 1,
+      "case_ids": [
+        "alpha-positive"
+      ],
+      "corpus_id": "synthetic-corpus-a",
+      "interpretation": "descriptive fixture coverage; not a population estimate",
+      "model_id": "offline-ranker-a",
+      "role": "positive",
+      "stratum_id": "positive/offline-ranker-a/synthetic-corpus-a"
+    },
+    {
+      "case_count": 1,
+      "case_ids": [
+        "beta-positive"
+      ],
+      "corpus_id": "synthetic-corpus-b",
+      "interpretation": "descriptive fixture coverage; not a population estimate",
+      "model_id": "offline-ranker-b",
+      "role": "positive",
+      "stratum_id": "positive/offline-ranker-b/synthetic-corpus-b"
+    }
+  ],
+  "uncertainty": {
+    "by_declared_stratum": [],
+    "by_model_corpus": [
+      {
+        "case_count": 1,
+        "corpus_id": "synthetic-corpus-a",
+        "hit_at_1": {
+          "confidence_interval": [
+            0.20654931437723745,
+            1.0
+          ],
+          "estimate": 1.0,
+          "sample_size": 1,
+          "status": "DESCRIPTIVE",
+          "successes": 1
+        },
+        "model_id": "offline-ranker-a"
+      },
+      {
+        "case_count": 1,
+        "corpus_id": "synthetic-corpus-b",
+        "hit_at_1": {
+          "confidence_interval": [
+            0.20654931437723745,
+            1.0
+          ],
+          "estimate": 1.0,
+          "sample_size": 1,
+          "status": "DESCRIPTIVE",
+          "successes": 1
+        },
+        "model_id": "offline-ranker-b"
+      }
+    ],
+    "limitations": [
+      "Intervals are descriptive and assume independent Bernoulli query outcomes.",
+      "The synthetic sample is not representative and must not be used as a production-quality claim.",
+      "Negative fixtures test retrieval/citation structure; they do not observe generated-answer abstention."
+    ],
+    "method": "Wilson score interval, two-sided 95%",
+    "metric": "case-level Hit@1 among positive retrieval cases",
+    "overall": {
+      "confidence_interval": [
+        0.34238022750665303,
+        1.0
+      ],
+      "estimate": 1.0,
+      "sample_size": 2,
+      "status": "DESCRIPTIVE",
+      "successes": 2
+    },
+    "sample_unit": "query case"
+  }
+}

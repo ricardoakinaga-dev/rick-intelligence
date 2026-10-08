@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import inspect
 from itertools import islice
-from collections.abc import Mapping
+from collections.abc import AsyncIterator, Mapping
 from contextlib import nullcontext
 from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Depends, Query, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from starlette.concurrency import run_in_threadpool
 
 from core.errors import ApiError
@@ -18,12 +18,39 @@ from core.middleware import RequestTooLarge, is_request_too_large
 from core.otel import current_trace_context
 from dependencies.identity import require_authenticated
 from dependencies.services import get_providers
-from services.audit import emit_required
+from services.audit_operations import (
+    run_operation, collection_transaction, collection_owner, source_digest, scoped_operation,
+    public_operation, reconcile_operation, pending_operations,
+)
 from services.authorization_service import build_retrieval_context, filter_collection_items, has_permission
 from services.ingestion_service import IngestionApplicationService, safe_job_json
 from services.json_boundary import decode_request_json
 
 router = APIRouter(tags=["Knowledge"])
+
+
+class AuditReconciliationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    resolution: str = Field(pattern=r"^(effect_confirmed|no_effect)$")
+    evidence_ref: str = Field(min_length=1, max_length=128, pattern=r"^[A-Za-z0-9_.:\-]+$")
+
+
+@router.get("/api/v1/audit/operations")
+def audit_pending_operations(request: Request, limit: int = Query(default=50, ge=1, le=100),
+                             session=Depends(require_authenticated)):
+    return pending_operations(request, session, limit)
+
+
+@router.get("/api/v1/audit/operations/{operation_id}")
+def audit_operation_status(operation_id: str, request: Request, session=Depends(require_authenticated)):
+    ledger, record = scoped_operation(request, session, operation_id)
+    return public_operation(record, ledger)
+
+
+@router.post("/api/v1/audit/operations/{operation_id}/reconcile")
+def audit_operation_reconcile(operation_id: str, payload: AuditReconciliationRequest,
+                              request: Request, session=Depends(require_authenticated)):
+    return reconcile_operation(request, session, operation_id, **payload.model_dump())
 
 # Legacy stub path (rollback when RICK_API_ROOT_KNOWLEDGE=0 or store unavailable).
 _DEMO_COLLECTIONS = [
@@ -55,6 +82,19 @@ _MIME_BY_EXTENSION = {
 
 class _UploadRequestTooLarge(Exception):
     """Internal signal for a chunked multipart body over the API limit."""
+
+
+async def _multipart_lifetime(request: Request) -> AsyncIterator[None]:
+    """Close every parsed part, including requests rejected before ingestion.
+
+    Request.form() is used directly, so FastAPI's declared-File cleanup does
+    not own these temporary files. The request dependency covers every exit;
+    closing just the selected file misses malformed or unauthorized parts.
+    """
+    try:
+        yield
+    finally:
+        await request.close()
 
 
 def _bounded_upload_receive(request: Request, max_bytes: int):
@@ -408,6 +448,7 @@ def _knowledge_documents(
 class UploadRequest(BaseModel):
     """Narrow JSON compatibility body; multipart is the primary contract."""
 
+    model_config = ConfigDict(extra="forbid")
     filename: str = Field(min_length=1, max_length=256)
     collection_id: str = Field(min_length=1, max_length=128)
     content: str = Field(min_length=1, max_length=50 * 1024 * 1024)
@@ -434,22 +475,21 @@ def create_collection(payload: CollectionCreateRequest, request: Request,
     if service is None:
         raise ApiError("provider_unavailable")
     context = _scope(session, workspace_id=payload.workspace_id)
-    try:
-        item = service.create_collection(
-            workspace_id=context["workspace_id"], tenant_id=context["tenant_id"],
-            collection_id=payload.collection_id, title=payload.title,
-            description=payload.description,
-        )
-    except KeyError:
-        raise ApiError("conflict") from None
-    except ValueError:
-        raise ApiError("validation_error") from None
-    emit_required(get_providers(request).audit_sink, {
-        "action": "collection.create", "actor_user_id": session.user_id,
-        "target_id": payload.collection_id, "tenant_id": context["tenant_id"],
-        "workspace_id": context["workspace_id"],
-    })
-    return item
+    def mutate(connection):
+        try:
+            return service.create_collection(
+                workspace_id=context["workspace_id"], tenant_id=context["tenant_id"],
+                collection_id=payload.collection_id, title=payload.title, description=payload.description,
+            )
+        except KeyError:
+            raise ApiError("conflict") from None
+        except ValueError:
+            raise ApiError("validation_error") from None
+    return run_operation(request=request, session=session, action="collection.create",
+        target_id=payload.collection_id, inputs=payload.model_dump(), callback=mutate,
+        owner=collection_owner(service.store), transaction=lambda: collection_transaction(service.store,
+            tenant_id=context["tenant_id"], workspace_id=context["workspace_id"], collection_id=payload.collection_id))
+
 
 
 @router.patch("/api/v1/collections/{collection_id}")
@@ -460,17 +500,22 @@ def update_collection(collection_id: str, payload: CollectionUpdateRequest, requ
     service = _knowledge_service(request)
     if service is None:
         raise ApiError("provider_unavailable")
-    context = _scope(session)
-    try:
-        item = service.update_collection(
-            workspace_id=context["workspace_id"], tenant_id=context["tenant_id"],
-            collection_id=collection_id, **payload.model_dump(exclude_unset=True),
-        )
-    except KeyError:
-        raise ApiError("not_found") from None
-    except ValueError:
-        raise ApiError("conflict") from None
-    return item
+    context = _scope(session, collection_id=collection_id)
+    def mutate(connection):
+        try:
+            return service.update_collection(
+                workspace_id=context["workspace_id"], tenant_id=context["tenant_id"],
+                collection_id=collection_id, **payload.model_dump(exclude_unset=True),
+            )
+        except KeyError:
+            raise ApiError("not_found") from None
+        except ValueError:
+            raise ApiError("conflict") from None
+    return run_operation(request=request, session=session, action="collection.update",
+        target_id=collection_id, inputs=payload.model_dump(exclude_unset=True), callback=mutate,
+        owner=collection_owner(service.store), transaction=lambda: collection_transaction(service.store,
+            tenant_id=context["tenant_id"], workspace_id=context["workspace_id"], collection_id=collection_id))
+
 
 
 @router.post("/api/v1/collections/{collection_id}/archive")
@@ -481,16 +526,19 @@ def archive_collection(collection_id: str, request: Request,
     service = _knowledge_service(request)
     if service is None:
         raise ApiError("provider_unavailable")
-    context = _scope(session)
-    try:
-        item = service.archive_collection(
-            workspace_id=context["workspace_id"], tenant_id=context["tenant_id"],
-            collection_id=collection_id,
-        )
-    except KeyError:
-        raise ApiError("not_found") from None
-    _audit_collection(request, "collection.archive", session, collection_id, context)
-    return item
+    context = _scope(session, collection_id=collection_id)
+    def mutate(connection):
+        try:
+            return service.archive_collection(
+                workspace_id=context["workspace_id"], tenant_id=context["tenant_id"], collection_id=collection_id,
+            )
+        except KeyError:
+            raise ApiError("not_found") from None
+    return run_operation(request=request, session=session, action="collection.archive",
+        target_id=collection_id, inputs={}, callback=mutate,
+        owner=collection_owner(service.store), transaction=lambda: collection_transaction(service.store,
+            tenant_id=context["tenant_id"], workspace_id=context["workspace_id"], collection_id=collection_id))
+
 
 
 class CollectionGrantRequest(BaseModel):
@@ -507,37 +555,37 @@ def set_collection_grant(collection_id: str, user_id: str, payload: CollectionGr
         raise ApiError("provider_unavailable")
     context = _scope(session, collection_id=collection_id)
     identity = get_providers(request).identity
-    list_users = getattr(identity, "list_users", None)
-    if not callable(list_users):
-        raise ApiError("provider_unavailable")
-    try:
-        users = list_users(
-            tenant_id=context["tenant_id"],
-            workspace_id=context["workspace_id"],
-        ) or []
-    except TypeError:
-        raise ApiError("provider_unavailable") from None
-    target = next((item for item in users if _job_field(item, "user_id") == user_id), None)
-    if target is None or _job_field(target, "tenant_id") != context["tenant_id"]:
-        raise ApiError("not_found")
-    current = list(_job_field(target, "authorized_collection_ids", []) or [])
+    transaction = getattr(identity, "audit_transaction", None)
+    grant = getattr(identity, "grant_collection_in_transaction", None)
+    atomic = callable(transaction) and callable(grant)
+    def mutate(connection):
+        if atomic:
+            return grant(actor=session, user_id=user_id, collection_id=normalized,
+                granted=payload.granted, connection=connection)
+        # Existing custom provider interface: tracked cross-owner workflow.
+        list_users = getattr(identity, "list_users", None)
+        update = getattr(identity, "update_user", None)
+        if not callable(list_users) or not callable(update):
+            raise ApiError("provider_unavailable")
+        try:
+            users = list_users(tenant_id=context["tenant_id"], workspace_id=context["workspace_id"]) or []
+        except TypeError:
+            raise ApiError("provider_unavailable") from None
+        target = next((item for item in users if _job_field(item, "user_id") == user_id
+            and _job_field(item, "tenant_id") == context["tenant_id"]
+            and _job_field(item, "workspace_id") == context["workspace_id"]), None)
+        if target is None:
+            raise ApiError("not_found")
+        current = [item for item in (_job_field(target, "authorized_collection_ids", []) or []) if item != normalized]
+        if payload.granted:
+            current.append(normalized)
+        update(actor=session, user_id=user_id, authorized_collection_ids=current)
+        return {"user_id": user_id, "collection_id": normalized, "granted": payload.granted}
     normalized = collection_id.strip()
-    current = [item for item in current if item != normalized]
-    if payload.granted:
-        current.append(normalized)
-    update = getattr(identity, "update_user", None)
-    if not callable(update):
-        raise ApiError("provider_unavailable")
-    update(actor=session, user_id=user_id, authorized_collection_ids=current)
-    _audit_collection(request, "collection.grant_updated", session, user_id, context)
-    return {"user_id": user_id, "collection_id": normalized, "granted": payload.granted}
+    return run_operation(request=request, session=session, action="collection.grant_updated",
+        target_id=user_id, inputs={"collection_id": normalized, "granted": payload.granted}, owner=identity,
+        transaction=(lambda: transaction(session)) if atomic else None, callback=mutate)
 
-
-def _audit_collection(request: Request, action: str, session, target_id: str, context: dict) -> None:
-    emit_required(get_providers(request).audit_sink, {
-        "action": action, "actor_user_id": session.user_id, "target_id": target_id,
-        "tenant_id": context["tenant_id"], "workspace_id": context["workspace_id"],
-    })
 
 
 @router.get("/api/v1/collections")
@@ -660,26 +708,18 @@ def delete_document(document_id: str, request: Request, session=Depends(require_
     delete_method = getattr(service, "delete_document", None)
     if not callable(delete_method):
         raise ApiError("storage_unavailable")
-    try:
-        result = delete_method(
-            document_id,
-            tenant_id=ctx["tenant_id"],
-            workspace_id=ctx["workspace_id"],
-            allowed_collection_ids=ctx.get("allowed_collection_ids", []),
-        )
-    except Exception as exc:
-        _api_ingestion_error(exc)
-    if result is None:
-        raise ApiError("not_found")
-    emit_required(get_providers(request).audit_sink, {
-        "action": "document.delete",
-        "actor_user_id": session.user_id,
-        "target_id": document_id,
-        "tenant_id": ctx["tenant_id"],
-        "workspace_id": ctx["workspace_id"],
-        "request_id": getattr(request.state, "request_id", None),
-    })
-    return result
+    def mutate(connection):
+        try:
+            result = delete_method(document_id, tenant_id=ctx["tenant_id"], workspace_id=ctx["workspace_id"],
+                allowed_collection_ids=ctx.get("allowed_collection_ids", []))
+        except Exception as exc:
+            _api_ingestion_error(exc)
+        if result is None:
+            raise ApiError("not_found")
+        return result
+    return run_operation(request=request, session=session, action="document.delete", target_id=document_id,
+        inputs={}, callback=mutate, owner=get_providers(request).identity)
+
 
 
 async def _request_json(request: Request) -> object:
@@ -736,7 +776,11 @@ def _request_context_values(request: Request) -> tuple[str | None, str | None]:
         }
     },
 )
-async def upload_document(request: Request, session=Depends(require_authenticated)):
+async def upload_document(
+    request: Request,
+    session=Depends(require_authenticated),
+    _form_lifetime=Depends(_multipart_lifetime),
+):
     # This guard deliberately precedes request.form()/source consumption. A
     # caller without the server permission cannot cause the lifecycle service
     # to read or stage an upload.
@@ -747,14 +791,14 @@ async def upload_document(request: Request, session=Depends(require_authenticate
     filename: str | None
     collection_id: str | None
     upload_part: object | None = None
-    content_type = (request.headers.get("content-type") or "").lower()
-    if content_type.startswith("multipart/form-data"):
+    content_type = (request.headers.get("content-type") or "").split(";", 1)[0].strip().lower()
+    if content_type == "multipart/form-data":
         settings = getattr(get_providers(request), "settings", None)
         max_upload_bytes = getattr(settings, "max_upload_bytes", 50 * 1024 * 1024)
         original_receive, bounded_receive = _bounded_upload_receive(request, max_upload_bytes)
         request._receive = bounded_receive
         try:
-            form = await request.form()
+            form = await request.form(max_files=1, max_fields=1)
         except _UploadRequestTooLarge:
             try:
                 await request.close()
@@ -770,7 +814,14 @@ async def upload_document(request: Request, session=Depends(require_authenticate
         upload_part = form.get("file")
         filename = getattr(upload_part, "filename", None)
         collection_id = form.get("collection_id") if isinstance(form.get("collection_id"), str) else None
-        if upload_part is None or (not callable(getattr(upload_part, "read", None)) and getattr(upload_part, "file", None) is None):
+        if (
+            set(form.keys()) != {"file", "collection_id"}
+            or len(form.getlist("file")) != 1
+            or len(form.getlist("collection_id")) != 1
+            or upload_part is None
+            or getattr(upload_part, "size", None) == 0
+            or (not callable(getattr(upload_part, "read", None)) and getattr(upload_part, "file", None) is None)
+        ):
             raise ApiError("validation_error")
         try:
             _validate_multipart_type(filename, getattr(upload_part, "content_type", None))
@@ -785,7 +836,7 @@ async def upload_document(request: Request, session=Depends(require_authenticate
                     pass
             raise
         source = upload_part
-    elif content_type.startswith("application/json"):
+    elif content_type == "application/json":
         raw = await _request_json(request)
         try:
             payload = UploadRequest.model_validate(raw)
@@ -822,11 +873,15 @@ async def upload_document(request: Request, session=Depends(require_authenticate
             parameter.kind is inspect.Parameter.VAR_KEYWORD for parameter in upload_parameters
         ):
             upload_kwargs["trace_context"] = current_trace_context()
-        result = await run_in_threadpool(
-            upload_method,
-            source,
-            **upload_kwargs,
-        )
+        def mutate(connection):
+            result = upload_method(source, **upload_kwargs)
+            if not _job_visible(result, ctx):
+                raise ApiError("ingestion_failed")
+            return _job_envelope(result)
+        response = await run_in_threadpool(run_operation, request=request, session=session,
+            action="document.upload", target_id=collection_id,
+            inputs={"filename": filename, "collection_id": collection_id, "source_digest": await run_in_threadpool(source_digest, source)},
+            callback=mutate, owner=get_providers(request).identity)
     except Exception as exc:
         _api_ingestion_error(exc)
     finally:
@@ -838,20 +893,6 @@ async def upload_document(request: Request, session=Depends(require_authenticate
                     await closed
             except Exception:
                 pass
-
-    if not _job_visible(result, ctx):
-        # The adapter result is untrusted even when the request was authorized;
-        # do not expose a job whose scope drifted during upload.
-        raise ApiError("ingestion_failed")
-    response = _job_envelope(result)
-    emit_required(get_providers(request).audit_sink, {
-        "action": "document.upload",
-        "actor_user_id": session.user_id,
-        "target_id": response["job_id"],
-        "tenant_id": ctx["tenant_id"],
-        "workspace_id": ctx["workspace_id"],
-        "request_id": request_id,
-    })
     return response
 
 
@@ -865,6 +906,7 @@ class ReindexRequest(BaseModel):
 class RetryRequest(BaseModel):
     """A local retry always carries a fresh bounded source."""
 
+    model_config = ConfigDict(extra="forbid")
     filename: str = Field(min_length=1, max_length=256)
     content: str = Field(min_length=1, max_length=50 * 1024 * 1024)
 
@@ -903,6 +945,16 @@ def _normalize_collection(value: str) -> str:
         "requestBody": {
             "required": True,
             "content": {
+                "multipart/form-data": {
+                    "schema": {
+                        "type": "object",
+                        "required": ["file"],
+                        "properties": {
+                            "file": {"type": "string", "format": "binary"},
+                        },
+                        "additionalProperties": False,
+                    }
+                },
                 "application/json": {
                     "schema": {
                         "type": "object",
@@ -955,29 +1007,23 @@ async def reindex(request: Request, session=Depends(require_authenticated)):
         raise ApiError("storage_unavailable")
     request_id, correlation_id = _request_context_values(request)
     filename = payload.filename or getattr(document, "display_filename", None) or getattr(document, "filename", None) or "document.txt"
+    def mutate(connection):
+        result = service.reindex(payload.document_id, collection_id=document_collection,
+            tenant_id=ctx["tenant_id"], workspace_id=ctx["workspace_id"], source=payload.content,
+            filename=filename, request_id=request_id, correlation_id=correlation_id)
+        if (not _job_visible(result, ctx) or not isinstance(_job_field(result, "document_id"), str)
+                or not _job_field(result, "document_id")):
+            raise ApiError("ingestion_failed")
+        return _job_envelope(result)
     try:
-        result = await run_in_threadpool(
-            service.reindex,
-            payload.document_id,
-            collection_id=document_collection,
-            tenant_id=ctx["tenant_id"],
-            workspace_id=ctx["workspace_id"],
-            source=payload.content if payload.content is not None else None,
-            filename=filename,
-            request_id=request_id,
-            correlation_id=correlation_id,
-        )
+        return await run_in_threadpool(run_operation, request=request, session=session,
+            action="document.reindex", target_id=payload.document_id,
+            inputs={"collection_id": document_collection, "filename": filename,
+                    "source_digest": await run_in_threadpool(source_digest, payload.content) if payload.content is not None else None},
+            callback=mutate, owner=get_providers(request).identity)
     except Exception as exc:
         _api_ingestion_error(exc)
-    if (
-        not _job_visible(result, ctx)
-        or not isinstance(_job_field(result, "document_id"), str)
-        or not _job_field(result, "document_id")
-    ):
-        # The adapter result is an untrusted postcondition. Never serialize a
-        # job whose scope or document identity drifted after authorization.
-        raise ApiError("ingestion_failed")
-    return _job_envelope(result)
+
 
 
 @router.get("/api/v1/ingestion/jobs/{job_id}")
@@ -1000,6 +1046,14 @@ def ingestion_job_status(job_id: str, request: Request, session=Depends(require_
         "requestBody": {
             "required": True,
             "content": {
+                "multipart/form-data": {
+                    "schema": {
+                        "type": "object",
+                        "required": ["file"],
+                        "properties": {"file": {"type": "string", "format": "binary"}},
+                        "additionalProperties": False,
+                    }
+                },
                 "application/json": {
                     "schema": {
                         "type": "object",
@@ -1015,7 +1069,12 @@ def ingestion_job_status(job_id: str, request: Request, session=Depends(require_
         }
     },
 )
-async def retry_ingestion_job(job_id: str, request: Request, session=Depends(require_authenticated)):
+async def retry_ingestion_job(
+    job_id: str,
+    request: Request,
+    session=Depends(require_authenticated),
+    _form_lifetime=Depends(_multipart_lifetime),
+):
     if not has_permission(session, "ingestion.run"):
         raise ApiError("forbidden")
     ctx = _scope(session)
@@ -1025,34 +1084,96 @@ async def retry_ingestion_job(job_id: str, request: Request, session=Depends(req
     before = _service_status(service, job_id, ctx)
     if before is None:
         raise ApiError("not_found")
-    payload = await _request_json(request)
-    try:
-        retry_payload = RetryRequest.model_validate(payload)
-    except Exception:
-        raise ApiError("validation_error") from None
     retry_method = getattr(service, "retry", None)
     if not callable(retry_method):
         raise ApiError("conflict")
+    source: object
+    filename: str
+    upload_part: object | None = None
+    content_type = (request.headers.get("content-type") or "").split(";", 1)[0].strip().lower()
+    if content_type == "multipart/form-data":
+        settings = getattr(get_providers(request), "settings", None)
+        max_upload_bytes = getattr(settings, "max_upload_bytes", 50 * 1024 * 1024)
+        original_receive, bounded_receive = _bounded_upload_receive(request, max_upload_bytes)
+        request._receive = bounded_receive
+        try:
+            form = await request.form(max_files=1, max_fields=0)
+        except _UploadRequestTooLarge:
+            try:
+                await request.close()
+            except Exception:
+                pass
+            raise ApiError("request_too_large") from None
+        except Exception as exc:
+            if is_request_too_large(exc):
+                raise ApiError("request_too_large") from None
+            raise ApiError("validation_error") from None
+        finally:
+            request._receive = original_receive
+        upload_part = form.get("file")
+        filename_value = getattr(upload_part, "filename", None)
+        if (
+            set(form.keys()) != {"file"}
+            or len(form.getlist("file")) != 1
+            or upload_part is None
+            or getattr(upload_part, "size", None) == 0
+            or not isinstance(filename_value, str)
+            or not filename_value
+            or (not callable(getattr(upload_part, "read", None)) and getattr(upload_part, "file", None) is None)
+        ):
+            raise ApiError("validation_error")
+        try:
+            _validate_multipart_type(filename_value, getattr(upload_part, "content_type", None))
+        except ApiError:
+            close = getattr(upload_part, "close", None)
+            if callable(close):
+                try:
+                    closed = close()
+                    if inspect.isawaitable(closed):
+                        await closed
+                except Exception:
+                    pass
+            raise
+        filename = filename_value
+        source = upload_part
+    elif content_type == "application/json":
+        payload = await _request_json(request)
+        try:
+            retry_payload = RetryRequest.model_validate(payload)
+        except Exception:
+            raise ApiError("validation_error") from None
+        filename = retry_payload.filename
+        source = retry_payload.content
+    else:
+        raise ApiError("unsupported_media_type")
     request_id, correlation_id = _request_context_values(request)
     try:
-        result = await run_in_threadpool(
-            retry_method,
-            job_id,
-            source=retry_payload.content,
-            filename=retry_payload.filename,
-            tenant_id=ctx["tenant_id"],
-            workspace_id=ctx["workspace_id"],
-            allowed_collection_ids=ctx.get("allowed_collection_ids", []),
-            request_id=request_id,
-            correlation_id=correlation_id,
-        )
+        def mutate(connection):
+            result = retry_method(job_id, source=source, filename=filename,
+                tenant_id=ctx["tenant_id"], workspace_id=ctx["workspace_id"],
+                allowed_collection_ids=ctx.get("allowed_collection_ids", []),
+                request_id=request_id, correlation_id=correlation_id)
+            if result is None:
+                raise ApiError("not_found")
+            if not _job_visible(result, ctx):
+                raise ApiError("ingestion_failed")
+            return _job_envelope(result)
+        response = await run_in_threadpool(run_operation, request=request, session=session,
+            action="ingestion.retry", target_id=job_id,
+            inputs={"filename": filename, "source_digest": await run_in_threadpool(source_digest, source)},
+            callback=mutate, owner=get_providers(request).identity)
     except Exception as exc:
         _api_ingestion_error(exc)
-    if result is None:
-        raise ApiError("not_found")
-    if not _job_visible(result, ctx):
-        raise ApiError("ingestion_failed")
-    return _job_envelope(result)
+    finally:
+        close = getattr(upload_part, "close", None)
+        if callable(close):
+            try:
+                closed = close()
+                if inspect.isawaitable(closed):
+                    await closed
+            except Exception:
+                pass
+    return response
 
 
 @router.post("/api/v1/ingestion/jobs/{job_id}/cancel")
@@ -1069,24 +1190,20 @@ def cancel_ingestion_job(job_id: str, request: Request, session=Depends(require_
     cancel_method = getattr(service, "cancel", None) or getattr(service, "cancel_job", None)
     if not callable(cancel_method):
         raise ApiError("not_found")
-    try:
-        result = cancel_method(
-            job_id,
-            tenant_id=ctx["tenant_id"],
-            workspace_id=ctx["workspace_id"],
-            allowed_collection_ids=ctx.get("allowed_collection_ids", []),
-        )
-    except TypeError:
-        # A legacy cancel signature without the server-derived scope is not a
-        # safe compatibility path: invoking it could mutate another tenant's
-        # job before any response postcondition can be checked.
-        raise ApiError("conflict") from None
-    if isinstance(result, bool):
-        after = _service_status(service, job_id, ctx) or before
-        return _job_envelope(after, cancelled=result)
-    if result is None:
-        after = _service_status(service, job_id, ctx) or before
-        return _job_envelope(after, cancelled=False)
-    if not _job_visible(result, ctx):
-        raise ApiError("ingestion_failed")
-    return _job_envelope(result, cancelled=bool(_job_field(result, "cancelled", False)))
+    def mutate(connection):
+        try:
+            result = cancel_method(job_id, tenant_id=ctx["tenant_id"], workspace_id=ctx["workspace_id"],
+                allowed_collection_ids=ctx.get("allowed_collection_ids", []))
+        except TypeError:
+            raise ApiError("conflict") from None
+        if isinstance(result, bool):
+            after = _service_status(service, job_id, ctx) or before
+            return _job_envelope(after, cancelled=result)
+        if result is None:
+            after = _service_status(service, job_id, ctx) or before
+            return _job_envelope(after, cancelled=False)
+        if not _job_visible(result, ctx):
+            raise ApiError("ingestion_failed")
+        return _job_envelope(result, cancelled=bool(_job_field(result, "cancelled", False)))
+    return run_operation(request=request, session=session, action="ingestion.cancel", target_id=job_id,
+        inputs={}, callback=mutate, owner=get_providers(request).identity)

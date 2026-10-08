@@ -15,9 +15,7 @@ import type {
   CaseReview,
   CaseReviewRequest,
   CaseUpdateRequest,
-  ChatCitation,
   ChatResponse,
-  ChatStreamEvent,
   ChatStreamRequest,
   ConversationDetailResponse,
   ConversationListResponse,
@@ -36,7 +34,6 @@ import type {
   ReindexRequest,
   RevokeAdminSessionsRequest,
   RevokeAdminSessionsResponse,
-  RetryJobRequest,
   SearchRequest,
   SearchResponse,
   Session,
@@ -50,24 +47,50 @@ import type {
 // must provide its own CORS + secure-cookie policy.
 const API_BASE = (process.env.NEXT_PUBLIC_API_BASE_URL || "").replace(/\/$/, "");
 
-export class ApiError extends Error {
-  readonly status: number;
-  readonly code: string;
-  readonly requestId?: string;
+import { ApiError } from "./api-error";
+import { parseChatResult, parseChatResponse, type ChatStreamEvent } from "./chat-response";
+export { ApiError } from "./api-error";
+export { parseChatResponse, parseChatMetadata } from "./chat-response";
+export type { ChatStreamEvent } from "./chat-response";
 
-  constructor(message: string, status: number, code = "request_failed", requestId?: string) {
-    super(message);
-    this.name = "ApiError";
-    this.status = status;
-    this.code = code;
-    this.requestId = requestId;
+/**
+ * Shared safe message extraction for caught errors. Returns the `ApiError`
+ * message (which is already a bounded, user-facing string from the server
+ * envelope) or the `message` of any other `Error`, otherwise `fallback`.
+ * Centralized so pages do not re-implement the same shape with drift.
+ */
+export function errorMessage(cause: unknown, fallback: string): string {
+  if (cause instanceof ApiError) return cause.message;
+  if (cause instanceof Error && cause.message) return cause.message;
+  return fallback;
+}
+
+const CSRF_COOKIE_NAME = "rick_csrf";
+const CSRF_HEADER_NAME = "X-CSRF-Token";
+const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+
+function readCsrfNonce(): string | null {
+  if (typeof document === "undefined") return null;
+  const prefix = `${CSRF_COOKIE_NAME}=`;
+  for (const part of document.cookie.split(";")) {
+    const item = part.trim();
+    if (item.startsWith(prefix)) {
+      const value = item.slice(prefix.length);
+      return value ? decodeURIComponent(value) : null;
+    }
   }
+  return null;
 }
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);
   headers.set("Accept", "application/json");
   if (init.body && !(init.body instanceof FormData)) headers.set("Content-Type", "application/json");
+  const method = (init.method || "GET").toUpperCase();
+  if (MUTATING_METHODS.has(method)) {
+    const nonce = readCsrfNonce();
+    if (nonce) headers.set(CSRF_HEADER_NAME, nonce);
+  }
 
   let response: Response;
   try {
@@ -159,7 +182,10 @@ export const api = {
     request<ConversationDetailResponse>(
       `/api/v1/conversations/${encodeURIComponent(conversationId)}?limit=${encodeURIComponent(String(limit))}`,
       { signal },
-    ),
+    ).then((detail) => ({
+      ...detail,
+      items: detail.items.map((item) => ({ ...item, ...parseChatResult(item) })),
+    })),
   archiveConversation: (conversationId: string) =>
     request<ArchiveConversationResponse>(`/api/v1/conversations/${encodeURIComponent(conversationId)}/archive`, {
       method: "POST",
@@ -198,11 +224,14 @@ export const api = {
   job: (jobId: string) => request<JobEnvelope>(`/api/v1/ingestion/jobs/${encodeURIComponent(jobId)}`),
   cancelJob: (jobId: string) =>
     request<JobEnvelope>(`/api/v1/ingestion/jobs/${encodeURIComponent(jobId)}/cancel`, { method: "POST" }),
-  retryJob: (jobId: string, body: RetryJobRequest) =>
-    request<JobEnvelope>(`/api/v1/ingestion/jobs/${encodeURIComponent(jobId)}/retry`, {
+  retryJob: (jobId: string, file: File) => {
+    const form = new FormData();
+    form.set("file", file, file.name);
+    return request<JobEnvelope>(`/api/v1/ingestion/jobs/${encodeURIComponent(jobId)}/retry`, {
       method: "POST",
-      body: JSON.stringify(body),
-    }),
+      body: form,
+    });
+  },
   reindexDocument: (documentId: string, body: Omit<ReindexRequest, "document_id"> = {}) =>
     request<JobEnvelope>("/api/v1/ingestion/reindex", {
       method: "POST",
@@ -214,7 +243,7 @@ export const api = {
     request<SearchResponse>("/api/v1/search", { method: "POST", body: JSON.stringify(body) }),
   audit: () => request<AuditListResponse>("/api/v1/admin/audit"),
   chat: (body: { message: string; workspace_id: string; collection_id?: string; stream?: boolean }) =>
-    request<ChatResponse>("/api/v1/chat", { method: "POST", body: JSON.stringify({ ...body, stream: false }) }),
+    request<ChatResponse>("/api/v1/chat", { method: "POST", body: JSON.stringify({ ...body, stream: false }) }).then(parseChatResult),
   chatStream: (body: ChatStreamRequest, signal?: AbortSignal, onEvent?: (event: ChatStreamEvent) => void) =>
     readChatStream(body, signal, onEvent),
 };
@@ -253,81 +282,5 @@ async function readChatStream(
     );
   }
 
-  const contentType = response.headers.get("content-type") || "";
-  if (!contentType.includes("text/event-stream") || !response.body) {
-    const text = await response.text();
-    const payload = text ? JSON.parse(text) as ChatResponse : null;
-    if (!payload) throw new ApiError("A API retornou uma resposta inválida.", 0, "invalid_response");
-    onEvent?.({ type: "completion", ...payload });
-    return payload;
-  }
-
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-  let dataLines: string[] = [];
-  let conversationId = "";
-  let messageId = "";
-  let answer = "";
-  let citations: ChatCitation[] = [];
-  let completed: ChatResponse | null = null;
-  let sawDone = false;
-
-  const addCitation = (citation: ChatCitation | null | undefined) => {
-    if (!citation) return;
-    const key = `${citation.document_id || ""}:${citation.chunk_id || ""}`;
-    if (!citations.some((item) => `${item.document_id || ""}:${item.chunk_id || ""}` === key)) citations = [...citations, citation];
-  };
-  const consume = (raw: string) => {
-    const data = raw.trim();
-    if (!data) return;
-    if (data === "[DONE]") {
-      sawDone = true;
-      return;
-    }
-    let event: ChatStreamEvent;
-    try { event = JSON.parse(data) as ChatStreamEvent; } catch { return; }
-    if (event.type === "error") {
-      const status = event.code === "forbidden" ? 403 : event.code === "unauthorized" ? 401 : 0;
-      throw new ApiError(event.message || "Não foi possível concluir a resposta.", status, event.code || "generation_failed");
-    }
-    if (event.conversation_id) conversationId = event.conversation_id;
-    if (event.message_id) messageId = event.message_id;
-    if (event.type === "delta" && event.delta) answer += event.delta;
-    if (event.type === "citation") addCitation(event.citation);
-    if (event.type === "completion") {
-      answer = event.answer ?? answer;
-      for (const citation of event.citations || []) addCitation(citation);
-      completed = {
-        conversation_id: event.conversation_id || conversationId,
-        message_id: event.message_id || messageId,
-        answer,
-        citations,
-        metadata: {},
-      };
-    }
-    onEvent?.(event);
-  };
-
-  try {
-    while (true) {
-      const { value, done } = await reader.read();
-      buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
-      const lines = buffer.split(/\r?\n/);
-      buffer = lines.pop() || "";
-      for (const line of lines) {
-        if (line === "") { consume(dataLines.join("\n")); dataLines = []; }
-        else if (line.startsWith("data:")) dataLines.push(line.slice(5).trimStart());
-      }
-      if (done) {
-        if (buffer.startsWith("data:")) dataLines.push(buffer.slice(5).trimStart());
-        consume(dataLines.join("\n"));
-        break;
-      }
-    }
-  } finally {
-    reader.releaseLock();
-  }
-  if (completed && sawDone) return completed;
-  throw new ApiError("A resposta foi interrompida antes da conclusão.", 0, "incomplete_response");
+  return parseChatResponse(response, onEvent, signal);
 }

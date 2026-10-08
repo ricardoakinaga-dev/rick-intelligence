@@ -1,0 +1,22 @@
+{"probe": "novel_async_cancel_parallel_recovery", "adapter": "memory", "committed": true, "fault": "RuntimeError", "unknown_reads": 6, "terminal": "published", "refreshes": 1}
+.{"probe": "novel_async_cancel_parallel_recovery", "adapter": "memory", "committed": false, "fault": "RuntimeError", "unknown_reads": 6, "terminal": "cancelled", "refreshes": 0}
+.{"probe": "novel_async_cancel_parallel_recovery", "adapter": "memory", "committed": true, "fault": "CancelledError", "unknown_reads": 6, "terminal": "published", "refreshes": 1}
+.{"probe": "novel_async_cancel_parallel_recovery", "adapter": "memory", "committed": false, "fault": "CancelledError", "unknown_reads": 6, "terminal": "cancelled", "refreshes": 0}
+.{"probe": "novel_async_cancel_parallel_recovery", "adapter": "sqlite", "committed": true, "fault": "RuntimeError", "unknown_reads": 6, "terminal": "published", "refreshes": 1}
+.{"probe": "novel_async_cancel_parallel_recovery", "adapter": "sqlite", "committed": false, "fault": "RuntimeError", "unknown_reads": 6, "terminal": "cancelled", "refreshes": 0}
+.{"probe": "novel_async_cancel_parallel_recovery", "adapter": "sqlite", "committed": true, "fault": "CancelledError", "unknown_reads": 6, "terminal": "published", "refreshes": 1}
+.{"probe": "novel_async_cancel_parallel_recovery", "adapter": "sqlite", "committed": false, "fault": "CancelledError", "unknown_reads": 6, "terminal": "cancelled", "refreshes": 0}
+.{"probe": "novel_async_alias", "adapter": "memory", "archived": true, "status": "failed"}
+.{"probe": "novel_async_alias", "adapter": "memory", "archived": false, "status": "published"}
+.{"probe": "novel_async_alias", "adapter": "sqlite", "archived": true, "status": "failed"}
+.{"probe": "novel_async_alias", "adapter": "sqlite", "archived": false, "status": "published"}
+.{"probe": "novel_legacy_resume", "adapter": "memory", "stable_id": "516d2364-8bfd-5b1a-8a2a-f434a082f145", "chunks": 5, "scope_count": 6}
+.{"probe": "novel_legacy_resume", "adapter": "sqlite", "stable_id": "516d2364-8bfd-5b1a-8a2a-f434a082f145", "chunks": 5, "scope_count": 6}
+.{"probe": "novel_tombstone_all_fields", "adapter": "memory", "rejected_fields": 20, "valid_restore": true}
+.{"probe": "novel_tombstone_all_fields", "adapter": "sqlite", "rejected_fields": 20, "valid_restore": true}
+.{"probe": "novel_stale_partial_ack_retry", "adapter": "memory", "fault": "RuntimeError", "loser": "failed", "winner": "published", "retry": "published", "unchanged": true}
+.{"probe": "novel_stale_partial_ack_retry", "adapter": "memory", "fault": "CancelledError", "loser": "failed", "winner": "published", "retry": "published", "unchanged": true}
+.{"probe": "novel_stale_partial_ack_retry", "adapter": "sqlite", "fault": "RuntimeError", "loser": "failed", "winner": "published", "retry": "published", "unchanged": true}
+.{"probe": "novel_stale_partial_ack_retry", "adapter": "sqlite", "fault": "CancelledError", "loser": "failed", "winner": "published", "retry": "published", "unchanged": true}
+.
+20 passed in 0.75s

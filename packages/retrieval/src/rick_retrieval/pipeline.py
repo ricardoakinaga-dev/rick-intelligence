@@ -13,10 +13,11 @@ import math
 import re
 from dataclasses import dataclass, field
 
-from rick_retrieval.backends import RetrievalBackend
+from rick_retrieval.backends import RetrievalBackend, _in_scope
 from rick_retrieval.fusion import rrf_fusion
+from rick_retrieval.qdrant import QdrantHybridUnavailableError
 from rick_retrieval.rerank import DisabledReranker
-from rick_retrieval.sparse import content_query_terms, sparse_overlap_score, tokenize_terms
+from rick_retrieval.sparse import content_query_terms, tokenize_terms
 
 DEFAULT_TOP_K = 5
 DEFAULT_CANDIDATE_MULTIPLIER = 10
@@ -55,6 +56,14 @@ def _has_minimal_support(query: str, text: str) -> bool:
     return bool(non_numeric.intersection({t for t in text_terms if not t.isdigit()}))
 
 
+def _query_term_coverage(query: str, text: str) -> float:
+    """Measure how much of the meaningful query vocabulary a chunk covers."""
+    terms = content_query_terms(query) or set(tokenize_terms(query))
+    if not terms:
+        return 0.0
+    return len(terms.intersection(tokenize_terms(text))) / len(terms)
+
+
 def retrieval_quality_score(item: dict, query: str | None = None) -> float:
     """Return a bounded ranking quality signal, never a probability.
 
@@ -63,7 +72,15 @@ def retrieval_quality_score(item: dict, query: str | None = None) -> float:
     interpretation until a separately versioned calibration dataset exists.
     """
     dense = max(0.0, min(1.0, float(item.get("dense_score", 0.0) or 0.0)))
-    sparse = max(0.0, min(1.0, math.tanh(float(item.get("sparse_score", 0.0) or 0.0) / 4.0)))
+    raw_sparse = float(item.get("sparse_score", 0.0) or 0.0)
+    if raw_sparse > 0 and query and isinstance(item.get("text"), str):
+        # Qdrant's sparse dot product scales with token weights and is not on
+        # the dense cosine scale. Recompute meaningful query-term coverage
+        # from the already ACL-filtered candidate text before comparing quality
+        # across backends; a rare exact identifier should count as full coverage.
+        sparse = _query_term_coverage(query, item["text"])
+    else:
+        sparse = max(0.0, min(1.0, math.tanh(raw_sparse / 4.0)))
     rrf = max(0.0, min(1.0, math.tanh(float(item.get("score", 0.0) or 0.0) * 30.0)))
     diversity = _lexical_diversity_ratio(item.get("text", ""))
     support = _has_minimal_support(query, item.get("text", "")) if query else True
@@ -141,6 +158,7 @@ class RetrievalResult:
     selected_count: int = 0
     backend: str = ""
     fallback_used: bool = False
+    metadata: dict = field(default_factory=dict)
 
 
 class RetrievalEngine:
@@ -160,27 +178,51 @@ class RetrievalEngine:
             raise ValueError("tenant_id is required")
         tenant_id = tenant_id.strip()
         allowed = list(context.get("allowed_collection_ids") or [])
+        if not allowed:
+            return RetrievalResult(query=normalized, backend=self.backend.name,
+                                   metadata={"authorization": "empty_scope"})
         chunks = self._chunks()
         query_vector = self._embed_query(normalized)
         limit = max(options.top_k * options.candidate_multiplier, DEFAULT_CANDIDATE_FLOOR)
 
-        dense, sparse = self.backend.search(
-            query=normalized, query_vector=query_vector, workspace_id=workspace_id,
-            allowed_collection_ids=allowed, chunks=chunks, limit=limit, tenant_id=tenant_id)
-        fallback_used = False
-        if not dense and not sparse and self.fallback is not None:
-            dense, sparse = self.fallback.search(
+        metadata: dict = {}
+        backend_name = self.backend.name
+        primary_unavailable = False
+        try:
+            search_result = self.backend.search(
                 query=normalized, query_vector=query_vector, workspace_id=workspace_id,
                 allowed_collection_ids=allowed, chunks=chunks, limit=limit, tenant_id=tenant_id)
-            fallback_used = bool(dense or sparse)
+            dense, sparse = search_result
+            backend_name = getattr(search_result, "backend", backend_name)
+            metadata = dict(getattr(search_result, "metadata", {}))
+            fallback_used = bool(getattr(search_result, "fallback_used", False))
+        except QdrantHybridUnavailableError:
+            if self.fallback is None:
+                raise
+            dense, sparse = [], []
+            primary_unavailable = True
+            fallback_used = False
+        if not dense and not sparse and self.fallback is not None:
+            fallback_result = self.fallback.search(
+                query=normalized, query_vector=query_vector, workspace_id=workspace_id,
+                allowed_collection_ids=allowed, chunks=chunks, limit=limit, tenant_id=tenant_id)
+            dense, sparse = fallback_result
+            metadata = {
+                "primary_backend": backend_name, "primary_observation": metadata,
+                "fallback_reason": "primary_unavailable" if primary_unavailable else "empty_primary",
+                **dict(getattr(fallback_result, "metadata", {})),
+            }
+            backend_name = getattr(fallback_result, "backend", self.fallback.name)
+            fallback_used = True
 
+        # Reject foreign candidates BEFORE rank fusion: a duplicate chunk ID
+        # must not poison a legitimate row's score or provenance during RRF.
+        allowed_set = set(allowed)
+        dense = [c for c in dense if _in_scope(c, workspace_id, allowed_set, tenant_id)]
+        sparse = [c for c in sparse if _in_scope(c, workspace_id, allowed_set, tenant_id)]
         fused = rrf_fusion(dense, sparse)
         # Authorization revalidation (defense in depth) + dedup.
-        allowed_set = set(allowed)
-        fused = [c for c in fused
-                 if c.get("tenant_id") == tenant_id
-                 and c.get("workspace_id") == workspace_id
-                 and ("*" in allowed_set or (c.get("collection_id") or "rag_phase0") in allowed_set)]
+        fused = [c for c in fused if _in_scope(c, workspace_id, allowed_set, tenant_id)]
         fused = dedupe_candidates(fused)
         for item in fused:
             quality = retrieval_quality_score(item, normalized)
@@ -189,10 +231,17 @@ class RetrievalEngine:
             # contract and docs identify this as a ranking signal, not a
             # calibrated confidence probability.
             item["confidence_score"] = quality
-        fused.sort(key=lambda i: (float(i.get("retrieval_quality_score", 0.0) or 0.0),
-                                  float(i.get("score", 0.0) or 0.0)), reverse=True)
+        # RRF is the cross-modality ranking contract: raw Qdrant cosine and
+        # sparse dot products have unrelated scales. If top dense/sparse ranks
+        # tie, favor a candidate actually retrieved by the sparse leg.
+        fused.sort(key=lambda i: (
+            float(i.get("score", 0.0) or 0.0),
+            float(i.get("sparse_score", 0.0) or 0.0) > 0,
+            float(i.get("retrieval_quality_score", 0.0) or 0.0),
+        ), reverse=True)
         if options.rerank:
             fused = self.reranker.rerank(normalized, fused)
+            fused = [c for c in fused if _in_scope(c, workspace_id, allowed_set, tenant_id)]
 
         # Context selection under a char budget (never unbounded concatenation).
         evidence: list[dict] = []
@@ -230,8 +279,8 @@ class RetrievalEngine:
                 "sparse_score": float(item.get("sparse_score", 0.0) or 0.0),
             })
         return RetrievalResult(query=normalized, evidence=evidence, candidate_count=len(fused),
-                               selected_count=len(evidence), backend=self.backend.name,
-                               fallback_used=fallback_used)
+                               selected_count=len(evidence), backend=backend_name,
+                               fallback_used=fallback_used, metadata=metadata)
 
     # -- seams (subclass/override in adapters; default in-memory index) --------
     def _chunks(self) -> list[dict]:

@@ -19,7 +19,7 @@ from core.errors import ApiError, envelope
 from core.security import constant_time_compare
 from dependencies.services import get_providers
 from models import SessionSnapshot
-from services.authorization_service import build_retrieval_context
+from services.authorization_service import build_retrieval_context, make_authorization_revalidator
 from services.chat_service import ChatApplicationService
 from routes.chat import _compat_rate_allowed, _validated_stream_event
 
@@ -109,9 +109,18 @@ async def chat_completions(payload: CompatRequest, request: Request):
         raise ApiError("validation_error", "Message is too long.")
     session = _compat_session(request)
     conversation_id = payload.conversation_id or payload.user or f"openwebui-{uuid.uuid4().hex[:8]}"
+    gate = getattr(providers.chat_backend, "evidence_gate", None)
+    authorization_revalidator = getattr(gate, "authorization_revalidator", None)
+    if not callable(authorization_revalidator):
+        authorization_revalidator = make_authorization_revalidator(
+            getattr(providers.identity, "refresh_authorization_context", None),
+            compatibility_workspace_id=providers.settings.compat_workspace_id,
+            compatibility_collection_ids=providers.settings.compat_allowed_collection_ids,
+        )
     service = ChatApplicationService(
         providers.chat_backend, providers.chat_history,
         telemetry=getattr(request.app.state, "telemetry", None),
+        authorization_revalidator=authorization_revalidator,
     )  # type: ignore[arg-type]
     created = int(time.time())
     completion_id = f"chatcmpl-{created}-{uuid.uuid4().hex[:6]}"

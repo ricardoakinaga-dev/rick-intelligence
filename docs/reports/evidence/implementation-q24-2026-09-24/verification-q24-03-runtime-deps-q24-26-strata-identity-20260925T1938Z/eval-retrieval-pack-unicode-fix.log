@@ -1,0 +1,1233 @@
+PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="/home/ricardo/rick-intelligence:/home/ricardo/rick-intelligence/scripts/state_of_art" python3 "/home/ricardo/rick-intelligence/scripts/state_of_art/evaluate_pack.py" --pack "/home/ricardo/rick-intelligence/docs/evaluation/packs/rec22-local-v2" --pretty
+{
+  "aggregate": {
+    "configuration": {
+      "k_values": [
+        1,
+        2,
+        3
+      ],
+      "source": "fixture_or_default"
+    },
+    "fixture": {
+      "case_count": 2,
+      "format": "json",
+      "path": null,
+      "provider": "synthetic-offline-pack",
+      "schema_version": "retrieval-evaluation.v1",
+      "status": "PASS"
+    },
+    "input": {
+      "errors": [],
+      "normalised_case_count": 2,
+      "status": "PASS"
+    },
+    "limitations": [
+      "This run evaluates recorded observations only; it does not call the API, vector store, embedding provider, LLM, or network.",
+      "Latency values are supplied by the fixture and do not establish a production SLO, capacity limit, or provider-performance claim.",
+      "Metrics describe the supplied cases and do not establish corpus representativeness, statistical significance, freshness, concurrency behavior, or production quality."
+    ],
+    "live_provider": {
+      "configured": false,
+      "reason": "offline fixture mode does not invoke live providers",
+      "status": "NOT_RUN"
+    },
+    "metrics": {
+      "acl_leakage": {
+        "cases_evaluated": 2,
+        "cases_with_context": 2,
+        "cases_with_unobservable_scope": 0,
+        "denied_assertions": 2,
+        "leakage_count": 0,
+        "returned_items": 3,
+        "status": "PASS",
+        "unobservable": [],
+        "violations": []
+      },
+      "citation_source_coverage": {
+        "checksum_coverage": {
+          "denominator": 3,
+          "numerator": 3,
+          "status": "PASS",
+          "value": 1.0
+        },
+        "checksum_items": 3,
+        "citation_coverage": {
+          "cases_with_citations": 2,
+          "cases_without_citations": [],
+          "denominator": 3,
+          "numerator": 3,
+          "retrieved_match_coverage": 1.0,
+          "source_mismatches": [],
+          "status": "PASS",
+          "unresolved": [],
+          "value": 1.0
+        },
+        "result_count": 3,
+        "source_coverage": {
+          "denominator": 3,
+          "numerator": 3,
+          "status": "PASS",
+          "value": 1.0
+        },
+        "source_items": 3,
+        "status": "PASS"
+      },
+      "citation_support": {
+        "citation_completeness": {
+          "aggregation": "micro_over_claims",
+          "denominator": 3,
+          "numerator": 3,
+          "status": "PASS",
+          "value": 1.0
+        },
+        "citation_precision": {
+          "aggregation": "micro_over_claim_citations",
+          "denominator": 3,
+          "numerator": 3,
+          "status": "PASS",
+          "value": 1.0
+        },
+        "citation_recall": {
+          "aggregation": "micro_over_reference_citations",
+          "denominator": 3,
+          "numerator": 3,
+          "status": "PASS",
+          "value": 1.0
+        },
+        "claim_count": 3,
+        "faithfulness": {
+          "aggregation": "mean_over_reviewed_claims",
+          "denominator": 3,
+          "numerator": 3.0,
+          "source": "reviewed_annotation",
+          "status": "PASS",
+          "value": 1.0
+        },
+        "invalid_citation_count": 0,
+        "limitations": [
+          "Citation support is identity-level evaluation against approved reference IDs; faithfulness is reported only from explicit reviewed annotations.",
+          "Low metric values remain observable so pack-owned thresholds, rather than this evaluator, decide quality acceptance."
+        ],
+        "per_claim": [
+          {
+            "case_id": "alpha-positive",
+            "claim_id": "alpha-claim-1",
+            "faithfulness": 1.0,
+            "faithfulness_source": "reviewed_annotation",
+            "invalid_citation_ids": [],
+            "predicted_citation_ids": [
+              "alpha-1"
+            ],
+            "reference_citation_ids": [
+              "alpha-1"
+            ],
+            "support_source": "reference_citation_intersection",
+            "supported": true,
+            "true_positive_citation_ids": [
+              "alpha-1"
+            ],
+            "valid_citation_ids": [
+              "alpha-1"
+            ]
+          },
+          {
+            "case_id": "alpha-positive",
+            "claim_id": "alpha-claim-2",
+            "faithfulness": 1.0,
+            "faithfulness_source": "reviewed_annotation",
+            "invalid_citation_ids": [],
+            "predicted_citation_ids": [
+              "alpha-2"
+            ],
+            "reference_citation_ids": [
+              "alpha-2"
+            ],
+            "support_source": "reference_citation_intersection",
+            "supported": true,
+            "true_positive_citation_ids": [
+              "alpha-2"
+            ],
+            "valid_citation_ids": [
+              "alpha-2"
+            ]
+          },
+          {
+            "case_id": "beta-positive",
+            "claim_id": "beta-claim-1",
+            "faithfulness": 1.0,
+            "faithfulness_source": "reviewed_annotation",
+            "invalid_citation_ids": [],
+            "predicted_citation_ids": [
+              "beta-1"
+            ],
+            "reference_citation_ids": [
+              "beta-1"
+            ],
+            "support_source": "reference_citation_intersection",
+            "supported": true,
+            "true_positive_citation_ids": [
+              "beta-1"
+            ],
+            "valid_citation_ids": [
+              "beta-1"
+            ]
+          }
+        ],
+        "source": "approved_claim_support",
+        "status": "PASS",
+        "supported_claims": 3,
+        "unsupported_claim_rate": {
+          "aggregation": "micro_over_claims",
+          "denominator": 3,
+          "numerator": 0,
+          "status": "PASS",
+          "value": 0.0
+        },
+        "unsupported_claims": 0
+      },
+      "latency": {
+        "max": 15.0,
+        "mean": 10.0,
+        "min": 7.0,
+        "missing_cases": [],
+        "observation": "fixture-reported retrieval latency; not harness runtime",
+        "observed_cases": 2,
+        "p50": 9.0,
+        "p95": 15.0,
+        "percentile_method": "nearest_rank",
+        "reason": "latency is descriptive only; no target threshold was configured",
+        "sample_count": 6,
+        "status": "PASS",
+        "unit": "ms"
+      },
+      "ranking": {
+        "aggregation": "macro_over_queries",
+        "eligible_cases": 2,
+        "excluded_cases": [],
+        "hit@k": {
+          "1": {
+            "denominator": 2,
+            "numerator": 2,
+            "status": "PASS",
+            "value": 1.0
+          },
+          "2": {
+            "denominator": 2,
+            "numerator": 2,
+            "status": "PASS",
+            "value": 1.0
+          },
+          "3": {
+            "denominator": 2,
+            "numerator": 2,
+            "status": "PASS",
+            "value": 1.0
+          }
+        },
+        "hit_at_k": {
+          "1": {
+            "denominator": 2,
+            "numerator": 2,
+            "status": "PASS",
+            "value": 1.0
+          },
+          "2": {
+            "denominator": 2,
+            "numerator": 2,
+            "status": "PASS",
+            "value": 1.0
+          },
+          "3": {
+            "denominator": 2,
+            "numerator": 2,
+            "status": "PASS",
+            "value": 1.0
+          }
+        },
+        "k_values": [
+          1,
+          2,
+          3
+        ],
+        "mrr": {
+          "status": "PASS",
+          "value": 1.0
+        },
+        "ndcg_at_k": {
+          "1": {
+            "status": "PASS",
+            "value": 1.0
+          },
+          "2": {
+            "status": "PASS",
+            "value": 1.0
+          },
+          "3": {
+            "status": "PASS",
+            "value": 1.0
+          }
+        },
+        "per_case": [
+          {
+            "case_id": "alpha-positive",
+            "hit_at_k": {
+              "1": 1,
+              "2": 1,
+              "3": 1
+            },
+            "recall_at_k": {
+              "1": 0.5,
+              "2": 1.0,
+              "3": 1.0
+            },
+            "relevant_count": 2
+          },
+          {
+            "case_id": "beta-positive",
+            "hit_at_k": {
+              "1": 1,
+              "2": 1,
+              "3": 1
+            },
+            "recall_at_k": {
+              "1": 1.0,
+              "2": 1.0,
+              "3": 1.0
+            },
+            "relevant_count": 1
+          }
+        ],
+        "recall@k": {
+          "1": {
+            "aggregation": "macro_over_queries",
+            "denominator": 3,
+            "numerator": 2,
+            "status": "PASS",
+            "value": 0.75
+          },
+          "2": {
+            "aggregation": "macro_over_queries",
+            "denominator": 3,
+            "numerator": 3,
+            "status": "PASS",
+            "value": 1.0
+          },
+          "3": {
+            "aggregation": "macro_over_queries",
+            "denominator": 3,
+            "numerator": 3,
+            "status": "PASS",
+            "value": 1.0
+          }
+        },
+        "recall_at_k": {
+          "1": {
+            "aggregation": "macro_over_queries",
+            "denominator": 3,
+            "numerator": 2,
+            "status": "PASS",
+            "value": 0.75
+          },
+          "2": {
+            "aggregation": "macro_over_queries",
+            "denominator": 3,
+            "numerator": 3,
+            "status": "PASS",
+            "value": 1.0
+          },
+          "3": {
+            "aggregation": "macro_over_queries",
+            "denominator": 3,
+            "numerator": 3,
+            "status": "PASS",
+            "value": 1.0
+          }
+        },
+        "status": "PASS"
+      }
+    },
+    "mode": "offline_fixture",
+    "schema_version": "retrieval-evaluation-result.v1",
+    "status": "PASS"
+  },
+  "limitations": [
+    "The pack uses synthetic recorded observations and does not establish production retrieval quality.",
+    "Provider, corpus, license, freshness, runtime, load, cost, and clinical acceptance evidence remain external gates."
+  ],
+  "live_provider": {
+    "reason": "pack evaluation is offline and makes no provider calls",
+    "status": "NOT_RUN"
+  },
+  "mode": "offline_pack",
+  "negative_cases": [
+    {
+      "case_id": "negative-no-evidence",
+      "expectation": "no_evidence",
+      "reasons": [],
+      "role": "negative",
+      "status": "PASS"
+    },
+    {
+      "case_id": "negative-weak-evidence",
+      "expectation": "weak_evidence",
+      "reasons": [],
+      "role": "negative",
+      "status": "PASS"
+    },
+    {
+      "case_id": "negative-unsupported-assertion",
+      "expectation": "unsupported_assertion",
+      "reasons": [],
+      "role": "negative",
+      "status": "PASS"
+    }
+  ],
+  "pack": {
+    "case_count": 5,
+    "metadata": {
+      "corpus_id": "synthetic-corpus",
+      "corpus_version": "2026-09-08",
+      "license": "synthetic",
+      "model_id": "offline-recorded-ranker",
+      "provenance": "checked-in synthetic observations; no clinical or licensed corpus content"
+    },
+    "negative_case_count": 3,
+    "pack_id": "rec22-local-synthetic-v2",
+    "path": "/home/ricardo/rick-intelligence/docs/evaluation/packs/rec22-local-v2",
+    "positive_case_count": 2,
+    "status": "PASS",
+    "version": "2.0.0"
+  },
+  "per_model_corpus": [
+    {
+      "case_count": 1,
+      "corpus_id": "synthetic-corpus-a",
+      "metrics": {
+        "acl_leakage": {
+          "cases_evaluated": 1,
+          "cases_with_context": 1,
+          "cases_with_unobservable_scope": 0,
+          "denied_assertions": 1,
+          "leakage_count": 0,
+          "returned_items": 2,
+          "status": "PASS",
+          "unobservable": [],
+          "violations": []
+        },
+        "citation_source_coverage": {
+          "checksum_coverage": {
+            "denominator": 2,
+            "numerator": 2,
+            "status": "PASS",
+            "value": 1.0
+          },
+          "checksum_items": 2,
+          "citation_coverage": {
+            "cases_with_citations": 1,
+            "cases_without_citations": [],
+            "denominator": 2,
+            "numerator": 2,
+            "retrieved_match_coverage": 1.0,
+            "source_mismatches": [],
+            "status": "PASS",
+            "unresolved": [],
+            "value": 1.0
+          },
+          "result_count": 2,
+          "source_coverage": {
+            "denominator": 2,
+            "numerator": 2,
+            "status": "PASS",
+            "value": 1.0
+          },
+          "source_items": 2,
+          "status": "PASS"
+        },
+        "citation_support": {
+          "citation_completeness": {
+            "aggregation": "micro_over_claims",
+            "denominator": 2,
+            "numerator": 2,
+            "status": "PASS",
+            "value": 1.0
+          },
+          "citation_precision": {
+            "aggregation": "micro_over_claim_citations",
+            "denominator": 2,
+            "numerator": 2,
+            "status": "PASS",
+            "value": 1.0
+          },
+          "citation_recall": {
+            "aggregation": "micro_over_reference_citations",
+            "denominator": 2,
+            "numerator": 2,
+            "status": "PASS",
+            "value": 1.0
+          },
+          "claim_count": 2,
+          "faithfulness": {
+            "aggregation": "mean_over_reviewed_claims",
+            "denominator": 2,
+            "numerator": 2.0,
+            "source": "reviewed_annotation",
+            "status": "PASS",
+            "value": 1.0
+          },
+          "invalid_citation_count": 0,
+          "limitations": [
+            "Citation support is identity-level evaluation against approved reference IDs; faithfulness is reported only from explicit reviewed annotations.",
+            "Low metric values remain observable so pack-owned thresholds, rather than this evaluator, decide quality acceptance."
+          ],
+          "per_claim": [
+            {
+              "case_id": "alpha-positive",
+              "claim_id": "alpha-claim-1",
+              "faithfulness": 1.0,
+              "faithfulness_source": "reviewed_annotation",
+              "invalid_citation_ids": [],
+              "predicted_citation_ids": [
+                "alpha-1"
+              ],
+              "reference_citation_ids": [
+                "alpha-1"
+              ],
+              "support_source": "reference_citation_intersection",
+              "supported": true,
+              "true_positive_citation_ids": [
+                "alpha-1"
+              ],
+              "valid_citation_ids": [
+                "alpha-1"
+              ]
+            },
+            {
+              "case_id": "alpha-positive",
+              "claim_id": "alpha-claim-2",
+              "faithfulness": 1.0,
+              "faithfulness_source": "reviewed_annotation",
+              "invalid_citation_ids": [],
+              "predicted_citation_ids": [
+                "alpha-2"
+              ],
+              "reference_citation_ids": [
+                "alpha-2"
+              ],
+              "support_source": "reference_citation_intersection",
+              "supported": true,
+              "true_positive_citation_ids": [
+                "alpha-2"
+              ],
+              "valid_citation_ids": [
+                "alpha-2"
+              ]
+            }
+          ],
+          "source": "approved_claim_support",
+          "status": "PASS",
+          "supported_claims": 2,
+          "unsupported_claim_rate": {
+            "aggregation": "micro_over_claims",
+            "denominator": 2,
+            "numerator": 0,
+            "status": "PASS",
+            "value": 0.0
+          },
+          "unsupported_claims": 0
+        },
+        "latency": {
+          "max": 11.0,
+          "mean": 9.333,
+          "min": 8.0,
+          "missing_cases": [],
+          "observation": "fixture-reported retrieval latency; not harness runtime",
+          "observed_cases": 1,
+          "p50": 9.0,
+          "p95": 11.0,
+          "percentile_method": "nearest_rank",
+          "reason": "latency is descriptive only; no target threshold was configured",
+          "sample_count": 3,
+          "status": "PASS",
+          "unit": "ms"
+        },
+        "ranking": {
+          "aggregation": "macro_over_queries",
+          "eligible_cases": 1,
+          "excluded_cases": [],
+          "hit@k": {
+            "1": {
+              "denominator": 1,
+              "numerator": 1,
+              "status": "PASS",
+              "value": 1.0
+            },
+            "2": {
+              "denominator": 1,
+              "numerator": 1,
+              "status": "PASS",
+              "value": 1.0
+            },
+            "3": {
+              "denominator": 1,
+              "numerator": 1,
+              "status": "PASS",
+              "value": 1.0
+            }
+          },
+          "hit_at_k": {
+            "1": {
+              "denominator": 1,
+              "numerator": 1,
+              "status": "PASS",
+              "value": 1.0
+            },
+            "2": {
+              "denominator": 1,
+              "numerator": 1,
+              "status": "PASS",
+              "value": 1.0
+            },
+            "3": {
+              "denominator": 1,
+              "numerator": 1,
+              "status": "PASS",
+              "value": 1.0
+            }
+          },
+          "k_values": [
+            1,
+            2,
+            3
+          ],
+          "mrr": {
+            "status": "PASS",
+            "value": 1.0
+          },
+          "ndcg_at_k": {
+            "1": {
+              "status": "PASS",
+              "value": 1.0
+            },
+            "2": {
+              "status": "PASS",
+              "value": 1.0
+            },
+            "3": {
+              "status": "PASS",
+              "value": 1.0
+            }
+          },
+          "per_case": [
+            {
+              "case_id": "alpha-positive",
+              "hit_at_k": {
+                "1": 1,
+                "2": 1,
+                "3": 1
+              },
+              "recall_at_k": {
+                "1": 0.5,
+                "2": 1.0,
+                "3": 1.0
+              },
+              "relevant_count": 2
+            }
+          ],
+          "recall@k": {
+            "1": {
+              "aggregation": "macro_over_queries",
+              "denominator": 2,
+              "numerator": 1,
+              "status": "PASS",
+              "value": 0.5
+            },
+            "2": {
+              "aggregation": "macro_over_queries",
+              "denominator": 2,
+              "numerator": 2,
+              "status": "PASS",
+              "value": 1.0
+            },
+            "3": {
+              "aggregation": "macro_over_queries",
+              "denominator": 2,
+              "numerator": 2,
+              "status": "PASS",
+              "value": 1.0
+            }
+          },
+          "recall_at_k": {
+            "1": {
+              "aggregation": "macro_over_queries",
+              "denominator": 2,
+              "numerator": 1,
+              "status": "PASS",
+              "value": 0.5
+            },
+            "2": {
+              "aggregation": "macro_over_queries",
+              "denominator": 2,
+              "numerator": 2,
+              "status": "PASS",
+              "value": 1.0
+            },
+            "3": {
+              "aggregation": "macro_over_queries",
+              "denominator": 2,
+              "numerator": 2,
+              "status": "PASS",
+              "value": 1.0
+            }
+          },
+          "status": "PASS"
+        }
+      },
+      "model_id": "offline-ranker-a",
+      "status": "PASS",
+      "thresholds": [
+        {
+          "id": "ranking-hit-at-1",
+          "metric_path": "metrics.ranking.hit_at_k.1.value",
+          "observed": 1.0,
+          "operator": ">=",
+          "reason": "threshold satisfied",
+          "status": "PASS",
+          "target": 1.0
+        },
+        {
+          "id": "ranking-recall-at-2",
+          "metric_path": "metrics.ranking.recall_at_k.2.value",
+          "observed": 1.0,
+          "operator": ">=",
+          "reason": "threshold satisfied",
+          "status": "PASS",
+          "target": 1.0
+        },
+        {
+          "id": "acl-leakage-count",
+          "metric_path": "metrics.acl_leakage.leakage_count",
+          "observed": 0.0,
+          "operator": "==",
+          "reason": "threshold satisfied",
+          "status": "PASS",
+          "target": 0.0
+        },
+        {
+          "id": "citation-coverage",
+          "metric_path": "metrics.citation_source_coverage.citation_coverage.value",
+          "observed": 1.0,
+          "operator": ">=",
+          "reason": "threshold satisfied",
+          "status": "PASS",
+          "target": 1.0
+        },
+        {
+          "id": "citation-precision",
+          "metric_path": "metrics.citation_support.citation_precision.value",
+          "observed": 1.0,
+          "operator": ">=",
+          "reason": "threshold satisfied",
+          "status": "PASS",
+          "target": 1.0
+        },
+        {
+          "id": "citation-recall",
+          "metric_path": "metrics.citation_support.citation_recall.value",
+          "observed": 1.0,
+          "operator": ">=",
+          "reason": "threshold satisfied",
+          "status": "PASS",
+          "target": 1.0
+        },
+        {
+          "id": "citation-completeness",
+          "metric_path": "metrics.citation_support.citation_completeness.value",
+          "observed": 1.0,
+          "operator": ">=",
+          "reason": "threshold satisfied",
+          "status": "PASS",
+          "target": 1.0
+        },
+        {
+          "id": "unsupported-claim-rate",
+          "metric_path": "metrics.citation_support.unsupported_claim_rate.value",
+          "observed": 0.0,
+          "operator": "<=",
+          "reason": "threshold satisfied",
+          "status": "PASS",
+          "target": 0.0
+        },
+        {
+          "id": "faithfulness",
+          "metric_path": "metrics.citation_support.faithfulness.value",
+          "observed": 1.0,
+          "operator": ">=",
+          "reason": "threshold satisfied",
+          "status": "PASS",
+          "target": 1.0
+        },
+        {
+          "id": "fixture-p95-latency",
+          "metric_path": "metrics.latency.p95",
+          "observed": 11.0,
+          "operator": "<=",
+          "reason": "threshold satisfied",
+          "status": "PASS",
+          "target": 100.0
+        }
+      ]
+    },
+    {
+      "case_count": 1,
+      "corpus_id": "synthetic-corpus-b",
+      "metrics": {
+        "acl_leakage": {
+          "cases_evaluated": 1,
+          "cases_with_context": 1,
+          "cases_with_unobservable_scope": 0,
+          "denied_assertions": 1,
+          "leakage_count": 0,
+          "returned_items": 1,
+          "status": "PASS",
+          "unobservable": [],
+          "violations": []
+        },
+        "citation_source_coverage": {
+          "checksum_coverage": {
+            "denominator": 1,
+            "numerator": 1,
+            "status": "PASS",
+            "value": 1.0
+          },
+          "checksum_items": 1,
+          "citation_coverage": {
+            "cases_with_citations": 1,
+            "cases_without_citations": [],
+            "denominator": 1,
+            "numerator": 1,
+            "retrieved_match_coverage": 1.0,
+            "source_mismatches": [],
+            "status": "PASS",
+            "unresolved": [],
+            "value": 1.0
+          },
+          "result_count": 1,
+          "source_coverage": {
+            "denominator": 1,
+            "numerator": 1,
+            "status": "PASS",
+            "value": 1.0
+          },
+          "source_items": 1,
+          "status": "PASS"
+        },
+        "citation_support": {
+          "citation_completeness": {
+            "aggregation": "micro_over_claims",
+            "denominator": 1,
+            "numerator": 1,
+            "status": "PASS",
+            "value": 1.0
+          },
+          "citation_precision": {
+            "aggregation": "micro_over_claim_citations",
+            "denominator": 1,
+            "numerator": 1,
+            "status": "PASS",
+            "value": 1.0
+          },
+          "citation_recall": {
+            "aggregation": "micro_over_reference_citations",
+            "denominator": 1,
+            "numerator": 1,
+            "status": "PASS",
+            "value": 1.0
+          },
+          "claim_count": 1,
+          "faithfulness": {
+            "aggregation": "mean_over_reviewed_claims",
+            "denominator": 1,
+            "numerator": 1.0,
+            "source": "reviewed_annotation",
+            "status": "PASS",
+            "value": 1.0
+          },
+          "invalid_citation_count": 0,
+          "limitations": [
+            "Citation support is identity-level evaluation against approved reference IDs; faithfulness is reported only from explicit reviewed annotations.",
+            "Low metric values remain observable so pack-owned thresholds, rather than this evaluator, decide quality acceptance."
+          ],
+          "per_claim": [
+            {
+              "case_id": "beta-positive",
+              "claim_id": "beta-claim-1",
+              "faithfulness": 1.0,
+              "faithfulness_source": "reviewed_annotation",
+              "invalid_citation_ids": [],
+              "predicted_citation_ids": [
+                "beta-1"
+              ],
+              "reference_citation_ids": [
+                "beta-1"
+              ],
+              "support_source": "reference_citation_intersection",
+              "supported": true,
+              "true_positive_citation_ids": [
+                "beta-1"
+              ],
+              "valid_citation_ids": [
+                "beta-1"
+              ]
+            }
+          ],
+          "source": "approved_claim_support",
+          "status": "PASS",
+          "supported_claims": 1,
+          "unsupported_claim_rate": {
+            "aggregation": "micro_over_claims",
+            "denominator": 1,
+            "numerator": 0,
+            "status": "PASS",
+            "value": 0.0
+          },
+          "unsupported_claims": 0
+        },
+        "latency": {
+          "max": 15.0,
+          "mean": 10.667,
+          "min": 7.0,
+          "missing_cases": [],
+          "observation": "fixture-reported retrieval latency; not harness runtime",
+          "observed_cases": 1,
+          "p50": 10.0,
+          "p95": 15.0,
+          "percentile_method": "nearest_rank",
+          "reason": "latency is descriptive only; no target threshold was configured",
+          "sample_count": 3,
+          "status": "PASS",
+          "unit": "ms"
+        },
+        "ranking": {
+          "aggregation": "macro_over_queries",
+          "eligible_cases": 1,
+          "excluded_cases": [],
+          "hit@k": {
+            "1": {
+              "denominator": 1,
+              "numerator": 1,
+              "status": "PASS",
+              "value": 1.0
+            },
+            "2": {
+              "denominator": 1,
+              "numerator": 1,
+              "status": "PASS",
+              "value": 1.0
+            },
+            "3": {
+              "denominator": 1,
+              "numerator": 1,
+              "status": "PASS",
+              "value": 1.0
+            }
+          },
+          "hit_at_k": {
+            "1": {
+              "denominator": 1,
+              "numerator": 1,
+              "status": "PASS",
+              "value": 1.0
+            },
+            "2": {
+              "denominator": 1,
+              "numerator": 1,
+              "status": "PASS",
+              "value": 1.0
+            },
+            "3": {
+              "denominator": 1,
+              "numerator": 1,
+              "status": "PASS",
+              "value": 1.0
+            }
+          },
+          "k_values": [
+            1,
+            2,
+            3
+          ],
+          "mrr": {
+            "status": "PASS",
+            "value": 1.0
+          },
+          "ndcg_at_k": {
+            "1": {
+              "status": "PASS",
+              "value": 1.0
+            },
+            "2": {
+              "status": "PASS",
+              "value": 1.0
+            },
+            "3": {
+              "status": "PASS",
+              "value": 1.0
+            }
+          },
+          "per_case": [
+            {
+              "case_id": "beta-positive",
+              "hit_at_k": {
+                "1": 1,
+                "2": 1,
+                "3": 1
+              },
+              "recall_at_k": {
+                "1": 1.0,
+                "2": 1.0,
+                "3": 1.0
+              },
+              "relevant_count": 1
+            }
+          ],
+          "recall@k": {
+            "1": {
+              "aggregation": "macro_over_queries",
+              "denominator": 1,
+              "numerator": 1,
+              "status": "PASS",
+              "value": 1.0
+            },
+            "2": {
+              "aggregation": "macro_over_queries",
+              "denominator": 1,
+              "numerator": 1,
+              "status": "PASS",
+              "value": 1.0
+            },
+            "3": {
+              "aggregation": "macro_over_queries",
+              "denominator": 1,
+              "numerator": 1,
+              "status": "PASS",
+              "value": 1.0
+            }
+          },
+          "recall_at_k": {
+            "1": {
+              "aggregation": "macro_over_queries",
+              "denominator": 1,
+              "numerator": 1,
+              "status": "PASS",
+              "value": 1.0
+            },
+            "2": {
+              "aggregation": "macro_over_queries",
+              "denominator": 1,
+              "numerator": 1,
+              "status": "PASS",
+              "value": 1.0
+            },
+            "3": {
+              "aggregation": "macro_over_queries",
+              "denominator": 1,
+              "numerator": 1,
+              "status": "PASS",
+              "value": 1.0
+            }
+          },
+          "status": "PASS"
+        }
+      },
+      "model_id": "offline-ranker-b",
+      "status": "PASS",
+      "thresholds": [
+        {
+          "id": "ranking-hit-at-1",
+          "metric_path": "metrics.ranking.hit_at_k.1.value",
+          "observed": 1.0,
+          "operator": ">=",
+          "reason": "threshold satisfied",
+          "status": "PASS",
+          "target": 1.0
+        },
+        {
+          "id": "ranking-recall-at-2",
+          "metric_path": "metrics.ranking.recall_at_k.2.value",
+          "observed": 1.0,
+          "operator": ">=",
+          "reason": "threshold satisfied",
+          "status": "PASS",
+          "target": 1.0
+        },
+        {
+          "id": "acl-leakage-count",
+          "metric_path": "metrics.acl_leakage.leakage_count",
+          "observed": 0.0,
+          "operator": "==",
+          "reason": "threshold satisfied",
+          "status": "PASS",
+          "target": 0.0
+        },
+        {
+          "id": "citation-coverage",
+          "metric_path": "metrics.citation_source_coverage.citation_coverage.value",
+          "observed": 1.0,
+          "operator": ">=",
+          "reason": "threshold satisfied",
+          "status": "PASS",
+          "target": 1.0
+        },
+        {
+          "id": "citation-precision",
+          "metric_path": "metrics.citation_support.citation_precision.value",
+          "observed": 1.0,
+          "operator": ">=",
+          "reason": "threshold satisfied",
+          "status": "PASS",
+          "target": 1.0
+        },
+        {
+          "id": "citation-recall",
+          "metric_path": "metrics.citation_support.citation_recall.value",
+          "observed": 1.0,
+          "operator": ">=",
+          "reason": "threshold satisfied",
+          "status": "PASS",
+          "target": 1.0
+        },
+        {
+          "id": "citation-completeness",
+          "metric_path": "metrics.citation_support.citation_completeness.value",
+          "observed": 1.0,
+          "operator": ">=",
+          "reason": "threshold satisfied",
+          "status": "PASS",
+          "target": 1.0
+        },
+        {
+          "id": "unsupported-claim-rate",
+          "metric_path": "metrics.citation_support.unsupported_claim_rate.value",
+          "observed": 0.0,
+          "operator": "<=",
+          "reason": "threshold satisfied",
+          "status": "PASS",
+          "target": 0.0
+        },
+        {
+          "id": "faithfulness",
+          "metric_path": "metrics.citation_support.faithfulness.value",
+          "observed": 1.0,
+          "operator": ">=",
+          "reason": "threshold satisfied",
+          "status": "PASS",
+          "target": 1.0
+        },
+        {
+          "id": "fixture-p95-latency",
+          "metric_path": "metrics.latency.p95",
+          "observed": 15.0,
+          "operator": "<=",
+          "reason": "threshold satisfied",
+          "status": "PASS",
+          "target": 100.0
+        }
+      ]
+    }
+  ],
+  "schema_version": "retrieval-evaluation-pack-result.v1",
+  "status": "PASS",
+  "thresholds": [
+    {
+      "id": "ranking-hit-at-1",
+      "metric_path": "metrics.ranking.hit_at_k.1.value",
+      "observed": 1.0,
+      "operator": ">=",
+      "reason": "threshold satisfied",
+      "status": "PASS",
+      "target": 1.0
+    },
+    {
+      "id": "ranking-recall-at-2",
+      "metric_path": "metrics.ranking.recall_at_k.2.value",
+      "observed": 1.0,
+      "operator": ">=",
+      "reason": "threshold satisfied",
+      "status": "PASS",
+      "target": 1.0
+    },
+    {
+      "id": "acl-leakage-count",
+      "metric_path": "metrics.acl_leakage.leakage_count",
+      "observed": 0.0,
+      "operator": "==",
+      "reason": "threshold satisfied",
+      "status": "PASS",
+      "target": 0.0
+    },
+    {
+      "id": "citation-coverage",
+      "metric_path": "metrics.citation_source_coverage.citation_coverage.value",
+      "observed": 1.0,
+      "operator": ">=",
+      "reason": "threshold satisfied",
+      "status": "PASS",
+      "target": 1.0
+    },
+    {
+      "id": "citation-precision",
+      "metric_path": "metrics.citation_support.citation_precision.value",
+      "observed": 1.0,
+      "operator": ">=",
+      "reason": "threshold satisfied",
+      "status": "PASS",
+      "target": 1.0
+    },
+    {
+      "id": "citation-recall",
+      "metric_path": "metrics.citation_support.citation_recall.value",
+      "observed": 1.0,
+      "operator": ">=",
+      "reason": "threshold satisfied",
+      "status": "PASS",
+      "target": 1.0
+    },
+    {
+      "id": "citation-completeness",
+      "metric_path": "metrics.citation_support.citation_completeness.value",
+      "observed": 1.0,
+      "operator": ">=",
+      "reason": "threshold satisfied",
+      "status": "PASS",
+      "target": 1.0
+    },
+    {
+      "id": "unsupported-claim-rate",
+      "metric_path": "metrics.citation_support.unsupported_claim_rate.value",
+      "observed": 0.0,
+      "operator": "<=",
+      "reason": "threshold satisfied",
+      "status": "PASS",
+      "target": 0.0
+    },
+    {
+      "id": "faithfulness",
+      "metric_path": "metrics.citation_support.faithfulness.value",
+      "observed": 1.0,
+      "operator": ">=",
+      "reason": "threshold satisfied",
+      "status": "PASS",
+      "target": 1.0
+    },
+    {
+      "id": "fixture-p95-latency",
+      "metric_path": "metrics.latency.p95",
+      "observed": 15.0,
+      "operator": "<=",
+      "reason": "threshold satisfied",
+      "status": "PASS",
+      "target": 100.0
+    }
+  ]
+}

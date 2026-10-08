@@ -25,6 +25,9 @@ from rick_retrieval.qdrant import (
     QdrantError,
     QdrantHealth,
     QdrantHttpVectorStore,
+    QdrantHybridResult,
+    QdrantHybridUnavailableError,
+    QdrantIndexSchema,
     QdrantLimits,
     QdrantMalformedResponseError,
     QdrantSearchHit,
@@ -32,6 +35,9 @@ from rick_retrieval.qdrant import (
     QdrantTimeoutError,
     QdrantTransportError,
     QdrantValidationError,
+    QdrantSchemaMismatchError,
+    HTTP_HYBRID_INDEX_VERSION,
+    versioned_index_collection,
 )
 from rick_retrieval.rerank import BM25FReranker, DisabledReranker, ModelReranker, Reranker
 from rick_retrieval.sparse import (
@@ -73,6 +79,8 @@ __all__ = [
     "QdrantCollectionInfo", "QdrantDeleteResult", "QdrantDependencyError",
     "QdrantError", "QdrantHealth",
     "QdrantHttpVectorStore", "QdrantLimits", "QdrantMalformedResponseError",
+    "QdrantHybridResult", "QdrantHybridUnavailableError", "QdrantIndexSchema",
+    "QdrantSchemaMismatchError", "HTTP_HYBRID_INDEX_VERSION", "versioned_index_collection",
     "QdrantSearchHit", "QdrantStatusError", "QdrantTimeoutError",
     "QdrantTransportError", "QdrantValidationError", "RetrievalBackend",
     "RetrievalEngine", "RetrievalOptions", "RetrievalResult", "VectorStore",

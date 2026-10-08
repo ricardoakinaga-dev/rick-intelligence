@@ -58,6 +58,7 @@ class CanonicalIngestionQueueAdapter:
 
     @staticmethod
     def _record(job: Job) -> QueueRecord:
+        current_attempt = job.attempts[-1] if job.attempts else None
         failure = job.failure.code if job.failure is not None else None
         document_id = job.result.document_id if job.result is not None else None
         return QueueRecord(
@@ -76,6 +77,10 @@ class CanonicalIngestionQueueAdapter:
             updated_at=job.updated_at,
             last_error=failure,
             document_id=document_id,
+            started_at=current_attempt.started_at if current_attempt is not None else None,
+            finished_at=(current_attempt.finished_at if current_attempt is not None and job.state in
+                         {JobState.SUCCEEDED, JobState.FAILED, JobState.CANCELLED, JobState.DEAD_LETTER}
+                         else job.updated_at if current_attempt is None and job.state.terminal else None),
         )
 
     def health_check(self) -> bool:
@@ -163,6 +168,14 @@ class CanonicalIngestionQueueAdapter:
             collection_id=collection_id,
             idempotency_key=idempotency_key,
         )
+        return None if job is None else self._record(job)
+
+    def reconcile_publication(self, job_id, *, tenant_id, workspace_id, collection_id):
+        recover = getattr(self.queue, "recover_publication", None)
+        if not callable(recover):
+            return self.get(job_id, tenant_id=tenant_id, workspace_id=workspace_id)
+        job = recover(job_id, tenant_id=tenant_id, workspace_id=workspace_id,
+                      collection_id=collection_id, now=float(self._clock()))
         return None if job is None else self._record(job)
 
     def list(

@@ -1,0 +1,79 @@
+WARNING: Git worktree is DIRTY (209 entries); local dirty state is reported but not rejected
+PASS: 30 historical files match their recorded SHA256
+[PASS] STATE_JSON: artifact parses (.agent/state.json)
+[PASS] BACKLOG_JSON: artifact parses (.agent/backlog.json)
+[PASS] EXECUTION_LOG: artifact parses (.agent/execution-log.jsonl)
+[PASS] VERIFICATION_LOG: artifact parses (.agent/verification.jsonl)
+[PASS] STATE_FIELDS: all canonical runtime fields are present
+[PASS] BACKLOG_CONTRACT: validated 35 backlog item(s)
+[PASS] LOG_CONTRACT: validated 334 append-oriented event(s)
+[PASS] VERIFY_CONTRACT: validated 336 verification record(s)
+[PASS] GATE_HISTORY: validated 28 append-only gate record(s)
+[PASS] RECONCILE: state, backlog, log, and active pointers agree
+RESULT PASS (pass=10 warn=0 fail=0)
+PASS: derived review views and 11 historical files verified; original acceptance preserved
+{
+  "valid": true,
+  "errors": []
+}
+Git: head=b52f32c141916a2ea3af1a6b913bd91f380606e0 branch=main worktree=DIRTY (209 entries) remote_main=b52f32c141916a2ea3af1a6b913bd91f380606e0 sync=HEAD_EQ_ORIGIN_MAIN
+Control-plane check OK: required pointers and current Git observations are structurally consistent.
+PASS: derived review views and 11 historical files verified; original acceptance preserved
+python3 "/home/ricardo/rick-intelligence/scripts/phase15/check_boundaries.py"
+{
+  "status": "PASS",
+  "checked": "/home/ricardo/rick-intelligence",
+  "errors": []
+}
+PYTHONDONTWRITEBYTECODE=1 python3 "/home/ricardo/rick-intelligence/docs/ci/check_control_plane.py"
+WARNING: Git worktree is DIRTY (209 entries); local dirty state is reported but not rejected
+PASS: 30 historical files match their recorded SHA256
+[PASS] STATE_JSON: artifact parses (.agent/state.json)
+[PASS] BACKLOG_JSON: artifact parses (.agent/backlog.json)
+[PASS] EXECUTION_LOG: artifact parses (.agent/execution-log.jsonl)
+[PASS] VERIFICATION_LOG: artifact parses (.agent/verification.jsonl)
+[PASS] STATE_FIELDS: all canonical runtime fields are present
+[PASS] BACKLOG_CONTRACT: validated 35 backlog item(s)
+[PASS] LOG_CONTRACT: validated 334 append-oriented event(s)
+[PASS] VERIFY_CONTRACT: validated 336 verification record(s)
+[PASS] GATE_HISTORY: validated 28 append-only gate record(s)
+[PASS] RECONCILE: state, backlog, log, and active pointers agree
+RESULT PASS (pass=10 warn=0 fail=0)
+PASS: derived review views and 11 historical files verified; original acceptance preserved
+{
+  "valid": true,
+  "errors": []
+}
+Git: head=b52f32c141916a2ea3af1a6b913bd91f380606e0 branch=main worktree=DIRTY (209 entries) remote_main=b52f32c141916a2ea3af1a6b913bd91f380606e0 sync=HEAD_EQ_ORIGIN_MAIN
+Control-plane check OK: required pointers and current Git observations are structurally consistent.
+PYTHONDONTWRITEBYTECODE=1 python3 "/home/ricardo/rick-intelligence/scripts/state_of_art/validate_quality_bar.py"
+{"path": "docs/reports/current-triple-aaa-quality-bar-v1.json", "sha256": "fe0f58eb84bea4d16a138391b1afd85a9312d81fdb2ac7a383c2dbaf767f9633", "status": "PASS"}
+python3 "/home/ricardo/rick-intelligence/scripts/phase11/runner.py" lint
+==> current root boundary validator: /home/ricardo/rick-intelligence/.runtime/venvs/cvg/bin/python scripts/phase15/check_boundaries.py
+{
+  "status": "PASS",
+  "checked": "/home/ricardo/rick-intelligence",
+  "errors": []
+}
+<== current root boundary validator: exit 0
+==> Phase 1.1 Python syntax: /home/ricardo/rick-intelligence/.runtime/venvs/cvg/bin/python -m py_compile scripts/phase11/check_skeleton.py scripts/phase11/runner.py scripts/phase11/test_check_skeleton.py scripts/phase15/check_boundaries.py scripts/phase15/test_check_boundaries.py
+<== Phase 1.1 Python syntax: exit 0
+==> Locker JavaScript syntax: node --check server.js
+<== Locker JavaScript syntax: exit 0
+==> CVG frontend lint: npm run lint
+
+> rag-frontend-premium@0.1.0 lint
+> ./node_modules/.bin/eslint .
+
+<== CVG frontend lint: exit 0
+python3 "/home/ricardo/rick-intelligence/scripts/phase11/runner.py" typecheck
+==> Professor TypeScript compiler: npm run build
+
+> rick-professor@1.0.0 build
+> tsc
+
+<== Professor TypeScript compiler: exit 0
+==> CVG frontend TypeScript compiler (compatibility override): npm exec -- tsc --noEmit --ignoreDeprecations 5.0
+<== CVG frontend TypeScript compiler (compatibility override): exit 0
+==> CVG Python compilation (no Python type checker configured): /home/ricardo/rick-intelligence/.runtime/venvs/cvg/bin/python -m compileall -q src
+<== CVG Python compilation (no Python type checker configured): exit 0

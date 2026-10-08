@@ -95,6 +95,7 @@ class CSRFProtectionMiddleware(HTTPMiddleware):
         session_cookie_name: str = "rick_session",
         csrf_token: str = "",
         csrf_header_name: str = "X-CSRF-Token",
+        csrf_cookie_name: str = "rick_csrf",
     ):
         super().__init__(app)
         self.environment = environment
@@ -102,6 +103,7 @@ class CSRFProtectionMiddleware(HTTPMiddleware):
         self.session_cookie_name = session_cookie_name
         self.csrf_token = csrf_token
         self.csrf_header_name = csrf_header_name
+        self.csrf_cookie_name = csrf_cookie_name
 
     async def handle(self, scope, receive, send):
         request = Request(scope, receive)
@@ -118,6 +120,7 @@ class CSRFProtectionMiddleware(HTTPMiddleware):
             presented_token=request.headers.get(self.csrf_header_name),
             configured_token=self.csrf_token,
             allowed_origins=self.allowed_origins,
+            csrf_cookie_value=request.cookies.get(self.csrf_cookie_name),
         )
         if not allowed:
             request_id = getattr(request.state, "request_id", "unknown")

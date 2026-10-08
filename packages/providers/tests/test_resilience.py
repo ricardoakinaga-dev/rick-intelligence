@@ -133,7 +133,63 @@ async def test_resilient_provider_delegates_live_health_and_fails_closed() -> No
 
 
 @pytest.mark.asyncio
-async def test_resilient_provider_falls_back_to_local_readiness_without_live_hook() -> None:
+async def test_resilient_provider_fails_closed_without_a_live_probe() -> None:
+    """A port with no probe is not healthy — circuit state is not reachability."""
     provider = ResilientProvider(FakeProvider())
 
-    assert await provider.health_check() is True
+    assert await provider.health_check() is False
+    assert provider.readiness_check() is True
+
+
+class DeclaredProvider(FakeProvider):
+    """A port that declares its own production decision but exposes no probe."""
+
+    def __init__(self, *, production_safe: bool) -> None:
+        super().__init__()
+        self.production_safe = production_safe
+
+
+class NonProductionPort(HealthAwareProvider):
+    """A test port with a working probe: still never production-safe."""
+
+    is_test_provider = True
+
+
+def test_production_safe_requires_a_probe_or_an_explicit_declaration() -> None:
+    # Synthetic port: no probe and no declaration => fail closed.
+    bare = ResilientProvider(FakeProvider())
+    assert bare.production_safe is False
+    assert getattr(FakeProvider, "health_check", None) is None
+
+    # The same class of port with a live probe is admitted.
+    probed = ResilientProvider(HealthAwareProvider())
+    assert probed.production_safe is True
+
+    # An explicit declaration is an owned decision and does not need a probe.
+    assert ResilientProvider(DeclaredProvider(production_safe=True)).production_safe is True
+    assert ResilientProvider(DeclaredProvider(production_safe=False)).production_safe is False
+
+    # A test port is never production-safe, probe or not.
+    assert ResilientProvider(NonProductionPort()).production_safe is False
+
+
+def test_the_official_client_is_admitted_through_its_own_probe() -> None:
+    from rick_providers import ProviderConfig, create_provider
+    from rick_providers.client import OpenAICompatibleClient
+
+    provider = create_provider(ProviderConfig(
+        base_url="https://provider.example/v1",
+        api_key="test-only-key",
+        chat_model="chat-test-model",
+        embedding_model="embedding-test-model",
+        embedding_dimensions=3,
+        environment="test",
+    ))
+    try:
+        assert isinstance(provider, OpenAICompatibleClient)
+        assert callable(provider.health_check)
+        assert ResilientProvider(provider).production_safe is True
+    finally:
+        import asyncio
+
+        asyncio.run(provider.aclose())

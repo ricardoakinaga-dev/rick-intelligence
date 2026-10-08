@@ -1,0 +1,10 @@
+# exp-a02 - 2026-10-07T15:36:43Z
+# command: PYTHONPATH=<canonical> .runtime/venvs/cvg/bin/python -m pytest -q -p no:cacheprovider apps/api/tests
+FAILED apps/api/tests/test_search_lifecycle.py::test_archived_collection_is_denied_on_a_hot_index
+FAILED apps/api/tests/test_search_lifecycle.py::test_archived_collection_is_denied_on_a_cold_index
+FAILED apps/api/tests/test_search_lifecycle.py::test_unpublished_document_is_dropped_at_the_response_edge
+FAILED apps/api/tests/test_search_lifecycle.py::test_lifecycle_authority_failure_denies_the_query
+FAILED apps/api/tests/test_search_lifecycle.py::test_remote_backend_is_subject_to_the_same_lifecycle_gate
+FAILED apps/api/tests/test_search_lifecycle.py::test_archive_then_search_returns_no_items_scoped_and_globally
+FAILED apps/api/tests/test_search_lifecycle.py::test_archive_survives_a_restart_with_the_sqlite_store
+7 failed, 1590 passed, 18 skipped, 1 warning in 54.67s

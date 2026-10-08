@@ -14,15 +14,19 @@ here; callers must provide the base URL and collection explicitly.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 import re
+import struct
 import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from threading import Lock
 from typing import Any, Callable, Protocol, TypeAlias
 from urllib.parse import urlsplit
+
+from rick_retrieval.sparse import sparse_vector
 
 try:
     from rick_observability import inject_w3c_trace_headers
@@ -44,6 +48,8 @@ MAX_PAYLOAD_BYTES = 64 * 1024
 MAX_QUERY_BYTES = 256 * 1024
 MAX_REQUEST_BYTES = 4 * 1024 * 1024
 MAX_RESPONSE_BYTES = 1_000_000
+MAX_DOCUMENT_SNAPSHOT_POINTS = 100_000
+MAX_DOCUMENT_SNAPSHOT_BYTES = 64 * 1024 * 1024
 MAX_REQUEST_ATTEMPTS = 5
 MAX_RETRY_BACKOFF_SECONDS = 5.0
 MAX_CIRCUIT_FAILURES = 10
@@ -57,6 +63,9 @@ MAX_RESPONSE_SIZE_BYTES = MAX_RESPONSE_BYTES
 
 _COLLECTION_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$")
 _DENSE_VECTOR_NAME = "dense"
+_SPARSE_VECTOR_NAME = "sparse"
+_SUPPORTED_DENSE_DISTANCES = frozenset({"Cosine"})
+HTTP_HYBRID_INDEX_VERSION = "dense-sparse-logtf-v1"
 
 JsonScalar: TypeAlias = str | int | float | bool | None
 JsonValue: TypeAlias = JsonScalar | list["JsonValue"] | dict[str, "JsonValue"]
@@ -141,6 +150,18 @@ class QdrantValidationError(QdrantError, ValueError):
 
 class QdrantBoundsError(QdrantValidationError):
     """Input or output crossed one of the adapter's finite bounds."""
+
+
+class QdrantSchemaMismatchError(QdrantError):
+    """The selected index cannot safely accept this representation."""
+
+    code = "qdrant_schema_mismatch"
+
+
+class QdrantHybridUnavailableError(QdrantError):
+    """No trustworthy search leg is available; an explicit fallback may run."""
+
+    code = "qdrant_hybrid_unavailable"
 
 
 class QdrantClosedError(QdrantError):
@@ -312,6 +333,40 @@ class QdrantCollectionInfo:
 
 
 @dataclass(frozen=True, slots=True)
+class QdrantIndexSchema:
+    dense_dimensions: int
+    distance: str
+    sparse_enabled: bool
+
+
+@dataclass(frozen=True, slots=True)
+class QdrantHybridResult:
+    """Per-request observations, never mutable state shared between callers."""
+
+    dense: list[QdrantSearchHit]
+    sparse: list[QdrantSearchHit]
+    mode: str
+    degraded: bool = False
+    metadata: dict[str, object] = field(default_factory=dict)
+
+
+def versioned_index_collection(
+    base: str, *, embedding_model: str, embedding_version: str, dimensions: int,
+) -> str:
+    """Stable physical index identity; rebuilding retains the old index."""
+
+    base = _validate_collection_name(base)
+    if (not isinstance(embedding_model, str) or not embedding_model.strip()
+            or not isinstance(embedding_version, str) or not embedding_version.strip()
+            or len(embedding_model) > 256 or len(embedding_version) > 128
+            or type(dimensions) is not int or not 1 <= dimensions <= MAX_VECTOR_DIMENSIONS):
+        raise QdrantConfigurationError()
+    contract = [HTTP_HYBRID_INDEX_VERSION, embedding_model, embedding_version, dimensions]
+    digest = hashlib.sha256(json.dumps(contract, separators=(",", ":")).encode()).hexdigest()[:20]
+    return f"{base[:100]}_h1_{digest}"
+
+
+@dataclass(frozen=True, slots=True)
 class QdrantAlias:
     """Validated alias mapping; raw Qdrant metadata never crosses the boundary."""
 
@@ -370,11 +425,14 @@ class _Scope:
 class _HttpxTransport:
     """Lazy sync httpx transport, including support for MockTransport."""
 
-    def __init__(self, transport: object | None = None) -> None:
+    def __init__(
+        self, transport: object | None = None, *, max_response_bytes: int = MAX_RESPONSE_BYTES,
+    ) -> None:
         try:
             import httpx
         except ImportError:
             raise QdrantDependencyError() from None
+        self._max_response_bytes = max_response_bytes
         try:
             # The configured endpoint is the authority. Environment proxy
             # variables must not silently redirect a signed vector request to
@@ -392,18 +450,23 @@ class _HttpxTransport:
         content: bytes,
         timeout: float,
     ) -> HttpResponse:
-        response = self._client.request(
+        with self._client.stream(
             method,
             url,
             headers=dict(headers),
             content=content,
             timeout=timeout,
-        )
-        return HttpResponse(
-            status_code=response.status_code,
-            content=response.content,
-            headers=dict(response.headers),
-        )
+        ) as response:
+            body = bytearray()
+            for chunk in response.iter_bytes():
+                if len(chunk) > self._max_response_bytes - len(body):
+                    raise QdrantResponseTooLargeError("http_response")
+                body.extend(chunk)
+            return HttpResponse(
+                status_code=response.status_code,
+                content=bytes(body),
+                headers=dict(response.headers),
+            )
 
     def close(self) -> None:
         self._client.close()
@@ -437,6 +500,8 @@ class QdrantHttpVectorStore:
         circuit_reset_seconds: float = 15.0,
         sleeper: Callable[[float], None] | None = None,
         clock: Callable[[], float] | None = None,
+        retrieval_mode: str = "auto",
+        allow_partial: bool = True,
     ) -> None:
         self._base_url = _validate_base_url(base_url)
         self.collection = _validate_collection_name(collection)
@@ -474,6 +539,14 @@ class QdrantHttpVectorStore:
             )
         selected_limits.validate()
         self.limits = selected_limits
+        if (not isinstance(retrieval_mode, str) or retrieval_mode not in {"auto", "hybrid", "dense"}
+                or type(allow_partial) is not bool):
+            raise QdrantConfigurationError()
+        self.retrieval_mode = retrieval_mode
+        self.allow_partial = allow_partial
+        # Canonical ingestion prepares the schema before planning any writes.
+        # Unprepared low-level dense callers retain their existing contract.
+        self._index_schema: QdrantIndexSchema | None = None
         self._max_attempts = _validate_attempts(max_attempts)
         self._retry_backoff_seconds = _validate_retry_backoff(retry_backoff_seconds)
         self._circuit_failure_threshold = _validate_circuit_failures(circuit_failure_threshold)
@@ -484,7 +557,9 @@ class QdrantHttpVectorStore:
         self._consecutive_failures = 0
         self._circuit_opened_at: float | None = None
         self._probe_in_flight = False
-        self._transport = _coerce_transport(transport)
+        self._transport = _coerce_transport(
+            transport, max_response_bytes=self.limits.max_response_bytes,
+        )
         self._closed = False
 
     def __repr__(self) -> str:
@@ -570,8 +645,68 @@ class QdrantHttpVectorStore:
             points_count=counts["points_count"],
         )
 
-    def create_collection(self, *, vector_dimensions: int, distance: str = "Cosine") -> bool:
-        """Create the named collection with the canonical dense vector schema.
+    def read_index_schema(self) -> QdrantIndexSchema:
+        """Inspect the real schema on every preflight, including after restart.
+
+        Missing schema is not evidence of a legacy dense collection. Schema
+        negotiation is read-only and never silently upgrades existing data.
+        """
+
+        operation = "index_schema"
+        response = self._request("GET", self._collection_path(""), operation=operation)
+        parsed = self._decode_json(response.content, operation)
+        try:
+            params = parsed["result"]["config"]["params"]
+            dense = params["vectors"][_DENSE_VECTOR_NAME]
+            dimensions, distance = dense["size"], dense["distance"]
+            sparse = params.get("sparse_vectors")
+            if sparse is None:
+                sparse = {}
+        except (KeyError, TypeError, AttributeError):
+            raise QdrantSchemaMismatchError(operation) from None
+        if (type(dimensions) is not int or not 1 <= dimensions <= self.limits.max_vector_dimensions
+                or distance not in _SUPPORTED_DENSE_DISTANCES or not isinstance(sparse, Mapping)):
+            raise QdrantSchemaMismatchError(operation)
+        sparse_enabled = _SPARSE_VECTOR_NAME in sparse
+        if sparse_enabled:
+            config = sparse[_SPARSE_VECTOR_NAME]
+            if not isinstance(config, Mapping) or config.get("modifier") not in (None, "none"):
+                raise QdrantSchemaMismatchError(operation)
+        return QdrantIndexSchema(dimensions, distance, sparse_enabled)
+
+    def prepare_index(self, *, vector_dimensions: int) -> QdrantIndexSchema:
+        """Fail before ingestion mutations when the selected index is incompatible."""
+
+        if type(vector_dimensions) is not int or not 1 <= vector_dimensions <= self.limits.max_vector_dimensions:
+            raise QdrantBoundsError("index_schema", limit=True)
+        schema = self.read_index_schema()
+        if (schema.dense_dimensions != vector_dimensions
+                or (self.retrieval_mode == "hybrid" and not schema.sparse_enabled)):
+            raise QdrantSchemaMismatchError("index_schema")
+        self._index_schema = schema
+        return schema
+
+    def ingestion_index_key(self, *, embedding_model: str, embedding_version: str) -> str:
+        """Bind ingestion idempotency to the destination and representation.
+
+        Content identity alone must not skip a rebuild into a new physical
+        index or reuse embeddings from another model with the same dimensions.
+        Writers use physical collection names; readers may use a retained alias.
+        """
+
+        if self._index_schema is None:
+            raise QdrantSchemaMismatchError("index_identity")
+        versioned = versioned_index_collection(
+            self.collection, embedding_model=embedding_model,
+            embedding_version=embedding_version, dimensions=self._index_schema.dense_dimensions,
+        )
+        version = HTTP_HYBRID_INDEX_VERSION if self._index_schema.sparse_enabled else "dense-v1"
+        return hashlib.sha256(f"{self.collection}:{versioned}:{version}".encode()).hexdigest()
+
+    def create_collection(
+        self, *, vector_dimensions: int, distance: str = "Cosine", hybrid: bool = True,
+    ) -> bool:
+        """Create the named collection with dense and deterministic lexical vectors.
 
         Creation is explicit and idempotency is delegated to Qdrant. Existing
         collections are never deleted or silently altered by this method.
@@ -581,10 +716,17 @@ class QdrantHttpVectorStore:
         self._ensure_open(operation)
         if type(vector_dimensions) is not int or not 1 <= vector_dimensions <= self.limits.max_vector_dimensions:
             raise QdrantBoundsError(operation, limit=True)
-        if not isinstance(distance, str) or distance not in {"Cosine", "Dot", "Euclid", "Manhattan"}:
+        if not isinstance(distance, str) or distance not in _SUPPORTED_DENSE_DISTANCES:
             raise QdrantValidationError(operation)
+        if type(hybrid) is not bool:
+            raise QdrantValidationError(operation)
+        schema_body: dict[str, object] = {
+            "vectors": {_DENSE_VECTOR_NAME: {"size": vector_dimensions, "distance": distance}},
+        }
+        if hybrid:
+            schema_body["sparse_vectors"] = {_SPARSE_VECTOR_NAME: {"index": {"on_disk": False}}}
         body = self._encode_json(
-            {"vectors": {_DENSE_VECTOR_NAME: {"size": vector_dimensions, "distance": distance}}},
+            schema_body,
             operation,
             max_bytes=self.limits.max_query_bytes,
         )
@@ -595,6 +737,7 @@ class QdrantHttpVectorStore:
             content=body,
         )
         _require_acknowledged_result(self._decode_json(response.content, operation), operation)
+        self._index_schema = QdrantIndexSchema(vector_dimensions, distance, hybrid)
         return True
 
     def create_payload_index(self, *, field_name: str, field_schema: str = "keyword") -> bool:
@@ -626,10 +769,14 @@ class QdrantHttpVectorStore:
         self._ensure_open(operation)
         response = self._request("GET", "/aliases", operation=operation)
         parsed = self._decode_json(response.content, operation)
-        if not isinstance(parsed, Mapping) or not isinstance(parsed.get("result"), list):
+        if not isinstance(parsed, Mapping):
+            raise QdrantMalformedResponseError(operation)
+        result = parsed.get("result")
+        rows = result.get("aliases") if isinstance(result, Mapping) else result
+        if not isinstance(rows, list):
             raise QdrantMalformedResponseError(operation)
         aliases: list[QdrantAlias] = []
-        for raw in parsed["result"]:
+        for raw in rows:
             if not isinstance(raw, Mapping):
                 raise QdrantMalformedResponseError(operation)
             try:
@@ -668,19 +815,67 @@ class QdrantHttpVectorStore:
             if old == target:
                 raise QdrantValidationError(operation)
             observed = {item.alias_name: item.collection_name for item in self.list_aliases()}
+            if observed.get(alias) == target:
+                return True  # The same activation already completed before a retry.
             if observed.get(alias) != old:
                 raise QdrantValidationError(operation)
-            actions: list[dict[str, str]] = [{"action": "delete_alias", "alias_name": alias}]
+            actions: list[dict[str, object]] = [{"delete_alias": {"alias_name": alias}}]
         else:
+            observed = {item.alias_name: item.collection_name for item in self.list_aliases()}
+            if alias in observed:
+                if observed[alias] == target:
+                    return True
+                raise QdrantValidationError(operation)
             actions = []
-        actions.append({"action": "create_alias", "alias_name": alias, "collection_name": target})
+        actions.append({"create_alias": {"alias_name": alias, "collection_name": target}})
         body = self._encode_json({"actions": actions}, operation, max_bytes=self.limits.max_query_bytes)
         response = self._request("POST", "/collections/aliases", operation=operation, content=body)
         _require_acknowledged_result(self._decode_json(response.content, operation), operation)
         return True
 
+    def activate_index(
+        self, *, alias_name: str, vector_dimensions: int, expected_points: int,
+        old_collection_name: str | None = None,
+    ) -> bool:
+        """Activate a validated staged index and retain the previous physical copy.
+
+        The caller owns the expected manifest and serializes alias changes.
+        A store pointing to the retained old index can perform the rollback.
+        """
+
+        if type(expected_points) is not int or expected_points <= 0:
+            raise QdrantValidationError("activate_index")
+        schema = self.prepare_index(vector_dimensions=vector_dimensions)
+        info = self.collection_info()
+        if info.status != "green" or info.points_count != expected_points:
+            raise QdrantValidationError("activate_index")
+        must: list[dict[str, object]] = [{"has_vector": _DENSE_VECTOR_NAME}]
+        if schema.sparse_enabled and self.retrieval_mode != "dense":
+            must.extend([
+                {"has_vector": _SPARSE_VECTOR_NAME},
+                {"key": "index_version", "match": {"value": HTTP_HYBRID_INDEX_VERSION}},
+            ])
+        body = self._encode_json(
+            {"filter": {"must": must}, "exact": True}, "activate_index",
+            max_bytes=self.limits.max_query_bytes,
+        )
+        response = self._request(
+            "POST", self._collection_path("/points/count"), operation="activate_index", content=body,
+        )
+        parsed = self._decode_json(response.content, "activate_index")
+        try:
+            complete = parsed["result"]["count"]
+        except (KeyError, TypeError):
+            raise QdrantMalformedResponseError("activate_index") from None
+        if type(complete) is not int or complete != expected_points:
+            raise QdrantValidationError("activate_index")
+        return self.replace_alias(
+            alias_name=alias_name, collection_name=self.collection,
+            old_collection_name=old_collection_name,
+        )
+
     def upsert_points(self, points: list[dict[str, Any]] | Sequence[Mapping[str, object]]) -> int:
-        """Upsert bounded points using the named ``dense`` vector."""
+        """Upsert bounded points using the prepared dense/sparse schema."""
 
         operation = "upsert"
         self._ensure_open(operation)
@@ -708,6 +903,44 @@ class QdrantHttpVectorStore:
         result = self._decode_json(response.content, operation)
         _require_acknowledged_result(result, operation)
         return len(encoded_points)
+
+    def plan_upsert_batches(
+        self, points: Sequence[Mapping[str, object]],
+    ) -> tuple[list[dict[str, Any]], ...]:
+        operation = "upsert"
+        self._ensure_open(operation)
+        if not isinstance(points, Sequence) or isinstance(points, (str, bytes, bytearray)):
+            raise QdrantValidationError(operation)
+        batches: list[list[dict[str, Any]]] = []
+        batch: list[dict[str, Any]] = []
+        envelope_bytes = len(b'{"points":[]}')
+        batch_bytes = envelope_bytes
+        for point in points:
+            encoded = self._encode_json(
+                self._normalize_point(point, operation), operation,
+                max_bytes=self.limits.max_request_bytes,
+            )
+            if envelope_bytes + len(encoded) > self.limits.max_request_bytes:
+                raise QdrantBoundsError(operation, limit=True)
+            if batch and (
+                len(batch) >= self.limits.max_points
+                or batch_bytes + 1 + len(encoded) > self.limits.max_request_bytes
+            ):
+                batches.append(batch)
+                batch = []
+                batch_bytes = envelope_bytes
+            normalized = json.loads(encoded)
+            batch_bytes += len(encoded) + bool(batch)
+            batch.append({
+                "point_id": normalized["id"],
+                "vector": normalized["vector"][_DENSE_VECTOR_NAME],
+                "payload": normalized["payload"],
+                **({"sparse_vector": normalized["vector"][_SPARSE_VECTOR_NAME]}
+                   if _SPARSE_VECTOR_NAME in normalized["vector"] else {}),
+            })
+        if batch:
+            batches.append(batch)
+        return tuple(batches)
 
     def upsert(self, points: list[dict[str, Any]] | Sequence[Mapping[str, object]]) -> int:
         """Operation-named alias for the contract method ``upsert_points``."""
@@ -760,6 +993,124 @@ class QdrantHttpVectorStore:
             operation="search",
         )
 
+    def query_sparse(
+        self, encoded: Mapping[str, object], *, tenant_id: str, workspace_id: str,
+        allowed_collection_ids: Sequence[str], limit: int = 10,
+    ) -> list[QdrantSearchHit]:
+        """Query the lexical index with the same mandatory scope as dense search."""
+
+        operation = "query_sparse"
+        self._ensure_open(operation)
+        checked = _validate_sparse_vector(encoded, operation, self.limits.max_vector_dimensions)
+        checked_limit = _validate_limit(limit, operation, self.limits.max_query_results)
+        scope = self._scope(
+            tenant_id, workspace_id, allowed_collection_ids,
+            operation=operation, require_nonempty=False,
+        )
+        if scope is None or not checked["indices"]:
+            return []
+        body = self._encode_json({
+            "query": checked, "using": _SPARSE_VECTOR_NAME, "filter": _acl_filter(scope),
+            "limit": checked_limit, "with_payload": True, "with_vector": False,
+        }, operation, max_bytes=self.limits.max_query_bytes)
+        response = self._request(
+            "POST", self._collection_path("/points/query"), operation=operation, content=body,
+        )
+        raw_hits = _extract_hits(self._decode_json(response.content, operation), operation)
+        if len(raw_hits) > self.limits.max_query_results:
+            raise QdrantBoundsError(operation, limit=True)
+        # Qdrant can fill top-k with points whose sparse dot product is zero.
+        # They share no sparse evidence with the query and must not be fused
+        # as lexical candidates, especially for wildcard collection grants.
+        return [hit for hit in self._trusted_hits(raw_hits, scope, operation)
+                if hit.score > 0][:checked_limit]
+
+    def search_hybrid(
+        self, *, query: str, query_vector: Sequence[float], tenant_id: str,
+        workspace_id: str, allowed_collection_ids: Sequence[str], limit: int = 10,
+    ) -> QdrantHybridResult:
+        """Execute independently scoped HTTP legs, reporting partial availability.
+
+        Only transient dependency failures may degrade to the other leg.
+        Schema, validation and malformed-response failures remain hard errors.
+        Empty results are successful queries, not proof of an unavailable leg.
+        """
+
+        operation = "search_hybrid"
+        self._ensure_open(operation)
+        vector = _validate_vector(query_vector, operation, self.limits.max_vector_dimensions)
+        checked_limit = _validate_limit(limit, operation, self.limits.max_query_results)
+        if not isinstance(query, str) or len(query) > 2000:
+            raise QdrantValidationError(operation)
+        scope = self._scope(
+            tenant_id, workspace_id, allowed_collection_ids,
+            operation=operation, require_nonempty=False,
+        )
+        if scope is None:
+            return QdrantHybridResult([], [], "denied", metadata={"reason": "empty_scope"})
+        try:
+            schema = self.read_index_schema()
+        except QdrantError as exc:
+            if _transient_search_failure(exc):
+                raise QdrantHybridUnavailableError("index_schema") from None
+            raise
+        if (len(vector) != schema.dense_dimensions
+                or (self.retrieval_mode == "hybrid" and not schema.sparse_enabled)):
+            raise QdrantSchemaMismatchError(operation)
+        encoded = sparse_vector(query)
+        indices = sorted(encoded)
+        use_sparse = schema.sparse_enabled and self.retrieval_mode != "dense" and bool(indices)
+        kwargs = {
+            "tenant_id": scope.tenant_id, "workspace_id": scope.workspace_id,
+            "allowed_collection_ids": scope.allowed_collection_ids, "limit": checked_limit,
+        }
+        dense: list[QdrantSearchHit] = []
+        sparse: list[QdrantSearchHit] = []
+        metadata: dict[str, object] = {
+            "index_version": HTTP_HYBRID_INDEX_VERSION if schema.sparse_enabled else "dense-v1",
+        }
+        failed: list[str] = []
+        legs = [("dense", lambda: self.query(vector, **kwargs))]
+        if use_sparse:
+            legs.append(("sparse", lambda: self.query_sparse(
+                {"indices": indices, "values": [encoded[index] for index in indices]}, **kwargs,
+            )))
+        for name, search in legs:
+            started = self._clock()
+            try:
+                hits = search()
+            except QdrantError as exc:
+                if not _transient_search_failure(exc):
+                    raise
+                failed.append(name)
+                metadata[f"{name}_status"] = exc.code
+            else:
+                metadata[f"{name}_status"] = "ok"
+                if name == "dense":
+                    dense = hits
+                else:
+                    sparse = hits
+            finally:
+                metadata[f"{name}_ms"] = round(max(0.0, self._clock() - started) * 1000, 3)
+        if len(failed) == len(legs) or (failed and not self.allow_partial):
+            raise QdrantHybridUnavailableError(operation) from None
+        degraded = bool(failed)
+        if failed:
+            mode = "sparse-degraded" if "dense" in failed else "dense-degraded"
+        elif self.retrieval_mode == "dense":
+            mode = "dense"
+            metadata["sparse_status"] = "disabled"
+        elif not schema.sparse_enabled:
+            mode, degraded = "dense-legacy", True
+            metadata["sparse_status"] = "legacy_index"
+        elif not indices:
+            mode = "dense-no-terms"
+            metadata["sparse_status"] = "empty_query_terms"
+        else:
+            mode = "hybrid"
+        metadata.update(mode=mode, degraded=degraded, dense_count=len(dense), sparse_count=len(sparse))
+        return QdrantHybridResult(dense, sparse, mode, degraded, metadata)
+
     def delete_by_filter(
         self,
         *,
@@ -811,6 +1162,134 @@ class QdrantHttpVectorStore:
             if type(candidate) is int or isinstance(candidate, str):
                 operation_id = candidate
         return QdrantDeleteResult(acknowledged=True, operation_id=operation_id)
+
+    def snapshot_document(
+        self,
+        document_id: str,
+        collection_id: str,
+        *,
+        tenant_id: str,
+        workspace_id: str,
+    ) -> list[dict[str, object]]:
+        """Read a complete, scoped, byte-bounded rollback snapshot via scroll.
+
+        One point is requested per page because point vectors can be much
+        larger than ordinary search payloads. Both the HTTP response limit
+        and the aggregate snapshot limits apply before a caller can delete.
+        """
+
+        operation = "snapshot_document"
+        self._ensure_open(operation)
+        scope = self._scope(
+            tenant_id,
+            workspace_id,
+            [collection_id],
+            operation=operation,
+            require_nonempty=True,
+        )
+        checked_document = _validate_id(document_id, operation)
+        if self._index_schema is None:
+            self._index_schema = self.read_index_schema()
+        must = list(_acl_filter(scope)["must"])
+        must.append({"key": "document_id", "match": {"value": checked_document}})
+        points: list[dict[str, object]] = []
+        seen_offsets: set[str] = set()
+        offset: str | None = None
+        total_bytes = 0
+        while True:
+            if len(points) >= MAX_DOCUMENT_SNAPSHOT_POINTS:
+                raise QdrantBoundsError(operation, limit=True)
+            request_body: dict[str, object] = {
+                "filter": {"must": must},
+                "limit": 1,
+                "with_payload": True,
+                "with_vector": True,
+            }
+            if offset is not None:
+                request_body["offset"] = offset
+            content = self._encode_json(
+                request_body, operation, max_bytes=self.limits.max_query_bytes,
+            )
+            response = self._request(
+                "POST", self._collection_path("/points/scroll"),
+                operation=operation, content=content,
+            )
+            parsed = self._decode_json(response.content, operation)
+            result = parsed.get("result") if isinstance(parsed, Mapping) else None
+            rows = result.get("points") if isinstance(result, Mapping) else None
+            next_offset = result.get("next_page_offset") if isinstance(result, Mapping) else None
+            if not isinstance(rows, list) or len(rows) > 1:
+                raise QdrantMalformedResponseError(operation)
+            if not rows:
+                if next_offset is not None:
+                    raise QdrantMalformedResponseError(operation)
+                break
+
+            raw = rows[0]
+            if not isinstance(raw, Mapping):
+                raise QdrantMalformedResponseError(operation)
+            raw_id = raw.get("id")
+            try:
+                point_id = _validate_id(raw_id, operation)
+                payload = _validate_json_mapping(raw.get("payload"), operation)
+            except QdrantValidationError:
+                raise QdrantMalformedResponseError(operation) from None
+            if any(payload.get(name) != expected for name, expected in (
+                ("document_id", checked_document),
+                ("tenant_id", scope.tenant_id),
+                ("workspace_id", scope.workspace_id),
+                ("collection_id", collection_id),
+            )):
+                raise QdrantMalformedResponseError(operation)
+            self._encode_json(payload, operation, max_bytes=self.limits.max_payload_bytes)
+
+            vectors = raw.get("vector")
+            if not isinstance(vectors, Mapping) or "dense" not in vectors:
+                raise QdrantMalformedResponseError(operation)
+            try:
+                dense = _validate_vector(
+                    vectors["dense"], operation, self.limits.max_vector_dimensions,
+                )
+            except QdrantValidationError:
+                raise QdrantMalformedResponseError(operation) from None
+            if len(dense) != self._index_schema.dense_dimensions:
+                raise QdrantSchemaMismatchError(operation)
+            point: dict[str, object] = {
+                "point_id": point_id,
+                "vector": dense,
+                "payload": payload,
+            }
+            if self._index_schema.sparse_enabled:
+                try:
+                    point["sparse_vector"] = _validate_sparse_vector(
+                        vectors.get("sparse"), operation, self.limits.max_vector_dimensions,
+                    )
+                except QdrantValidationError:
+                    raise QdrantMalformedResponseError(operation) from None
+            elif "sparse" in vectors:
+                raise QdrantSchemaMismatchError(operation)
+
+            encoded_point = self._encode_json(
+                point, operation, max_bytes=MAX_DOCUMENT_SNAPSHOT_BYTES,
+            )
+            total_bytes += len(encoded_point)
+            if total_bytes > MAX_DOCUMENT_SNAPSHOT_BYTES:
+                raise QdrantBoundsError(operation, limit=True)
+            points.append(point)
+
+            if next_offset is None:
+                break
+            if not isinstance(next_offset, str):
+                raise QdrantMalformedResponseError(operation)
+            try:
+                next_offset = _validate_id(next_offset, operation)
+            except QdrantValidationError:
+                raise QdrantMalformedResponseError(operation) from None
+            if next_offset in seen_offsets:
+                raise QdrantMalformedResponseError(operation)
+            seen_offsets.add(next_offset)
+            offset = next_offset
+        return points
 
     def delete_document(
         self,
@@ -893,6 +1372,8 @@ class QdrantHttpVectorStore:
             raise QdrantValidationError(operation)
         selected_vector = query_vector if query_vector is not None else vector
         checked_vector = _validate_vector(selected_vector, operation, self.limits.max_vector_dimensions)
+        if self._index_schema is not None and len(checked_vector) != self._index_schema.dense_dimensions:
+            raise QdrantSchemaMismatchError(operation)
         checked_limit = _validate_limit(limit, operation, self.limits.max_query_results)
         scope = self._scope(
             tenant_id,
@@ -934,7 +1415,7 @@ class QdrantHttpVectorStore:
         raw_hits = _extract_hits(parsed, operation)
         if len(raw_hits) > self.limits.max_query_results:
             raise QdrantBoundsError(operation, limit=True)
-        return self._trusted_hits(raw_hits, scope, operation)
+        return self._trusted_hits(raw_hits, scope, operation)[:checked_limit]
 
     def _trusted_hits(
         self,
@@ -984,6 +1465,8 @@ class QdrantHttpVectorStore:
             raise QdrantValidationError(operation)
         point_id = _validate_id(point.get("point_id"), operation)
         vector = _validate_vector(point.get("vector"), operation, self.limits.max_vector_dimensions)
+        if self._index_schema is not None and len(vector) != self._index_schema.dense_dimensions:
+            raise QdrantSchemaMismatchError(operation)
         payload_obj = point.get("payload")
         payload = _validate_json_mapping(payload_obj, operation)
         for field_name in ("tenant_id", "workspace_id", "collection_id"):
@@ -992,10 +1475,34 @@ class QdrantHttpVectorStore:
                 raise QdrantValidationError(operation)
             if any(ord(char) < 0x20 or ord(char) == 0x7F for char in value):
                 raise QdrantValidationError(operation)
+        named: dict[str, object] = {_DENSE_VECTOR_NAME: vector}
+        if self._index_schema is not None and self._index_schema.sparse_enabled:
+            text = payload.get("text")
+            if not isinstance(text, str):
+                raise QdrantValidationError(operation)
+            encoded = sparse_vector(text)
+            indices = sorted(encoded)
+            lexical = {"indices": indices, "values": [encoded[index] for index in indices]}
+            checked = _validate_sparse_vector(
+                point.get("sparse_vector", lexical), operation, self.limits.max_vector_dimensions,
+            )
+            same_sparse = (
+                checked["indices"] == indices
+                and all(
+                    _same_float32(left, right)
+                    for left, right in zip(checked["values"], lexical["values"])
+                )
+            )
+            if not same_sparse or payload.get("index_version") not in (None, "", HTTP_HYBRID_INDEX_VERSION):
+                raise QdrantSchemaMismatchError(operation)
+            named[_SPARSE_VECTOR_NAME] = checked
+            payload["index_version"] = HTTP_HYBRID_INDEX_VERSION
+        elif "sparse_vector" in point:
+            raise QdrantSchemaMismatchError(operation)
         self._encode_json(payload, operation, max_bytes=self.limits.max_payload_bytes)
         return {
             "id": point_id,
-            "vector": {_DENSE_VECTOR_NAME: vector},
+            "vector": named,
             "payload": payload,
         }
 
@@ -1069,6 +1576,9 @@ class QdrantHttpVectorStore:
                 last_error = exc
             except QdrantTransportError as exc:
                 last_error = exc
+            except QdrantResponseTooLargeError:
+                self._clear_circuit_probe()
+                raise QdrantResponseTooLargeError(operation) from None
             except QdrantError:
                 # Validation, malformed response and lifecycle errors are
                 # contract failures. Retrying them would hide a bug and can
@@ -1182,15 +1692,19 @@ class QdrantHttpVectorStore:
             raise QdrantClosedError(operation)
 
 
-def _coerce_transport(transport: HttpTransport | object | None) -> HttpTransport:
+def _coerce_transport(
+    transport: HttpTransport | object | None,
+    *,
+    max_response_bytes: int = MAX_RESPONSE_BYTES,
+) -> HttpTransport:
     if transport is None:
-        return _HttpxTransport()
+        return _HttpxTransport(max_response_bytes=max_response_bytes)
     if callable(getattr(transport, "request", None)):
         return transport  # type: ignore[return-value]
     # httpx.MockTransport exposes handle_request rather than request.  Keep
     # this compatibility branch lazy and avoid importing httpx at module time.
     if callable(getattr(transport, "handle_request", None)):
-        return _HttpxTransport(transport)
+        return _HttpxTransport(transport, max_response_bytes=max_response_bytes)
     raise QdrantConfigurationError()
 
 
@@ -1309,7 +1823,13 @@ def _validate_vector(value: object, operation: str, max_dimensions: int) -> list
     for item in value:
         if isinstance(item, bool) or not isinstance(item, (int, float)):
             raise QdrantValidationError(operation)
-        converted = float(item)
+        overflowed = False
+        try:
+            converted = float(item)
+        except (ValueError, OverflowError):
+            overflowed = True
+        if overflowed:
+            raise QdrantValidationError(operation)
         if not math.isfinite(converted):
             raise QdrantValidationError(operation)
         result.append(converted)
@@ -1335,6 +1855,45 @@ def _validate_json_mapping(value: object, operation: str) -> dict[str, JsonValue
     if any(not isinstance(key, str) for key in value):
         raise QdrantValidationError(operation)
     return dict(value)  # type: ignore[return-value]
+
+
+def _validate_sparse_vector(value: object, operation: str, max_terms: int) -> dict[str, list]:
+    if not isinstance(value, Mapping) or set(value) != {"indices", "values"}:
+        raise QdrantValidationError(operation)
+    indices, values = value["indices"], value["values"]
+    if (not isinstance(indices, (list, tuple)) or not isinstance(values, (list, tuple))
+            or len(indices) != len(values)):
+        raise QdrantValidationError(operation)
+    if len(indices) > max_terms:
+        raise QdrantBoundsError(operation, limit=True)
+    if any(type(index) is not int or not 0 <= index < 2**32 for index in indices):
+        raise QdrantValidationError(operation)
+    if any(left >= right for left, right in zip(indices, indices[1:])):
+        raise QdrantValidationError(operation)
+    if any(not isinstance(weight, (int, float)) or isinstance(weight, bool)
+           or not math.isfinite(float(weight)) for weight in values):
+        raise QdrantValidationError(operation)
+    return {"indices": list(indices), "values": [float(weight) for weight in values]}
+
+
+def _same_float32(left: float, right: float) -> bool:
+    """Compare sparse weights at the precision Qdrant stores and returns.
+
+    Qdrant serializes its float32 sparse values as shortest round-tripping JSON
+    decimals. Compare their float32 encodings so snapshots remain restorable
+    without allowing a change large enough to alter the stored value.
+    """
+
+    try:
+        return struct.pack("!f", left) == struct.pack("!f", right)
+    except (OverflowError, struct.error):
+        return False
+
+
+def _transient_search_failure(error: QdrantError) -> bool:
+    return isinstance(error, (QdrantTimeoutError, QdrantTransportError, QdrantCircuitOpenError)) or (
+        isinstance(error, QdrantStatusError) and _retryable_status(error.status_code)
+    )
 
 
 def _acl_filter(scope: _Scope) -> dict[str, object]:
@@ -1418,6 +1977,12 @@ __all__ = [
     "QdrantHealth",
     "QdrantHttpAdapter",
     "QdrantHttpVectorStore",
+    "QdrantHybridResult",
+    "QdrantHybridUnavailableError",
+    "QdrantIndexSchema",
+    "QdrantSchemaMismatchError",
+    "HTTP_HYBRID_INDEX_VERSION",
+    "versioned_index_collection",
     "QdrantMalformedResponseError",
     "QdrantLimits",
     "QdrantResponseError",

@@ -1,0 +1,10 @@
+PYTHONDONTWRITEBYTECODE=1 python3 "/home/ricardo/rick-intelligence/infrastructure/scripts/migrate.py" "/home/ricardo/rick-intelligence/infrastructure/migrations" --check
+0001 0001_control_plane.sql sha256:07113ff4a5e00e9986b1584864eb097e67a6daa66285895b9d6993f6bf116195
+0002 0002_product_schema.sql sha256:0bd4a31e3a821de3efcdaad621674aafc9215b0acb84a55fb681fc9fd6054312
+0003 0003_product_contract_extensions.sql sha256:d6d6413a45f93a5a65146d20221721bc60d5131f86ec29c0fd848cac351ae14a
+0004 0004_durable_jobs_contract.sql sha256:0621c726c6eaae17fba0a72a209452964eb6320c38f2ebc60966b1d562731274
+0005 0005_rewrite_legacy_jobs.sql sha256:58878320223f9f30d42aea840c7e58795eb5c448daf90a0877adedc781cc9774
+0006 0006_document_lineage_contract.sql sha256:2d35f6e5a784258150baf68c0e88cbdb1f7b733034af662d694a45956eb8ffdd
+migration checksums: PASS (6 file(s)); execution: NOT_RUN
+bash -n "/home/ricardo/rick-intelligence/infrastructure/scripts/validate-env.sh"
+PYTHONDONTWRITEBYTECODE=1 python3 -m py_compile "/home/ricardo/rick-intelligence/infrastructure/scripts/backup-restore-check.py" "/home/ricardo/rick-intelligence/infrastructure/scripts/backup_restore.py"

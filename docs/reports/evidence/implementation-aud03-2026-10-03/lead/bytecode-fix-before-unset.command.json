@@ -1,0 +1,29 @@
+{
+  "command": [
+    "env",
+    "-u",
+    "PYTHONDONTWRITEBYTECODE",
+    "/tmp/rick-aud03-lockenv-qzj0r3mc/venv/bin/python",
+    "-m",
+    "pytest",
+    "-q",
+    "-p",
+    "no:cacheprovider",
+    "scripts/state_of_art/tests/test_ci_control_restore.py"
+  ],
+  "cwd": "/home/ricardo/rick-intelligence",
+  "pythonpath": "/home/ricardo/rick-intelligence:/home/ricardo/rick-intelligence/apps/api/src:/home/ricardo/rick-intelligence/apps/api/tests:/home/ricardo/rick-intelligence/apps/worker:/home/ricardo/rick-intelligence/packages/authorization/src:/home/ricardo/rick-intelligence/packages/contracts/src:/home/ricardo/rick-intelligence/packages/decision/src:/home/ricardo/rick-intelligence/packages/evidence/src:/home/ricardo/rick-intelligence/packages/identity/src:/home/ricardo/rick-intelligence/packages/ingestion/src:/home/ricardo/rick-intelligence/packages/jobs/src:/home/ricardo/rick-intelligence/packages/knowledge/src:/home/ricardo/rick-intelligence/packages/locking/src:/home/ricardo/rick-intelligence/packages/observability/src:/home/ricardo/rick-intelligence/packages/professor/src:/home/ricardo/rick-intelligence/packages/providers/src:/home/ricardo/rick-intelligence/packages/retrieval/src:/home/ricardo/rick-intelligence/packages/storage/src",
+  "started_at": "2026-10-04T01:59:43.995158+00:00",
+  "finished_at": "2026-10-04T02:00:11.449998+00:00",
+  "exit_code": 1,
+  "before_hashes": {
+    "docs/ci/restore_control_inputs.py": "5b22dc8d4a529019f0796672ea47868f5a6cc0c186a7ac237ff4765f53894eb1",
+    "scripts/state_of_art/tests/test_ci_control_restore.py": "1b8059570db29f601e164ceb82c3c7bd87760ecf1677445c87f3a5c95e3b4026"
+  },
+  "after_hashes": {
+    "docs/ci/restore_control_inputs.py": "5b22dc8d4a529019f0796672ea47868f5a6cc0c186a7ac237ff4765f53894eb1",
+    "scripts/state_of_art/tests/test_ci_control_restore.py": "1b8059570db29f601e164ceb82c3c7bd87760ecf1677445c87f3a5c95e3b4026"
+  },
+  "source_unchanged": true,
+  "log": "bytecode-fix-before-unset.log"
+}

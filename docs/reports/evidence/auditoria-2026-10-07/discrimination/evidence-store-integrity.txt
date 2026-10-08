@@ -1,0 +1,12 @@
+=== AUD07-18 C: integridade da bolsa (2026-10-08) ===
+blob alvo: 21/21a13cd157aafd5d5b1594e16d51cc4136987b0d02d7cad900eef47d6608551f original_path: -
+--- C1: blob corrompido, verify (espera FAIL) ---
+FAIL: hash divergente: 21/21a13cd157aafd5d5b1594e16d51cc4136987b0d02d7cad900eef47d6608551f
+exit=1
+--- C2: blob reposto, verify (espera PASS) ---
+PASS: todos os hashes da bolsa conferem
+exit=0
+--- C3: e o check continua verde ---
+AVISO: 771 citação(ões) em forma relativa sem arquivo na árvore (consulte docs/reports/evidence/README.md)
+PASS: evidência citada presente e layout conforme a política AUD07-18
+exit=0

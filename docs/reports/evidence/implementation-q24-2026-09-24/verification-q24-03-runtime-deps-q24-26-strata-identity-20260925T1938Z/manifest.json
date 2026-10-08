@@ -1,0 +1,413 @@
+{
+  "schema_version": "q24-local-verification.v1",
+  "scope": [
+    "Q24-03",
+    "Q24-26"
+  ],
+  "result": "PASS",
+  "scope_status": "PARTIAL_LOCAL_ONLY",
+  "generated_at": "2026-09-25T22:06:26Z",
+  "candidate": {
+    "source_revision": "b52f32c141916a2ea3af1a6b913bd91f380606e0",
+    "worktree_status": "DIRTY_SHARED_WORKTREE",
+    "campaign_result_schema": "retrieval-campaign-result.v4"
+  },
+  "canonical_state": {
+    "state_revision": 378,
+    "last_event_id": "EVT-Q17-01A-Q24-26-UNICODE-REVIEW-PASS-20260925T2206Z",
+    "status": "IN_PROGRESS",
+    "verification_state": "PARTIAL",
+    "active_task": "Q17-01.A",
+    "active_action_id": "Q17-01.A:VERIFY-Q17-19A-DEPLOYED-INVENTORY",
+    "backlog_items": 35,
+    "events": 402,
+    "verifications": 405,
+    "gates": 28
+  },
+  "results": {
+    "Q24-03": {
+      "status": "PASS_LOCAL",
+      "runtime_environment": "CPython 3.12.3; clean temporary environment; 45 exact hash-pinned runtime packages",
+      "direct_http_stack": {
+        "fastapi": "0.141.1",
+        "starlette": "1.7.0",
+        "uvicorn": "0.54.0"
+      },
+      "dependency_pin_consistency": "PASS",
+      "advisory_audits": {
+        "runtime-audit-pypi.json": {
+          "status": "PASS",
+          "packages": 45,
+          "known_vulnerabilities": 0
+        },
+        "runtime-audit-osv.json": {
+          "status": "PASS",
+          "packages": 45,
+          "known_vulnerabilities": 0
+        }
+      },
+      "pip_check": "PASS",
+      "uv_lock_check": "PASS",
+      "transport_tests": {
+        "passed": 15,
+        "failed": 0,
+        "server_disconnect_traceback": false
+      },
+      "api_tests": {
+        "passed": 749,
+        "failed": 0,
+        "warnings": [
+          "StarletteDeprecationWarning: HTTPX use with starlette.testclient is deprecated; upstream suggests httpx2."
+        ],
+        "server_disconnect_traceback": false
+      },
+      "remaining": [
+        "Container/image build and immutable base-image audit were not run.",
+        "Deployed-image inventory remains D02-gated."
+      ],
+      "ci_direct_pin_coverage": "All five checked direct-install workflows explicitly pin FastAPI, Pydantic, python-multipart, Starlette and Uvicorn; phase-1.5 now includes python-multipart==0.0.32."
+    },
+    "Q24-26": {
+      "status": "PASS_OFFLINE_SYNTHETIC_HARNESS",
+      "schema_version": "retrieval-campaign-result.v4",
+      "campaign_harness": "PASS",
+      "campaign_status": "NOT_RUN",
+      "eligibility_status": "BLOCKED",
+      "provider_status": "NOT_RUN",
+      "campaign_tests": "23 passed",
+      "pack_tests": "15 passed",
+      "retrieval_pack": "PASS",
+      "strata_identity": "Exact positive model/corpus IDs fall back to pack_manifest.metadata when omitted on cases; every non-empty valid Unicode identity and dimension-label string, including whitespace-only strings, is retained. Empty strings and unpaired surrogates are rejected explicitly. Quality rows and grouped uncertainty use the same resolved identities.",
+      "abstention": "NOT_MEASURED",
+      "synthetic_only": true,
+      "blockers": [
+        "No rights-approved representative corpus or evaluation authorization.",
+        "Provider/model run and live product answer path remain NOT_RUN.",
+        "D04 risk/ambiguity labels, thresholds, adjudication and risk acceptance remain unapproved.",
+        "No authorized calibration/reserved split; minimum positive-stratum sample sizes are unmet."
+      ],
+      "stratum_id_encoding": "Identity components are percent-encoded without trimming. Declared dimension maps are canonicalized and represented by reversible unpadded URL-safe base64; regression tests decode the exact whitespace-preserving JSON.",
+      "identity_regressions": "PASS: slash-containing identities remain distinct; ranker and space-padded ranker remain distinct; manifest defaults are inherited; whitespace-only valid Unicode IDs/labels are preserved; isolated high, low and embedded surrogates fail with typed validation errors.",
+      "label_encoding_round_trip": "PASS: canonical dimension JSON decodes exactly for valid Unicode strings, including significant and whitespace-only labels.",
+      "overall_uncertainty": "uncertainty.overall is pooled across positive cases; by_model_corpus and by_quality_stratum are distinct grouped projections.",
+      "postreview_checks": {
+        "campaign_tests": {
+          "passed": 23,
+          "failed": 0
+        },
+        "pack_tests": {
+          "passed": 15,
+          "failed": 0
+        },
+        "retrieval_pack": "PASS",
+        "lint": "PASS",
+        "typecheck": "PASS",
+        "make_validate": "PASS (10/10 control checks; state revision 378, 402 events, 405 verifications)",
+        "git_diff_check": "PASS",
+        "canonical_views": "PASS (11 historical files verified)",
+        "synthetic_campaign": "PASS harness; NOT_RUN; BLOCKED; observed dispositions NOT_MEASURED"
+      },
+      "previous_snapshot_independent_review": {
+        "status": "PASS_SCOPED",
+        "reviewer": "Kuhn",
+        "independence": "I1; fork_context=false; sealed read-only scope",
+        "report": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/critic-q24-26-identities-pass-20260925.md",
+        "candidate_fingerprint_pre": "e295f35d384e58108109a8ef481fa0efa5d3fed9eb551a20ee3394adb2e17f9a",
+        "candidate_fingerprint_post": "e295f35d384e58108109a8ef481fa0efa5d3fed9eb551a20ee3394adb2e17f9a",
+        "mutation_sentinel_pre": "38ce6e6870d0920859f26745811ef8a48701f1858d1588e38755aa88abb141ea",
+        "mutation_sentinel_post": "38ce6e6870d0920859f26745811ef8a48701f1858d1588e38755aa88abb141ea",
+        "mutation_sentinel_unchanged": true,
+        "findings": [],
+        "full_product_approval": false
+      },
+      "independent_review": {
+        "status": "PASS_SCOPED",
+        "reviewer": "Aquinas",
+        "independence": "I1; fork_context=false; sealed read-only scope",
+        "report": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/critic-q24-26-unicode-identities-pass-20260925.md",
+        "candidate_fingerprint_pre": "7f82efea804c187ace39b24ffb5a2c734f9ac203146c45136b80a88fca762e81",
+        "candidate_fingerprint_post": "7f82efea804c187ace39b24ffb5a2c734f9ac203146c45136b80a88fca762e81",
+        "mutation_sentinel_pre": "f70fd9413dddf112438639c59d3d6035c3aded85f6a750b88735e81dabdfb1b6",
+        "mutation_sentinel_post": "f70fd9413dddf112438639c59d3d6035c3aded85f6a750b88735e81dabdfb1b6",
+        "mutation_sentinel_unchanged": true,
+        "findings": [],
+        "full_product_approval": false
+      }
+    },
+    "shared_checks": {
+      "lint": "PASS",
+      "typecheck": "PASS",
+      "make_validate": "PASS (10/10 control checks; final state revision 378)",
+      "frozen_quality_bar": "PASS",
+      "git_diff_check": "PASS",
+      "canonical_views": "PASS (11 historical files verified)"
+    }
+  },
+  "peer_review": {
+    "status": "PASS_SCOPED",
+    "scope": "PASS for current Q24-26 result v4 valid-Unicode identity, serialization, grouping, uncertainty and synthetic-claim scope only. Not approval of full product or full 14-criterion bar.",
+    "intermediate_valid_review": {
+      "verdict": "CONDITIONAL PASS",
+      "report": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/critic-q24-03-q24-26-conditional-20260925.md",
+      "candidate_fingerprint": "74fd65ee35f39f2417cf218bd3d85d8afb9a863a2d2edb7965e13c0ec50b61ff",
+      "mutation_sentinel_unchanged": true,
+      "findings_fixed": [
+        "ambiguous stratum IDs",
+        "missing explicit python-multipart CI pin in phase-1.5"
+      ]
+    },
+    "earlier_invalid_review": {
+      "verdict": "INVALID",
+      "report": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/critic-previous-invalid.md",
+      "reason": "The previous critic changed ignored Python bytecode; its judgment was not accepted."
+    },
+    "latest_attempt": {
+      "status": "VALID_PASS_SCOPED",
+      "verdict": "PASS",
+      "reviewer": "Aquinas",
+      "independence": "I1; fork_context=false; sealed read-only scope",
+      "candidate_fingerprint": "7f82efea804c187ace39b24ffb5a2c734f9ac203146c45136b80a88fca762e81",
+      "candidate_fingerprint_post": "7f82efea804c187ace39b24ffb5a2c734f9ac203146c45136b80a88fca762e81",
+      "mutation_sentinel": "f70fd9413dddf112438639c59d3d6035c3aded85f6a750b88735e81dabdfb1b6",
+      "mutation_sentinel_post": "f70fd9413dddf112438639c59d3d6035c3aded85f6a750b88735e81dabdfb1b6",
+      "mutation_sentinel_unchanged": true,
+      "report": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/critic-q24-26-unicode-identities-pass-20260925.md",
+      "findings": [],
+      "note": "Valid independent PASS with no findings for the current Q24-26 identity/serialization slice; does not close the full product campaign, quality bar, runtime or promotion gates."
+    },
+    "pre_fix_valid_fail": {
+      "status": "VALID_FAIL",
+      "verdict": "FAIL",
+      "reviewer": "Jason",
+      "independence": "I1; fork_context=false; sealed read-only scope",
+      "candidate_fingerprint": "a74f9cf061eee070e1907a4eb5d1212ab7d224348ee22fadfff80e2a24b05ce6",
+      "candidate_fingerprint_post": "a74f9cf061eee070e1907a4eb5d1212ab7d224348ee22fadfff80e2a24b05ce6",
+      "mutation_sentinel": "10c10a483b824f9f3bd553dece5f06d11c48f1bed21d9fc6181c76551e9d6522",
+      "mutation_sentinel_post": "10c10a483b824f9f3bd553dece5f06d11c48f1bed21d9fc6181c76551e9d6522",
+      "mutation_sentinel_unchanged": true,
+      "report": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/critic-q24-26-identity-fail-20260925.md",
+      "findings_fixed": [
+        "Significant whitespace was trimmed from identity strings in campaign and pack grouping.",
+        "Declared dimension identity used only a 16-hex-character truncated SHA-256 suffix."
+      ],
+      "note": "Valid pre-v4 FAIL; corrected and retested. A fresh independent review of result v4 remains pending."
+    },
+    "review_history": [
+      {
+        "status": "NOT_RETURNED",
+        "reviewer": "Gibbs",
+        "independence": "I1; fork_context=false",
+        "candidate_fingerprint": "453f227c23ecd17bb8dd51c7f8d3369aa7bb34ea7bd666958cc4bcd51a284f07",
+        "mutation_sentinel_unchanged": true,
+        "report": null,
+        "note": "The reviewer remained running after status/finalization requests and was closed; no judgment was received. This is not approval."
+      },
+      {
+        "status": "VALID_FAIL",
+        "verdict": "FAIL",
+        "reviewer": "Jason",
+        "independence": "I1; fork_context=false; sealed read-only scope",
+        "candidate_fingerprint": "a74f9cf061eee070e1907a4eb5d1212ab7d224348ee22fadfff80e2a24b05ce6",
+        "candidate_fingerprint_post": "a74f9cf061eee070e1907a4eb5d1212ab7d224348ee22fadfff80e2a24b05ce6",
+        "mutation_sentinel": "10c10a483b824f9f3bd553dece5f06d11c48f1bed21d9fc6181c76551e9d6522",
+        "mutation_sentinel_post": "10c10a483b824f9f3bd553dece5f06d11c48f1bed21d9fc6181c76551e9d6522",
+        "mutation_sentinel_unchanged": true,
+        "report": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/critic-q24-26-identity-fail-20260925.md",
+        "findings_fixed": [
+          "Significant whitespace was trimmed from identity strings in campaign and pack grouping.",
+          "Declared dimension identity used only a 16-hex-character truncated SHA-256 suffix."
+        ],
+        "note": "Valid pre-v4 FAIL; corrected and retested. A fresh independent review of result v4 remains pending."
+      },
+      {
+        "status": "NOT_RETURNED",
+        "reviewer": "Harvey",
+        "independence": "I1; fork_context=false; sealed read-only scope",
+        "candidate_fingerprint": "09b915e4b508258fcf9f6f4db010d562706fbe5fcc451056bb0b4dcf38b1aa4a",
+        "mutation_sentinel_unchanged": true,
+        "report": null,
+        "note": "Reviewer could not read files under the original overly restrictive retrieval instruction; no review occurred."
+      },
+      {
+        "status": "VALID_FAIL",
+        "verdict": "FAIL",
+        "reviewer": "Halley",
+        "independence": "I1; fork_context=false; sealed read-only scope",
+        "candidate_fingerprint": "09b915e4b508258fcf9f6f4db010d562706fbe5fcc451056bb0b4dcf38b1aa4a",
+        "candidate_fingerprint_post": "09b915e4b508258fcf9f6f4db010d562706fbe5fcc451056bb0b4dcf38b1aa4a",
+        "mutation_sentinel": "a5674ea84d6db1fa53961692fe5da1a16c720caf2b1857c2ee1c1bc62cdf85f6",
+        "mutation_sentinel_post": "a5674ea84d6db1fa53961692fe5da1a16c720caf2b1857c2ee1c1bc62cdf85f6",
+        "mutation_sentinel_unchanged": true,
+        "report": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/critic-q24-26-default-identities-fail-20260925.md",
+        "findings_fixed": [
+          "pack metadata defaults in campaign strata/quality",
+          "whitespace-only non-empty IDs/labels",
+          "pooled uncertainty.overall documentation"
+        ],
+        "note": "Valid FAIL on the prior snapshot. Corrected and locally retested; fresh review pending."
+      },
+      {
+        "status": "VALID_PASS_SCOPED",
+        "verdict": "PASS",
+        "reviewer": "Kuhn",
+        "independence": "I1; fork_context=false; sealed read-only scope",
+        "candidate_fingerprint": "e295f35d384e58108109a8ef481fa0efa5d3fed9eb551a20ee3394adb2e17f9a",
+        "candidate_fingerprint_post": "e295f35d384e58108109a8ef481fa0efa5d3fed9eb551a20ee3394adb2e17f9a",
+        "mutation_sentinel": "38ce6e6870d0920859f26745811ef8a48701f1858d1588e38755aa88abb141ea",
+        "mutation_sentinel_post": "38ce6e6870d0920859f26745811ef8a48701f1858d1588e38755aa88abb141ea",
+        "mutation_sentinel_unchanged": true,
+        "report": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/critic-q24-26-identities-pass-20260925.md",
+        "findings": [],
+        "note": "Scoped PASS; no finding and no repository mutation."
+      },
+      {
+        "status": "VALID_PASS_SCOPED",
+        "verdict": "PASS",
+        "reviewer": "Aquinas",
+        "independence": "I1; fork_context=false; sealed read-only scope",
+        "candidate_fingerprint": "7f82efea804c187ace39b24ffb5a2c734f9ac203146c45136b80a88fca762e81",
+        "candidate_fingerprint_post": "7f82efea804c187ace39b24ffb5a2c734f9ac203146c45136b80a88fca762e81",
+        "mutation_sentinel": "f70fd9413dddf112438639c59d3d6035c3aded85f6a750b88735e81dabdfb1b6",
+        "mutation_sentinel_post": "f70fd9413dddf112438639c59d3d6035c3aded85f6a750b88735e81dabdfb1b6",
+        "mutation_sentinel_unchanged": true,
+        "report": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/critic-q24-26-unicode-identities-pass-20260925.md",
+        "findings": [],
+        "note": "Valid independent PASS with no findings for the current Q24-26 identity/serialization slice; does not close the full product campaign, quality bar, runtime or promotion gates."
+      }
+    ],
+    "corrections_after_latest_fail": {
+      "status": "IMPLEMENTED_AND_REVIEWED_SCOPED",
+      "campaign_tests": 23,
+      "pack_tests": 15,
+      "details": [
+        "Campaign strata and quality metrics share positive model/corpus defaults from pack manifest metadata.",
+        "All valid non-empty Unicode identities and labels are preserved exactly, including whitespace-only values.",
+        "Empty strings and unpaired surrogate code points are rejected with typed validation errors before URI/UTF-8 encoding.",
+        "Docs state pooled overall uncertainty separately from grouped projections."
+      ],
+      "fresh_independent_review": "PASS_SCOPED",
+      "report": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/critic-q24-26-unicode-identities-pass-20260925.md"
+    },
+    "unicode_hardening_after_prior_pass": {
+      "status": "IMPLEMENTED_AND_LOCALLY_VERIFIED",
+      "report": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/identity-unicode-boundary.md",
+      "fresh_independent_review": "PENDING"
+    }
+  },
+  "program_limitations": [
+    "No product-quality, production-readiness, deployment or promotion claim is made.",
+    "Q24-03 and Q24-26 remain partial; corpus/provider/domain authorization and D02 image/deployed inventory remain open.",
+    "The active Q17-01.A D02 inventory action is unchanged."
+  ],
+  "files": {
+    ".agent/backlog.json": "1963c802400f74034cbed37a2dd5ad48a6f842c1562f01e9f498974cfbbec98b",
+    ".agent/execution-log.jsonl": "d9163b93c12600900226214d4a0d306f6b130332fa47780f7aade0da1290122d",
+    ".agent/plans/phase-3-runtime-evidence-production-promotion.md": "222a4b295902a730f390ea647a9d39c3d57c9bcd27d86686cc0a59c795ca5f4a",
+    ".agent/state.json": "6ef79522170200b6c5d9e8a66799d64edab0ee1bb6a257eb44af634b25c72dc2",
+    ".agent/verification.jsonl": "1fbc29396db1a8320d08576882f20398350507a78c894cce6b3ece58b0f058aa",
+    ".gauntlet-state-of-art/state.json": "cc7b8473a7e8d75aa27c909f70430b86a331f71538045c6cc873f105f1e364af",
+    ".gauntlet-state-of-art/state.md": "7d576103274e57b24010bf404f169a81ca7978fffb6135c4e820dd335fb9c368",
+    ".gauntlet/bar.json": "f1ea9aa44d0d66e00bb47e75e30ad616ff575897de7d2a40bb5bc8e1f4936310",
+    ".gauntlet/state.md": "f7287f22a9ea84f02310df63576b1e44c574a9660e91df19515b9a370dc54483",
+    ".github/workflows/phase-1.3.1.yml": "5919dfaff10e825a3e3232d976835fd5d7733ab5450859b825861d6f0099da6f",
+    ".github/workflows/phase-1.3.yml": "77db0ec317f8b94f638b3520a25717e6ae8b6ce92a15ed19796dd25fb440bc6d",
+    ".github/workflows/phase-1.4.yml": "55e8bdc72e6b6df9dd59894fe537e71fd5a990d9874f9d7aacd334c6b7e8c50e",
+    ".github/workflows/phase-1.5.yml": "b1f8ac4877b0f92d316b7fffa136cea50d7e1fdb32d6d83c820d2a82e7c69fd8",
+    ".github/workflows/phase-1.6.yml": "1e1efd1354fd5dc26530395e5ae63fcee5df04bedc766dda4a5e0746c04cead8",
+    ".github/workflows/quality.yml": "0cfacf43ddce2e0827146bb8109b5411164a738fa71304e20b65d2fb6501bd2c",
+    ".orchestrate-state-of-art/state.json": "fe6a6adb950c3329bb238ddb9b575ca9a4b96c518d39a01541f257e1681dca5c",
+    ".orchestrate/state.json": "fe6a6adb950c3329bb238ddb9b575ca9a4b96c518d39a01541f257e1681dca5c",
+    "Makefile": "9048360117005577a1463bbc509609842a5c038211e2d86da6d420b4d285f431",
+    "apps/api/pyproject.toml": "479be6367485764a9e66c5e083a8c905648414aec51cd7f2ba288c5041e461f7",
+    "apps/api/tests/test_object_store_transport.py": "bd55b282936b81bfc4fa15d51ee4c70598a6e183aac7e078850b7de0c930a6c9",
+    "apps/api/uv.lock": "4852605f61c41c7712c2333e45006954cd8b753f4b620ced91ca0b3b3b397b07",
+    "docs/backlog-qualidade-2026-09-24.md": "5d0b16cb1abe738bdd2937921fbef2b0198691e88cb3a9ff3b5ccbddfb28957a",
+    "docs/evaluation/campaigns/README.md": "2cdac396e2cbbe97607887bf762f24e0fc346707a1315ee0534bb524240b5a39",
+    "docs/evaluation/campaigns/rec22-local-synthetic-v1/manifest.json": "6e9f078ebfb153ed01c1b32b75e9e791a6687e6ab5740364307ab4357efbf2b2",
+    "docs/evaluation/packs/rec22-local-v2/cases.json": "adb90cc36db83f0b69c1b1ac04d2e3108fd84a4ee6a36d99e684681defd036b7",
+    "docs/evaluation/packs/rec22-local-v2/manifest.json": "eaf88ffe512b26af923d8ae2ea810efd90b26a97d42f1363e1f84301fc4fec88",
+    "docs/evaluation/retrieval-evaluation.md": "36b74f940a5f9db0013872b9b25206bed51806760b924f8cbb6ab45ba842e20a",
+    "docs/plano-executivo-qualidade-2026-09-24.md": "17571065dc29992ff9a4144d758a15bf986655b1cc62d13b9302640ccc296038",
+    "docs/reports/current-triple-aaa-quality-bar-v1.json": "fe0f58eb84bea4d16a138391b1afd85a9312d81fdb2ac7a383c2dbaf767f9633",
+    "docs/reports/estado-implementacao-q24-2026-09-24.md": "7ee8a8e8310ca12bf50b984ef7344dcf07510c592599e3dffae7be4495c4dd61",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/api16-root.log": "194ff83cb1e8de30b7634ae95e3014e90391fbb70826e0d838c442da9db0c4e8",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/attempt-history.md": "dbeb04f130328bb5ec9fa46385d742479c06f890f31b5be00c9e1f0fc9eecab6",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/campaign-tests.log": "2ff158e0598d4e92245e9df28474438ab9988395c696e6ab3d61327663a2cf7b",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/campaign-v3-synthetic.json": "d77795fda6f6596c2f4439321613f3050a80749c85488b73e761dee23f67f898",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/canonical-views.log": "df270bed12e28fcfea0d301ac95cf995b7bb454b6047284bff50ce0f7ab08914",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/clean-runtime-install.log": "54117638833486f71425ee2f527381ae4f59785157961fd532927788f13e3f3e",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/critic-previous-invalid.md": "454b1b925579b1c920ba6c7db96d23b3cbe9912b8130d7fb6c8e9802d63f3200",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/critic-q24-03-q24-26-conditional-20260925.md": "cf5eb96c04aeaaae61eeb6255f8cae29edc6471eb1205be45ac25e7c91db47c0",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/dependency-pin-consistency-check.log": "5ddb2fec0b83fbde8648f4ee0d0b6a997bb5655eb42053351012fee0048fb20d",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/dependency-pin-consistency.json": "5dc429705a0bcff638c09f99e29b4075a95870808bc69c4150db08f7f4365f15",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/diff-check.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/eval-retrieval-pack.log": "39dcbab2720e9124edb157480e4267188b49b0c5cb3552b4bb1d881424fe97f0",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/lint.log": "a7a5650dee62a2a315b1b3413dc05105661cd0c4bd71ec25608e7101f4d1dd63",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/object-store-transport-tests.log": "4188b97c4464433e005624c18ed3572f553945a86c2e211c5205fbb1a5351ad3",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/pack-tests.log": "1bcc44011bf78a58bc505eb612ef283786f7b4e7ea8747b915963e5b06958e4c",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/pip-check.log": "45922de1258b952bb1bd42b7324238348b314c16b33d20f1717317c2ccef8258",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/runtime-audit-osv.json": "27627573efe50824ae10fc40f5c568b7fe154aefb82bac7adb0cfb3d261152a6",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/runtime-audit-osv.log": "643fa8761c9fa081af9a231b36b733d595f8ee2c6d08b0e00f5589f993fd1c8c",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/runtime-audit-pypi.json": "27627573efe50824ae10fc40f5c568b7fe154aefb82bac7adb0cfb3d261152a6",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/runtime-audit-pypi.log": "53f3d56d544990bd4f86117c0cea86ba5a606814ce92178522ff508c3cdaaee4",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/runtime-lock-summary.json": "e8701df32da5db8fad5d659cbc76496621a495fcf864d2f6568f7a6d699ff257",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/test-tool-install.log": "1b732496daaa83fb1590227def8da2fb791e8b49a940276dafa6db763205098f",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/typecheck.log": "f4e2482bfa89fd0a34aa7a5fab375fdbb03747d3941dd8fecfa8bdb1bc77c92d",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/uv-lock-check.log": "1bde0de53f5623bdc901253d58b5b1ebb84a3f4d8214b3c8e189f030dec5e683",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/validate.log": "e1ae0104b15a5948a9a1683aaac6220f1beba9c217f9bb328e2bf7e54e718a93",
+    "docs/roadmap-qualidade-2026-09-24.md": "aac090c45055bb4c4fc4fbcb696e58f16127d567d28204709f7b8b3172412ea2",
+    "requirements/runtime.in": "c50deef0598a35a39570fb51285568eca07fd1866f13c013110e295b09f7a970",
+    "requirements/runtime.lock": "8dc58f04067faf64a9fc3cebc6767764a88b3e094cf33e999c4a0c5f5da064b3",
+    "scripts/state_of_art/evaluate_campaign.py": "45ef82abfa0a3336dd086352ec03d87eeb28d75912b4efb0ceb2affa69d627aa",
+    "scripts/state_of_art/evaluate_pack.py": "d07d086e0762f6a3eb983415526cb836b204129b4c32cc14f57f3fdc22eb39a6",
+    "scripts/state_of_art/evaluate_retrieval.py": "8c5fa0bce1f164c1936db9282489f21d91b745f65bd7a4cba1bc8d1f06a0656d",
+    "scripts/state_of_art/tests/test_evaluate_campaign.py": "681804137a8545a4908e6b0a0473e24788eecfda6c547053eccd79d13203568b",
+    "scripts/state_of_art/tests/test_evaluate_pack.py": "566f69c92a4e8ff0b251eb07ba0e25b443edd44bc79263771149ec1568426de7",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/critic-q24-26-identity-fail-20260925.md": "60b34461d502546277c0845b6cdeef2cb2c9f4c702c24d96319c8147cd6710c5",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/campaign-tests-v4.log": "aefec41ff0671ec93dd0bddac11947a25858df8b32aa2336eb3cde41393dc583",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/pack-tests-v4.log": "1bcc44011bf78a58bc505eb612ef283786f7b4e7ea8747b915963e5b06958e4c",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/eval-retrieval-pack-v4.log": "39dcbab2720e9124edb157480e4267188b49b0c5cb3552b4bb1d881424fe97f0",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/lint-v4.log": "a7a5650dee62a2a315b1b3413dc05105661cd0c4bd71ec25608e7101f4d1dd63",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/typecheck-v4.log": "f4e2482bfa89fd0a34aa7a5fab375fdbb03747d3941dd8fecfa8bdb1bc77c92d",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/validate-v4.log": "271f041b4eb5364f1e46a2bce6d3cd023cd189020fa647ac6cffd84bdab87649",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/diff-check-v4.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/campaign-v4-synthetic.json": "8076da8ad172286e2ac124cfab633f8ece09ff98f420e2c6186d3cd793bd9a0b",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/canonical-views-v4.log": "df270bed12e28fcfea0d301ac95cf995b7bb454b6047284bff50ce0f7ab08914",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/validate-final-v4.log": "82dbf0ecb4457c431f458a53c8e23be1d30b635577e162c07f3db7d1893bcace",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/diff-check-final-v4.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/critic-q24-26-default-identities-fail-20260925.md": "df2a2114288b1fe9211f3dbe3cd9d6d3d193f2c8aca44718a4ecc7626bb5fa9c",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/campaign-tests-v4-postreview.log": "a6f0138d0fc1c491d7f5a7f61bb0ea7c4ed0952ad8258217e9312ea0a82a0f66",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/pack-tests-v4-postreview.log": "1bcc44011bf78a58bc505eb612ef283786f7b4e7ea8747b915963e5b06958e4c",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/eval-retrieval-pack-v4-postreview.log": "39dcbab2720e9124edb157480e4267188b49b0c5cb3552b4bb1d881424fe97f0",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/lint-v4-postreview.log": "a7a5650dee62a2a315b1b3413dc05105661cd0c4bd71ec25608e7101f4d1dd63",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/typecheck-v4-postreview.log": "f4e2482bfa89fd0a34aa7a5fab375fdbb03747d3941dd8fecfa8bdb1bc77c92d",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/validate-v4-postreview.log": "74d1146945003f54d752b33cec7f5905eab5a1f737b745668fae378f7b7656c8",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/diff-check-v4-postreview.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/campaign-v4-synthetic-postreview.json": "8076da8ad172286e2ac124cfab633f8ece09ff98f420e2c6186d3cd793bd9a0b",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/validate-final-postreview.log": "9ebd5de2dde47351fcda8bab460823f61e0df2dd11e70935dc5ddf875c5188d9",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/diff-check-final-postreview.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/canonical-views-final-postreview.log": "1b5f715a42c91f35fcf10e0bb03e47dfa93d26c8331255fd51d4348366a8df7f",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/critic-q24-26-identities-pass-20260925.md": "19b8a867d3eec8a0ffe2350fad73855431f6bd942d9b7679ffee720a4059cf15",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/validate-review-final.log": "81f75e8c9378de9da8d78e15969da834fb35b66d21850ec181cdcac3cf4e5212",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/diff-check-review-final.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/canonical-views-review-final.log": "1b5f715a42c91f35fcf10e0bb03e47dfa93d26c8331255fd51d4348366a8df7f",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/validate-final.log": "81f75e8c9378de9da8d78e15969da834fb35b66d21850ec181cdcac3cf4e5212",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/diff-check-final.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/canonical-views-final.log": "1b5f715a42c91f35fcf10e0bb03e47dfa93d26c8331255fd51d4348366a8df7f",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/identity-unicode-boundary.md": "d4a31695c4cc0b0adc81aac91bac16f127e8ef839bb277e9357e82db09c125fc",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/campaign-v4-synthetic-unicode-fix.json": "8076da8ad172286e2ac124cfab633f8ece09ff98f420e2c6186d3cd793bd9a0b",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/campaign-v4-synthetic-unicode-fix.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/campaign-tests-unicode-fix.log": "4180455bfd3c95077fd59776dcae69c3a9a7cef18311fb2f922a413a55372c14",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/pack-tests-unicode-fix.log": "1bcc44011bf78a58bc505eb612ef283786f7b4e7ea8747b915963e5b06958e4c",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/eval-retrieval-pack-unicode-fix.log": "39dcbab2720e9124edb157480e4267188b49b0c5cb3552b4bb1d881424fe97f0",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/lint-unicode-fix.log": "a7a5650dee62a2a315b1b3413dc05105661cd0c4bd71ec25608e7101f4d1dd63",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/typecheck-unicode-fix.log": "f4e2482bfa89fd0a34aa7a5fab375fdbb03747d3941dd8fecfa8bdb1bc77c92d",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/validate-unicode-fix.log": "3c99563f1751b4fbdeb038f75107cbc3339673260c3e6846021d7819bac48414",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/diff-check-unicode-fix.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/canonical-views-unicode-fix.log": "1b5f715a42c91f35fcf10e0bb03e47dfa93d26c8331255fd51d4348366a8df7f",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/critic-q24-26-unicode-identities-pass-20260925.md": "ebd4255343a54c37f6a45f69a253a91ba8c11dea18db5fa0e57127a881bf9e80",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/validate-unicode-review-final.log": "131e7744e7f28ff239da637fe79e9ae426774bd95f2528004c35bdb815dd70bd",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/diff-check-unicode-review-final.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-03-runtime-deps-q24-26-strata-identity-20260925T1938Z/canonical-views-unicode-review-final.log": "1b5f715a42c91f35fcf10e0bb03e47dfa93d26c8331255fd51d4348366a8df7f"
+  }
+}

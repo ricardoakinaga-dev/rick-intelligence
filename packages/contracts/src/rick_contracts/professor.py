@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Final, Literal
 
 from pydantic import ConfigDict, Field
 
@@ -12,7 +12,7 @@ from rick_contracts.rag import EvidenceDto
 from rick_contracts.providers import ProviderMessage
 from rick_contracts.security import RetrievalContext
 
-PROFESSOR_CONTRACT_VERSION = "professor-contract-v1"
+PROFESSOR_CONTRACT_VERSION: Final = "professor-contract-v1"
 EvidenceStatus = Literal[
     "NO_EVIDENCE",
     "WEAK_EVIDENCE",
@@ -25,7 +25,7 @@ EvidenceStatus = Literal[
 class ProfessorRequest(StrictContractModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
-    contract_version: Literal[PROFESSOR_CONTRACT_VERSION] = PROFESSOR_CONTRACT_VERSION
+    contract_version: Literal["professor-contract-v1"] = PROFESSOR_CONTRACT_VERSION
     query: str = Field(min_length=1, max_length=20_000)
     conversation_id: str = Field(min_length=1, max_length=128)
     retrieval_context: RetrievalContext
@@ -36,7 +36,7 @@ class ProfessorRequest(StrictContractModel):
 class ProfessorResponse(StrictContractModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
-    contract_version: Literal[PROFESSOR_CONTRACT_VERSION] = PROFESSOR_CONTRACT_VERSION
+    contract_version: Literal["professor-contract-v1"] = PROFESSOR_CONTRACT_VERSION
     conversation_id: str = Field(min_length=1, max_length=128)
     answer: str = Field(min_length=1, max_length=1_000_000)
     evidence_status: EvidenceStatus

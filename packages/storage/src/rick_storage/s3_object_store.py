@@ -390,15 +390,31 @@ class S3ObjectStore:
         return self.list(scope, prefix=prefix, limit=limit)
 
     def delete(self, scope: ObjectScope, key: str) -> bool:
-        """Delete one scoped object; absent objects return ``False``."""
+        """Delete one scoped object; objects observed absent return ``False``.
+
+        S3 acknowledges DELETE for missing keys with 204, so existence must be
+        observed before deletion. This observation is not an atomic ownership
+        claim: a concurrent deletion may still result in ``True``.
+        """
 
         self._ensure_open()
         scope = _validated_scope(scope)
         key = validate_object_key(key)
+        url = self._object_url(self._remote_key(scope, key))
+        presence = self._send(
+            operation="delete", method="HEAD", url=url, headers={}, body=None,
+        )
+        try:
+            status = _response_status(presence, operation="delete")
+            if status == 404:
+                return False
+            _expect_status(status, operation="delete", accepted=(200,), max_object_bytes=None)
+        finally:
+            _close_response(presence)
         response = self._send(
             operation="delete",
             method="DELETE",
-            url=self._object_url(self._remote_key(scope, key)),
+            url=url,
             headers={},
             body=None,
         )

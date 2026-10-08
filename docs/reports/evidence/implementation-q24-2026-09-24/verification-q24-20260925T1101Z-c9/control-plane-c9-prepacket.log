@@ -1,0 +1,20 @@
+WARNING: Git worktree is DIRTY (251 entries); local dirty state is reported but not rejected
+PASS: 30 historical files match their recorded SHA256
+[PASS] STATE_JSON: artifact parses (.agent/state.json)
+[PASS] BACKLOG_JSON: artifact parses (.agent/backlog.json)
+[PASS] EXECUTION_LOG: artifact parses (.agent/execution-log.jsonl)
+[PASS] VERIFICATION_LOG: artifact parses (.agent/verification.jsonl)
+[PASS] STATE_FIELDS: all canonical runtime fields are present
+[PASS] BACKLOG_CONTRACT: validated 35 backlog item(s)
+[PASS] LOG_CONTRACT: validated 366 append-oriented event(s)
+[PASS] VERIFY_CONTRACT: validated 368 verification record(s)
+[PASS] GATE_HISTORY: validated 28 append-only gate record(s)
+[PASS] RECONCILE: state, backlog, log, and active pointers agree
+RESULT PASS (pass=10 warn=0 fail=0)
+PASS: derived review views and 11 historical files verified; original acceptance preserved
+{
+  "valid": true,
+  "errors": []
+}
+Git: head=b52f32c141916a2ea3af1a6b913bd91f380606e0 branch=main worktree=DIRTY (251 entries) remote_main=b52f32c141916a2ea3af1a6b913bd91f380606e0 sync=HEAD_EQ_ORIGIN_MAIN
+Control-plane check OK: required pointers and current Git observations are structurally consistent.

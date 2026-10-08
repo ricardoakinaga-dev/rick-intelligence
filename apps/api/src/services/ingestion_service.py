@@ -17,6 +17,7 @@ claim of a distributed queue or object-storage semantics.
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
+from asyncio import CancelledError
 from contextlib import contextmanager, nullcontext
 import hashlib
 import inspect
@@ -125,6 +126,12 @@ def _retryable(error_code: str | None) -> bool:
         return error_code in {"provider_timeout", "provider_unavailable", "vector_store_unavailable", "lock_unavailable", "storage_unavailable"}
 
 
+def _publication_unknown(job: object) -> bool:
+    metadata = _value(job, "metadata", {})
+    return (_value(job, "status") == "verifying" and isinstance(metadata, Mapping)
+            and metadata.get("publication_outcome_unknown") is True)
+
+
 def safe_job_json(
     job: object,
     *,
@@ -161,6 +168,15 @@ def safe_job_json(
     error_code = raw_error_code if isinstance(raw_error_code, str) and raw_error_code in _SAFE_ERROR_CODES else None
 
     metadata = _value(job, "metadata", {})
+    # The durable facade produces this complete tuple internally. Recognize
+    # only that contract, then render constants rather than copying metadata.
+    durable = (
+        isinstance(metadata, Mapping)
+        and metadata.get("execution") == "external-worker"
+        and metadata.get("durability") == "postgres-s3"
+        and metadata.get("restart_recovery") is True
+        and metadata.get("storage") == "object-store"
+    )
     journaled = _value(job, "_journaled", False) is True or (
         isinstance(metadata, Mapping)
         and (metadata.get("durability") == "local-sqlite" or metadata.get("restart_recovery") is True)
@@ -179,12 +195,20 @@ def safe_job_json(
         "workspace_id": _safe_identifier(_value(job, "workspace_id"), default=workspace_id, max_length=128),
         "collection_id": _safe_identifier(_value(job, "collection_id"), default=collection_id, max_length=128),
         "metadata": {
+            "execution": "external-worker",
+            "durability": "postgres-s3",
+            "restart_recovery": True,
+            "storage": "object-store",
+        } if durable else {
             "execution": "process-local",
             "durability": "local-sqlite" if journaled else "process-local",
             "restart_recovery": journaled,
             "storage": "private-staging" if journaled else "private-temporary",
         },
     }
+
+    if _publication_unknown(job):
+        result["metadata"]["publication_outcome"] = "unknown"
 
     # Timestamps are bounded scalar observability fields.  Do not include the
     # package's heartbeat list because it is extensible input from the worker.
@@ -464,7 +488,12 @@ class IngestionApplicationService:
         if not preserve_request_context or correlation_id is not None:
             kwargs["correlation_id"] = correlation_id
         try:
-            outcome = upsert(job, **kwargs)
+            repair = getattr(journal, 'repair_committed_publication', None)
+            knowledge = getattr(self.ingestion, 'knowledge', None)
+            if status == 'published' and callable(repair) and callable(getattr(knowledge, 'get_publication', None)):
+                outcome = repair(job, knowledge=knowledge, **kwargs)
+            else:
+                outcome = upsert(job, **kwargs)
             if outcome is False:
                 return False
         except Exception:
@@ -856,6 +885,24 @@ class IngestionApplicationService:
                 self._retry_counts[job_id] = 0
 
             status = _value(job, "status")
+            if status in _RECOVERABLE_STATES or status == 'published':
+                recover = getattr(self.ingestion, "recover_publication", None)
+                if callable(recover):
+                    try:
+                        recovered = recover(job_id, tenant_id=job["tenant_id"],
+                            workspace_id=job["workspace_id"], collection_id=job["collection_id"],
+                            snapshot=job)
+                    except Exception:
+                        # An unavailable authority read cannot authorize replay.
+                        job.update(status="verifying", stage="verifying")
+                        job["metadata"] = dict(job["metadata"], publication_outcome_unknown=True)
+                    else:
+                        if recovered is not None:
+                            job = recovered
+                            self._jobs[job_id] = job
+                    status = _value(job, "status")
+                if _publication_unknown(job) or (_value(job, 'metadata', {}) or {}).get('retirement_pending'):
+                    self._cancel_events.setdefault(job_id, Event())
             source = self._recovery_path(record.get("source_path"))
             if source is not None:
                 if source not in restored_source_paths:
@@ -885,8 +932,10 @@ class IngestionApplicationService:
                     # unlink succeeds.
                     self._job_paths[job_id] = source
                     self._cleanup_job_source(job_id, job, source)
-            elif status in _RECOVERABLE_STATES:
+            elif status in _RECOVERABLE_STATES and not _publication_unknown(job):
                 self._mark_recovery_required(job)
+            if status not in {"failed", "cancelled"} or source is None:
+                self._journal_upsert(job, source, preserve_request_context=True)
 
         self._evict_if_needed()
         self._evict_document_sources_if_needed()
@@ -894,7 +943,8 @@ class IngestionApplicationService:
         candidates = [
             (job_id, job, self._job_paths.get(job_id))
             for job_id, job in self._jobs.items()
-            if _value(job, "status") in _RECOVERABLE_STATES and self._job_paths.get(job_id) is not None
+            if _value(job, "status") in _RECOVERABLE_STATES and not _publication_unknown(job)
+            and self._job_paths.get(job_id) is not None
         ]
         candidates.sort(key=lambda item: (_safe_order(_value(item[1], "created_at", 0.0)), item[0]))
         for job_id, job, path in candidates[: self.max_jobs]:
@@ -1262,18 +1312,24 @@ class IngestionApplicationService:
             # accounting keeps its dependent stores alive while it runs.
             with self._admitted_operation(allow_stopping=True):
                 callback()
-        except Exception:
+        except (Exception, CancelledError):
             return
 
     @contextmanager
-    def _mutation_guard(self):
+    def _mutation_guard(self, *, document_id: str | None = None):
         # Always take the canonical operation lock before the application
         # lock: async ingestion takes these in that order at publication.
         guard = getattr(self.ingestion, "operation_guard", None)
+        knowledge = getattr(self.ingestion, "knowledge", None)
+        document_guard = getattr(knowledge, "mutation_guard", None)
+        safe_document_id = _safe_identifier(document_id, max_length=256) if document_id is not None else None
         with self._admitted_operation():
             with guard() if callable(guard) else nullcontext():
-                with self._lock:
-                    yield
+                # The store fence precedes app state, matching publication's
+                # lock order and participating across pipeline instances.
+                with document_guard("document:" + safe_document_id) if callable(document_guard) and safe_document_id else nullcontext():
+                    with self._lock:
+                        yield
 
     @contextmanager
     def _publication_guard(self):
@@ -1316,6 +1372,9 @@ class IngestionApplicationService:
                 self._remove_or_quarantine(obsolete_path, scope=scope)
             if refresh_required is not None:
                 refresh_required[0] = True
+        elif _publication_unknown(job):
+            # An unacknowledged commit still owns its source for reconciliation.
+            self._journal_upsert(job, path, display_filename=display_filename)
         else:
             # A failed/cancelled attempt never replaces a previously published
             # source.  Its temporary copy can be removed immediately.
@@ -1344,7 +1403,7 @@ class IngestionApplicationService:
             allowed_collection_ids=[collection_id],
         ):
             return False
-        if _value(job, "status") == "published":
+        if _value(job, "status") == "published" or _publication_unknown(job):
             return bool(_safe_identifier(_value(job, "document_id"), max_length=256))
         return _value(job, "status") in _TERMINAL_STATES
 
@@ -1655,8 +1714,9 @@ class IngestionApplicationService:
             )
         # The event callback is intentionally outside the application lock;
         # a reentrant sink may inspect or cancel the just-enqueued job. The
-        # worker waits on the gate until this callback returns, preserving the
-        # public lifecycle order without invoking user code under the lock.
+        # worker waits on the gate until this callback returns or its bounded
+        # telemetry deadline expires. A timed-out best-effort sink can deliver
+        # lifecycle events late or out of order; job state remains authoritative.
         try:
             self._emit_event_fields("worker.ingestion.enqueued", event_fields)
         finally:
@@ -1877,7 +1937,8 @@ class IngestionApplicationService:
                 )
             if refresh_required[0]:
                 self._refresh()
-            self._emit_event_fields(terminal_event_name, terminal_fields)
+            if not _publication_unknown(terminal_job):
+                self._emit_event_fields(terminal_event_name, terminal_fields)
 
     def _upload(
         self,
@@ -2196,7 +2257,7 @@ class IngestionApplicationService:
         refresh_required = [False]
         try:
             with self._admitted_operation():
-                with self._mutation_guard():
+                with self._mutation_guard(document_id=document_id):
                     result = self._delete_document(
                         document_id,
                         tenant_id=tenant_id,
@@ -2313,16 +2374,26 @@ class IngestionApplicationService:
                 except Exception:
                     pass
             metadata_restored = False
-            restore_document = getattr(knowledge, "upsert_document", None)
-            if callable(restore_document):
-                try:
-                    restore_document(copy.deepcopy(document_snapshot))
+            try:
+                current_document = getter(safe_document_id)
+                if _value(current_document, "status") == "deleted":
+                    # A tombstone is terminal for ordinary upsert. The
+                    # explicit restore validates the unchanged lineage and
+                    # restores metadata/chunks atomically in the adapter.
+                    restore_document = getattr(knowledge, "restore_deleted_document", None)
+                    if not callable(restore_document):
+                        raise RuntimeError("delete restoration is unavailable")
+                    restore_document(copy.deepcopy(document_snapshot), chunk_snapshot)
+                elif current_document == document_snapshot:
                     replace_chunks = getattr(knowledge, "replace_document_chunks", None)
-                    if callable(replace_chunks):
-                        replace_chunks(safe_document_id, chunk_snapshot)
-                    metadata_restored = True
-                except Exception:
-                    pass
+                    if not callable(replace_chunks):
+                        raise RuntimeError("chunk restoration is unavailable")
+                    replace_chunks(safe_document_id, chunk_snapshot)
+                else:
+                    raise RuntimeError("document changed during deletion")
+                metadata_restored = True
+            except Exception:
+                pass
             if not (points_restored and metadata_restored):
                 # If either side of the pair cannot prove restoration, hide
                 # the record from the public library until reconciliation
@@ -2539,7 +2610,13 @@ class IngestionApplicationService:
                     # If the adapter has no status lookup, the event is still
                     # the safe cooperative cancellation request.
                     changed = True if canonical_job is None else changed
-                    if isinstance(job, dict):
+                    if _publication_unknown(job):
+                        if isinstance(job, dict):
+                            job["cancel_requested"] = True
+                        else:
+                            job.cancel_requested = True
+                        self._journal_upsert(job, self._job_paths.get(job_id))
+                    elif isinstance(job, dict):
                         job.update({
                             "status": "cancelled",
                             "stage": "cancelled",
@@ -2565,6 +2642,70 @@ class IngestionApplicationService:
                 result = safe_job_json(job)
                 result["cancelled"] = changed
                 return result
+
+    def reconcile_publication(
+        self,
+        job_id: str,
+        *,
+        tenant_id: str,
+        workspace_id: str,
+        allowed_collection_ids: Iterable[str],
+    ) -> dict[str, Any] | None:
+        """Resolve a restored unknown commit and register its scoped API outcome.
+        """
+        refresh_required = [False]
+        with self._admitted_operation():
+            with self._lock:
+                job = self._jobs.get(job_id)
+                if job is None or not self._visible(
+                    job, tenant_id=tenant_id, workspace_id=workspace_id,
+                    allowed_collection_ids=allowed_collection_ids,
+                ):
+                    return None
+                document_id = _value(job, "document_id")
+            with self._mutation_guard(document_id=document_id):
+                job = self._jobs.get(job_id)
+                if job is None or not self._visible(
+                    job, tenant_id=tenant_id, workspace_id=workspace_id,
+                    allowed_collection_ids=allowed_collection_ids,
+                ):
+                    return None
+                path = self._job_paths.get(job_id)
+                if _publication_unknown(job) or (_value(job, 'metadata', {}) or {}).get('retirement_pending'):
+                    recover = getattr(self.ingestion, "recover_publication", None)
+                    reconcile = getattr(self.ingestion, "reconcile_publication", None)
+                    if not callable(recover) and not callable(reconcile):
+                        raise IngestionApplicationError("storage_unavailable")
+                    canonical_status = getattr(self.ingestion, "get_status", None)
+                    if callable(reconcile) and callable(canonical_status) and canonical_status(job_id) is not None:
+                        job = reconcile(job_id) or job
+                    else:
+                        job = (recover(job_id, tenant_id=tenant_id, workspace_id=workspace_id,
+                                       collection_id=self._job_scope(job)[2], snapshot=job)
+                               if callable(recover) else reconcile(job_id)) or job
+                    scope = self._job_scope(job)
+                    if scope is None or not self._job_result_matches_scope(
+                        job, tenant_id=tenant_id, workspace_id=workspace_id,
+                        collection_id=scope[2],
+                    ):
+                        raise IngestionApplicationError("storage_unavailable")
+                    self._jobs[job_id] = job
+                if path is None:
+                    self._journal_upsert(job, None)
+                    return safe_job_json(job)
+                if self._published(job) and self._document_paths.get(document_id) == path:
+                    return safe_job_json(job)
+                display_filename = None
+                if self._published(job):
+                    document = self.ingestion.knowledge.get_document(document_id)
+                    display_filename = _value(document, "display_filename")
+                result = self._record_result(
+                    job, path, display_filename=display_filename,
+                    refresh_required=refresh_required,
+                )
+            if refresh_required[0]:
+                self._refresh()
+            return result
 
     cancel_job = cancel
 

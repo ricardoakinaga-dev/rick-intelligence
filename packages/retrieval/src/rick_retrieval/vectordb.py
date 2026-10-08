@@ -19,6 +19,24 @@ from typing import Protocol
 CANONICAL_EMBEDDING_MODEL = "text-embedding-3-small"
 CANONICAL_EMBEDDING_DIM = 1536
 MAX_POINTS_PER_READ = 100_000
+_UNSCOPED = object()
+
+
+def _document_scope(tenant_id: object, workspace_id: object) -> tuple[str, str] | None:
+    """Only omitted scope retains the historical standalone aggregate API."""
+    if tenant_id is _UNSCOPED and workspace_id is _UNSCOPED:
+        return None
+    # Match modern Qdrant scope bounds/control rules without trimming IDs or
+    # inventing defaults; additionally reject whitespace-only authorization.
+    for value in (tenant_id, workspace_id):
+        if (
+            not isinstance(value, str)
+            or not value.strip()
+            or len(value) > 128
+            or any(ord(char) < 0x20 or ord(char) == 0x7F for char in value)
+        ):
+            raise ValueError("complete tenant/workspace scope is required")
+    return tenant_id, workspace_id
 
 
 class EmbeddingProvider(Protocol):
@@ -29,8 +47,16 @@ class EmbeddingProvider(Protocol):
 
 class VectorStore(Protocol):
     def upsert_points(self, points: list[dict]) -> int: ...
-    def delete_document(self, document_id: str, collection_id: str) -> int: ...
-    def count_for_document(self, document_id: str, collection_id: str) -> int: ...
+    def delete_document(
+        self, document_id: str, collection_id: str, *,
+        tenant_id: str | None = _UNSCOPED,  # type: ignore[assignment]
+        workspace_id: str | None = _UNSCOPED,  # type: ignore[assignment]
+    ) -> int: ...
+    def count_for_document(
+        self, document_id: str, collection_id: str, *,
+        tenant_id: str | None = _UNSCOPED,  # type: ignore[assignment]
+        workspace_id: str | None = _UNSCOPED,  # type: ignore[assignment]
+    ) -> int: ...
 
 
 class DeterministicHashEmbedding:
@@ -67,18 +93,34 @@ class InMemoryVectorStore:
             self._points[point["point_id"]] = point
         return len(points)
 
-    def delete_document(self, document_id: str, collection_id: str) -> int:
+    def delete_document(
+        self, document_id: str, collection_id: str, *,
+        tenant_id: str | None = _UNSCOPED,  # type: ignore[assignment]
+        workspace_id: str | None = _UNSCOPED,  # type: ignore[assignment]
+    ) -> int:
+        scope = _document_scope(tenant_id, workspace_id)
         doomed = [pid for pid, p in self._points.items()
                   if p["payload"].get("document_id") == document_id
-                  and p["payload"].get("collection_id") == collection_id]
+                  and p["payload"].get("collection_id") == collection_id
+                  and (scope is None or (
+                      p["payload"].get("tenant_id") == scope[0]
+                      and p["payload"].get("workspace_id") == scope[1]))]
         for pid in doomed:
             del self._points[pid]
         return len(doomed)
 
-    def count_for_document(self, document_id: str, collection_id: str) -> int:
+    def count_for_document(
+        self, document_id: str, collection_id: str, *,
+        tenant_id: str | None = _UNSCOPED,  # type: ignore[assignment]
+        workspace_id: str | None = _UNSCOPED,  # type: ignore[assignment]
+    ) -> int:
+        scope = _document_scope(tenant_id, workspace_id)
         return sum(1 for p in self._points.values()
                    if p["payload"].get("document_id") == document_id
-                   and p["payload"].get("collection_id") == collection_id)
+                   and p["payload"].get("collection_id") == collection_id
+                   and (scope is None or (
+                       p["payload"].get("tenant_id") == scope[0]
+                       and p["payload"].get("workspace_id") == scope[1])))
 
     def all_points(
         self,
@@ -132,26 +174,48 @@ class QdrantVectorStore:
         )
         return len(points)
 
-    def delete_document(self, document_id: str, collection_id: str) -> int:
+    def delete_document(
+        self, document_id: str, collection_id: str, *,
+        tenant_id: str | None = _UNSCOPED,  # type: ignore[assignment]
+        workspace_id: str | None = _UNSCOPED,  # type: ignore[assignment]
+    ) -> int:
+        scope = _document_scope(tenant_id, workspace_id)
         from qdrant_client.models import FieldCondition, Filter, MatchValue
 
+        must = [
+            FieldCondition(key="document_id", match=MatchValue(value=document_id)),
+            FieldCondition(key="collection_id", match=MatchValue(value=collection_id)),
+        ]
+        if scope is not None:
+            must.extend([
+                FieldCondition(key="tenant_id", match=MatchValue(value=scope[0])),
+                FieldCondition(key="workspace_id", match=MatchValue(value=scope[1])),
+            ])
         self._client.delete(
             collection_name=self.collection,
-            points_selector=Filter(must=[
-                FieldCondition(key="document_id", match=MatchValue(value=document_id)),
-                FieldCondition(key="collection_id", match=MatchValue(value=collection_id)),
-            ]),
+            points_selector=Filter(must=must),
         )
         return 0
 
-    def count_for_document(self, document_id: str, collection_id: str) -> int:
+    def count_for_document(
+        self, document_id: str, collection_id: str, *,
+        tenant_id: str | None = _UNSCOPED,  # type: ignore[assignment]
+        workspace_id: str | None = _UNSCOPED,  # type: ignore[assignment]
+    ) -> int:
+        scope = _document_scope(tenant_id, workspace_id)
         from qdrant_client.models import FieldCondition, Filter, MatchValue
 
+        must = [
+            FieldCondition(key="document_id", match=MatchValue(value=document_id)),
+            FieldCondition(key="collection_id", match=MatchValue(value=collection_id)),
+        ]
+        if scope is not None:
+            must.extend([
+                FieldCondition(key="tenant_id", match=MatchValue(value=scope[0])),
+                FieldCondition(key="workspace_id", match=MatchValue(value=scope[1])),
+            ])
         return self._client.count(
             collection_name=self.collection,
-            count_filter=Filter(must=[
-                FieldCondition(key="document_id", match=MatchValue(value=document_id)),
-                FieldCondition(key="collection_id", match=MatchValue(value=collection_id)),
-            ]),
+            count_filter=Filter(must=must),
             exact=True,
         ).count

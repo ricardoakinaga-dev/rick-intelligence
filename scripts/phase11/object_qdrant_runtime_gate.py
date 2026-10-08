@@ -32,9 +32,11 @@ ROOT = Path(__file__).resolve().parents[2]
 
 try:
     from scripts.state_of_art.json_boundary import loads_json
+    from scripts.phase11.redis_runtime_gate import _reserve_output
 except ModuleNotFoundError:  # Direct execution from the scripts/phase11 directory.
     sys.path.insert(0, str(ROOT))
     from scripts.state_of_art.json_boundary import loads_json
+    from scripts.phase11.redis_runtime_gate import _reserve_output
 
 DEFAULT_OUTPUT = ".runtime/phase-2/object-qdrant-runtime-gate.json"
 DEFAULT_TIMEOUT_SECONDS = 5.0
@@ -386,6 +388,9 @@ def _gate_report(
     production_safe: bool = False,
     observations: Mapping[str, object] | None = None,
 ) -> dict[str, object]:
+    if any(result.result == FAIL for result in results):
+        status = FAIL
+    production_safe = production_safe and status == PASS
     report: dict[str, object] = {
         "status": status,
         "live": status == PASS,
@@ -991,10 +996,15 @@ def _delete_qdrant_collection(
 
     transport = _QdrantTransport()
     try:
+        path = f"/collections/{quote(collection, safe='')}"
+        before = _qdrant_json_request(transport, endpoint, path, api_key)
+        if before.status_code not in {200, 404}:
+            raise _QdrantHttpFailure(before.status_code)
+        was_absent = before.status_code == 404
         response = _qdrant_json_request(
             transport,
             endpoint,
-            f"/collections/{quote(collection, safe='')}",
+            path,
             api_key,
             method="DELETE",
         )
@@ -1004,9 +1014,13 @@ def _delete_qdrant_collection(
             raise _QdrantHttpFailure(response.status_code)
         if response.status_code in {200, 202}:
             parsed = _qdrant_json_body(response)
-            if not isinstance(parsed, Mapping) or parsed.get("result") is False or parsed.get("result") is None:
+            if (not isinstance(parsed, Mapping) or parsed.get("result") is None
+                    or (parsed.get("result") is False and not was_absent)):
                 raise RuntimeError("Qdrant collection delete was not acknowledged")
-        return "deleted"
+        after = _qdrant_json_request(transport, endpoint, path, api_key)
+        if after.status_code != 404:
+            raise RuntimeError("Qdrant collection remained visible after delete")
+        return "absent" if was_absent else "deleted"
     finally:
         transport.close()
 
@@ -1023,7 +1037,7 @@ def _delete_qdrant_alias(
         "/collections/aliases",
         api_key,
         method="POST",
-        body={"actions": [{"action": "delete_alias", "alias_name": alias}]},
+        body={"actions": [{"delete_alias": {"alias_name": alias}}]},
     )
     if response.status_code == 404:
         return "absent"
@@ -1302,6 +1316,7 @@ def _run_vector_gate(args: argparse.Namespace, run_id: str) -> dict[str, object]
                 "collection_id": logical_a,
                 "document_id": document_a,
                 "chunk_id": point_a,
+                "text": "synthetic runtime fixture alpha",
                 "runtime_gate": True,
             },
         },
@@ -1314,6 +1329,7 @@ def _run_vector_gate(args: argparse.Namespace, run_id: str) -> dict[str, object]
                 "collection_id": logical_b,
                 "document_id": document_b,
                 "chunk_id": point_b,
+                "text": "synthetic runtime fixture beta",
                 "runtime_gate": True,
             },
         },
@@ -1326,6 +1342,7 @@ def _run_vector_gate(args: argparse.Namespace, run_id: str) -> dict[str, object]
                 "collection_id": logical_a,
                 "document_id": document_c,
                 "chunk_id": point_c,
+                "text": "synthetic runtime fixture gamma",
                 "runtime_gate": True,
             },
         },
@@ -1481,7 +1498,10 @@ def _run_vector_gate(args: argparse.Namespace, run_id: str) -> dict[str, object]
                 try:
                     wrong_tenant = _query_scoped(store_v1, [0.0, 0.0, 1.0], tenant=tenant_a, workspace=workspace_a, collection_id=logical_a)
                     wrong_workspace = _query_scoped(store_v1, [0.0, 1.0, 0.0], tenant=tenant_a, workspace=workspace_a, collection_id=logical_b)
-                    negative_filter_ok = not wrong_tenant and not wrong_workspace
+                    # A nearest-neighbor query may return an authorized point
+                    # even for an orthogonal vector. Only point_a belongs to
+                    # this scope; the negative rejects every foreign point.
+                    negative_filter_ok = {hit.point_id for hit in wrong_tenant}.issubset({point_a}) and not wrong_workspace
                 except Exception as error:
                     add_exception("cross-scope-negative", error, "negative scoped query failed")
             add("cross-scope-negative", PASS if negative_filter_ok else (BLOCKED_EXTERNAL if blocked_external else FAIL), "cross-tenant and cross-workspace queries returned no foreign points" if negative_filter_ok else "foreign point visibility was not rejected")
@@ -1806,6 +1826,8 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
 
 def _overall_status(object_gate: dict[str, object], vector_gate: dict[str, object]) -> str:
     statuses = (object_gate["status"], vector_gate["status"])
+    if FAIL in statuses:
+        return FAIL
     if BLOCKED_EXTERNAL in statuses:
         return BLOCKED_EXTERNAL
     if all(status == PASS for status in statuses):
@@ -1813,20 +1835,17 @@ def _overall_status(object_gate: dict[str, object], vector_gate: dict[str, objec
     return FAIL
 
 
-def _write_report(path_value: str, report: dict[str, object]) -> Path:
-    root = ROOT.resolve()
-    path = (ROOT / path_value).resolve()
-    try:
-        path.relative_to(root)
-    except ValueError:
-        raise _InvalidConfiguration() from None
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(report, ensure_ascii=False, sort_keys=True, indent=2) + "\n", encoding="utf-8")
-    return path
-
-
 def main(argv: list[str] | None = None) -> int:
     args = _parse_args(sys.argv[1:] if argv is None else argv)
+    try:
+        with _reserve_output(ROOT, args.output) as (stream, output):
+            return _execute(args, stream, output)
+    except Exception:
+        print(json.dumps({"status": FAIL, "report": "output_or_runtime_failed"}, sort_keys=True))
+        return 1
+
+
+def _execute(args: argparse.Namespace, stream, output: Path) -> int:
     run_id = uuid.uuid4().hex[:16]
 
     try:
@@ -1880,16 +1899,13 @@ def main(argv: list[str] | None = None) -> int:
         },
     }
 
-    try:
-        output = _write_report(args.output, report)
-    except Exception:
-        print(json.dumps({"status": FAIL, "report": "write_failed"}, sort_keys=True))
-        return 1
+    stream.write(json.dumps(report, ensure_ascii=False, sort_keys=True, indent=2) + "\n")
+    stream.flush()
 
     print(
         json.dumps(
             {
-                "output": str(output.relative_to(ROOT)),
+                "output": str(output.relative_to(ROOT.resolve())),
                 "status": status,
                 "object_status": object_gate["status"],
                 "vector_status": vector_gate["status"],

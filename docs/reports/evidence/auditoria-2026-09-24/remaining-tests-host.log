@@ -1,0 +1,41 @@
+PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="/home/ricardo/rick-intelligence/apps/worker:/home/ricardo/rick-intelligence/apps/api/src:/home/ricardo/rick-intelligence/packages/jobs/src:/home/ricardo/rick-intelligence/packages/contracts/src:/home/ricardo/rick-intelligence/packages/authorization/src:/home/ricardo/rick-intelligence/packages/identity/src:/home/ricardo/rick-intelligence/packages/observability/src:/home/ricardo/rick-intelligence/packages/knowledge/src:/home/ricardo/rick-intelligence/packages/ingestion/src:/home/ricardo/rick-intelligence/packages/retrieval/src:/home/ricardo/rick-intelligence/packages/providers/src:/home/ricardo/rick-intelligence/packages/locking/src:/home/ricardo/rick-intelligence/packages/professor/src:/home/ricardo/rick-intelligence/packages/evidence/src:/home/ricardo/rick-intelligence/packages/decision/src" python3 -m pytest -q -p no:cacheprovider "/home/ricardo/rick-intelligence/apps/worker/tests" "/home/ricardo/rick-intelligence/apps/api/tests/test_phase16_health.py"
+........................................................................ [ 80%]
+.................                                                        [100%]
+=============================== warnings summary ===============================
+../.local/lib/python3.12/site-packages/starlette/testclient.py:41
+  /home/ricardo/.local/lib/python3.12/site-packages/starlette/testclient.py:41: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    [], typing.ContextManager[anyio.abc.BlockingPortal]
+
+tests/test_phase16_health.py::test_readiness_reports_selected_runtime_components_without_changing_liveness
+tests/test_phase16_health.py::test_readiness_preserves_custom_checks_and_distinguishes_degraded_and_not_ready
+tests/test_phase16_health.py::test_readiness_preserves_custom_checks_and_distinguishes_degraded_and_not_ready
+tests/test_phase16_health.py::test_selected_runtime_component_cannot_downgrade_itself_to_optional
+tests/test_phase16_health.py::test_async_checks_and_admin_details_are_safe
+tests/test_phase16_health.py::test_ready_route_uses_finite_default_and_redacts_timeout
+  /home/ricardo/.local/lib/python3.12/site-packages/httpx/_client.py:680: DeprecationWarning: The 'app' shortcut is now deprecated. Use the explicit style 'transport=WSGITransport(app=...)' instead.
+    warnings.warn(message, DeprecationWarning)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+89 passed, 7 warnings in 2.35s
+PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="/home/ricardo/rick-intelligence/packages/contracts/src:/home/ricardo/rick-intelligence/packages/providers/src" python3 -m pytest -q -p no:cacheprovider "/home/ricardo/rick-intelligence/packages/providers/tests"
+........................................................................ [ 94%]
+....                                                                     [100%]
+76 passed in 0.43s
+PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="/home/ricardo/rick-intelligence/packages/contracts/src:/home/ricardo/rick-intelligence/packages/professor/src" python3 -m pytest -q -p no:cacheprovider "/home/ricardo/rick-intelligence/packages/professor/tests"
+............................................................             [100%]
+60 passed in 0.31s
+PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="/home/ricardo/rick-intelligence/packages/contracts/src" python3 -m pytest -q -p no:cacheprovider "/home/ricardo/rick-intelligence/packages/contracts/tests"
+............                                                             [100%]
+12 passed in 0.16s
+PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="/home/ricardo/rick-intelligence/packages/contracts/src:/home/ricardo/rick-intelligence/packages/locking/src" python3 -m pytest -q -p no:cacheprovider "/home/ricardo/rick-intelligence/packages/locking/tests"
+......................................................                   [100%]
+54 passed in 0.38s
+PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="/home/ricardo/rick-intelligence/packages/storage/src" python3 -m pytest -q -p no:cacheprovider "/home/ricardo/rick-intelligence/packages/storage/tests"
+..........................                                               [100%]
+26 passed in 0.08s
+PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="/home/ricardo/rick-intelligence/apps/worker:/home/ricardo/rick-intelligence/packages/jobs/src:/home/ricardo/rick-intelligence/packages/observability/src" python3 -m pytest -q -p no:cacheprovider "/home/ricardo/rick-intelligence/apps/worker/tests/test_runtime.py" "/home/ricardo/rick-intelligence/apps/worker/tests/test_canonical_queue.py" "/home/ricardo/rick-intelligence/apps/worker/tests/test_postgres_jobs.py" "/home/ricardo/rick-intelligence/packages/jobs/tests"
+............................................                             [100%]
+44 passed in 0.13s
+PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -q -p no:cacheprovider "/home/ricardo/rick-intelligence/infrastructure/scripts/tests/test_backup_restore.py"
+.......                                                                  [100%]
+7 passed in 0.03s

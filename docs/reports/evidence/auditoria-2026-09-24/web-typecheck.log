@@ -1,0 +1,5 @@
+cd "/home/ricardo/rick-intelligence/apps/web" && npm run typecheck
+
+> rick-intelligence-web@0.1.0 typecheck
+> tsc --noEmit
+

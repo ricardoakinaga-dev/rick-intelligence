@@ -1,0 +1,13 @@
+{
+  "run_id": "rick-q24-migration-bc0d2178367d45249aa4bf325fb24d38",
+  "container_id": "bf1d19a701a78a55556db2800994c4ef422b2ec3b94fa937406fe684f46b5caf",
+  "image": "postgres:16-alpine",
+  "server_version": "16.15",
+  "loopback_port": 32956,
+  "image_id": "sha256:3c5c8892d184f738f4fe282d14ddaa613a38f00f4189d2d94725ebe6f2909ddb",
+  "memory_bytes": 536870912,
+  "cpus": 1,
+  "tmpfs_bytes": 268435456,
+  "readiness_limit_seconds": 30,
+  "command_limit_seconds": 45
+}

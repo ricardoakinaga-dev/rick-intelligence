@@ -63,6 +63,8 @@ def test_identity_provider_requires_authoritative_membership_and_never_defaults_
             "tenant_id": "tenant-a",
             "workspace_id": "workspace-a",
             "role": "VETERINARIAN",
+            "status": "active",
+            "membership_status": "active",
             "authorized_collection_ids": ["rag_phase0"],
         }
     }

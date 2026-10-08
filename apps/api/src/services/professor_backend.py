@@ -8,14 +8,19 @@ provider retry policy.
 from __future__ import annotations
 
 from collections.abc import AsyncIterator, Mapping, Sequence
+from contextlib import aclosing
+import asyncio
 import inspect
 
 from core.otel import record_safe_exception, stage_span
+from rick_authorization import permission_granted
 from rick_contracts.chat import Citation
 from rick_contracts.professor import ProfessorRequest
-from rick_contracts.providers import ChatCompletionChunk, ChatCompletionResult, ProviderMessage
+from rick_contracts.providers import ChatCompletionChunk, ChatCompletionResult, ProviderMessage, ProviderToolCallDelta
 from rick_contracts.security import RetrievalContext
 from rick_professor import ProfessorLimits, ProfessorOrchestrator
+
+_DEFAULT_REQUEST_CLASSIFIER = object()
 
 
 class ProfessorBackendError(Exception):
@@ -57,13 +62,22 @@ class ProviderChatAdapter:
                         stream = target(messages=messages, correlation_id=f"chat-{conversation_id}"[:128])
                         if hasattr(stream, "__await__"):
                             stream = await stream
-                        async for chunk in stream:
-                            yield chunk if isinstance(chunk, ChatCompletionChunk) else ChatCompletionChunk.model_validate(chunk)
+                        try:
+                            async for chunk in stream:
+                                yield chunk if isinstance(chunk, ChatCompletionChunk) else ChatCompletionChunk.model_validate(chunk)
+                        finally:
+                            close = getattr(stream, "aclose", None)
+                            if callable(close):
+                                await close()
                         return
                     result = await self.complete(messages=messages, conversation_id=conversation_id)
                     yield ChatCompletionChunk(
                         model=result.model, delta=result.content, finish_reason=result.finish_reason,
                         correlation_id=result.correlation_id, usage=result.usage,
+                        tool_calls=[
+                            ProviderToolCallDelta(index=index, **call.model_dump())
+                            for index, call in enumerate(result.tool_calls)
+                        ] if result.tool_calls else None,
                     )
                 except Exception as exc:
                     record_safe_exception(span, exc)
@@ -101,9 +115,24 @@ class EvidenceDecisionGate:
                     tenant_id=scope.tenant_id,
                     workspace_id=scope.workspace_id,
                 )
-                if document is None or document.collection_id != scope.collection_id:
+                if document is None or (
+                    document.document_id != document_id
+                    or document.tenant_id != scope.tenant_id
+                    or document.workspace_id != scope.workspace_id
+                    or document.collection_id != scope.collection_id
+                ):
                     return None
                 if document.status != "published":
+                    return None
+                collection = self.knowledge.get_collection(
+                    scope.workspace_id, scope.collection_id, tenant_id=scope.tenant_id,
+                )
+                if collection is None or (
+                    collection.tenant_id != scope.tenant_id
+                    or collection.workspace_id != scope.workspace_id
+                    or collection.collection_id != scope.collection_id
+                    or collection.status != "active"
+                ):
                     return None
                 get_chunks = self.knowledge.get_chunks
                 try:
@@ -133,8 +162,8 @@ class EvidenceDecisionGate:
                 (
                     item for item in chunks
                     if getattr(item, "chunk_id", None) == chunk_id
-                    and getattr(item, "document_id", document_id) == document_id
-                    and getattr(item, "tenant_id", scope.tenant_id) == scope.tenant_id
+                    and getattr(item, "document_id", None) == document_id
+                    and getattr(item, "tenant_id", None) == scope.tenant_id
                 ),
                 None,
             )
@@ -146,6 +175,7 @@ class EvidenceDecisionGate:
                 "collection_id": document.collection_id,
                 "document_id": document.document_id,
                 "document_version": document.document_version,
+                "document_checksum": document.content_checksum,
                 "chunk_id": chunk.chunk_id,
                 "source": getattr(document, "display_filename", "") or getattr(document, "filename", ""),
                 "title": (
@@ -162,7 +192,11 @@ class EvidenceDecisionGate:
                 "reranking_score": raw.get("reranking_score", raw.get("rerank_score", 0.0)),
             }
 
-    def __init__(self, retrieval, *, knowledge=None) -> None:
+    def __init__(
+        self, retrieval, *, knowledge=None,
+        request_classifier=_DEFAULT_REQUEST_CLASSIFIER,
+        authorization_revalidator=None,
+    ) -> None:
         from rick_decision import (
             CitationSupportMetrics,
             DecisionAction,
@@ -172,10 +206,20 @@ class EvidenceDecisionGate:
             DomainRisk,
             IntentClarity,
             UserIntent,
+            ClinicalDomainPolicy,
+            RequestClassification,
+            classify_request,
         )
         from rick_evidence import EvidenceBundle, EvidenceScope, EvidenceValidator
 
         self.retrieval = retrieval
+        self.request_classifier = (
+            ClinicalDomainPolicy()
+            if request_classifier is _DEFAULT_REQUEST_CLASSIFIER else request_classifier
+        )
+        self.authorization_revalidator = authorization_revalidator
+        self._classify_request = classify_request
+        self._RequestClassification = RequestClassification
         self._CitationSupportMetrics = CitationSupportMetrics
         self._DecisionAction = DecisionAction
         self._DecisionInput = DecisionInput
@@ -206,7 +250,8 @@ class EvidenceDecisionGate:
 
     @staticmethod
     async def _call(target, **kwargs):
-        result = target(**kwargs)
+        is_async = inspect.iscoroutinefunction(target) or inspect.iscoroutinefunction(getattr(target, "__call__", None))
+        result = target(**kwargs) if is_async else await asyncio.to_thread(target, **kwargs)
         return await result if inspect.isawaitable(result) else result
 
     def _citation_support_metrics(
@@ -301,6 +346,8 @@ class EvidenceDecisionGate:
         attempt: int,
         citation_support_metrics: object | None = None,
         citation_metrics_present: bool = False,
+        classification=None,
+        retry_available: bool = True,
     ):
         tenant_id = context.get("tenant_id") if bundle is not None else None
         workspace_id = context.get("workspace_id") if bundle is not None else None
@@ -314,6 +361,14 @@ class EvidenceDecisionGate:
             if citation_metrics_present and citation_support_metrics is None
             else self._structural_citation_support(bundle)
         )
+        policy = self._DecisionPolicy(
+            min_retrieval_quality=0.50,
+            min_citation_support=1.0,
+            min_provider_confidence_signal=0.0,
+            max_retrieval_attempts=1,
+        )
+        if not isinstance(classification, self._RequestClassification):
+            classification = self._RequestClassification("unavailable", "request_policy_unavailable")
         return self._DecisionInput(
             evidence_bundle=bundle,
             tenant_id=tenant_id,
@@ -328,19 +383,13 @@ class EvidenceDecisionGate:
             # This is an availability signal for the already composed typed
             # provider port. It is not presented as a model confidence score.
             provider_confidence_signal=1.0,
-            domain_risk=self._DomainRisk.LOW,
-            user_intent=self._UserIntent(
-                intent_code="grounded_query",
-                clarity=self._IntentClarity.CLEAR,
-            ),
-            policy=self._DecisionPolicy(
-                min_retrieval_quality=0.50,
-                min_citation_support=1.0,
-                min_provider_confidence_signal=0.0,
-                max_retrieval_attempts=1,
-            ),
+            domain_risk=classification.domain_risk,
+            user_intent=classification.intent,
+            human_review_required=classification.human_review_required,
+            policy_allows_answer=classification.allows_answer and self.validator.authority is not None,
+            policy=policy,
             retrieval_attempt=attempt,
-            retrieval_available=True,
+            retrieval_available=retry_available,
         )
 
     def _issue_candidates(
@@ -375,14 +424,12 @@ class EvidenceDecisionGate:
                 continue
             if "*" not in allowed and collection_id not in allowed:
                 continue
-            if selected_collection is None:
-                selected_collection = collection_id
-            if collection_id != selected_collection:
+            if selected_collection is not None and collection_id != selected_collection:
                 continue
             scope = self._EvidenceScope(
                 tenant_id=tenant_id,
                 workspace_id=workspace_id,
-                collection_id=selected_collection,
+                collection_id=collection_id,
             )
             authoritative = None
             if self.validator.authority is not None:
@@ -402,6 +449,9 @@ class EvidenceDecisionGate:
                 # Missing or malformed provenance is not a reason to trust a
                 # legacy identifier. It is simply excluded from generation.
                 continue
+            if any(item.evidence_id == evidence.evidence_id for item in issued):
+                continue
+            selected_collection = collection_id
             raw_quality = candidate.get(
                 "retrieval_quality_score", candidate.get("confidence_score", 0.0)
             )
@@ -417,6 +467,10 @@ class EvidenceDecisionGate:
                     "collection_id": evidence.collection_id,
                     "document_id": evidence.document_id,
                     "document_version": evidence.document_version,
+                    "document_checksum": (
+                        authoritative.get("document_checksum")
+                        if isinstance(authoritative, Mapping) else None
+                    ),
                     "chunk_id": evidence.chunk_id,
                     "source": evidence.source,
                     "title": (
@@ -440,6 +494,7 @@ class EvidenceDecisionGate:
                     "dense_score": candidate.get("dense_score", 0.0),
                     "sparse_score": candidate.get("sparse_score", 0.0),
                     "reranking_score": evidence.reranking_score,
+                    "retrieval_score": evidence.retrieval_score,
                 }
             )
             issued.append(evidence)
@@ -466,18 +521,25 @@ class EvidenceDecisionGate:
         )
         return normalized, bundle, max(quality_values or [0.0])
 
-    async def retrieve(self, *, query: str, context: dict) -> dict[str, object]:
+    async def retrieve(self, *, query: str, context: dict, history: Sequence[str] = ()) -> dict[str, object]:
         target = getattr(self.retrieval, "retrieve", None)
         if not callable(target):
             raise TypeError("retrieval dependency has no retrieve callable")
         last_payload: dict[str, object] = {"evidence": []}
         last_decision = None
+        classification = self._classify_request(self.request_classifier, query, history=history)
+        retry_query = classification.retry_query
+        retry_available = isinstance(retry_query, str) and retry_query.strip() != query.strip()
+        initial_action = None
         for attempt in range(2):
             with stage_span("retrieval", attributes={"retrieval.attempt": attempt}) as retrieval_span:
                 try:
                     with stage_span("stores.retrieval", attributes={"store.operation": "retrieve"}) as stores_span:
                         try:
-                            raw_result = await self._call(target, query=query, context=context)
+                            raw_result = await self._call(
+                                target, query=query if attempt == 0 else retry_query,
+                                context={**context, "allowed_collection_ids": list(context.get("allowed_collection_ids") or [])},
+                            )
                         except Exception as exc:
                             record_safe_exception(stores_span, exc)
                             raise
@@ -491,7 +553,8 @@ class EvidenceDecisionGate:
                     )
                     with stage_span("evidence.validation", attributes={"evidence.candidates": len(candidates)}) as evidence_span:
                         try:
-                            normalized, bundle, quality = self._issue_candidates(
+                            normalized, bundle, quality = await asyncio.to_thread(
+                                self._issue_candidates,
                                 query=query,
                                 context=context,
                                 candidates=candidates,
@@ -508,6 +571,8 @@ class EvidenceDecisionGate:
                         attempt=attempt,
                         citation_support_metrics=citation_support_metrics,
                         citation_metrics_present=citation_metrics_present,
+                        classification=classification,
+                        retry_available=retry_available,
                     )
                     with stage_span("decision.policy", attributes={"decision.attempt": attempt}) as decision_span:
                         try:
@@ -520,11 +585,20 @@ class EvidenceDecisionGate:
                     raise
             last_payload = payload
             last_decision = decision
+            if initial_action is None:
+                initial_action = decision.action.value
             if decision.action is not self._DecisionAction.RETRIEVE_AGAIN:
                 break
 
         raw_metadata = last_payload.get("metadata")
         metadata = dict(raw_metadata) if isinstance(raw_metadata, Mapping) else {}
+        metadata.update(classification.metadata())
+        metadata.update({
+            "decision_initial_action": initial_action,
+            "retrieval_strategy": "original" if last_decision.retrieval_attempt == 0 else "policy_topic_terms_v1",
+            "evidence_collection_mode": "first_valid_single_collection",
+            "semantic_support_status": "NOT_EVALUATED",
+        })
         if last_decision is not None:
             metadata.update(
                 {
@@ -542,6 +616,158 @@ class EvidenceDecisionGate:
             last_payload["selected_count"] = 0
         last_payload["metadata"] = metadata
         return last_payload
+
+    async def validate_publication(
+        self, *, context: dict, evidence: Sequence[Mapping[str, object]],
+        cited_evidence_ids: Sequence[str],
+    ) -> bool:
+        """Re-resolve the full prompt snapshot at the final delivery boundary.
+
+        A live authorization callback is a server composition port, never a
+        request field. Its result may narrow, but cannot expand, request scope.
+        No snapshot or grant is cached on this shared gate between requests.
+        """
+        if self.validator.authority is None or not 1 <= len(evidence) <= 8:
+            return False
+        original = dict(context)
+        original_permissions = original.get("permissions")
+        if not isinstance(original_permissions, list) or not permission_granted(
+            role=None, permissions=original_permissions, required="chat.query", authoritative=True,
+        ):
+            return False
+        current = original
+        if self.authorization_revalidator is not None:
+            try:
+                current = await self._call(self.authorization_revalidator, context={
+                    **original,
+                    "allowed_collection_ids": list(original.get("allowed_collection_ids") or []),
+                    "permissions": list(original.get("permissions") or []),
+                })
+            except Exception:
+                return False
+            if not isinstance(current, Mapping) or any(
+                current.get(key) != original.get(key)
+                for key in ("tenant_id", "workspace_id", "user_id")
+            ):
+                return False
+            permissions = current.get("permissions")
+            if not isinstance(permissions, list) or not permission_granted(
+                role=None, permissions=permissions, required="chat.query", authoritative=True,
+            ):
+                return False
+        allowed = original.get("allowed_collection_ids")
+        refreshed = current.get("allowed_collection_ids")
+        if not isinstance(allowed, list) or not isinstance(refreshed, list):
+            return False
+        if any(not isinstance(value, str) for value in [*allowed, *refreshed]):
+            return False
+        if any(not isinstance(item, Mapping) for item in evidence):
+            return False
+        ids = [item.get("evidence_id") for item in evidence]
+        if (
+            any(not isinstance(value, str) for value in [*ids, *cited_evidence_ids])
+            or len(set(ids)) != len(ids)
+            or not cited_evidence_ids or not set(cited_evidence_ids).issubset(ids)
+        ):
+            return False
+        if len({item.get("collection_id") for item in evidence}) != 1:
+            return False
+
+        def revalidate() -> bool:
+            for item in evidence:
+                collection_id = item.get("collection_id")
+                if ("*" not in allowed and collection_id not in allowed) or (
+                    "*" not in refreshed and collection_id not in refreshed
+                ):
+                    return False
+                scope = self._EvidenceScope(
+                    tenant_id=original.get("tenant_id"), workspace_id=original.get("workspace_id"),
+                    collection_id=collection_id,
+                )
+                authoritative = self.validator.authority.resolve(item, scope=scope)
+                if not isinstance(authoritative, Mapping):
+                    return False
+                fresh = self.validator.issue(item, scope=scope, _resolved_candidate=authoritative)
+                if fresh.evidence_id != item.get("evidence_id"):
+                    return False
+                if (
+                    not item.get("document_checksum")
+                    or item.get("document_checksum") != authoritative.get("document_checksum")
+                    or item.get("title", "") != authoritative.get("title", "")
+                ):
+                    return False
+            return True
+
+        try:
+            return await asyncio.to_thread(revalidate)
+        except Exception:
+            return False
+
+    async def validate_cached_response(
+        self, *, context: Mapping[str, object], response: Mapping[str, object],
+    ) -> bool:
+        """Revalidate every source before returning an idempotent cached answer."""
+        metadata = response.get("metadata")
+        citations = response.get("citations")
+        if not isinstance(citations, Sequence) or isinstance(citations, (str, bytes, bytearray)):
+            return False
+        if not citations:
+            return not (
+                isinstance(metadata, Mapping)
+                and metadata.get("evidence_status") == "APPROVED_EVIDENCE"
+            )
+        authority = self.validator.authority
+        if authority is None or not 1 <= len(citations) <= 8:
+            return False
+
+        def resolve_snapshot() -> tuple[list[dict[str, object]], list[str]] | None:
+            evidence: list[dict[str, object]] = []
+            cited_ids: list[str] = []
+            for citation in citations:
+                if not isinstance(citation, Mapping):
+                    return None
+                collection_id = citation.get("collection_id")
+                if not isinstance(collection_id, str) or not collection_id:
+                    return None
+                scope = self._EvidenceScope(
+                    tenant_id=context.get("tenant_id"),
+                    workspace_id=context.get("workspace_id"),
+                    collection_id=collection_id,
+                )
+                authoritative = authority.resolve(citation, scope=scope)
+                if not isinstance(authoritative, Mapping):
+                    return None
+                if (
+                    (citation.get("checksum") is not None
+                     and citation.get("checksum") != authoritative.get("checksum"))
+                    or (citation.get("title") is not None
+                        and citation.get("title") != authoritative.get("title"))
+                ):
+                    return None
+                issued = self.validator.issue(
+                    citation, scope=scope, _resolved_candidate=authoritative,
+                )
+                cited_ids.append(issued.evidence_id)
+                evidence.append({
+                    "evidence_id": issued.evidence_id,
+                    "document_id": issued.document_id,
+                    "chunk_id": issued.chunk_id,
+                    "collection_id": issued.collection_id,
+                    "document_checksum": authoritative.get("document_checksum"),
+                    "title": authoritative.get("title", ""),
+                })
+            return evidence, cited_ids
+
+        try:
+            snapshot = await asyncio.to_thread(resolve_snapshot)
+        except Exception:
+            return False
+        if snapshot is None:
+            return False
+        evidence, cited_ids = snapshot
+        return await self.validate_publication(
+            context=dict(context), evidence=evidence, cited_evidence_ids=cited_ids,
+        )
 
 
 class OwnedLeaseAdapter:
@@ -573,9 +799,17 @@ class ProfessorChatBackend:
 
     provider_kind = "professor"
 
-    def __init__(self, *, retrieval, provider, lease=None, knowledge=None, limits: ProfessorLimits | None = None) -> None:
+    def __init__(
+        self, *, retrieval, provider, lease=None, knowledge=None,
+        limits: ProfessorLimits | None = None,
+        request_classifier=_DEFAULT_REQUEST_CLASSIFIER,
+        authorization_revalidator=None,
+    ) -> None:
         self.retrieval = retrieval
-        self.evidence_gate = EvidenceDecisionGate(retrieval, knowledge=knowledge)
+        self.evidence_gate = EvidenceDecisionGate(
+            retrieval, knowledge=knowledge, request_classifier=request_classifier,
+            authorization_revalidator=authorization_revalidator,
+        )
         self.provider = ProviderChatAdapter(provider)
         self.lease = OwnedLeaseAdapter(lease) if lease is not None else None
         self.orchestrator = ProfessorOrchestrator(
@@ -583,12 +817,18 @@ class ProfessorChatBackend:
             chat_provider=self.provider,
             lease_manager=self.lease,
             limits=limits,
+            require_publication_revalidation=True,
         )
 
     def readiness_check(self) -> bool:
         """Assert that the composed grounded chat wrapper is usable locally."""
 
         return self.lease is not None and callable(getattr(self.provider.provider, "chat_completion", None))
+
+    async def validate_cached_response(
+        self, *, context: Mapping[str, object], response: Mapping[str, object],
+    ) -> bool:
+        return await self.evidence_gate.validate_cached_response(context=context, response=response)
 
     async def generate(self, *, message: str, context: dict, conversation_id: str,
                        history: list[dict[str, str]] | None = None) -> dict:
@@ -640,26 +880,27 @@ class ProfessorChatBackend:
         )
 
         async def stream():
-            async for event in self.orchestrator.stream(request):
-                if event.get("kind") == "delta":
-                    yield {"type": "delta", "delta": str(event.get("delta") or "")}
-                    continue
-                result = event.get("response")
-                if result is None:
-                    continue
-                if result.evidence_status == "GENERATION_FAILED":
-                    raise ProfessorBackendError(str(result.metadata.get("failure_stage", "provider_failed")))
-                if result.evidence_status == "CITATION_INVALID":
-                    raise ProfessorBackendError("citation_invalid")
-                yield {
-                    "type": "final",
-                    "result": {
-                        "answer": result.answer,
-                        "citations": [c.model_dump(mode="json") for c in result.citations],
-                        "metadata": {
-                            "backend": "professor", "evidence_status": result.evidence_status,
-                            **result.metadata,
+            async with aclosing(self.orchestrator.stream(request)) as source:
+                async for event in source:
+                    if event.get("kind") == "delta":
+                        yield {"type": "delta", "delta": str(event.get("delta") or ""), "provisional": True}
+                        continue
+                    result = event.get("response")
+                    if result is None:
+                        continue
+                    if result.evidence_status == "GENERATION_FAILED":
+                        raise ProfessorBackendError(str(result.metadata.get("failure_stage", "provider_failed")))
+                    if result.evidence_status == "CITATION_INVALID":
+                        raise ProfessorBackendError("citation_invalid")
+                    yield {
+                        "type": "final",
+                        "result": {
+                            "answer": result.answer,
+                            "citations": [c.model_dump(mode="json") for c in result.citations],
+                            "metadata": {
+                                "backend": "professor", "evidence_status": result.evidence_status,
+                                **result.metadata,
+                            },
                         },
-                    },
-                }
+                    }
         return stream()

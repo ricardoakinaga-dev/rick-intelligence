@@ -1,0 +1,91 @@
+{
+  "audit_date": "2026-09-24",
+  "head": "b52f32c141916a2ea3af1a6b913bd91f380606e0",
+  "scope": "local working tree including pre-existing uncommitted changes",
+  "tracked_files_checked_before_report": 1198,
+  "tracked_content_changed_before_report": [],
+  "installed_python_packages": {
+    "fastapi": "0.109.2",
+    "starlette": "0.36.3",
+    "python-multipart": "0.0.9",
+    "pydantic": "2.6.1",
+    "pytest": "8.0.2"
+  },
+  "artifacts": [
+    {
+      "file": "api16-root-host.log",
+      "bytes": 3483,
+      "sha256": "c0fb2df2ef2250a9ed84a9d5aac60bd9b3027ae508ad15dfc67d022a455ff80d"
+    },
+    {
+      "file": "api16-domain.log",
+      "bytes": 763,
+      "sha256": "087551a29d95fb10f69e105fbe2f3b5a1dff9b506f31d91ea0b27da2ea563293"
+    },
+    {
+      "file": "remaining-tests-host.log",
+      "bytes": 5060,
+      "sha256": "a18d9c0d50d67a6d33453e49344f13c97817185040de0b8da60431b5781a64aa"
+    },
+    {
+      "file": "foundation-release-tests.log",
+      "bytes": 581,
+      "sha256": "d65742ec74225bf7fd4ea001796cd722200665bc8e4d8e903b1ae16210ea1309"
+    },
+    {
+      "file": "browser-upload.log",
+      "bytes": 2886,
+      "sha256": "982c8f57731eea1e8ae4efcf345bc75fcfa1ee9a0892432f293cbae553b573b1"
+    },
+    {
+      "file": "validate.log",
+      "bytes": 1730,
+      "sha256": "736205b808231b02f32d90e6be57f1957a2e76c3e52a2ec3863f83dc5a519ee7"
+    },
+    {
+      "file": "lint.log",
+      "bytes": 879,
+      "sha256": "a7a5650dee62a2a315b1b3413dc05105661cd0c4bd71ec25608e7101f4d1dd63"
+    },
+    {
+      "file": "typecheck.log",
+      "bytes": 607,
+      "sha256": "f4e2482bfa89fd0a34aa7a5fab375fdbb03747d3941dd8fecfa8bdb1bc77c92d"
+    },
+    {
+      "file": "web-lint.log",
+      "bytes": 110,
+      "sha256": "8f9596f3e34443b9079584d502523f9a9b1b4c78e3b7bb1432b9387517cb502f"
+    },
+    {
+      "file": "web-typecheck.log",
+      "bytes": 124,
+      "sha256": "b948d9c357fe1ebf6125fa2416acaf6a7fb9741f9fdf13d45371b7669b75ef2e"
+    },
+    {
+      "file": "compose-static.log",
+      "bytes": 286,
+      "sha256": "57a2ad623507430ce76dd96ad4d4b62e5d89e9ba60a5167271a18d3d4d51f55c"
+    },
+    {
+      "file": "ops-static.log",
+      "bytes": 1154,
+      "sha256": "440029d3e0e1099239586c35e29844082f1a8072725cb342b979448e9ee65766"
+    },
+    {
+      "file": "eval-retrieval-pack.log",
+      "bytes": 33052,
+      "sha256": "c1a28b5150e8e6ff330b246753d54faca7f067dd7f5a46f02b847d2dd2b2a32a"
+    },
+    {
+      "file": "security-adversarial.log",
+      "bytes": 168,
+      "sha256": "6717f5c4fad4f35a19357af7539a19fe69e3fefcb287086b7fd2e95b99574f3c"
+    },
+    {
+      "file": "check-results.json",
+      "bytes": 6516,
+      "sha256": "f100362e01940307df8cb6db6076797e7471a262708b0b7c8c6e57e865a85799"
+    }
+  ]
+}

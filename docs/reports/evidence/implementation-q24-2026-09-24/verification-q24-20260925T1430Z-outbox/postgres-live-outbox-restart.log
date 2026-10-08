@@ -1,0 +1,23 @@
+E
+==================================== ERRORS ====================================
+_ ERROR at setup of test_postgres_admin_mutation_outbox_projection_and_last_admin_serialization _
+
+tmp_path_factory = TempPathFactory(_given_basetemp=None, _trace=<pluggy._tracing.TagTracerSub object at 0x7b7b3c273350>, _basetemp=None, _retention_count=3, _retention_policy='all')
+
+    @pytest.fixture(scope="module")
+    def postgres_cluster(tmp_path_factory):
+        """Opt-in live tests always provision their own disposable PostgreSQL.
+    
+        No caller-provided DSN, existing database, network, or volume is accepted.
+        The only port is dynamically assigned on loopback. Teardown verifies the
+        unique ownership label before removing this container and its volumes.
+        """
+        if os.environ.get("RICK_MIGRATION_POSTGRES_TESTS") != "1":
+            pytest.skip("set RICK_MIGRATION_POSTGRES_TESTS=1 for disposable Docker PostgreSQL")
+>       import psycopg
+E       ModuleNotFoundError: No module named 'psycopg'
+
+infrastructure/scripts/tests/test_migrate.py:355: ModuleNotFoundError
+=========================== short test summary info ============================
+ERROR infrastructure/scripts/tests/test_migrate.py::test_postgres_admin_mutation_outbox_projection_and_last_admin_serialization
+1 error in 0.25s

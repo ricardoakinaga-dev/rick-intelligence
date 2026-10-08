@@ -30,6 +30,7 @@ import {
   type FormEvent,
   type KeyboardEvent,
   type MouseEvent as ReactMouseEvent,
+  type ReactNode,
 } from "react";
 import { useSession } from "@/components/session-provider";
 import { Button, Spinner, StatusPill } from "@/components/ui";
@@ -281,6 +282,35 @@ function CitationList({ citations, messageId, responseNumber }: { citations: Cha
   );
 }
 
+function AnswerContent({ content }: { content: string }) {
+  const blocks = content.replace(/\r\n?/g, "\n").split(/\n[ \t]*\n+/).map((block) => block.trim()).filter(Boolean);
+  const renderedBlocks: ReactNode[] = [];
+
+  for (let index = 0; index < blocks.length; index += 1) {
+    const value = blocks[index];
+    const heading = value.match(/^ {0,3}#{1,6}[ \t]+([^\n]+)(?:\n([\s\S]*))?$/);
+    if (!heading) {
+      renderedBlocks.push(<p className={styles.answerParagraph} key={`paragraph-${index}`}>{value}</p>);
+      continue;
+    }
+
+    let body = heading[2]?.trim();
+    const next = blocks[index + 1];
+    if (!body && next && !/^ {0,3}#{1,6}[ \t]+/.test(next)) {
+      body = next;
+      index += 1;
+    }
+    renderedBlocks.push(
+      <div className={styles.answerSection} key={`heading-${index}`}>
+        <h3>{heading[1].trim()}</h3>
+        {body ? <p>{body}</p> : null}
+      </div>,
+    );
+  }
+
+  return <div className={styles.answerBlocks}>{renderedBlocks}</div>;
+}
+
 function MessageBubble({ message, onCopy, responseNumber }: { message: WorkspaceMessage; onCopy: (content: string) => void; responseNumber: number }) {
   const assistant = message.role === "assistant";
   const sourcesId = sourceHeadingId(message.id);
@@ -296,7 +326,9 @@ function MessageBubble({ message, onCopy, responseNumber }: { message: Workspace
         <time dateTime={message.createdAt ? new Date(timestamp(message.createdAt)).toISOString() : undefined}>{formatTime(message.createdAt)}</time>
       </div>
       {assistant && message.citations.length ? <a className="source-jump" href={`#${sourcesId}`} onClick={(event) => focusAnchor(event, sourcesId)}>Consultar fontes ({message.citations.length})</a> : null}
-      <div className={`${styles.messageContent}${assistant ? " answer-text" : ""}`}>{message.content || "A resposta não trouxe texto."}</div>
+      <div className={`${styles.messageContent}${assistant ? " answer-text" : ""}`}>
+        {assistant ? <AnswerContent content={message.content || "A resposta não trouxe texto."} /> : message.content}
+      </div>
       {!assistant && message.status && message.status !== "sent" ? (
         <p className={`${styles.messageStatus} ${message.status === "failed" ? styles.failedStatus : ""}`}>
           {message.status === "sending" ? "Enviando consulta…" : message.status === "cancelled" ? "Consulta cancelada." : "Consulta não concluída."}

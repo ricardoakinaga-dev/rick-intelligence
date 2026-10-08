@@ -1,19 +1,42 @@
 # CI contracts
 
-The historical root workflow is
-[`phase-0.6.yml`](../../.github/workflows/phase-0.6.yml). It preserves the
-three component boundaries and separates quick pull-request checks from checks
-that need disposable Qdrant/Redis services or a browser.
+The canonical root CI is
+[`quality.yml`](../../.github/workflows/quality.yml), with release-integrity
+checks in [`state-of-art-quality.yml`](../../.github/workflows/state-of-art-quality.yml).
+Current toolchain declarations are documented in
+[`docs/architecture/toolchain.md`](../architecture/toolchain.md).
+For a new checkout, follow the versioned
+[control-input recovery contract](control-inputs/README.md): install the declared
+web dependencies, run `make control-inputs-restore`, then `make validate`.
+Validation is read-only and missing or corrupt inputs remain failures.
+Historical snapshots retain their original checksums and authority; restored
+or mutated artifacts do not constitute approval or current promotion evidence.
 
-The current additive foundation workflow is
+## Historical Phase 0.6 / 1.1 contract
+
+The sections below preserve the contract recorded during those phases. Their
+tool versions, lane names, branch-protection proposal and environment observations
+are historical; the canonical workflows and recovery contract above govern
+the current candidate.
+
+The historical root workflow was
+`.github/workflows/phase-0.6.yml`. It preserved the three component boundaries
+and separated quick pull-request checks from checks that need disposable
+Qdrant/Redis services or a browser. AUD07-04 deleted that workflow together
+with the components it guarded (AUD07-02); it remains reachable in git history
+and is no longer listed among the required control inputs.
+
+The historical additive foundation workflow is
 [`phase-1.1.yml`](../../.github/workflows/phase-1.1.yml). It installs the
 preserved lockfiles, runs the root `make ci` contract, and then rechecks the
-control-plane pointers. It does not start a root compose stack or move runtime
-code. `docs/ci/check_control_plane.py` accepts either the historical Phase 0.6
-plan or the active Phase 1.1 plan and always keeps the Phase 0.6 final gate
-present and `BLOCKED` while Phase 1.1 is active.
+control-plane pointers. That foundation contract did not start a root compose
+stack or move runtime code. At that stage, `docs/ci/check_control_plane.py`
+accepted the Phase 0.6 or Phase 1.1 plan and kept the Phase 0.6 final gate
+present and `BLOCKED` while Phase 1.1 was active. The current checker requires
+the v2 canonical controller and verifies its preserved history and review state;
+the old plan branches are not a fallback for missing current controls.
 
-## Pinned execution contract
+## Historical pinned execution contract
 
 | Tool or service | Declaration |
 | --- | --- |
@@ -27,12 +50,14 @@ present and `BLOCKED` while Phase 1.1 is active.
 | Python install mode | `python -m pip install --no-cache-dir -r cvg-master-rag-v2/src/requirements.txt` |
 | Node install mode | `npm ci --ignore-scripts --no-audit --no-fund` from the component lockfile |
 
-The versions match the preserved Phase 0.5 characterization. A version change
-requires updating the workflow and this table together with fresh evidence.
+The versions match the preserved Phase 0.5 characterization of the retired
+Phase 0.6 workflow; they are recorded here as history, not as live
+configuration. A version change to a live lane requires updating its workflow
+and this table together with fresh evidence.
 The workflow does not inject a provider credential and does not claim that its
 deterministic provider doubles are live-provider evidence.
 
-## Lanes and check names
+## Historical lanes and check names
 
 The following job `name` values are the exact GitHub check names:
 
@@ -52,10 +77,11 @@ The following job `name` values are the exact GitHub check names:
 | historical | `legacy / historical baseline (waived if unavailable)` | Runs the full legacy suite only when the authorized classification artifact exists; otherwise reports an explicit waiver |
 | evidence | `evidence / live provider (unavailable)` | Records that no approved endpoint/credential is available; makes no provider request |
 
-The fast and integration rows are the required branch-protection set for
-ordinary code changes. Branch protection cannot be configured from this bounded
-workspace task, so configure these exact names manually on the protected `main`
-branch. Do not use a shortened job ID or a different display name.
+The fast and integration rows were the required branch-protection set proposed
+for ordinary code changes in that phase. Branch protection was not configured
+by the bounded workspace task. Current required checks must be reconciled with
+the canonical workflow and the repository's actual protection configuration;
+this historical table does not establish that configuration.
 
 The historical and live-provider checks remain visible but are not promotion
 evidence when unavailable. Their current state is intentional:
@@ -78,10 +104,10 @@ An actual failure in the available historical lane fails the job. The
 branch-protection set should be updated only after the corresponding promotion
 authority accepts the current evidence.
 
-## Local checks
+## Historical local checks
 
-Dependency-free deployment and control checks can be run from the workspace
-root:
+The phase-specific local commands were recorded as follows. Current clean-checkout
+validation requires the recovery procedure linked above before checking controls:
 
 ```bash
 python3 scripts/phase06/check_locker_boundary.py
@@ -93,6 +119,9 @@ which keeps it usable while independent component work is in progress. CI uses
 `--require-clean --require-remote` and also requires `HEAD == origin/main` on a
 push to `main`.
 
-The integration lanes require a runner with Docker-backed GitHub Actions
-services. The current local environment has no Docker executable, so local
-absence of those services is reported as unavailable rather than simulated.
+The historical integration lanes required a runner with Docker-backed GitHub
+Actions services. At the time this contract was recorded, that local environment
+had no Docker executable and reported services as unavailable. The current
+workstation has Docker; availability of a specific service and authority to run
+it must be established by that lane's actual execution evidence. The old
+environment observation is not a current limitation or an approval.

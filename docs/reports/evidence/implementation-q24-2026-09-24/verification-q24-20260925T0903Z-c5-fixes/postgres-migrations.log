@@ -1,0 +1,13 @@
+........................................................................ [ 66%]
+....................................                                     [100%]
+=============================== warnings summary ===============================
+infrastructure/scripts/tests/test_migrate.py::test_postgres_admin_mutation_outbox_projection_and_last_admin_serialization
+  /tmp/rick-intelligence-api-test-env/lib/python3.12/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+infrastructure/scripts/tests/test_migrate.py::test_postgres_admin_mutation_outbox_projection_and_last_admin_serialization
+  /tmp/rick-intelligence-api-test-env/lib/python3.12/site-packages/starlette/testclient.py:53: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    _PortalFactoryType = Callable[[], AbstractContextManager[anyio.abc.BlockingPortal]]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+108 passed, 2 warnings in 41.52s

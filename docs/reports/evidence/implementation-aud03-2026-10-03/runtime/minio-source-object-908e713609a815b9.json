@@ -1,0 +1,115 @@
+{
+  "started_at": "2026-10-03T12:14:46.551617+00:00",
+  "scope": "AUD03 owned disposable loopback S3 adapter gate only",
+  "declared_oci_image_parity": false,
+  "production_safe": false,
+  "promotable": false,
+  "harness_sha256": "ce51987be7eb3152ff168ebf073096fd722c3a1c35dbe9fe3a9cb8a2e89871ef",
+  "binary_sha256": "217221998d41178e3ebd248feb8f9e50d6157c67de36da91d967c3e4aa3c6212",
+  "source_commit": "8c2c92f7afdc8386b000c0cb57ecec2ee1f5bcb0",
+  "image_id": "sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6",
+  "build_record_sha256": "c1a4f9038b8c37e28a25ff2427e8344b797a5695d36863baaf37c7ccbfad12ea",
+  "source_hashes": {
+    "packages/storage/src/rick_storage/__init__.py": "c67398fcd81087ef495b59c44af72f1ab9f8578284071adb1051798081ccdfef",
+    "packages/storage/src/rick_storage/errors.py": "e7767c2733967a8a2f5c390cdac5007c9b165ad17247c2cca28247cd09ec895e",
+    "packages/storage/src/rick_storage/models.py": "a6dfd86c9b50030bc1cd9c10dcf55eed791287de26c486ce2d4f21aa10639701",
+    "packages/storage/src/rick_storage/object_store.py": "f81be07d280f38214a23bd3dfc211367da2b92bedacd932540e5610bf861d87c",
+    "packages/storage/src/rick_storage/protocols.py": "19c548029920ab76665ed30732a1589c9ee7502796cd26323d851dd35e146725",
+    "packages/storage/src/rick_storage/s3_object_store.py": "fe26dcb37ea3a4153729876e5257d578990bc0721dea88f17df6fe18c80de091",
+    "packages/storage/src/rick_storage/validation.py": "adcceaf9da55970ebb59cff98847e9aa0fe7657e68ae6fc5c64258ca6851b80a",
+    "scripts/phase11/object_qdrant_runtime_gate.py": "95010fde6e4354c5903384ac577d0149ac5e652ef9fdd2acda14ba433aaa0b0a"
+  },
+  "container": "rick-aud03-minio-source-908e713609a815b9",
+  "container_id": "5e383fc639ab8c4c3ba23ba4b0e08297d2aec8357ba7ea08a2e1b37b6b3726d5",
+  "endpoint": "http://127.0.0.1:32778",
+  "object_gate": {
+    "status": "PASS",
+    "live": true,
+    "endpoint": {
+      "scheme": "http",
+      "host_scope": "loopback",
+      "port_configured": true,
+      "path_configured": false
+    },
+    "authentication": {
+      "kind": "aws_sigv4",
+      "configured": true,
+      "secret_values": "omitted"
+    },
+    "results": [
+      {
+        "name": "health",
+        "result": "PASS",
+        "detail": "bucket health probe succeeded"
+      },
+      {
+        "name": "put-streaming",
+        "result": "PASS",
+        "detail": "bounded file-like uploads returned scoped checksum and size metadata"
+      },
+      {
+        "name": "put-idempotent",
+        "result": "PASS",
+        "detail": "repeating the same scoped upload preserved metadata"
+      },
+      {
+        "name": "head-checksum-content-length",
+        "result": "PASS",
+        "detail": "HEAD verified checksum and content length for every scoped fixture"
+      },
+      {
+        "name": "get-streaming-integrity",
+        "result": "PASS",
+        "detail": "GET streamed bounded bodies and matched every fixture"
+      },
+      {
+        "name": "streaming-limits",
+        "result": "PASS",
+        "detail": "GET and streaming PUT enforced the configured byte ceiling"
+      },
+      {
+        "name": "private-access",
+        "result": "PASS",
+        "detail": "unsigned access to the existing fixture was rejected"
+      },
+      {
+        "name": "tenant-workspace-isolation",
+        "result": "PASS",
+        "detail": "tenant and workspace listings/reads remained in their exact namespaces"
+      },
+      {
+        "name": "delete",
+        "result": "PASS",
+        "detail": "all live fixture objects were deleted"
+      },
+      {
+        "name": "delete-idempotent",
+        "result": "PASS",
+        "detail": "repeated DELETE returned absence without resurrecting a fixture"
+      },
+      {
+        "name": "restore-negative",
+        "result": "PASS",
+        "detail": "deleted objects remained absent on HEAD and GET; no restore claim was made"
+      },
+      {
+        "name": "cleanup",
+        "result": "PASS",
+        "detail": "all UUID-scoped object fixtures are absent"
+      }
+    ],
+    "production_safe": false,
+    "promotable": false,
+    "observations": {
+      "fixture_count": 5,
+      "created_fixture_count": 5,
+      "stream_read_calls": 172,
+      "max_fixture_bytes": 16384,
+      "restore_claim": false
+    }
+  },
+  "source_unchanged": true,
+  "status": "PASS",
+  "own_container_removed": true,
+  "finished_at": "2026-10-03T12:14:47.560816+00:00"
+}

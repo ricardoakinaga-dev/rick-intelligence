@@ -1,0 +1,29 @@
+python3 "/home/ricardo/rick-intelligence/scripts/phase15/check_boundaries.py"
+{
+  "status": "PASS",
+  "checked": "/home/ricardo/rick-intelligence",
+  "errors": []
+}
+PYTHONDONTWRITEBYTECODE=1 python3 "/home/ricardo/rick-intelligence/docs/ci/check_control_plane.py"
+WARNING: Git worktree is DIRTY (2839 entries); local dirty state is reported but not rejected
+Control-plane check failed:
+- Required controller check failed: check_state.py
+PASS: 30 historical files match their recorded SHA256
+[PASS] STATE_JSON: artifact parses (.agent/state.json)
+[PASS] BACKLOG_JSON: artifact parses (.agent/backlog.json)
+[PASS] EXECUTION_LOG: artifact parses (.agent/execution-log.jsonl)
+[PASS] VERIFICATION_LOG: artifact parses (.agent/verification.jsonl)
+[PASS] STATE_FIELDS: all canonical runtime fields are present
+[PASS] BACKLOG_CONTRACT: validated 35 backlog item(s)
+[FAIL] LOG_ACTION: EVT-Q24-08-WORKER-SHUTDOWN-REVIEW-20260926T021657Z.active_action_id must be scoped as Q17-23.A:<STABLE-ID>
+[FAIL] VERIFY_TIMESTAMP: VER-Q24-08-WORKER-SHUTDOWN-REVIEW-20260926T021657Z: observed_at must not be later than record timestamp
+[PASS] GATE_HISTORY: validated 28 append-only gate record(s)
+[PASS] RECONCILE: state, backlog, log, and active pointers agree
+RESULT FAIL (pass=8 warn=0 fail=2)
+PASS: derived review views and 11 historical files verified; original acceptance preserved
+{
+  "valid": true,
+  "errors": []
+}
+Git: head=b52f32c141916a2ea3af1a6b913bd91f380606e0 branch=main worktree=DIRTY (2839 entries) remote_main=b52f32c141916a2ea3af1a6b913bd91f380606e0 sync=HEAD_EQ_ORIGIN_MAIN
+make: *** [Makefile:86: validate] Error 1

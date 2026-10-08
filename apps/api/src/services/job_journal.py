@@ -255,6 +255,20 @@ def _normalize_metadata(value: object) -> dict[str, Any]:
     if not isinstance(value, Mapping):
         return {}
     result: dict[str, Any] = {}
+    if value.get("publication_outcome_unknown") is True:
+        result["publication_outcome_unknown"] = True
+    attempt = _safe_text(value.get("publication_attempt"), max_length=128)
+    if attempt is not None:
+        result["publication_attempt"] = attempt
+    for key in ('retirement_pending', 'retirement_error_after_commit', 'retirement_superseded',
+                'index_activation_required', 'deduplicated'):
+        if isinstance(value.get(key), bool):
+            result[key] = value[key]
+    for key in ('previous_document_id', 'previous_document_attempt', 'published_document_attempt',
+                'retirement_deferred'):
+        safe = _safe_text(value.get(key), max_length=256)
+        if safe is not None:
+            result[key] = safe
     for key in ("execution", "durability", "restart_recovery", "storage"):
         raw = value.get(key)
         if key == "restart_recovery":
@@ -562,7 +576,39 @@ class JobJournal:
         if remaining > self.max_rows:
             raise JobJournalCapacityError("job journal capacity is exhausted by active jobs")
 
+    def repair_committed_publication(self, job, *, knowledge, **kwargs):
+        """Repair a projection only from a freshly read scoped committed receipt.
+
+        Ordinary journal writes retain all attempt/terminal fences. Neither a
+        stale caller token nor the journal's terminal label is commit authority.
+        """
+        receipt = knowledge.get_publication(_value(job, 'job_id'), **{
+            key: _value(job, key) for key in ('tenant_id', 'workspace_id', 'collection_id')})
+        if receipt is None or receipt['outcome'] != 'committed':
+            return self.upsert(job, **kwargs)
+        from rick_knowledge.publication import validate_publication_snapshot
+        saved = receipt['job_snapshot']
+        validate_publication_snapshot(saved, attempt_id=receipt['attempt_id'], document_attempt=receipt['document_attempt'])
+        if _value(job, 'status') != 'published' or any(_value(job, key) != receipt[key] for key in
+                ('job_id', 'tenant_id', 'workspace_id', 'collection_id', 'document_id')):
+            raise ValueError('journal committed receipt identity changed')
+        if any(_value(job, key) != saved[key] for key in ('attempt', 'created_at', 'started_at', 'finished_at')):
+            raise ValueError('journal committed receipt facts changed')
+        if (_value(job, 'metadata', {}) or {}).get('publication_attempt') != receipt['attempt_id']:
+            raise ValueError('journal committed receipt token changed')
+        return self._upsert(job, _committed_receipt=receipt, **kwargs)
+
     def upsert(
+        self, job: object, *, source_path: str | Path | None | object = _UNSET,
+        display_filename: str | None | object = _UNSET, retry_count: int | object = _UNSET,
+        acl_snapshot: Mapping[str, Any] | list[str] | tuple[str, ...] | object = _UNSET,
+        request_id: str | None | object = _UNSET, correlation_id: str | None | object = _UNSET,
+    ) -> dict[str, Any]:
+        return self._upsert(job, source_path=source_path, display_filename=display_filename,
+            retry_count=retry_count, acl_snapshot=acl_snapshot,
+            request_id=request_id, correlation_id=correlation_id)
+
+    def _upsert(
         self,
         job: object,
         *,
@@ -572,6 +618,7 @@ class JobJournal:
         acl_snapshot: Mapping[str, Any] | list[str] | tuple[str, ...] | object = _UNSET,
         request_id: str | None | object = _UNSET,
         correlation_id: str | None | object = _UNSET,
+        _committed_receipt: dict | None = None,
     ) -> dict[str, Any]:
         """Atomically insert/update one whitelisted job row."""
 
@@ -579,6 +626,9 @@ class JobJournal:
             job_id = _safe_text(_value(job, "job_id"), max_length=MAX_JOB_ID_LENGTH)
             if job_id is None:
                 raise ValueError("job_id is required")
+            attempt = _value(job, 'attempt', 1)
+            if type(attempt) is not int or not 1 <= attempt <= 64:
+                raise ValueError('job journal attempt is invalid')
             existing = self._row_record(
                 self._connection.execute(
                     "SELECT * FROM ingestion_jobs WHERE job_id = ?", (job_id,)
@@ -594,6 +644,33 @@ class JobJournal:
                 request_id=request_id,
                 correlation_id=correlation_id,
             )
+            if existing is not None:
+                for key in ('tenant_id', 'workspace_id', 'collection_id'):
+                    if normalized[key] != existing[key]:
+                        raise ValueError('job journal scope changed')
+                old_token = existing['metadata'].get('publication_attempt')
+                new_token = json.loads(normalized['metadata_json']).get('publication_attempt')
+                if _committed_receipt is not None:
+                    if existing['document_id'] not in (None, _committed_receipt['document_id']):
+                        raise ValueError('job journal committed document changed')
+                elif normalized['attempt'] != existing['attempt']:
+                    if (existing['status'] not in {'failed', 'cancelled'} or
+                            normalized['attempt'] != existing['attempt'] + 1 or
+                            (old_token is not None and (new_token is None or new_token == old_token))):
+                        raise ValueError('job journal retry attempt is invalid')
+                else:
+                    if old_token is not None and new_token != old_token:
+                        raise ValueError('job journal publication attempt changed')
+                    if existing['status'] in {'published', 'failed', 'cancelled'}:
+                        if normalized['status'] != existing['status']:
+                            if normalized['status'] == 'queued':
+                                raise ValueError('job journal retry must advance the attempt')
+                            return existing
+                        # Metadata/source cleanup can continue after commit.
+                        # It cannot rewrite facts of the completed attempt.
+                        for key in ('document_id', 'status', 'stage', 'progress', 'attempt', 'error_code',
+                                    'created_at', 'started_at', 'finished_at', 'cancel_requested'):
+                            normalized[key] = existing[key]
             self._connection.execute(
                 """
                 INSERT INTO ingestion_jobs (

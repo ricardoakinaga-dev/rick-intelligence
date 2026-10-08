@@ -12,6 +12,18 @@ production deployment must supply shared metrics/alerting and choose whether
 to wrap the live adapter at its composition root. The underlying HTTP client
 still owns timeout, retry, response-size and redaction policy.
 
+Admission is fail-closed (A16). `production_safe` is `True` only when the wrapped
+port exposes a live `health_check` probe or declares `production_safe = True`
+itself — an owned, named decision; a test port is never production-safe. A port
+with neither is reported `production_safe = False`. `health_check()` follows the
+same rule: it delegates to the port's probe and returns `False` when there is no
+probe, instead of falling back to `readiness_check()` — circuit state is a local
+signal, not reachability. `readiness_check()` keeps its cheap, no-I/O meaning for
+callers that explicitly want it. The official OpenAI-compatible and Anthropic
+adapters carry their own `/models` probe, so the canonical composition stays
+green; the composition-level admission test covers the registered `provider`
+readiness check, not only the wrapper.
+
 The provider HTTP, SSE and structured-tool paths decode JSON through a finite,
 duplicate-free boundary. Non-finite constants and duplicate object keys fail
 closed before chat/embedding response projection, streaming delta extraction,

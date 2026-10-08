@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-09-25T16:53:06Z",
+  "scope": "Q24-21 scoped local PostgreSQL regression for sparse administrative PATCH/password-recovery serialization, plus API/identity regression and static checks. This is not complete Q24-21 or production acceptance.",
+  "checkout": {
+    "head": "b52f32c141916a2ea3af1a6b913bd91f380606e0",
+    "worktree": "dirty shared checkout; unrelated and prior changes remain present"
+  },
+  "result": "PASS",
+  "results": {
+    "focused_postgresql": "4 passed, 109 deselected in 7.41s (postgres-auth-race-retry.log); covers empty and workspace-only PATCH in both lock orders",
+    "api_identity": "773 passed, 421 warnings in 51.15s (api-identity-regression.log)",
+    "static": "make lint and make typecheck passed"
+  },
+  "environment": {
+    "platform": "Linux; Python 3.12; disposable Docker PostgreSQL 16.15",
+    "successful_container": "rick-q24-migration-9cf82e95e44c4cfdb4577e7592e4014d",
+    "image": "postgres:16-alpine; image digest sha256:3c5c8892d184f738f4fe282d14ddaa613a38f00f4189d2d94725ebe6f2909ddb",
+    "isolation": "1 CPU, 512 MiB memory, 256 MiB tmpfs, dynamically assigned loopback port, uniquely owned container label",
+    "teardown": "teardown.json records remaining_containers=0; Docker command log confirms ownership-label check and removal"
+  },
+  "attempt_history": [
+    {
+      "artifact": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-21-tenant-race-20260925/postgres-auth-race.log",
+      "outcome": "Initial test attempt failed two admin-first cases because the concurrency-test barrier did not release at the correct completion boundary; this was corrected in the test harness and preserved."
+    },
+    {
+      "artifact": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-21-tenant-race-20260925/postgres-auth-race-retry.log",
+      "outcome": "Focused four-case PostgreSQL retry passed."
+    },
+    {
+      "artifact": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-21-tenant-race-20260925/postgres-auth-race-artifacts.log",
+      "outcome": "Later evidence-only rerun used the global Python without psycopg and failed before creating a resource; it is preserved and is not counted as a product/test failure."
+    }
+  ],
+  "files": {
+    "apps/api/src/services/postgres_identity.py": "0ce17f9a9bc3d7103d6182f8d481bd26c6b2e29830c5d4ed447024b69083e10c",
+    "apps/api/tests/test_postgres_admin_mutations.py": "fdf4241adff59ce74ff397b11708561feb22f3d92b75181ed589e63d598fb73a",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-21-tenant-race-20260925/api-identity-regression.log": "643f567abc44d48da7f9b61c0f23aca149a12f4f464cd1cf41f0abe070380383",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-21-tenant-race-20260925/docker/rick-q24-migration-9cf82e95e44c4cfdb4577e7592e4014d/docker-commands.jsonl": "e3e8d51d7d8a32ea8956cc83d8db943f5defb4960a32a56558a75effdbf6dd5e",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-21-tenant-race-20260925/docker/rick-q24-migration-9cf82e95e44c4cfdb4577e7592e4014d/postgres.log": "df34e118439dcbc9d659543cb03d669b27264a04e36b07a703f334f7db3e84e0",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-21-tenant-race-20260925/docker/rick-q24-migration-9cf82e95e44c4cfdb4577e7592e4014d/resource.json": "00645866c188bb48eebed20f742431a238372bd399f096068febe4340da3945a",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-21-tenant-race-20260925/docker/rick-q24-migration-9cf82e95e44c4cfdb4577e7592e4014d/teardown.json": "366eee7b9cf0a090f674e7d06577a228c5bcebe7e573daa81b840a74af478c36",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-21-tenant-race-20260925/docker/rick-q24-migration-b4057133ec144f55be690a7a1d7fc9fd/docker-commands.jsonl": "fdd2504d1c3d307ed229072e166365461cf64a4874fac808b3dd73a5da90af37",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-21-tenant-race-20260925/docker/rick-q24-migration-b4057133ec144f55be690a7a1d7fc9fd/postgres.log": "8fcdcb348801c77ef170824b66961656f7f5d6cf411be97fa5d8a2cf9ef6dcea",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-21-tenant-race-20260925/docker/rick-q24-migration-b4057133ec144f55be690a7a1d7fc9fd/resource.json": "2bcabd76dd6487b4f6d87bc1650cb16e0b45a98f59d42fd28d2d51ead351dd68",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-21-tenant-race-20260925/docker/rick-q24-migration-b4057133ec144f55be690a7a1d7fc9fd/teardown.json": "b16e1246dc79064af4d8dfefb747bd992404b8411e474b3c4a21a34cdef283b5",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-21-tenant-race-20260925/lint.log": "a7a5650dee62a2a315b1b3413dc05105661cd0c4bd71ec25608e7101f4d1dd63",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-21-tenant-race-20260925/postgres-auth-race-artifacts.log": "2828e9fa582c400e68a8d7d6a5d8aad777c08a195c8381b0b3756d7cfd3d4f76",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-21-tenant-race-20260925/postgres-auth-race-retry.log": "c49c5b5a19016c8fa02eb8bf31df3d98f9be9c5e3bd49f3fd32be0bdf03328dc",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-21-tenant-race-20260925/postgres-auth-race.log": "88a3daf91f5a548e3da9465956f39afe13ceaf4942cbe67e19ca182faa5c53c1",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-21-tenant-race-20260925/typecheck.log": "f4e2482bfa89fd0a34aa7a5fab375fdbb03747d3941dd8fecfa8bdb1bc77c92d",
+    "infrastructure/scripts/tests/test_migrate.py": "4e4028dc1acdcdbf37ceba56f48282a787e9966564506de4b9760f4cff33229f",
+    "packages/identity/src/rick_identity/postgres.py": "cb380ed45b65ab49d31673a32d993882b9b036c7770e0bae2b4ad14b6d719382"
+  },
+  "limitations": "The PostgreSQL service is disposable and local. The test proves the scoped lock race only; it does not establish all session expiry/revocation, complete role/tenant isolation, deployed authentication, distributed topology, full API/worker composition, operations, or production acceptance. The checkout remains dirty."
+}

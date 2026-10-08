@@ -1,0 +1,256 @@
+{
+  "direct_runtime_pins": {
+    "anyio": "4.15.0",
+    "fastapi": "0.141.1",
+    "httpx": "0.27.0",
+    "opentelemetry-api": "1.29.0",
+    "opentelemetry-exporter-otlp-proto-grpc": "1.29.0",
+    "opentelemetry-sdk": "1.29.0",
+    "pdfplumber": "0.11.10",
+    "psycopg": "3.2.3",
+    "pydantic": "2.13.5",
+    "pyjwt": "2.15.0",
+    "python-docx": "1.2.0",
+    "python-multipart": "0.0.32",
+    "redis": "5.2.1",
+    "starlette": "1.7.0",
+    "uvicorn": "0.54.0"
+  },
+  "python_version": "3.12.3",
+  "runtime_lock": {
+    "all_packages_hash_pinned": true,
+    "package_count": 45,
+    "packages": [
+      {
+        "hash_pinned": true,
+        "name": "annotated-doc",
+        "version": "0.0.5"
+      },
+      {
+        "hash_pinned": true,
+        "name": "annotated-types",
+        "version": "0.8.0"
+      },
+      {
+        "hash_pinned": true,
+        "name": "anyio",
+        "version": "4.15.0"
+      },
+      {
+        "hash_pinned": true,
+        "name": "certifi",
+        "version": "2026.7.22"
+      },
+      {
+        "hash_pinned": true,
+        "name": "cffi",
+        "version": "2.1.1"
+      },
+      {
+        "hash_pinned": true,
+        "name": "charset-normalizer",
+        "version": "3.5.1"
+      },
+      {
+        "hash_pinned": true,
+        "name": "click",
+        "version": "8.5.0"
+      },
+      {
+        "hash_pinned": true,
+        "name": "cryptography",
+        "version": "50.0.1"
+      },
+      {
+        "hash_pinned": true,
+        "name": "deprecated",
+        "version": "1.3.1"
+      },
+      {
+        "hash_pinned": true,
+        "name": "fastapi",
+        "version": "0.141.1"
+      },
+      {
+        "hash_pinned": true,
+        "name": "googleapis-common-protos",
+        "version": "1.75.0"
+      },
+      {
+        "hash_pinned": true,
+        "name": "grpcio",
+        "version": "1.84.0"
+      },
+      {
+        "hash_pinned": true,
+        "name": "h11",
+        "version": "0.16.0"
+      },
+      {
+        "hash_pinned": true,
+        "name": "httpcore",
+        "version": "1.0.9"
+      },
+      {
+        "hash_pinned": true,
+        "name": "httpx",
+        "version": "0.27.0"
+      },
+      {
+        "hash_pinned": true,
+        "name": "idna",
+        "version": "3.20"
+      },
+      {
+        "hash_pinned": true,
+        "name": "importlib-metadata",
+        "version": "8.5.0"
+      },
+      {
+        "hash_pinned": true,
+        "name": "lxml",
+        "version": "6.1.3"
+      },
+      {
+        "hash_pinned": true,
+        "name": "opentelemetry-api",
+        "version": "1.29.0"
+      },
+      {
+        "hash_pinned": true,
+        "name": "opentelemetry-exporter-otlp-proto-common",
+        "version": "1.29.0"
+      },
+      {
+        "hash_pinned": true,
+        "name": "opentelemetry-exporter-otlp-proto-grpc",
+        "version": "1.29.0"
+      },
+      {
+        "hash_pinned": true,
+        "name": "opentelemetry-proto",
+        "version": "1.29.0"
+      },
+      {
+        "hash_pinned": true,
+        "name": "opentelemetry-sdk",
+        "version": "1.29.0"
+      },
+      {
+        "hash_pinned": true,
+        "name": "opentelemetry-semantic-conventions",
+        "version": "0.50b0"
+      },
+      {
+        "hash_pinned": true,
+        "name": "pdfminer-six",
+        "version": "20260107"
+      },
+      {
+        "hash_pinned": true,
+        "name": "pdfplumber",
+        "version": "0.11.10"
+      },
+      {
+        "hash_pinned": true,
+        "name": "pillow",
+        "version": "12.3.0"
+      },
+      {
+        "hash_pinned": true,
+        "name": "protobuf",
+        "version": "5.29.6"
+      },
+      {
+        "hash_pinned": true,
+        "name": "psycopg",
+        "version": "3.2.3"
+      },
+      {
+        "hash_pinned": true,
+        "name": "psycopg-binary",
+        "version": "3.2.3"
+      },
+      {
+        "hash_pinned": true,
+        "name": "pycparser",
+        "version": "3.0"
+      },
+      {
+        "hash_pinned": true,
+        "name": "pydantic",
+        "version": "2.13.5"
+      },
+      {
+        "hash_pinned": true,
+        "name": "pydantic-core",
+        "version": "2.46.5"
+      },
+      {
+        "hash_pinned": true,
+        "name": "pyjwt",
+        "version": "2.15.0"
+      },
+      {
+        "hash_pinned": true,
+        "name": "pypdfium2",
+        "version": "5.13.0"
+      },
+      {
+        "hash_pinned": true,
+        "name": "python-docx",
+        "version": "1.2.0"
+      },
+      {
+        "hash_pinned": true,
+        "name": "python-multipart",
+        "version": "0.0.32"
+      },
+      {
+        "hash_pinned": true,
+        "name": "redis",
+        "version": "5.2.1"
+      },
+      {
+        "hash_pinned": true,
+        "name": "sniffio",
+        "version": "1.3.1"
+      },
+      {
+        "hash_pinned": true,
+        "name": "starlette",
+        "version": "1.7.0"
+      },
+      {
+        "hash_pinned": true,
+        "name": "typing-extensions",
+        "version": "4.16.0"
+      },
+      {
+        "hash_pinned": true,
+        "name": "typing-inspection",
+        "version": "0.4.4"
+      },
+      {
+        "hash_pinned": true,
+        "name": "uvicorn",
+        "version": "0.54.0"
+      },
+      {
+        "hash_pinned": true,
+        "name": "wrapt",
+        "version": "2.4.1"
+      },
+      {
+        "hash_pinned": true,
+        "name": "zipp",
+        "version": "4.1.0"
+      }
+    ],
+    "path": "requirements/runtime.lock"
+  },
+  "test_runner": {
+    "pytest": "8.0.2",
+    "pytest_asyncio": "0.23.5"
+  }
+}

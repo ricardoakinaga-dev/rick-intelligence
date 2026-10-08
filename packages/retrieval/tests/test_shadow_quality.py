@@ -15,7 +15,15 @@ for _pkg in ("knowledge", "ingestion", "retrieval", "contracts", "authorization"
     _p = ROOT / "packages" / _pkg / "src"
     if str(_p) not in sys.path:
         sys.path.insert(0, str(_p))
-LEGACY_SRC = str(ROOT / "cvg-master-rag-v2" / "src")
+import os
+
+LEGACY_ROOT = Path(os.environ.get("RICK_LEGACY_REFERENCE", str(ROOT / ".runtime" / "legacy-reference")))
+LEGACY_SRC = str(LEGACY_ROOT / "cvg-master-rag-v2" / "src")
+if not Path(LEGACY_SRC).is_dir():
+    raise RuntimeError(
+        "legacy differential reference is missing; run "
+        "`python3 scripts/phase15/legacy_reference.py` before this suite"
+    )
 if LEGACY_SRC not in sys.path:
     sys.path.append(LEGACY_SRC)
 
@@ -30,7 +38,7 @@ def _load(name, relpath):
              [m for m in sys.modules if m.split(".")[0] in ("services", "core", "models")]}
     try:
         sys.path.insert(0, LEGACY_SRC)
-        spec = _importlib_util.spec_from_file_location(key, ROOT / relpath)
+        spec = _importlib_util.spec_from_file_location(key, LEGACY_ROOT / relpath)
         module = _importlib_util.module_from_spec(spec)
         sys.modules[key] = module
         spec.loader.exec_module(module)

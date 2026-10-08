@@ -86,6 +86,119 @@ def _point(point_id: str = "p-1", *, text: str = "allowed text") -> dict[str, ob
     }
 
 
+def _wire_points(points):
+    return json.dumps(
+        {"points": [
+            {"id": point["point_id"], "vector": {"dense": [float(v) for v in point["vector"]]},
+             "payload": point["payload"]}
+            for point in points
+        ]},
+        allow_nan=False, ensure_ascii=False, sort_keys=True, separators=(",", ":"),
+    ).encode("utf-8")
+
+
+@pytest.mark.parametrize("max_points", [256, 7])
+def test_upsert_planner_bounds_realistic_http_batches(max_points):
+    import httpx
+
+    points = [
+        {**_point(f"p-{index:03d}", text="ação 漢字" * 20),
+         "vector": [(dimension + 1) / 1537 for dimension in range(1536)]}
+        for index in range(257)
+    ]
+    requests = []
+
+    def handler(request):
+        requests.append(request)
+        return httpx.Response(200, json={"result": {"status": "completed", "operation_id": 1}})
+
+    with QdrantHttpVectorStore(
+        "http://qdrant.test", "rag_phase0", max_points=max_points,
+        transport=httpx.MockTransport(handler),
+    ) as store:
+        with pytest.raises(QdrantBoundsError):
+            store.upsert_points(points[:256])
+        assert requests == []
+        batches = store.plan_upsert_batches(points)
+        assert requests == []
+        assert len(batches) > 1
+        assert sum(store.upsert_points(batch) for batch in batches) == len(points)
+        assert [json.loads(request.content) for request in requests] == [
+            json.loads(_wire_points(batch)) for batch in batches
+        ]
+        assert all(len(request.content) <= store.limits.max_request_bytes for request in requests)
+        assert all(0 < len(batch) <= max_points for batch in batches)
+        assert [point["point_id"] for batch in batches for point in batch] == [
+            point["point_id"] for point in points
+        ]
+        assert all(request.method == "PUT" and request.url.params["wait"] == "true" for request in requests)
+
+
+@pytest.mark.parametrize("delta, expected", [(0, [2, 1]), (-1, [1, 1, 1])])
+def test_upsert_planner_uses_exact_normalized_utf8_size(delta, expected):
+    points = [{**_point(str(index), text='ação 漢字 " \\n'), "vector": [1, 2]} for index in range(3)]
+    limit = len(_wire_points(points[:2])) + delta
+    transport = FakeTransport(lambda *_: _json_response({"result": True}))
+    store = QdrantHttpVectorStore(
+        "http://qdrant.test", "rag_phase0", limits=QdrantLimits(max_request_bytes=limit),
+        transport=transport,
+    )
+    with pytest.raises(QdrantBoundsError):
+        store.upsert_points(points)
+    batches = store.plan_upsert_batches(points)
+    assert transport.requests == []
+    assert [len(batch) for batch in batches] == expected
+    for batch in batches:
+        assert store.upsert_points(batch) == len(batch)
+    assert [request[3] for request in transport.requests] == [_wire_points(batch) for batch in batches]
+    assert all(len(request[3]) <= limit for request in transport.requests)
+
+
+@pytest.mark.parametrize("fault", ["oversized", "payload", "invalid", "overflow"])
+def test_upsert_planner_rejects_late_invalid_point_before_io(fault):
+    point = _point("bad")
+    if fault == "oversized":
+        point["vector"] = [0.1234567890123456] * 1536
+    elif fault == "payload":
+        point["payload"]["text"] = "private" * 10000
+    elif fault == "invalid":
+        point["vector"] = [float("nan")]
+    else:
+        point["vector"] = [10 ** 1000]
+    transport = FakeTransport(lambda *_: _json_response({"result": True}))
+    store = QdrantHttpVectorStore(
+        "http://qdrant.test", "rag_phase0", limits=QdrantLimits(max_points=1, max_request_bytes=512),
+        transport=transport,
+    )
+    with pytest.raises(QdrantValidationError) as caught:
+        batches = store.plan_upsert_batches([_point(), point])
+        for batch in batches:
+            store.upsert_points(batch)
+    assert transport.requests == []
+    assert "private" not in repr(caught.value)
+
+
+@pytest.mark.parametrize("points", [None, "points", {}, [None]])
+def test_upsert_planner_validates_input(points):
+    store = QdrantHttpVectorStore(
+        "http://qdrant.test", "rag_phase0",
+        transport=FakeTransport(lambda *_: pytest.fail("unexpected HTTP")),
+    )
+    with pytest.raises(QdrantValidationError):
+        store.plan_upsert_batches(points)
+
+
+def test_upsert_planner_empty_and_closed():
+    store = QdrantHttpVectorStore(
+        "http://qdrant.test", "rag_phase0",
+        transport=FakeTransport(lambda *_: pytest.fail("unexpected HTTP")),
+    )
+    assert store.plan_upsert_batches([]) == ()
+    store.close()
+    with pytest.raises(QdrantClosedError):
+        store.plan_upsert_batches([])
+
+
 def test_configuration_requires_explicit_destination_and_collection() -> None:
     transport = FakeTransport(lambda *_: _json_response({"result": True}))
     with pytest.raises(QdrantConfigurationError):
@@ -314,7 +427,10 @@ def test_collection_schema_index_and_alias_operations_are_bounded() -> None:
             )
         if method == "PUT" and url.endswith("/collections/rag_phase0"):
             body = json.loads(content)
-            assert body == {"vectors": {"dense": {"distance": "Cosine", "size": 1536}}}
+            assert body == {
+                "vectors": {"dense": {"distance": "Cosine", "size": 1536}},
+                "sparse_vectors": {"sparse": {"index": {"on_disk": False}}},
+            }
             return _json_response({"result": True})
         if method == "PUT" and url.endswith("/collections/rag_phase0/index"):
             body = json.loads(content)
@@ -322,18 +438,17 @@ def test_collection_schema_index_and_alias_operations_are_bounded() -> None:
             return _json_response({"result": True})
         if method == "GET" and url.endswith("/aliases"):
             return _json_response(
-                {"result": [{"alias_name": "rag_current", "collection_name": "rag_phase0"}]}
+                {"result": {"aliases": [{"alias_name": "rag_current", "collection_name": "rag_phase0"}]}}
             )
         if method == "POST" and url.endswith("/collections/aliases"):
             body = json.loads(content)
             assert body == {
                 "actions": [
-                    {"action": "delete_alias", "alias_name": "rag_current"},
-                    {
-                        "action": "create_alias",
+                    {"delete_alias": {"alias_name": "rag_current"}},
+                    {"create_alias": {
                         "alias_name": "rag_current",
                         "collection_name": "rag_phase1",
-                    },
+                    }},
                 ]
             }
             return _json_response({"result": True})
@@ -393,6 +508,42 @@ def test_malformed_and_oversized_success_responses_are_safe_errors() -> None:
     )
     with pytest.raises(QdrantResponseTooLargeError):
         bounded.health()
+
+
+def test_default_httpx_transport_stops_streaming_at_response_byte_cap() -> None:
+    import httpx
+
+    class CountingStream(httpx.SyncByteStream):
+        def __init__(self) -> None:
+            self.yielded = 0
+            self.closed = False
+
+        def __iter__(self):
+            for chunk in (b"a" * 16, b"b" * 17, b"c" * 16):
+                self.yielded += 1
+                yield chunk
+
+        def close(self) -> None:
+            self.closed = True
+
+    stream = CountingStream()
+
+    def handler(_request):
+        return httpx.Response(200, stream=stream)
+
+    with QdrantHttpVectorStore(
+        "http://qdrant.test",
+        "rag_phase0",
+        transport=httpx.MockTransport(handler),
+        max_response_bytes=32,
+        max_attempts=1,
+    ) as bounded:
+        with pytest.raises(QdrantResponseTooLargeError) as error:
+            bounded.health()
+
+    assert error.value.operation == "health"
+    assert stream.yielded == 2
+    assert stream.closed
 
 
 @pytest.mark.parametrize(

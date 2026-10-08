@@ -1,0 +1,48 @@
+PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="/home/ricardo/rick-intelligence/apps/api/src:/home/ricardo/rick-intelligence/apps/worker:/home/ricardo/rick-intelligence/packages/jobs/src:/home/ricardo/rick-intelligence/packages/contracts/src:/home/ricardo/rick-intelligence/packages/authorization/src:/home/ricardo/rick-intelligence/packages/identity/src:/home/ricardo/rick-intelligence/packages/observability/src:/home/ricardo/rick-intelligence/packages/knowledge/src:/home/ricardo/rick-intelligence/packages/ingestion/src:/home/ricardo/rick-intelligence/packages/retrieval/src:/home/ricardo/rick-intelligence/packages/providers/src:/home/ricardo/rick-intelligence/packages/locking/src:/home/ricardo/rick-intelligence/packages/professor/src:/home/ricardo/rick-intelligence/packages/evidence/src:/home/ricardo/rick-intelligence/packages/decision/src" python3 -m pytest -q -p no:cacheprovider "/home/ricardo/rick-intelligence/apps/api/tests"
+........................................................................ [ 10%]
+........................................................................ [ 20%]
+........................................................................ [ 31%]
+........................................................................ [ 41%]
+........................................................................ [ 51%]
+........................................................................ [ 62%]
+........................................................................ [ 72%]
+........................................................................ [ 82%]
+........................................................................ [ 93%]
+..............................................                           [100%]
+=============================== warnings summary ===============================
+../.local/lib/python3.12/site-packages/starlette/testclient.py:41
+  /home/ricardo/.local/lib/python3.12/site-packages/starlette/testclient.py:41: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    [], typing.ContextManager[anyio.abc.BlockingPortal]
+
+tests/test_app_lifecycle.py: 5 warnings
+tests/test_audit_factory.py: 80 warnings
+tests/test_auth.py: 8 warnings
+tests/test_canonical_negatives.py: 5 warnings
+tests/test_cases.py: 7 warnings
+tests/test_chat_history.py: 3 warnings
+tests/test_compat_openai.py: 4 warnings
+tests/test_decision_policy_publication.py: 6 warnings
+tests/test_differential_auth.py: 1 warning
+tests/test_dual_equivalence.py: 2 warnings
+tests/test_errors.py: 4 warnings
+tests/test_health.py: 7 warnings
+tests/test_http_contract.py: 8 warnings
+tests/test_negative_security.py: 8 warnings
+tests/test_phase15_root.py: 5 warnings
+tests/test_phase16_health.py: 6 warnings
+tests/test_phase16_root.py: 25 warnings
+tests/test_provider_isolation.py: 20 warnings
+tests/test_readiness_flags.py: 79 warnings
+tests/test_rec_foundation.py: 6 warnings
+tests/test_retry_multipart_contract.py: 12 warnings
+tests/test_route_policy.py: 46 warnings
+tests/test_search_endpoint.py: 13 warnings
+tests/test_security_hardening.py: 12 warnings
+tests/test_streaming.py: 10 warnings
+tests/test_telemetry.py: 1 warning
+tests/test_transport_observation.py: 3 warnings
+  /home/ricardo/.local/lib/python3.12/site-packages/httpx/_client.py:680: DeprecationWarning: The 'app' shortcut is now deprecated. Use the explicit style 'transport=WSGITransport(app=...)' instead.
+    warnings.warn(message, DeprecationWarning)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+694 passed, 387 warnings in 45.05s

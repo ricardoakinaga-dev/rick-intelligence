@@ -226,12 +226,14 @@ def test_head_get_list_delete_and_response_closure(scope: ObjectScope) -> None:
     get_response = FakeResponse(200, object_headers(payload), payload)
     list_response = FakeResponse(200, {"Content-Length": str(len(list_body))}, list_body)
     listed_head_response = FakeResponse(200, object_headers(payload))
+    delete_presence_response = FakeResponse(200, object_headers(payload))
     delete_response = FakeResponse(204)
     transport = FakeTransport(
         head_response,
         get_response,
         list_response,
         listed_head_response,
+        delete_presence_response,
         delete_response,
     )
     store = make_store(transport)
@@ -240,10 +242,10 @@ def test_head_get_list_delete_and_response_closure(scope: ObjectScope) -> None:
     assert store.get(scope, key) == payload
     assert [item.key for item in store.list(scope)] == [key]
     assert store.delete(scope, key) is True
-    assert [request.method for request in transport.requests] == ["HEAD", "GET", "GET", "HEAD", "DELETE"]
+    assert [request.method for request in transport.requests] == ["HEAD", "GET", "GET", "HEAD", "HEAD", "DELETE"]
     assert all(
         response.closed
-        for response in (head_response, get_response, list_response, listed_head_response, delete_response)
+        for response in (head_response, get_response, list_response, listed_head_response, delete_presence_response, delete_response)
     )
 
 
@@ -398,6 +400,26 @@ def test_delete_maps_not_found_to_false(scope: ObjectScope) -> None:
     store = make_store(transport)
     assert store.delete(scope, "missing") is False
     assert response.closed
+
+
+def test_s3_204_delete_acknowledgement_does_not_imply_repeated_effect(scope: ObjectScope) -> None:
+    present = FakeResponse(200)
+    acknowledged = FakeResponse(204)
+    absent = FakeResponse(404)
+    transport = FakeTransport(present, acknowledged, absent)
+    store = make_store(transport)
+    assert store.delete(scope, "fixture") is True
+    assert store.delete(scope, "fixture") is False
+    assert [request.method for request in transport.requests] == ["HEAD", "DELETE", "HEAD"]
+    assert all(response.closed for response in (present, acknowledged, absent))
+
+
+def test_delete_after_concurrent_removal_remains_absent(scope: ObjectScope) -> None:
+    present, gone = FakeResponse(200), FakeResponse(404)
+    transport = FakeTransport(present, gone)
+    store = make_store(transport)
+    assert store.delete(scope, "fixture") is False
+    assert all(response.closed for response in (present, gone))
 
 
 def test_scope_and_remote_key_validation_happen_before_transport(scope: ObjectScope) -> None:

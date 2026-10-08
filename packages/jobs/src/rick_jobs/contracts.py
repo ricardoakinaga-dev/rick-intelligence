@@ -329,6 +329,32 @@ def _failure_dict(failure: JobFailure) -> dict[str, object]:
 
 
 @dataclass(frozen=True, slots=True)
+class JobContinuation:
+    """Durable pre-intent authority to resume the existing canonical attempt.
+
+    This is an internal owner callback result, never a caller scheduling hint.
+    A queue must validate these facts against its locked active attempt.
+    """
+    job_id: JobId
+    scope: JobScope
+    attempt: int
+    created_at: float
+    started_at: float
+    attempt_id: str
+
+    def __post_init__(self):
+        object.__setattr__(self, 'job_id', JobId(_text(self.job_id, field_name='job_id', maximum=MAX_IDENTIFIER_LENGTH)))
+        if not isinstance(self.scope, JobScope):
+            raise JobValidationError('continuation scope is invalid')
+        object.__setattr__(self, 'attempt', _attempt_number(self.attempt))
+        for name in ('created_at', 'started_at'):
+            object.__setattr__(self, name, _timestamp(getattr(self, name), field_name=name))
+        if self.started_at < self.created_at:
+            raise JobValidationError('continuation time is out of order')
+        _text(self.attempt_id, field_name='attempt_id', maximum=MAX_IDENTIFIER_LENGTH)
+
+
+@dataclass(frozen=True, slots=True)
 class JobResult:
     output_refs: JobMetadata = field(default_factory=dict)
     document_id: str | None = None
@@ -348,6 +374,58 @@ class JobResult:
         if self.document_id is not None:
             object.__setattr__(self, "document_id", _identifier(self.document_id, field_name="result.document_id"))
         object.__setattr__(self, "completed_at", _timestamp(self.completed_at, field_name="result.completed_at"))
+
+
+@dataclass(frozen=True, slots=True)
+class JobPublicationFacts:
+    """Facts read by the scoped publication owner, never caller projections.
+
+    A receipt confirms the same active attempt's start, count and creation.
+    Conflicts require explicit resolution; canonical attempt identities and
+    history are immutable even while RUNNING.
+    The token identifies the receipt/checkpoint; it is not a worker lease.
+    """
+    job_id: JobId
+    scope: JobScope
+    attempt: int
+    created_at: float
+    started_at: float
+    attempt_id: str
+
+    def __post_init__(self):
+        validated = JobContinuation(self.job_id, self.scope, self.attempt,
+            self.created_at, self.started_at, self.attempt_id)
+        for name in ('job_id', 'scope', 'attempt', 'created_at', 'started_at', 'attempt_id'):
+            object.__setattr__(self, name, getattr(validated, name))
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class JobPublicationResult(JobResult):
+    """Committed result with explicit durable business-attempt authority."""
+    facts: JobPublicationFacts
+
+    def __post_init__(self):
+        JobResult.__post_init__(self)
+        if not isinstance(self.facts, JobPublicationFacts):
+            raise JobValidationError('publication facts are invalid')
+        if self.completed_at < self.facts.started_at:
+            raise JobValidationError('publication finish precedes its start')
+
+
+@dataclass(frozen=True, slots=True)
+class JobPublicationCancellation:
+    """Durable cancellation completion; an unknown historical end stays None."""
+    facts: JobPublicationFacts
+    completed_at: float | None
+
+    def __post_init__(self):
+        if not isinstance(self.facts, JobPublicationFacts):
+            raise JobValidationError('publication facts are invalid')
+        if self.completed_at is not None:
+            finished = _timestamp(self.completed_at, field_name='completed_at')
+            if finished < self.facts.started_at:
+                raise JobValidationError('publication finish precedes its start')
+            object.__setattr__(self, 'completed_at', finished)
 
 
 @dataclass(frozen=True, slots=True)
@@ -695,6 +773,7 @@ class Job:
         result: JobResult | None = None,
         failure: JobFailure | None = None,
         available_at: float | None = None,
+        finished_at: float | None = None,
     ) -> "Job":
         """Finish the active attempt and move the job to its resulting state."""
 
@@ -739,12 +818,17 @@ class Job:
             if result is not None:
                 raise InvalidTransitionError(f"{target.value} cannot contain a result")
             attempt_state = JobState.FAILED
+        completion = timestamp if finished_at is None else _timestamp(finished_at, field_name='finished_at')
+        if not current.started_at <= completion <= timestamp:
+            raise InvalidTransitionError('attempt completion is outside its lifetime')
+        if target is JobState.SUCCEEDED and finished_at is not None and completion != result.completed_at:
+            raise InvalidTransitionError('attempt completion differs from its result')
         finished_attempt = JobAttempt(
             number=current.number,
             worker_id=current.worker_id,
             state=attempt_state,
             started_at=current.started_at,
-            finished_at=timestamp,
+            finished_at=completion,
             failure=observed_failure,
         )
         next_available = self.available_at if available_at is None else _timestamp(available_at, field_name="available_at")

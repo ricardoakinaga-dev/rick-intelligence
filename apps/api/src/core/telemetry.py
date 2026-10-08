@@ -12,10 +12,15 @@ from __future__ import annotations
 from collections import deque
 from copy import deepcopy
 import hashlib
+import inspect
+from ipaddress import IPv4Address, IPv6Address
 import math
 import re
-from threading import Event, RLock, Thread
+import time
+from threading import Condition, Event, Lock, RLock, Thread
 from typing import Any, Mapping
+from unicodedata import category
+from urllib.parse import urlsplit
 
 try:  # The monorepo runtime exposes this package through PYTHONPATH.
     from rick_observability import (
@@ -25,6 +30,8 @@ try:  # The monorepo runtime exposes this package through PYTHONPATH.
         emit_safely,
         opaque_ref,
         safe_event,
+        shutdown_sink_delivery,
+        sink_delivery_snapshot,
     )
 
     _IMPLEMENTATION = "rick_observability"
@@ -130,6 +137,164 @@ except ImportError:  # Keep a minimal, bounded local runtime for packaged API im
         "error", "workers", "recovered", "duration_ms", "progress", "attempt", "attempts", "count",
         "changed", "message",
     )
+    _FALLBACK_DELIVERY_COUNTERS = (
+        "sink.delivery.emitted", "sink.delivery.failed", "sink.delivery.dropped",
+        "sink.delivery.timeout", "sink.delivery.shutdown_timeout",
+    )
+    _FALLBACK_EMIT_TIMEOUT_SECONDS = 0.25
+    _FALLBACK_SINK_QUEUE_CAPACITY = 1_024
+    _FALLBACK_SINK_WORKERS = 2
+    _FALLBACK_MISSING = object()
+
+    def _fallback_may_have_emitter(sink: object) -> bool:
+        """Check sink shape without invoking caller-thread descriptors."""
+
+        try:
+            if inspect.getattr_static(sink, "emit", _FALLBACK_MISSING) is not _FALLBACK_MISSING:
+                return True
+            if inspect.getattr_static(type(sink), "__getattr__", _FALLBACK_MISSING) is not _FALLBACK_MISSING:
+                return True
+            return inspect.getattr_static(
+                type(sink), "__getattribute__", object.__getattribute__
+            ) is not object.__getattribute__
+        except Exception:
+            return False
+
+    class _FallbackSinkDelivery:
+        """Process-local fixed workers and a finite best-effort event queue."""
+
+        def __init__(self, *, workers: int = _FALLBACK_SINK_WORKERS,
+                     capacity: int = _FALLBACK_SINK_QUEUE_CAPACITY) -> None:
+            if isinstance(workers, bool) or not isinstance(workers, int) or not 1 <= workers <= 8:
+                raise ValueError("workers must be an integer between 1 and 8")
+            if isinstance(capacity, bool) or not isinstance(capacity, int) or not 1 <= capacity <= 1_024:
+                raise ValueError("capacity must be between 1 and 1024")
+            self._capacity = capacity
+            self._counters = {name: 0 for name in _FALLBACK_DELIVERY_COUNTERS}
+            self._condition = Condition(RLock())
+            self._closed = False
+            self._queue: deque[tuple[object, Event, list[bool]]] = deque()
+            self._active = 0
+            self._threads = tuple(
+                Thread(target=self._work, name=f"rick-api-telemetry-sink-{index}", daemon=True)
+                for index in range(workers)
+            )
+            for thread in self._threads:
+                thread.start()
+
+        def snapshot(self) -> dict[str, object]:
+            with self._condition:
+                return {
+                    "workers": len(self._threads),
+                    "capacity": self._capacity,
+                    "queued": len(self._queue),
+                    "active": self._active,
+                    "closed": self._closed,
+                    "counters": [
+                        {"name": name, "total": float(self._counters[name])}
+                        for name in _FALLBACK_DELIVERY_COUNTERS
+                    ],
+                }
+
+        def offer(self, deliver, timeout: float) -> bool:
+            completed = Event()
+            state = [False]
+            with self._condition:
+                if self._closed or len(self._queue) >= self._capacity:
+                    self._counters["sink.delivery.dropped"] += 1
+                    return False
+                self._queue.append((deliver, completed, state))
+                self._condition.notify()
+            if not completed.wait(max(0.0, timeout)):
+                self._count("sink.delivery.timeout")
+                return False
+            return state[0]
+
+        def shutdown(self, *, timeout: float = 2.0) -> bool:
+            try:
+                bounded_timeout = float(timeout)
+            except (TypeError, ValueError):
+                bounded_timeout = 0.0
+            if not math.isfinite(bounded_timeout) or bounded_timeout < 0:
+                bounded_timeout = 0.0
+            began = time.monotonic()
+            with self._condition:
+                self._closed = True
+                self._condition.notify_all()
+                while (self._queue or self._active) and time.monotonic() - began < bounded_timeout:
+                    remaining = max(0.0, bounded_timeout - (time.monotonic() - began))
+                    self._condition.wait(timeout=remaining)
+                while self._queue:
+                    _, completed, _state = self._queue.popleft()
+                    self._counters["sink.delivery.dropped"] += 1
+                    completed.set()
+            for thread in self._threads:
+                remaining = bounded_timeout - (time.monotonic() - began)
+                if remaining <= 0:
+                    break
+                thread.join(remaining)
+            drained = all(not thread.is_alive() for thread in self._threads)
+            if not drained:
+                self._count("sink.delivery.shutdown_timeout")
+            return drained
+
+        def _count(self, name: str) -> None:
+            with self._condition:
+                self._counters[name] += 1
+
+        def _work(self) -> None:
+            while True:
+                with self._condition:
+                    while not self._closed and not self._queue:
+                        self._condition.wait()
+                    if not self._queue:
+                        return
+                    deliver, completed, state = self._queue.popleft()
+                    self._active += 1
+                try:
+                    deliver()
+                    state[0] = True
+                    self._count("sink.delivery.emitted")
+                except Exception:
+                    self._count("sink.delivery.failed")
+                finally:
+                    completed.set()
+                    with self._condition:
+                        self._active -= 1
+                        self._condition.notify_all()
+
+    _fallback_delivery: _FallbackSinkDelivery | None = None
+    _fallback_delivery_lock = Lock()
+
+    def _get_fallback_delivery() -> _FallbackSinkDelivery:
+        global _fallback_delivery
+        with _fallback_delivery_lock:
+            if _fallback_delivery is None:
+                _fallback_delivery = _FallbackSinkDelivery()
+            return _fallback_delivery
+
+    def sink_delivery_snapshot() -> dict[str, object]:
+        """Inspect fallback delivery without starting background workers."""
+
+        with _fallback_delivery_lock:
+            delivery = _fallback_delivery
+        if delivery is not None:
+            return delivery.snapshot()
+        return {
+            "workers": 0,
+            "capacity": _FALLBACK_SINK_QUEUE_CAPACITY,
+            "queued": 0,
+            "active": 0,
+            "closed": False,
+            "counters": [
+                {"name": name, "total": 0.0} for name in _FALLBACK_DELIVERY_COUNTERS
+            ],
+        }
+
+    def shutdown_sink_delivery(timeout: float = 2.0) -> bool:
+        """Close and boundedly drain the process-wide fallback sink lane."""
+
+        return _get_fallback_delivery().shutdown(timeout=timeout)
 
     def _fallback_safe_text(value: object, *, limit: int = 128) -> str | None:
         if not isinstance(value, str):
@@ -226,37 +391,31 @@ except ImportError:  # Keep a minimal, bounded local runtime for packaged API im
             return True
         try:
             event = safe_event(fields, event_name=event_name)
-            emitter = getattr(sink, "emit", None)
-            if not callable(emitter) and not callable(sink):
+            callable_sink = callable(sink)
+            has_emitter = _fallback_may_have_emitter(sink)
+            if not callable_sink and not has_emitter:
                 return False
             if timeout is None:
-                if callable(emitter):
-                    emitter(deepcopy(event))
-                else:
-                    sink(deepcopy(event))
-                return True
-            try:
-                bounded_timeout = float(timeout)
-            except (TypeError, ValueError):
-                bounded_timeout = 0.0
+                bounded_timeout = _FALLBACK_EMIT_TIMEOUT_SECONDS
+            else:
+                try:
+                    bounded_timeout = float(timeout)
+                except (TypeError, ValueError):
+                    bounded_timeout = 0.0
             if not math.isfinite(bounded_timeout) or bounded_timeout < 0:
                 bounded_timeout = 0.0
-            completed = Event()
 
             def deliver() -> None:
-                try:
-                    if callable(emitter):
-                        emitter(deepcopy(event))
-                    else:
-                        sink(deepcopy(event))
-                except Exception:
-                    return
-                finally:
-                    completed.set()
+                payload = deepcopy(event)
+                emitter = getattr(sink, "emit", None) if has_emitter else None
+                if callable(emitter):
+                    emitter(payload)
+                elif callable_sink:
+                    sink(payload)
+                else:
+                    raise TypeError("event sink must be callable or expose emit(event)")
 
-            Thread(target=deliver, name="rick-api-telemetry-sink", daemon=True).start()
-            completed.wait(bounded_timeout)
-            return completed.is_set()
+            return _get_fallback_delivery().offer(deliver, bounded_timeout)
         except Exception:
             return False
 
@@ -265,6 +424,11 @@ MAX_ROUTE_FAMILIES = 16
 MAX_HISTOGRAM_SAMPLES = 10_000
 MAX_TELEMETRY_EVENTS = 256
 MAX_METRIC_OBSERVATION_MS = 86_400_000.0
+_MONITORING_PATHS = (
+    "/health/live", "/health/ready", "/metrics", "/api/v1/admin/health",
+    "/api/v1/admin/metrics", "/api/v1/admin/metrics/prometheus",
+)
+_DNS_LABEL = re.compile(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?", re.ASCII)
 _RETRIEVAL_LATENCY_BUCKETS_MS = (50.0, 100.0, 250.0, 500.0, 1_000.0, 1_500.0, 2_000.0, 5_000.0, 10_000.0)
 _READINESS_STATUSES = frozenset({"unknown", "ready", "degraded", "not_ready"})
 _PROVIDER_COMPONENTS = frozenset({
@@ -413,6 +577,40 @@ def route_family(path: str) -> str:
     return "other"
 
 
+def _export_origin(destination: str | None) -> str | None:
+    """Retain only a validated HTTP(S) origin from exporter configuration."""
+
+    if not isinstance(destination, str) or not destination or len(destination) > 512:
+        return None
+    # urlsplit silently discards some controls; reject them before parsing.
+    if any(char.isspace() or category(char) in {"Cc", "Cf", "Cs"} for char in destination):
+        return None
+    try:
+        parsed = urlsplit(destination)
+        host = parsed.hostname
+        port = parsed.port
+        if parsed.scheme not in {"http", "https"} or not host:
+            return None
+        authority = parsed.netloc.rsplit("@", 1)[-1]
+        if authority.startswith("["):
+            if re.fullmatch(r"\[[0-9a-fA-F:.]+\](?::[0-9]+)?", authority) is None:
+                return None
+            host = f"[{IPv6Address(host).compressed}]"
+        else:
+            if re.fullmatch(r"[^:]+(?::[0-9]+)?", authority) is None:
+                return None
+            host = host.encode("idna").decode("ascii").lower()
+            dns_name = host[:-1] if host.endswith(".") else host
+            if len(host) > 253 or any(_DNS_LABEL.fullmatch(label) is None for label in dns_name.split(".")):
+                return None
+            if re.fullmatch(r"[0-9.]+", host):
+                host = str(IPv4Address(host))
+        origin = f"{parsed.scheme}://{host}" + (f":{port}" if port is not None else "")
+        return origin if len(origin) <= 512 else None
+    except (ValueError, UnicodeError):
+        return None
+
+
 class ApiTelemetry:
     """Per-application bounded metrics and explicit SLO evaluation."""
 
@@ -436,11 +634,11 @@ class ApiTelemetry:
         self._lock = RLock()
 
     def set_export(self, *, status: str, destination: str | None) -> None:
-        """Record exporter configuration without exposing credentials."""
+        """Record configuration, never delivery, with an origin-only destination."""
 
         if status not in {"CONFIGURED", "NOT_CONFIGURED"}:
             status = "NOT_CONFIGURED"
-        safe_destination = destination if isinstance(destination, str) and len(destination) <= 512 else None
+        safe_destination = _export_origin(destination)
         with self._lock:
             self._export_status = status
             self._export_destination = safe_destination
@@ -662,6 +860,7 @@ class ApiTelemetry:
         status_labels = {"status": f"{status // 100}xx" if isinstance(status, int) else "unknown"}
         observed_duration = max(0.0, float(duration_ms))
         service_failed = failed or status >= 500
+        is_business = path.split("?", 1)[0].rstrip("/") not in _MONITORING_PATHS
         with self._lock:
             self._counters.increment("api.http.requests", labels=route_labels)
             self._counters.increment("api.http.responses", labels=status_labels)
@@ -669,8 +868,15 @@ class ApiTelemetry:
                 self._counters.increment("api.http.errors", labels=route_labels)
             if status in (401, 403):
                 self._counters.increment("api.http.auth_denied", labels=route_labels)
-            self._latency.observe(observed_duration)
-            self._recent_errors.append(service_failed)
+            if is_business:
+                self._counters.increment("api.http.business.requests", labels=route_labels)
+                # A zero-valued series on success permits error-budget rates
+                # before this route's first error. Totals never evict or reset.
+                self._counters.increment(
+                    "api.http.business.errors", labels=route_labels, value=int(service_failed),
+                )
+                self._latency.observe(observed_duration)
+                self._recent_errors.append(service_failed)
             self._events.append(safe_event({
                 "request_id": request_id,
                 "correlation_id": correlation_id,
@@ -720,6 +926,8 @@ class ApiTelemetry:
                 "name": self._slo.name,
                 "window": "last_requests",
                 "window_capacity": MAX_HISTOGRAM_SAMPLES,
+                "sample_scope": "business_requests",
+                "excluded_route_count": len(_MONITORING_PATHS),
                 "observations": total,
                 "latency_scope": "response_headers",
                 "status": decision.status,
@@ -751,6 +959,7 @@ class ApiTelemetry:
             "counters": [snapshot.as_dict() for snapshot in snapshots],
             "events": list(events),
             "event_capacity": MAX_TELEMETRY_EVENTS,
+            "sink_delivery": sink_delivery_snapshot(),
         }
 
     @staticmethod
@@ -817,6 +1026,50 @@ class ApiTelemetry:
                 if not math.isfinite(value) or value < 0:
                     continue
                 lines.append(f"{name}{labels} {value:g}")
+
+        sink_delivery = current.get("sink_delivery")
+        if isinstance(sink_delivery, Mapping):
+            for field, metric, help_text in (
+                ("workers", "rick_api_telemetry_sink_workers", "Active fixed sink-delivery workers."),
+                ("capacity", "rick_api_telemetry_sink_queue_capacity", "Bounded sink-delivery queue capacity."),
+                ("queued", "rick_api_telemetry_sink_queue_depth", "Events waiting for a sink-delivery worker."),
+                ("active", "rick_api_telemetry_sink_active", "Sink callbacks currently running."),
+            ):
+                try:
+                    observed = int(sink_delivery.get(field, 0))
+                except (TypeError, ValueError):
+                    continue
+                if observed < 0:
+                    continue
+                lines.extend((f"# HELP {metric} {help_text}", f"# TYPE {metric} gauge", f"{metric} {observed}"))
+            lines.extend((
+                "# HELP rick_api_telemetry_sink_closed Whether process-local sink delivery is shut down.",
+                "# TYPE rick_api_telemetry_sink_closed gauge",
+                f"rick_api_telemetry_sink_closed {1 if sink_delivery.get('closed') is True else 0}",
+            ))
+            delivery_counters = sink_delivery.get("counters")
+            if isinstance(delivery_counters, list):
+                lines.extend((
+                    "# HELP rick_api_telemetry_sink_delivery_total Best-effort sink callback outcomes.",
+                    "# TYPE rick_api_telemetry_sink_delivery_total counter",
+                ))
+                allowed_outcomes = {"emitted", "failed", "dropped", "timeout", "shutdown_timeout"}
+                for raw in delivery_counters:
+                    if not isinstance(raw, Mapping):
+                        continue
+                    name = raw.get("name")
+                    outcome = name.rsplit(".", 1)[-1] if isinstance(name, str) else ""
+                    if outcome not in allowed_outcomes:
+                        continue
+                    try:
+                        value = float(raw.get("total", 0.0))
+                    except (TypeError, ValueError):
+                        continue
+                    if not math.isfinite(value) or value < 0:
+                        continue
+                    lines.append(
+                        f'rick_api_telemetry_sink_delivery_total{{outcome="{outcome}"}} {value:g}'
+                    )
 
         readiness = current.get("readiness")
         if isinstance(readiness, Mapping):

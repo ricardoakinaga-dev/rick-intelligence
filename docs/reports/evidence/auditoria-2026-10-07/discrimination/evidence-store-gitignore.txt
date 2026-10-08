@@ -1,0 +1,22 @@
+# AUD07-18 — sonda D: evidência mantida escondida pelo .gitignore
+# Discriminação: sem a exceção a política é violada em silêncio (exit 1);
+# com a exceção reposta volta a ficar verde (exit 0).
+
+$ com a exceção !docs/reports/evidence/**/*.log no .gitignore (estado do repositório)
+exit=0
+AVISO: 738 citação(ões) em forma relativa sem arquivo na árvore (consulte docs/reports/evidence/README.md)
+PASS: evidência citada presente e layout conforme a política AUD07-18
+
+$ exceção removida — mantidos *.log ficam escondidos do git
+exit=1
+AVISO: 738 citação(ões) em forma relativa sem arquivo na árvore (consulte docs/reports/evidence/README.md)
+FAIL: evidência mantida ignorada pelo git: docs/reports/evidence/auditoria-2026-09-24/api16-domain.log
+FAIL: evidência mantida ignorada pelo git: docs/reports/evidence/auditoria-2026-09-24/api16-root-host.log
+FAIL: evidência mantida ignorada pelo git: docs/reports/evidence/auditoria-2026-09-24/browser-upload.log
+... +8 linhas FAIL
+
+$ exceção reposta
+exit=0
+AVISO: 738 citação(ões) em forma relativa sem arquivo na árvore (consulte docs/reports/evidence/README.md)
+PASS: evidência citada presente e layout conforme a política AUD07-18
+

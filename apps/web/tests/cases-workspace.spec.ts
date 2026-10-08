@@ -1,3 +1,5 @@
+import { mkdir } from "node:fs/promises";
+import { resolve } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 
 const session = {
@@ -51,7 +53,7 @@ test("D04 gate is visible when the case surface is disabled", async ({ page }) =
   await expect(page.getByText(/não cria registros, chama agentes/)).toBeVisible();
 });
 
-test("enabled case surface shows the human record, catalog, and review controls", async ({ page }) => {
+test("enabled case surface shows the human record, catalog, and review controls", async ({ page }, testInfo) => {
   await identify(page);
   await page.route("**/api/v1/cases?**", route => route.fulfill({ json: { items: [caseRecord], total: 1, next_offset: null } }));
   await page.route("**/api/v1/cases/catalog/agents", route => route.fulfill({ json: { catalog_status: "configured", items: [{ agent_id: "review-agent", model_id: "review-model", catalog_version: "v1", status: "authorized", purpose: "human_review_assist" }] } }));
@@ -64,4 +66,8 @@ test("enabled case surface shows the human record, catalog, and review controls"
   await expect(page.getByRole("heading", { name: "Feedback" })).toBeVisible();
   await expect(page.getByLabel("Título")).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  if (process.env.RICK_AUD03_WEB_EVIDENCE_DIR) {
+    await mkdir(process.env.RICK_AUD03_WEB_EVIDENCE_DIR, { recursive: true });
+    await page.screenshot({ path: resolve(process.env.RICK_AUD03_WEB_EVIDENCE_DIR, `${testInfo.project.name}-next-cases-ready.png`), fullPage: true });
+  }
 });

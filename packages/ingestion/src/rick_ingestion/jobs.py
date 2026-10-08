@@ -71,10 +71,14 @@ class IngestionJob:
         self.stage = to_status
         if progress is not None:
             self.progress = min(1.0, max(0.0, progress))
+        # A first transition can already be terminal (for example cancellation
+        # of the start notification). Both facts describe this one transition;
+        # separate clock reads could record a finish before the start.
+        now = time.time()
         if to_status in TERMINAL_STATES:
-            self.finished_at = time.time()
+            self.finished_at = now
         if self.started_at is None and to_status not in ("queued",):
-            self.started_at = time.time()
+            self.started_at = now
         self.error_code = error_code
         self.safe_error_message = message
 

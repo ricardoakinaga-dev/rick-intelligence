@@ -1,0 +1,16 @@
+== CONTROL a17 (2026-08) ==
+== contexto: probe removido, baseline limpo ==
+== comando: make typecheck ==
+python3 "/home/ricardo/rick-intelligence/scripts/phase11/runner.py" typecheck
+==> canonical web TypeScript compiler: npm run typecheck
+
+> rick-intelligence-web@0.1.0 typecheck
+> tsc --noEmit
+
+<== canonical web TypeScript compiler: exit 0
+==> canonical scripts/packages Python compilation: /home/ricardo/rick-intelligence/.runtime/venvs/cvg/bin/python -m compileall -q scripts packages
+<== canonical scripts/packages Python compilation: exit 0
+==> canonical Python gradual type check (mypy baseline): /home/ricardo/rick-intelligence/.runtime/venvs/cvg/bin/python /home/ricardo/rick-intelligence/scripts/phase11/typecheck_baseline.py
+PASS: type checking gradual — packages/contracts/src=0/0, packages/authorization/src=0/0
+<== canonical Python gradual type check (mypy baseline): exit 0
+control_exit=0

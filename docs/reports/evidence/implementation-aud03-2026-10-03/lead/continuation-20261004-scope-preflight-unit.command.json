@@ -1,0 +1,54 @@
+{
+  "command": [
+    "/tmp/rick-aud03-lockenv-qzj0r3mc/venv/bin/python",
+    "-m",
+    "pytest",
+    "--rootdir=.",
+    "--import-mode=importlib",
+    "-q",
+    "-p",
+    "no:cacheprovider",
+    "infrastructure/scripts/tests/test_scope_preflight.py"
+  ],
+  "cwd": "/home/ricardo/rick-intelligence",
+  "pythonpath": "/home/ricardo/rick-intelligence:/home/ricardo/rick-intelligence/apps/api/src:/home/ricardo/rick-intelligence/apps/api/tests:/home/ricardo/rick-intelligence/apps/worker:/home/ricardo/rick-intelligence/packages/authorization/src:/home/ricardo/rick-intelligence/packages/contracts/src:/home/ricardo/rick-intelligence/packages/decision/src:/home/ricardo/rick-intelligence/packages/evidence/src:/home/ricardo/rick-intelligence/packages/identity/src:/home/ricardo/rick-intelligence/packages/ingestion/src:/home/ricardo/rick-intelligence/packages/jobs/src:/home/ricardo/rick-intelligence/packages/knowledge/src:/home/ricardo/rick-intelligence/packages/locking/src:/home/ricardo/rick-intelligence/packages/observability/src:/home/ricardo/rick-intelligence/packages/professor/src:/home/ricardo/rick-intelligence/packages/providers/src:/home/ricardo/rick-intelligence/packages/retrieval/src:/home/ricardo/rick-intelligence/packages/storage/src",
+  "environment": {
+    "PYTHONPATH": "/home/ricardo/rick-intelligence:/home/ricardo/rick-intelligence/apps/api/src:/home/ricardo/rick-intelligence/apps/api/tests:/home/ricardo/rick-intelligence/apps/worker:/home/ricardo/rick-intelligence/packages/authorization/src:/home/ricardo/rick-intelligence/packages/contracts/src:/home/ricardo/rick-intelligence/packages/decision/src:/home/ricardo/rick-intelligence/packages/evidence/src:/home/ricardo/rick-intelligence/packages/identity/src:/home/ricardo/rick-intelligence/packages/ingestion/src:/home/ricardo/rick-intelligence/packages/jobs/src:/home/ricardo/rick-intelligence/packages/knowledge/src:/home/ricardo/rick-intelligence/packages/locking/src:/home/ricardo/rick-intelligence/packages/observability/src:/home/ricardo/rick-intelligence/packages/professor/src:/home/ricardo/rick-intelligence/packages/providers/src:/home/ricardo/rick-intelligence/packages/retrieval/src:/home/ricardo/rick-intelligence/packages/storage/src",
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "started_at": "2026-10-04T10:27:17.789017+00:00",
+  "finished_at": "2026-10-04T10:27:18.327266+00:00",
+  "exit_code": 0,
+  "before_hashes": {
+    "Makefile": "8dc87fcfb22f3574aa05140352ca6b6e5517474f57d0e2dd9d083c2e0df30d6e",
+    "docs/operations/0008-scope-preflight.sql": "01595696249ca38f77942a59c941907dcff336a071eff45e6314a752f95b1b3b",
+    "infrastructure/migrations/0001_control_plane.sql": "07113ff4a5e00e9986b1584864eb097e67a6daa66285895b9d6993f6bf116195",
+    "infrastructure/migrations/0002_product_schema.sql": "0bd4a31e3a821de3efcdaad621674aafc9215b0acb84a55fb681fc9fd6054312",
+    "infrastructure/migrations/0003_product_contract_extensions.sql": "d6d6413a45f93a5a65146d20221721bc60d5131f86ec29c0fd848cac351ae14a",
+    "infrastructure/migrations/0004_durable_jobs_contract.sql": "0621c726c6eaae17fba0a72a209452964eb6320c38f2ebc60966b1d562731274",
+    "infrastructure/migrations/0005_rewrite_legacy_jobs.sql": "58878320223f9f30d42aea840c7e58795eb5c448daf90a0877adedc781cc9774",
+    "infrastructure/migrations/0006_document_lineage_contract.sql": "2d35f6e5a784258150baf68c0e88cbdb1f7b733034af662d694a45956eb8ffdd",
+    "infrastructure/migrations/0007_admin_audit_reconciliation.sql": "4af11b3250c3b5f3d2ea1e3a1042883ccf3cb703370daa6011cd4c2c748ae6e2",
+    "infrastructure/migrations/0008_composite_scope_constraints.sql": "94f1ede25b4c849f6b70fec6e19dcb97662b7f213e6523d832e27bb6109db0fe",
+    "infrastructure/scripts/scope_preflight.py": "3c03c631a51ffcbd5173c5603d1356d7db951f7c4b9c594a974cd0014fdef6fe",
+    "infrastructure/scripts/tests/test_migrate.py": "e7660ab9bee31b66c8238d2f8f4ec98538673a318b7e6825e0d07152deeae0ab",
+    "infrastructure/scripts/tests/test_scope_preflight.py": "0a202868b8f765085bd42c39e5cc549e6488294c9f6a29586aa7da88b64ef2d9"
+  },
+  "after_hashes": {
+    "Makefile": "8dc87fcfb22f3574aa05140352ca6b6e5517474f57d0e2dd9d083c2e0df30d6e",
+    "docs/operations/0008-scope-preflight.sql": "01595696249ca38f77942a59c941907dcff336a071eff45e6314a752f95b1b3b",
+    "infrastructure/migrations/0001_control_plane.sql": "07113ff4a5e00e9986b1584864eb097e67a6daa66285895b9d6993f6bf116195",
+    "infrastructure/migrations/0002_product_schema.sql": "0bd4a31e3a821de3efcdaad621674aafc9215b0acb84a55fb681fc9fd6054312",
+    "infrastructure/migrations/0003_product_contract_extensions.sql": "d6d6413a45f93a5a65146d20221721bc60d5131f86ec29c0fd848cac351ae14a",
+    "infrastructure/migrations/0004_durable_jobs_contract.sql": "0621c726c6eaae17fba0a72a209452964eb6320c38f2ebc60966b1d562731274",
+    "infrastructure/migrations/0005_rewrite_legacy_jobs.sql": "58878320223f9f30d42aea840c7e58795eb5c448daf90a0877adedc781cc9774",
+    "infrastructure/migrations/0006_document_lineage_contract.sql": "2d35f6e5a784258150baf68c0e88cbdb1f7b733034af662d694a45956eb8ffdd",
+    "infrastructure/migrations/0007_admin_audit_reconciliation.sql": "4af11b3250c3b5f3d2ea1e3a1042883ccf3cb703370daa6011cd4c2c748ae6e2",
+    "infrastructure/migrations/0008_composite_scope_constraints.sql": "94f1ede25b4c849f6b70fec6e19dcb97662b7f213e6523d832e27bb6109db0fe",
+    "infrastructure/scripts/scope_preflight.py": "3c03c631a51ffcbd5173c5603d1356d7db951f7c4b9c594a974cd0014fdef6fe",
+    "infrastructure/scripts/tests/test_migrate.py": "e7660ab9bee31b66c8238d2f8f4ec98538673a318b7e6825e0d07152deeae0ab",
+    "infrastructure/scripts/tests/test_scope_preflight.py": "0a202868b8f765085bd42c39e5cc549e6488294c9f6a29586aa7da88b64ef2d9"
+  },
+  "source_unchanged": true,
+  "log": "continuation-20261004-scope-preflight-unit.log"
+}

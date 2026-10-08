@@ -297,12 +297,24 @@ def test_unhandled_error_keeps_security_and_correlation_headers():
     assert "private failure" not in response.text
 
 
-def test_canonical_streaming_routes_own_response_teardown():
+@pytest.mark.parametrize("path,expected_status", (("/api/v1/chat", 401), ("/v1/chat/completions", 400)))
+def test_canonical_streaming_routes_own_response_teardown(path, expected_status):
     from core.streaming import ClosingStreamingRoute
     app = create_app(make_settings())
-    for path in ("/api/v1/chat", "/v1/chat/completions"):
-        route = next(route for route in app.routes if getattr(route, "path", None) == path)
-        assert isinstance(route, ClosingStreamingRoute)
+    selected_routes = []
+
+    async def observe_route(request_scope, receive, send):
+        await app(request_scope, receive, send)
+        selected_routes.append(request_scope.get("route"))
+
+    # Resolve the public path through the real ASGI stack. Included routers
+    # need not be flattened into app.routes by the framework; the selected
+    # endpoint must still own teardown when authentication or body validation
+    # rejects the empty request (the compatibility route validates its body).
+    messages = asyncio.run(exercise(observe_route, path=path, method="POST"))
+    assert any(message.get("status") == expected_status for message in messages), messages
+    assert len(selected_routes) == 1
+    assert isinstance(selected_routes[0], ClosingStreamingRoute)
 
 
 def test_cleanup_failure_is_not_hidden_by_transport_disconnect():

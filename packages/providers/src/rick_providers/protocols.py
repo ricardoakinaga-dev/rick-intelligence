@@ -5,6 +5,8 @@ from __future__ import annotations
 from collections.abc import AsyncIterator, Mapping, Sequence
 from typing import Protocol
 
+from rick_providers.sampling import Temperature, USE_DEFAULT_TEMPERATURE
+
 from rick_contracts.providers import ChatCompletionChunk, ChatCompletionResult, EmbeddingResult, ProviderMessage
 
 
@@ -15,7 +17,7 @@ class AsyncProvider(Protocol):
         self,
         model_or_messages: str | Sequence[ProviderMessage | Mapping[str, object]] | None = None,
         messages: Sequence[ProviderMessage | Mapping[str, object]] | None = None,
-        temperature: int | float | None = 0.2,
+        temperature: Temperature = USE_DEFAULT_TEMPERATURE,
         response_format: Mapping[str, object] | None = None,
         tools: Sequence[Mapping[str, object]] | None = None,
         *,
@@ -35,7 +37,7 @@ class AsyncProvider(Protocol):
         self,
         model_or_messages: str | Sequence[ProviderMessage | Mapping[str, object]] | None = None,
         messages: Sequence[ProviderMessage | Mapping[str, object]] | None = None,
-        temperature: int | float | None = 0.2,
+        temperature: Temperature = USE_DEFAULT_TEMPERATURE,
         response_format: Mapping[str, object] | None = None,
         tools: Sequence[Mapping[str, object]] | None = None,
         *, model: str | None = None, correlation_id: str | None = None,

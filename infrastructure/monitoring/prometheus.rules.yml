@@ -12,7 +12,7 @@ groups:
         labels: {severity: high}
         annotations: {summary: "RICK worker dead-letter jobs increased"}
       - alert: RickApiErrorBudgetBurn
-        expr: sum(rate(rick_api_http_errors_total[5m])) / clamp_min(sum(rate(rick_api_http_requests_total[5m])), 1) > 0.05
+        expr: sum(rate(rick_api_http_business_errors_total[5m])) / clamp_min(sum(rate(rick_api_http_business_requests_total[5m])), 1) > 0.05
         for: 10m
         labels: {severity: high}
         annotations: {summary: "RICK API error rate exceeded the warning budget"}

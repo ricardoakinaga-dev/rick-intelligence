@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "sealed_at": "2026-09-25T08:42:05Z",
+  "scope": "Independent read-only review of the corrected local Q24-19/Q24-20 implementation only. Do not infer whole-product, production, release or promotion readiness.",
+  "acceptance_criteria": [
+    "Each durable admin operation uses its operation-specific atomic method when atomic support is declared. Partial atomic capability fails closed before request audit or mutation.",
+    "Non-atomic fallback is available only to an explicitly non-durable, non-production-safe provider whose identity mode is dev/test while the application environment is local/dev/test. Staging, production, unknown and other modes fail closed before mutation.",
+    "Tenant-scoped deactivation changes only the selected tenant/workspace membership and must not write global email, status, password hash, password_version or role_version. It remains safe if global credentials change concurrently. Other-tenant membership and session state remain intact.",
+    "Global email/password and shared role_version changes remain protected across tenants. Rejected role, grants, permission override, email or password changes leave account, memberships, sessions and outbox unchanged.",
+    "PostgresIdentityProvider.create_user either fails closed before opening a connection when no authorized actor is supplied, or delegates an actor-scoped request to the atomic admin_create_user transaction with completion outbox. The mutation/outbox transaction rolls back together.",
+    "The actual admin HTTP route is exercised through a callable atomic PostgresIdentityProvider and its returned audit event ID is present in real PostgreSQL outbox and can be projected. Clearly account for any test auth override.",
+    "The outbox projection remains idempotent and bounded, with retry/dead-letter/manual retry, consumer concurrency, worker runtime composition and restart recovery supported by implementation and test evidence. Identify material residual gaps."
+  ],
+  "review_instruction": "Use a fresh isolated context. Verify every SHA-256 listed in files before review. Inspect only this packet and its hash-listed implementation/test/evidence files; do not read prior C1-C4 review reports, other status documents, or conversation. Make no repository changes. Return ACCEPT or REJECT for this scoped local implementation, with severity, exact file/line, concrete failure path, evidence/test gap and residual limitations. Do not claim whole-product, production, release or promotion acceptance.",
+  "files": {
+    "apps/api/src/routes/admin.py": "34d7d0eeb82ecd6592c11fc196233098e35270b0d345583e82518230c9a8774b",
+    "apps/api/src/services/identity_service.py": "d8d085c30661fdbef6a5f88b32891d2c1eaec4eea7a5d2d54b59b2ab9d6b8c4f",
+    "apps/api/src/services/postgres_identity.py": "82d70b7536320bee37ed378100168efa463d9b6ac7b6811f558d1361e26db0d6",
+    "packages/identity/src/rick_identity/postgres.py": "188331a28e4076e3e6bbbb839b0740400c08be2b1fe41ceb617df57bca62b77a",
+    "apps/api/tests/test_audit_factory.py": "ff36b1705d8236f695239ec4e7e2aebbf3fd6492dc4aca8ab27cd29945de6830",
+    "apps/api/tests/test_postgres_admin_mutations.py": "5437c6dda920e7dedbc8b83214e5aa2b9dfbdbd4f808410cb9ea6a8f8cf55e4d",
+    "packages/identity/tests/test_postgres.py": "ac4a43a32fe6cf30f9a7c106554966ced54cdd93a65e6821b6e9cc4165a01b6a",
+    "apps/worker/admin_audit_outbox.py": "046595f9da759a3fc3f08eff1233cb5d53665d444301c053932124b51d76ee3a",
+    "apps/worker/deployment_composition.py": "09b8ebae1d2f869226789b013050b2ffb2cf9e7c96f5b2a7556e1a46189cf818",
+    "apps/worker/tests/test_admin_audit_outbox.py": "a6d47c7ba1172a701ac012a8652287da05aba74814ca75bcb1b9259dc6317de2",
+    "apps/worker/tests/test_deployment_composition.py": "e390ff5f01232a233ec803daf2cceb1c85e58c2f97cd0e60e11401b50a5afc12",
+    "infrastructure/migrations/0007_admin_audit_reconciliation.sql": "4af11b3250c3b5f3d2ea1e3a1042883ccf3cb703370daa6011cd4c2c748ae6e2",
+    "infrastructure/scripts/tests/test_migrate.py": "c677ce27d3575a18fca4c7ece6f0d670cf196859f9881ad296cc2e82ca2ef4f8",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0830Z/api16-root-final.log": "712eadb23064c8a0f40f83fad736706bd96546d1f319d87c23a1cf67b3e9a257",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0830Z/api16-worker-final.log": "f4a43a79bcc99d6266505356d1a434570f71d3f8c9bd2e4f0486db257ea5234d",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0830Z/postgres-migrations-final.log": "5bbb5dcf3fdf8925a084cbd4a344e61390ae395ee0f15c7e56f745293d9569fb",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0830Z/postgres-admin-api-integration.log": "f9623a302299399c1c6d68e3182f879367022e26681c6125ecae42fd3ae04d47",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0830Z/identity-postgres-final.log": "c8640adbc29ec469f07af3603c6fbeea92e63790adc56c6d8b8429d12a5e6bc2",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0830Z/lint-final.log": "a7a5650dee62a2a315b1b3413dc05105661cd0c4bd71ec25608e7101f4d1dd63",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0830Z/typecheck-final.log": "f4e2482bfa89fd0a34aa7a5fab375fdbb03747d3941dd8fecfa8bdb1bc77c92d",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0830Z/ops-static-final.log": "fe2e5b2d7c8fc442d97df5d04bb70b2ac92fc920fa45ded651e2162606088dce",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0830Z/review-views-c4-final.log": "df270bed12e28fcfea0d301ac95cf995b7bb454b6047284bff50ce0f7ab08914",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0830Z/control-plane-c4-final.log": "1919fedc58ef6da3db1b52a095cb4bc271bffcd80d5ceb39fdfbacfa87129f00",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0830Z/make-validate-c4-final.log": "2a17e660bd2051fa60b543b0f1f2c81abd2d7c686d92ca1cfb81fa1c1e3d4fda",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0830Z/diff-check-c4-final.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T0830Z/manifest.json": "59c73240ff63c0955a12f7e75d53bf577306d233ad75ef69532eada41d0cfef7"
+  },
+  "reported_test_results": {
+    "api": "726 passed, 407 warnings; see current api16-root-final.log",
+    "worker": "116 passed; see api16-worker-final.log",
+    "postgresql": "108 passed against disposable PostgreSQL 16.15; the named verbose integration additionally covers API route, direct create, shared-account deactivation, outbox and reconciliation",
+    "identity_store": "11 passed; see identity-postgres-final.log",
+    "static": "make lint, make typecheck, make ops-static, make validate, controller checks, derived views and git diff --check passed; see hash-listed logs"
+  },
+  "limitations": "Dirty shared checkout at baseline HEAD b52f32c. The real HTTP/PostgreSQL integration uses TestClient and overrides get_current_session with a test SessionSnapshot; it exercises route-to-atomic-provider-to-database behavior but is not authentication or full runtime acceptance. External service flow, approved domain/provider/corpus, operations/capacity/chaos/soak, visual/accessibility, release and promotion remain open."
+}

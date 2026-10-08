@@ -8,12 +8,19 @@ Every read carries tenant and workspace scope at the SQL boundary.
 
 from __future__ import annotations
 
+from rick_knowledge.publication import PublicationStore
+from rick_knowledge.fencing import OwnershipLostError
+from asyncio import CancelledError
+import json
+
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from contextlib import contextmanager
 from datetime import datetime
 from typing import Protocol
+from threading import local
 
 from rick_knowledge.json_boundary import decode_metadata, encode_metadata
+from rick_knowledge.fencing import catalog_collection_ids, select_catalog_collection, advisory_key, collection_guard_key, collection_mutation, document_mutation, require_deleted_snapshot, require_unchanged_tombstone
 from rick_knowledge.models import (
     DOCUMENT_STATUSES,
     Chunk,
@@ -54,7 +61,13 @@ def _row_dict(cursor: object, row: object) -> dict[str, object]:
     if isinstance(row, Mapping):
         return {str(key): value for key, value in row.items()}
     description = getattr(cursor, "description", None) or ()
-    names = [item[0] for item in description if isinstance(item, (tuple, list)) and item]
+    names: list[str] = []
+    for item in description:
+        name = getattr(item, "name", None)
+        if not isinstance(name, str) and isinstance(item, (tuple, list)) and item:
+            name = item[0]
+        if isinstance(name, str):
+            names.append(name)
     return dict(zip(names, row if isinstance(row, (tuple, list)) else ()))
 
 
@@ -66,7 +79,7 @@ def _bounded_limit(value: int | None, *, default: int = 100, maximum: int = 1_00
     return value
 
 
-class PostgresKnowledgeStore:
+class PostgresKnowledgeStore(PublicationStore):
     """Transactional implementation of the canonical ``KnowledgeStore`` port."""
 
     def __init__(
@@ -87,9 +100,220 @@ class PostgresKnowledgeStore:
         self._created_by = created_by.strip() if isinstance(created_by, str) else None
         self._close_connections = close_connections
         self._max_page_size = max_page_size
+        self._guards = local()
+        self._restore_sessions = local()
+
+    def restore_deleted_document(self, snapshot: Document, chunks: list[Chunk]) -> None:
+        with self.mutation_guard("document:" + snapshot.document_id):
+            with self._session(write=True) as (connection, cursor):
+                self._execute(cursor, "SELECT * FROM rick_documents WHERE document_id=%s FOR UPDATE",
+                              (snapshot.document_id,))
+                row = self._fetchone(cursor)
+                try:
+                    snapshot = require_deleted_snapshot(self._document(row) if row else None, snapshot)
+                except ValueError:
+                    raise PostgresKnowledgeError("conflict") from None
+                inherited = getattr(self._restore_sessions, "connection", None)
+                self._restore_sessions.connection = connection
+                try:
+                    self._execute(cursor, "UPDATE rick_documents SET status=%s WHERE document_id=%s",
+                                  (snapshot.status, snapshot.document_id))
+                    self.replace_document_chunks(snapshot.document_id, chunks)
+                finally:
+                    self._restore_sessions.connection = inherited
+
+    @contextmanager
+    def ingestion_checkpoint_guard(self, job):
+        # Serialize absent-row claims as well as updates. The inherited session
+        # makes intent creation and cancellation propagation one PG transaction.
+        with self._session(write=True) as (connection, cursor):
+            key = json.dumps([job.tenant_id, job.workspace_id, job.collection_id, job.job_id])
+            self._execute(cursor, "SET LOCAL statement_timeout = '5000ms'")
+            self._execute(cursor, "SELECT pg_advisory_xact_lock(%s)", (advisory_key('ingestion-checkpoint:' + key),))
+            inherited = getattr(self._restore_sessions, 'connection', None)
+            self._restore_sessions.connection = connection
+            try:
+                yield
+            finally:
+                self._restore_sessions.connection = inherited
+
+    def _read_ingestion_checkpoint(self, job_id, tenant_id, workspace_id, collection_id):
+        with self._session() as (_, cursor):
+            self._execute(cursor, "SET LOCAL statement_timeout = '5000ms'")
+            self._execute(cursor, """SELECT record FROM rick_ingestion_checkpoints
+                WHERE tenant_id=%s AND workspace_id=%s AND collection_id=%s AND job_id=%s""",
+                (tenant_id, workspace_id, collection_id, job_id))
+            row = self._fetchone(cursor)
+            return row['record'] if row else None
+
+    def _write_ingestion_checkpoint(self, record):
+        from rick_knowledge.publication import encode_checkpoint
+        encoded = encode_checkpoint(record)
+        with self._session(write=True) as (_, cursor):
+            self._execute(cursor, """INSERT INTO rick_ingestion_checkpoints
+                (tenant_id, workspace_id, collection_id, job_id, record)
+                VALUES (%s, %s, %s, %s, CAST(%s AS jsonb))
+                ON CONFLICT(tenant_id, workspace_id, collection_id, job_id)
+                DO UPDATE SET record=excluded.record""",
+                (*[record[k] for k in ('tenant_id', 'workspace_id', 'collection_id', 'job_id')], encoded))
+
+    def _read_publication(self, job_id, tenant_id, workspace_id, collection_id):
+        with self._session() as (_, cursor):
+            self._execute(cursor, "SET LOCAL statement_timeout = '5000ms'")
+            self._execute(cursor, """SELECT tenant_id, workspace_id, collection_id, job_id,
+                document_id, attempt_id, document_attempt, outcome, cancel_requested, ready_count, job_snapshot FROM rick_publication_receipts
+                WHERE tenant_id=%s AND workspace_id=%s AND collection_id=%s AND job_id=%s""",
+                (tenant_id, workspace_id, collection_id, job_id))
+            return self._fetchone(cursor)
+
+    def _publication_commit_time(self):
+        # resolve_publication inherits the row-locked decision transaction.
+        with self._session() as (_, cursor):
+            self._execute(cursor, 'SELECT EXTRACT(EPOCH FROM clock_timestamp())::double precision AS finished_at')
+            return self._fetchone(cursor)['finished_at']
+
+    def _write_publication(self, record):
+        keys = ('tenant_id', 'workspace_id', 'collection_id', 'job_id', 'document_id',
+                'attempt_id', 'document_attempt', 'outcome', 'cancel_requested', 'ready_count', 'job_snapshot')
+        with self._session(write=True) as (_, cursor):
+            self._execute(cursor, "SET LOCAL statement_timeout = '5000ms'")
+            self._execute(cursor, """INSERT INTO rick_publication_receipts
+                (tenant_id, workspace_id, collection_id, job_id, document_id, attempt_id, document_attempt, outcome, cancel_requested, ready_count, job_snapshot)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CAST(%s AS jsonb))
+                ON CONFLICT(tenant_id, workspace_id, collection_id, job_id) DO UPDATE SET
+                document_id=excluded.document_id, attempt_id=excluded.attempt_id,
+                document_attempt=excluded.document_attempt, ready_count=excluded.ready_count, job_snapshot=excluded.job_snapshot,
+                outcome=CASE WHEN rick_publication_receipts.attempt_id=excluded.attempt_id AND rick_publication_receipts.outcome<>'pending'
+                    THEN rick_publication_receipts.outcome WHEN rick_publication_receipts.attempt_id=excluded.attempt_id
+                    AND rick_publication_receipts.cancel_requested AND excluded.outcome='failed'
+                    THEN 'cancelled' ELSE excluded.outcome END,
+                cancel_requested=excluded.cancel_requested OR
+                    (rick_publication_receipts.attempt_id=excluded.attempt_id AND rick_publication_receipts.cancel_requested)""",
+                tuple(encode_metadata(record[k]) if k == 'job_snapshot' else record[k] for k in keys))
+
+    @contextmanager
+    def publication_decision_guard(self, record):
+        # Lock the receipt row so request-only cancellation and the document
+        # commit have a single transaction winner, without needing a lease.
+        with self._session(write=True) as (connection, cursor):
+            self._execute(cursor, """SELECT attempt_id FROM rick_publication_receipts
+                WHERE tenant_id=%s AND workspace_id=%s AND collection_id=%s AND job_id=%s FOR UPDATE""",
+                tuple(record[k] for k in ('tenant_id','workspace_id','collection_id','job_id')))
+            row = self._fetchone(cursor)
+            if row is None or row['attempt_id'] != record['attempt_id']:
+                raise OwnershipLostError('publication attempt changed')
+            inherited = getattr(self._restore_sessions, 'connection', None)
+            self._restore_sessions.connection = connection
+            try:
+                yield
+            finally:
+                self._restore_sessions.connection = inherited
+
+    def _mark_publication_cancel(self, job):
+        with self._session(write=True) as (_, cursor):
+            self._execute(cursor, "SET LOCAL statement_timeout = '5000ms'")
+            self._execute(cursor, """UPDATE rick_publication_receipts SET cancel_requested=TRUE
+                WHERE tenant_id=%s AND workspace_id=%s AND collection_id=%s AND job_id=%s
+                AND attempt_id=%s AND outcome='pending'""",
+                (job.tenant_id, job.workspace_id, job.collection_id, job.job_id,
+                 job.metadata['publication_attempt']))
+
+    @contextmanager
+    def mutation_guard(self, key: str):
+        """Session advisory lock across committed knowledge and vector effects.
+
+        The injected factory must provide a dedicated connection for this guard.
+        Nested calls on this adapter/thread reuse the lock; ordinary write sessions
+        remain short and commit independently. No migration is required.
+        """
+        held = getattr(self._guards, "held", None)
+        if held is None:
+            held = self._guards.held = set()
+        if key in held:
+            yield
+            return
+        connection = None
+        cursor = None
+        acquired = False
+        try:
+            try:
+                connection = self._connection_factory()
+                cursor = connection.cursor()
+                self._execute(cursor, "SET LOCAL statement_timeout = '15000ms'")
+                self._execute(cursor, "SELECT pg_advisory_lock(%s)", (advisory_key(key),))
+                acquired = True
+            except Exception:
+                raise PostgresKnowledgeError() from None
+            held.add(key)
+            yield
+        finally:
+            held.discard(key)
+            try:
+                if connection is not None:
+                    connection.rollback()
+                if acquired:
+                    self._execute(cursor, "SELECT pg_advisory_unlock(%s)", (advisory_key(key),))
+                    connection.rollback()
+            except Exception:
+                # A connection whose lock could not be released cannot safely
+                # return to a pool, even in close_connections=False mode.
+                if connection is not None:
+                    connection.close()
+                raise PostgresKnowledgeError() from None
+            finally:
+                try:
+                    if cursor is not None:
+                        close_cursor = getattr(cursor, "close", None)
+                        if callable(close_cursor):
+                            close_cursor()
+                finally:
+                    if connection is not None and self._close_connections:
+                        connection.close()
+
+    def collection_guard(self, *, tenant_id: str, workspace_id: str, collection_id: str):
+        return self.mutation_guard(collection_guard_key(tenant_id=tenant_id,
+            workspace_id=workspace_id, collection_id=collection_id))
+
+    @collection_mutation
+    def ensure_collection(self, collection: Collection) -> Collection:
+        if collection.status not in {"active", "archived"} or collection.version <= 0:
+            raise PostgresKnowledgeError("invalid_input")
+        try:
+            metadata_json = encode_metadata(collection.metadata)
+        except ValueError:
+            raise PostgresKnowledgeError("invalid_input") from None
+        creator = self._creator(collection.metadata, self._created_by)
+        with self._session(write=True) as (_connection, cursor):
+            self._execute(cursor, """
+                INSERT INTO rick_collections
+                    (tenant_id, workspace_id, collection_id, title, description, status, version, created_by, metadata)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, CAST(%s AS jsonb))
+                ON CONFLICT (tenant_id, workspace_id, collection_id) DO NOTHING
+            """, (collection.tenant_id, collection.workspace_id, collection.collection_id,
+                   collection.title, collection.description, collection.status, collection.version,
+                   creator, metadata_json))
+            self._execute(cursor, """
+                SELECT tenant_id, workspace_id, collection_id, title, description, status, version, metadata
+                FROM rick_collections WHERE tenant_id=%s AND workspace_id=%s AND collection_id=%s
+            """, (collection.tenant_id, collection.workspace_id, collection.collection_id))
+            row = self._fetchone(cursor)
+            result = self._collection(row) if row else None
+            if result is None:
+                raise PostgresKnowledgeError("conflict")
+            return result
 
     @contextmanager
     def _session(self, *, write: bool = False) -> Iterator[tuple[DbConnection, object]]:
+        inherited = getattr(self._restore_sessions, "connection", None)
+        if inherited is not None:
+            cursor = inherited.cursor()
+            try:
+                yield inherited, cursor
+            finally:
+                close_cursor = getattr(cursor, "close", None)
+                if callable(close_cursor):
+                    close_cursor()
+            return
         connection: DbConnection | None = None
         cursor: object | None = None
         try:
@@ -100,7 +324,13 @@ class PostgresKnowledgeStore:
             yield connection, cursor
             if write:
                 connection.commit()
-        except PostgresKnowledgeError:
+        except (CancelledError, SystemExit, KeyboardInterrupt):
+            # Preserve the supported signal after rolling back our own write
+            # transaction. A borrowed transaction remains the owner's duty.
+            if write and connection is not None:
+                connection.rollback()
+            raise
+        except (PostgresKnowledgeError, OwnershipLostError):
             if write and connection is not None:
                 try:
                     connection.rollback()
@@ -237,6 +467,7 @@ class PostgresKnowledgeStore:
         except PostgresKnowledgeError:
             return False
 
+    @collection_mutation
     def upsert_collection(self, collection: Collection) -> None:
         if collection.status not in {"active", "archived"} or collection.version <= 0:
             raise PostgresKnowledgeError("invalid_input")
@@ -261,6 +492,16 @@ class PostgresKnowledgeStore:
                    metadata_json))
 
     def get_collection(self, workspace_id: str, collection_id: str, *, tenant_id: str) -> Collection | None:
+        keys = catalog_collection_ids(collection_id)
+        if len(keys) > 1:
+            with self._session() as (_connection, cursor):
+                self._execute(cursor, """
+                    SELECT tenant_id, workspace_id, collection_id, title, description, status, version, metadata
+                    FROM rick_collections
+                    WHERE tenant_id = %s AND workspace_id = %s AND collection_id = ANY(%s)
+                """, (tenant_id, workspace_id, list(keys)))
+                rows = self._fetchall(cursor)
+            return select_catalog_collection([self._collection(row) for row in rows], collection_id)
         with self._session() as (_connection, cursor):
             self._execute(cursor, """
                 SELECT tenant_id, workspace_id, collection_id, title, description, status, version, metadata
@@ -281,6 +522,7 @@ class PostgresKnowledgeStore:
             rows = self._fetchall(cursor)
         return [item for row in rows if (item := self._collection(row)) is not None]
 
+    @document_mutation
     def upsert_document(self, document: Document) -> None:
         if document.status not in DOCUMENT_STATUSES:
             raise PostgresKnowledgeError("invalid_input")
@@ -301,7 +543,7 @@ class PostgresKnowledgeStore:
         if isinstance(byte_size, bool) or not isinstance(byte_size, int) or byte_size < 0:
             raise PostgresKnowledgeError("invalid_input")
         with self._session(write=True) as (_connection, cursor):
-            self._execute(cursor, "SELECT tenant_id, workspace_id, collection_id, status "
+            self._execute(cursor, "SELECT * "
                          "FROM rick_documents WHERE document_id = %s FOR UPDATE", (document.document_id,))
             existing = self._fetchone(cursor)
             if existing and (
@@ -314,6 +556,12 @@ class PostgresKnowledgeStore:
                 raise PostgresKnowledgeError("conflict")
             if existing and existing.get("status") == "deleted" and document.status != "deleted":
                 raise PostgresKnowledgeError("conflict")
+            if existing and existing.get("status") == "deleted":
+                try:
+                    document = require_unchanged_tombstone(self._document(existing), document)
+                except ValueError:
+                    raise PostgresKnowledgeError("conflict") from None
+                return
             self._execute(cursor, """
                 INSERT INTO rick_documents
                     (document_id, tenant_id, workspace_id, collection_id, document_version,
@@ -456,6 +704,7 @@ class PostgresKnowledgeStore:
         except (TypeError, ValueError):
             raise PostgresKnowledgeError() from None
 
+    @document_mutation
     def set_document_status(
         self,
         document_id: str,
@@ -476,6 +725,15 @@ class PostgresKnowledgeStore:
                 raise PostgresKnowledgeError("not_found")
             if row.get("status") == "deleted" and status != "deleted":
                 raise PostgresKnowledgeError("conflict")
+            if status == 'published':
+                self._execute(cursor, """SELECT receipt.cancel_requested FROM rick_publication_receipts AS receipt
+                    JOIN rick_documents AS document ON receipt.document_id=document.document_id
+                    AND receipt.tenant_id=document.tenant_id AND receipt.workspace_id=document.workspace_id
+                    AND receipt.collection_id=document.collection_id
+                    AND receipt.document_attempt=document.metadata->>'_ingestion_attempt'
+                    WHERE document.document_id=%s AND receipt.outcome='pending' FOR UPDATE OF receipt""", (document_id,))
+                if any(r['cancel_requested'] for r in self._fetchall(cursor)):
+                    raise PostgresKnowledgeError('conflict')
             self._execute(
                 cursor,
                 f"""UPDATE rick_documents
@@ -489,6 +747,25 @@ class PostgresKnowledgeStore:
                 (status, status, *params),
             )
 
+            if status == 'published':
+                self._execute(cursor, """WITH decision AS MATERIALIZED (
+                    SELECT EXTRACT(EPOCH FROM clock_timestamp())::double precision AS finished_at)
+                    UPDATE rick_publication_receipts AS receipt
+                    SET outcome='committed', job_snapshot=CASE
+                      WHEN receipt.job_snapshot->>'finished_at' IS NOT NULL THEN receipt.job_snapshot
+                      WHEN decision.finished_at >= COALESCE(
+                        (receipt.job_snapshot->>'started_at')::double precision,
+                        (receipt.job_snapshot->>'created_at')::double precision)
+                      THEN jsonb_set(receipt.job_snapshot, '{finished_at}', to_jsonb(decision.finished_at))
+                      ELSE receipt.job_snapshot END
+                    FROM rick_documents AS document, decision
+                    WHERE document.document_id=%s AND document.status='published'
+                      AND receipt.document_id=document.document_id AND receipt.outcome='pending'
+                      AND receipt.tenant_id=document.tenant_id AND receipt.workspace_id=document.workspace_id
+                      AND receipt.collection_id=document.collection_id
+                      AND receipt.document_attempt=document.metadata->>'_ingestion_attempt'""", (document_id,))
+
+    @document_mutation
     def delete_document(
         self,
         document_id: str,
@@ -513,6 +790,7 @@ class PostgresKnowledgeStore:
             count = int((row or {}).get("count", 0))
         return max(0, count)
 
+    @document_mutation
     def replace_document_chunks(
         self,
         document_id: str,
@@ -535,10 +813,12 @@ class PostgresKnowledgeStore:
             document_id, tenant_id=tenant_id, workspace_id=workspace_id
         )
         with self._session(write=True) as (_connection, cursor):
-            self._execute(cursor, f"SELECT tenant_id, workspace_id, collection_id FROM rick_documents WHERE {where} FOR UPDATE", params)
+            self._execute(cursor, f"SELECT tenant_id, workspace_id, collection_id, status FROM rick_documents WHERE {where} FOR UPDATE", params)
             document = self._fetchone(cursor)
             if document is None:
                 raise PostgresKnowledgeError("not_found")
+            if document.get("status") == "deleted" and chunks:
+                raise PostgresKnowledgeError("conflict")
             self._execute(cursor, "DELETE FROM rick_chunks WHERE document_id = %s AND tenant_id = %s AND workspace_id = %s", (document_id, document["tenant_id"], document["workspace_id"]))
             for index, chunk in enumerate(chunks):
                 if chunk.document_id != document_id or chunk.chunk_index != index:

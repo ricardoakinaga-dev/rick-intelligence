@@ -1,0 +1,81 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-09-25T12:50:55Z",
+  "review_packet": "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T1132Z-c9-fix/c11-review-packet.json",
+  "checkout": {
+    "branch": "main",
+    "head": "b52f32c141916a2ea3af1a6b913bd91f380606e0",
+    "worktree": "dirty shared checkout; unrelated and pre-existing changes remain present"
+  },
+  "scope": "Provenance for the sealed C11 local identity/session correction review packet; not a release manifest.",
+  "frozen_quality_bar": {
+    "path": ".gauntlet/bar.json",
+    "sha256": "f1ea9aa44d0d66e00bb47e75e30ad616ff575897de7d2a40bb5bc8e1f4936310",
+    "source_artifacts": [
+      {
+        "path": ".gauntlet-state-of-art/bar.json",
+        "sha256": "6274bcd8fe7f1d81a0615a00b68673c9d0ac891560774b9975bdd910ed1e1405",
+        "expected_snapshot_sha256": "6274bcd8fe7f1d81a0615a00b68673c9d0ac891560774b9975bdd910ed1e1405"
+      }
+    ]
+  },
+  "separate_static_quality_bar": {
+    "path": "docs/reports/current-triple-aaa-quality-bar-v1.json",
+    "sha256": "fe0f58eb84bea4d16a138391b1afd85a9312d81fdb2ac7a383c2dbaf767f9633",
+    "validator": "scripts/state_of_art/validate_quality_bar.py"
+  },
+  "files": {
+    ".gauntlet/bar.json": "f1ea9aa44d0d66e00bb47e75e30ad616ff575897de7d2a40bb5bc8e1f4936310",
+    ".gauntlet-state-of-art/bar.json": "6274bcd8fe7f1d81a0615a00b68673c9d0ac891560774b9975bdd910ed1e1405",
+    "docs/reports/current-triple-aaa-quality-bar-v1.json": "fe0f58eb84bea4d16a138391b1afd85a9312d81fdb2ac7a383c2dbaf767f9633",
+    "scripts/state_of_art/validate_quality_bar.py": "2cf253d1c268b16451aee034b6051f5fd0814ca796aa9ce24564c58c6d752dbb",
+    "apps/api/src/routes/admin.py": "2af36569195366810742201846cfe565c937aaec4445ef23d190e13cb05304b8",
+    "apps/api/src/services/identity_service.py": "4be2f9142c6edb883a7ca558ad060e67df94f7bc89d2657d8291cc4dd2b8e480",
+    "apps/api/src/services/postgres_identity.py": "93be1598872da3371bc263c5e68ae68229a8f3365f3d09a2fa3844decb62e47a",
+    "apps/api/tests/test_audit_factory.py": "d7a3687790f6233a7e0ea93bcc08accb68c7fa42ed33ec6d27c72e9aa0143635",
+    "apps/api/tests/test_in_memory_admin_mutations.py": "a7dbdbab3cdf5286b8cc480a064358f7c767d45a039bb068106815cfaec6aa52",
+    "apps/api/tests/test_postgres_admin_mutations.py": "29b16484d79bf10ffd979bca16c8b663fd2d1ecb5d8726cfdc8d0f7fb9033ed5",
+    "packages/identity/src/rick_identity/provider.py": "c0ac6d703aff059c5186b931db8047af37b73b534f30cb09015e029be5298b9b",
+    "packages/identity/src/rick_identity/protocols.py": "14fe8005608878831b92e40a629d17bb2acc86b774ff0264681fb4d900a7787b",
+    "packages/identity/src/rick_identity/stores.py": "370edf9e68a732f71d2ddb66a8772c406931c51098d743d35f6b95f5073bfbcb",
+    "packages/identity/src/rick_identity/postgres.py": "cb380ed45b65ab49d31673a32d993882b9b036c7770e0bae2b4ad14b6d719382",
+    "packages/identity/tests/test_provider.py": "53f458980e5a440f6e98c47568ac6d96875d28a464d9b121c20b6f8e989742ef",
+    "packages/identity/tests/test_postgres.py": "cf2b4bbf2cbb55ac03a2e6823801cc3e329075e4498e2482df754cb63ca2fa2a",
+    "infrastructure/scripts/tests/test_migrate.py": "b7293e79d3a9fe2d3115c9318b53e9eb9610ca554d72d0a5f55942edbc129319",
+    "apps/web/types/api.ts": "bc908699b7275d68f3256984330d58ad5a1f0adafc50b2b14f716879f08c712a",
+    "apps/web/components/admin/admin-management.tsx": "cf588a9368fd434bfd5db20f3b0a9bb2ee5e8ee4b400f1f14677c09367667e5c",
+    "apps/web/tests/admin-management.spec.ts": "ea6c7a695182f48dc85c4d627818f41de2cd96fc31a0ff035ebc278723727330",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T1132Z-c9-fix/backend-decision-c10.md": "18a39f87fd0728140efeff86feb76a3cd17337b21a00c7971ae015d348497cd1",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T1132Z-c9-fix/backend-decision-c11.md": "2af922e809fdd0d2d9bb2e412f2aac7fe78c11331290d8c1257f4a9dfc5e906f",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T1132Z-c9-fix/c11-api-root.log": "9fe4a88f556ffa1d565b29a60bed639a57c6555aa4909242ea82b7fba257e9c2",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T1132Z-c9-fix/c11-identity-full.log": "fb9421a174475092e96a3e59ca570ee0e27c12539baa038b6b5715a0fb42557b",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T1132Z-c9-fix/c11-postgres-migrations-full.log": "ac90b1d356071d1abd586b59194d74f6003b1e94992a1b36edd72689bfc5dd55",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T1132Z-c9-fix/c11-postgres-session-focused.log": "b4534d518d67ec9216dd64b5f8176db0288caf8a40363d40abaff5d7458a1e4b",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T1132Z-c9-fix/admin-management-e2e.log": "fd18ba76a629bb3eb5705d6f9cbe690f85c46c81b0115ff5057640a1a52ef840",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T1132Z-c9-fix/c11-lint.log": "a7a5650dee62a2a315b1b3413dc05105661cd0c4bd71ec25608e7101f4d1dd63",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T1132Z-c9-fix/c11-typecheck.log": "f4e2482bfa89fd0a34aa7a5fab375fdbb03747d3941dd8fecfa8bdb1bc77c92d",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T1132Z-c9-fix/c11-web-lint.log": "8f9596f3e34443b9079584d502523f9a9b1b4c78e3b7bb1432b9387517cb502f",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T1132Z-c9-fix/c11-web-typecheck.log": "b948d9c357fe1ebf6125fa2416acaf6a7fb9741f9fdf13d45371b7669b75ef2e",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T1132Z-c9-fix/canonical-c11-postledger.log": "58b8f3a2f34a37212ac0a7d5ca4f66ba78b9bbeb04df00fc1dbb050fb7684d39",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T1132Z-c9-fix/control-plane-c11-postledger.log": "a61258ad15544fc7d2c0cfda41c695194b075ee74203c46d24e8b8cb681f5219",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T1132Z-c9-fix/make-validate-c11-postledger.log": "2efce6fd07fecb4ae64e462636bb055d60fe569450629240024af23b86043f27",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T1132Z-c9-fix/quality-bar-c11.log": "005e5f5482d2c554da3a97e69abee45345d1ffdb790a0cd2a7d80ff90ccbaed4",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T1132Z-c9-fix/review-views-c11-postledger.log": "1b5f715a42c91f35fcf10e0bb03e47dfa93d26c8331255fd51d4348366a8df7f",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T1132Z-c9-fix/relative-links-c11.log": "7af2359471233f7c66b2404c48019d64e17a46d6d4cf77f3d2636922ee7fbaad",
+    "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-20260925T1132Z-c9-fix/diff-check-c11-postledger.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "results": {
+    "api": "742 passed; full apps/api suite after exact-workspace session resolution change",
+    "identity": "30 passed; complete identity package including two same-tenant workspace sessions and legacy default session regressions",
+    "postgresql": "108 passed; full disposable PostgreSQL 16.15 migration suite",
+    "postgres_session_regression": "1 passed; live PostgreSQL test validates active bearers in both workspaces of one tenant and confirms account-wide recovery revokes both",
+    "admin_ui": "15 passed in the C10 Playwright run; C11 changes no web source or UI test files",
+    "static": "make lint, make typecheck, make web-lint and make web-typecheck passed",
+    "canonical": "10/10; control plane 10/10; 35 backlog items, 372 execution events, 374 verification records, 28 gates; make validate passed",
+    "quality_bars": "Frozen .gauntlet/bar.json matches its listed .gauntlet-state-of-art/bar.json source snapshot; separate static quality bar validation passes with the listed input and validator",
+    "review_views": "Derived review views and historical files verified",
+    "relative_links": "61 local Markdown links across 8 updated documents passed",
+    "diff": "git diff --check passed"
+  },
+  "limitations": "Local scoped evidence only. API authentication uses test dependency overrides and does not prove deployed authentication. The in-memory adapter holds one membership per user and its RLock coordinates only threads in one process; PostgreSQL is the durable multi-workspace path. Integrated production worker/runtime, operational monitoring/recovery, domain/provider/corpus acceptance, representative RAG quality, visual/accessibility, release and promotion remain open."
+}

@@ -147,7 +147,7 @@ def normalize_permissions(permissions: Iterable[str] | None) -> list[str]:
 
 def normalize_permission_overrides(overrides: object | None) -> dict[str, list[str]]:
     if hasattr(overrides, "model_dump"):
-        payload = overrides.model_dump(exclude_none=True)  # type: ignore[union-attr]
+        payload = overrides.model_dump(exclude_none=True)
     elif isinstance(overrides, Mapping):
         payload = overrides
     else:
@@ -170,7 +170,9 @@ def normalize_permission_overrides(overrides: object | None) -> dict[str, list[s
     return {"add": sorted(additions), "remove": sorted(removals)}
 
 
-def permissions_for_role(role: str | None, overrides: dict | None = None) -> list[str]:
+def permissions_for_role(
+    role: str | None, overrides: Mapping[str, object] | None = None,
+) -> list[str]:
     base = set(normalize_permissions(ROLE_PERMISSIONS[canonical_role(role)]))
     normalized = normalize_permission_overrides(overrides)
     additions = set(normalized["add"])
@@ -237,22 +239,64 @@ def _normalize_collection_id(value: str) -> str:
 
 
 def allowed_collection_ids_for_user(user: Mapping | object) -> list[str]:
+    """Preserve explicit denial; only omitted legacy grants inherit defaults.
+
+    A modern AUTHORITATIVE/MIGRATED record never inherits collection access,
+    even when its grant field is missing or malformed.
+    """
+    omitted = object()
     if isinstance(user, Mapping):
         role = user.get("role")
-        raw = user.get("authorized_collection_ids", [])
+        raw = user.get("authorized_collection_ids", omitted)
+        state = user.get("authorization_state")
     else:
         role = getattr(user, "role", None)
-        raw = getattr(user, "authorized_collection_ids", [])
+        raw = getattr(user, "authorized_collection_ids", omitted)
+        state = getattr(user, "authorization_state", None)
+    if raw is omitted:
+        if state is not None and state != "LEGACY_UNMIGRATED":
+            return []
+        if canonical_role(role) in {"PLATFORM_ADMIN", "KNOWLEDGE_MANAGER"}:
+            return ["*"]
+        return [CANONICAL_COLLECTION_ID]
+    if not isinstance(raw, (list, tuple, set)):
+        return []
     grants = []
-    for item in raw or []:
+    for item in raw:
         if not isinstance(item, str) or not item.strip():
             continue
         grants.append("*" if item.strip() == "*" else _normalize_collection_id(item))
-    if grants:
-        return grants
-    if canonical_role(role) in {"PLATFORM_ADMIN", "KNOWLEDGE_MANAGER"}:
-        return ["*"]
-    return [CANONICAL_COLLECTION_ID]
+    return grants
+
+
+def authorization_grants_for_user(user: Mapping | object) -> dict[str, list[str]]:
+    """Resolve the canonical permission and collection grants for one user."""
+    if isinstance(user, Mapping):
+        role = user.get("role")
+        overrides = user.get("permission_overrides")
+    else:
+        role = getattr(user, "role", None)
+        overrides = getattr(user, "permission_overrides", None)
+    return {
+        "permissions": permissions_for_role(
+            role, overrides if isinstance(overrides, Mapping) else None,
+        ),
+        "allowed_collection_ids": allowed_collection_ids_for_user(user),
+    }
+
+
+def intersect_grants(previous: Iterable[str], current: Iterable[str]) -> list[str]:
+    """Intersect grant ceilings, treating an explicit wildcard as all grants.
+
+    Empty input remains denied; neither current authority nor a persisted
+    snapshot can independently expand the other side's finite scope.
+    """
+    old, fresh = set(previous), set(current)
+    if "*" in old:
+        return sorted(fresh)
+    if "*" in fresh:
+        return sorted(old)
+    return sorted(old.intersection(fresh))
 
 
 def can_access_collection(*, allowed: Iterable[str], collection_id: str | None) -> bool:
