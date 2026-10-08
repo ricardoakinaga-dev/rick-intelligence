@@ -17,6 +17,11 @@ política default-deny de rotas, A16 fail-closed no wrapper de resiliência) —
 foi revertida por ser artefacto de verificação; checkout limpo = 0 linhas; `make ci`/`make test`
 = 0 crescimento; regressão `scripts/phase11/test_untracked_hygiene.py`; E4 prova que, com os
 inputs de CI trackeados, um checkout novo dá `make validate` = 0).
+**AUD07-43 em curso** — as 7 falhas de CI do checkout novo (run `37768041811`, 08/10/2026)
+foram remediadas localmente e confirmadas em CI após push autorizado; o PHASE3 `--verify`
+permanece vermelho **por decisão de 08/10/2026 (deixar vermelho e registar)**, sem alteração
+de gates — ver
+[`ci-lanes-remediation.md`](reports/evidence/auditoria-2026-10-07/ci-lanes-remediation.md).
 **Baseline:** 64,2/100 em 26 áreas, 20 achados (A01–A20); prontidão `NO-GO`.
 
 Este roadmap organiza o caminho do checkout atual até um candidato promovível a produção. A
@@ -26,7 +31,7 @@ reproduzidos (A02, A03) têm regressões discriminantes. A entrega final depende
 sobre serviços externos, evidência operacional selada e decisão de promoção vinculada ao
 candidato.
 
-O [backlog desta rodada](backlog-auditoria-2026-10-07.md) detalha **42 tarefas AUD07** com
+O [backlog desta rodada](backlog-auditoria-2026-10-07.md) detalha **43 tarefas AUD07** com
 dependências e critérios de aceite. O [relatório da auditoria](reports/relatorio-auditoria-2026-10-07.md)
 preserva notas, achados A01–A20, comandos, exit codes e limites. Este planejamento não altera os
 estados de execução em `.agent/` nem inicia as correções.
@@ -54,7 +59,7 @@ reproduzidos ao vivo nesta rodada e têm precedência sobre qualquer trabalho de
 |---|---|---|---|
 | **M0 Baseline selada e gates verdes locais** | Candidato identificável com `validate`, `lint`, `test-fast`, `api-security` e `build` passando | AUD07-01–09 | `make ci` retorna 0 em checkout limpo; reproduções A02/A03 preservadas com hash |
 | **M1 Defeitos de integridade e autorização** | Idempotência e lifecycle de coleção têm regressões que rejeitam a baseline; toda rota está na política default-deny; `production_safe` defaulta sem probe | AUD07-10–14 | A02, A03, A04 e A16 corrigidos com testes que falham antes e passam depois; `make api-security` verde |
-| **M2 Confiabilidade da toolchain** | Bootstrap reproduzível, type-checker Python, dependências sem alerta, árvore limpa | AUD07-15–21 | Checkout novo instala só dos locks e roda as suites sem `PYTHONPATH` manual; `npm audit` 0 HIGH; `git status` limpo |
+| **M2 Confiabilidade da toolchain** | Bootstrap reproduzível, type-checker Python, dependências sem alerta, árvore limpa, lanes de CI verdes | AUD07-15–21, 43 | Checkout novo instala só dos locks e roda as suites sem `PYTHONPATH` manual; `npm audit` 0 HIGH; `git status` limpo; os 7 workflows do run de referência passam |
 | **M3 Documentação e testes coerentes** | README/índice refletem o checkout; lanes raiz materializadas; skips classificados | AUD07-22–26 | 0 links quebrados em primário/plans/reports; inventário de skips com gate |
 | **M4 Candidato integrado local** | Todas as suites locais, contrato, build e navegador executam juntas no candidato | AUD07-27 | `make ci`, `make api16-full`, `make web-validate` verdes no mesmo SHA |
 | **M5 Integração com serviços reais** | PostgreSQL, Redis, Qdrant, object-storage e provider exercitados de ponta a ponta | AUD07-28–33 | Golden path, isolamento multi-tenant, revogação e publicação comprovados com teardown |

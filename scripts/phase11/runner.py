@@ -632,6 +632,11 @@ def mode_test_fast() -> int:
             timeout=120,
         ),
         python_case(
+            "legacy differential reference regression",
+            ["-m", "unittest", "scripts/phase15/test_legacy_reference.py"],
+            timeout=180,
+        ),
+        python_case(
             "canonical route/security contract regression",
             [str(ROOT / "scripts" / "phase13" / "phase13.py"), "security"],
             env=canonical_env(),

@@ -14,18 +14,32 @@ from types import SimpleNamespace
 import pytest
 
 ROOT = Path(__file__).resolve().parents[3]
-RUNTIME = "docs/reports/evidence/implementation-aud03-2026-10-03/runtime"
+# Cited evidence: the policy keeps files referenced from scripts/tests versioned.
+HARNESS_SOURCES = (
+    "docs/reports/evidence/implementation-aud03-2026-10-03/runtime/redis_fault_harness.py",
+    "docs/reports/evidence/implementation-aud03-2026-10-03/runtime/qdrant_fault_harness.py",
+    "docs/reports/evidence/implementation-aud03-2026-10-03/runtime/redis_replica_harness.py",
+)
 GATES = ("redis_runtime_gate", "redis_multi_replica_runtime_gate", "object_qdrant_runtime_gate")
-HARNESSES = ("redis_fault_harness", "qdrant_fault_harness", "redis_replica_harness")
+HARNESSES = tuple(Path(source).stem for source in HARNESS_SOURCES)
 CANARY = "SYNTHETIC_EUCLID1_NEVER_PERSIST"
 
 
 def load(name):
-    location = f"scripts/phase11/{name}.py" if name in GATES else f"{RUNTIME}/{name}.py"
+    if name in GATES:
+        location = f"scripts/phase11/{name}.py"
+    else:
+        location = next(source for source in HARNESS_SOURCES if source.endswith(f"/{name}.py"))
     spec = importlib.util.spec_from_file_location(f"euclid1_{name}", ROOT / location)
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
+    # The evidence tree stays free of bytecode: no __pycache__ under docs/reports.
+    previous = sys.dont_write_bytecode
+    sys.dont_write_bytecode = True
+    try:
+        spec.loader.exec_module(module)
+    finally:
+        sys.dont_write_bytecode = previous
     return module
 
 

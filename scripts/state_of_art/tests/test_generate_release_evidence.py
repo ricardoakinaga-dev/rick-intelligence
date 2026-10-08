@@ -357,7 +357,9 @@ def test_canonical_workflow_binds_ci_artifacts_to_the_same_run() -> None:
     assert "Download RAG evaluation CI envelope from this workflow run" in text
     assert "Download frontend CI envelope from this workflow run" in text
     assert "Download supply-chain CI envelope from this workflow run" in text
-    assert "cvg-master-rag-v2','rick-professor','modulo-redis-locker" in text
+    assert "pip-audit -r requirements/test.lock --strict" in text
+    assert "pip-audit -r requirements/runtime.lock --strict" in text
+    assert "npm --prefix apps/web audit --audit-level=high" in text
     assert "run: make phase3-frontend-supply-runtime" in text
     assert ".runtime/phase-3" in text
 

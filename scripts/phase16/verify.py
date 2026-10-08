@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[2]
 CHILDREN = ("cvg-master-rag-v2", "rick-professor", "modulo-redis-locker")
 
 
-def _run(command: list[str], timeout: int = 300) -> dict[str, object]:
+def _run(command: list[str], timeout: int = 900) -> dict[str, object]:
     environment = os.environ.copy()
     environment.update({
         "PYTHONDONTWRITEBYTECODE": "1",

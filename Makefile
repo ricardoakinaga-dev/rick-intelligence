@@ -335,7 +335,11 @@ api15-lock:
 api15-professor:
 	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)/packages/contracts/src:$(ROOT)/packages/professor/src" $(PYTEST) -m pytest -q -p no:cacheprovider "$(ROOT)/packages/professor/tests"
 
-api15-root:
+.PHONY: legacy-reference
+legacy-reference:
+	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) "$(ROOT)/scripts/phase15/legacy_reference.py"
+
+api15-root: legacy-reference
 	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)/apps/api/src:$(ROOT)/apps/worker:$(ROOT)/packages/jobs/src:$(ROOT)/packages/contracts/src:$(ROOT)/packages/authorization/src:$(ROOT)/packages/identity/src:$(ROOT)/packages/observability/src:$(ROOT)/packages/knowledge/src:$(ROOT)/packages/ingestion/src:$(ROOT)/packages/retrieval/src:$(ROOT)/packages/providers/src:$(ROOT)/packages/locking/src:$(ROOT)/packages/professor/src:$(ROOT)/packages/evidence/src:$(ROOT)/packages/decision/src" $(PYTEST) -m pytest -q -p no:cacheprovider "$(ROOT)/apps/api/tests"
 
 api15-benchmark:
@@ -347,13 +351,13 @@ api15-verify:
 
 api15-full: api15-boundaries api15-contracts api15-provider api15-lock api15-professor api15-root api15-benchmark
 
-api16-domain:
+api16-domain: legacy-reference
 	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)/apps/worker:$(ROOT)/packages/knowledge/src:$(ROOT)/packages/ingestion/src:$(ROOT)/packages/retrieval/src:$(ROOT)/packages/storage/src" $(PYTEST) -m pytest -q -p no:cacheprovider "$(ROOT)/packages/knowledge/tests" "$(ROOT)/packages/ingestion/tests" "$(ROOT)/packages/retrieval/tests"
 
 api16-worker:
 	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)/apps:$(ROOT)/apps/worker:$(ROOT)/apps/api/src:$(ROOT)/packages/jobs/src:$(ROOT)/packages/contracts/src:$(ROOT)/packages/authorization/src:$(ROOT)/packages/identity/src:$(ROOT)/packages/observability/src:$(ROOT)/packages/knowledge/src:$(ROOT)/packages/ingestion/src:$(ROOT)/packages/retrieval/src:$(ROOT)/packages/providers/src:$(ROOT)/packages/locking/src:$(ROOT)/packages/professor/src:$(ROOT)/packages/evidence/src:$(ROOT)/packages/decision/src:$(ROOT)/packages/storage/src" $(PYTEST) -m pytest -q -p no:cacheprovider "$(ROOT)/apps/worker/tests" "$(ROOT)/apps/api/tests/test_phase16_health.py"
 
-api16-root:
+api16-root: legacy-reference
 	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)/apps/api/src:$(ROOT)/apps/worker:$(ROOT)/packages/jobs/src:$(ROOT)/packages/contracts/src:$(ROOT)/packages/authorization/src:$(ROOT)/packages/identity/src:$(ROOT)/packages/observability/src:$(ROOT)/packages/knowledge/src:$(ROOT)/packages/ingestion/src:$(ROOT)/packages/retrieval/src:$(ROOT)/packages/providers/src:$(ROOT)/packages/locking/src:$(ROOT)/packages/professor/src:$(ROOT)/packages/evidence/src:$(ROOT)/packages/decision/src:$(ROOT)/packages/storage/src" $(PYTEST) -m pytest -q -p no:cacheprovider "$(ROOT)/apps/api/tests"
 
 .PHONY: api-coverage worker-coverage web-coverage

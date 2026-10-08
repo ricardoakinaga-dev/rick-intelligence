@@ -41,7 +41,14 @@ async def wait_event(event):
 @pytest.mark.parametrize('interrupt', ['cancel', 'timeout'])
 @pytest.mark.parametrize('release_before_retry', [False, True])
 async def test_i1_05_sync_close_reconciled_once(monkeypatch, interrupt, release_before_retry):
-    monkeypatch.setattr(app_module, 'APP_LIFESPAN_SHUTDOWN_TIMEOUT_SECONDS', .04)
+    # The cancel branch must observe CancelledError: a 40ms lifespan budget lets a
+    # loaded event loop finish the shutdown first, so only the timeout branch keeps
+    # the short budget it exists to exercise.
+    monkeypatch.setattr(
+        app_module,
+        'APP_LIFESPAN_SHUTDOWN_TIMEOUT_SECONDS',
+        5.0 if interrupt == 'cancel' else .04,
+    )
     first, last = SyncClose(), SyncClose()
     last.release.set()
     app = application(close=[first, last])

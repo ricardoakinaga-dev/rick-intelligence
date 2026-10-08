@@ -1,8 +1,10 @@
 # Backlog de remediação RICK Intelligence
 
-**Data:** 07/10/2026. **Estado:** 42 tarefas propostas; **AUD07-01–15, AUD07-17, AUD07-18 e
+**Data:** 07/10/2026 (atualizado em 08/10/2026). **Estado:** 43 tarefas propostas; **AUD07-01–15, AUD07-17, AUD07-18 e
 AUD07-19 concluídas e evidenciadas** (**M0 e M1 completos** + M2 em curso: A02/A03, A04, A16, A10, A09 e
-A11 tratados), AUD07-16 e AUD07-20–27 pendentes, AUD07-28–42 com dependência externa. **Origem:** auditoria de 07/10/2026, 64,2/100 em
+A11 tratados), **AUD07-43 em curso** (as 7 falhas de CI do checkout novo remediadas localmente e
+push autorizado em 08/10; PHASE3 `--verify` mantido vermelho por decisão explícita),
+AUD07-16 e AUD07-20–27 pendentes, AUD07-28–42 com dependência externa. **Origem:** auditoria de 07/10/2026, 64,2/100 em
 26 áreas, 20 achados (A01–A20) e prontidão `NO-GO`.
 
 Este backlog traduz os achados A01–A20 em correções verificáveis e acrescenta o trabalho de
@@ -79,6 +81,7 @@ repor Actions por tag mutável, remover gates ou marcar casos como ignorados par
 | AUD07-40 | M7 | P0 | Selecionar pacote de promoção vinculado ao candidato | G | 39 | Dependência externa |
 | AUD07-41 | M7 | P1 | Reauditar as 26 áreas sobre o candidato exato | G | 40 | Dependência externa |
 | AUD07-42 | M7 | P0 | Decisão Go/No-Go explícita com riscos residuais | G | 41 | Dependência externa |
+| AUD07-43 | M2 | P0 | Remediar as 7 falhas de CI do checkout novo | G | 09 | Em curso |
 
 As dependências abreviadas usam o prefixo AUD07. Intervalos incluem todos os IDs indicados.
 
@@ -484,6 +487,36 @@ foram trackeados. O experimento E4 mostrou que, com esses inputs trackeados, o
 desta tarefa depende da decisão de trackear/commitar (opção A de
 [`untracked-hygiene.md`](reports/evidence/auditoria-2026-10-07/untracked-hygiene.md)), não de
 mudar o `PYTHONPATH`.
+
+### AUD07-43 Remediar as 7 falhas de CI do checkout novo
+
+**Responsável sugerido:** CI e integração. **Origem:** consolidação de M0–M2. **Fontes:**
+`.github/workflows/quality.yml`, `.github/workflows/phase-1.3.yml`,
+`.github/workflows/phase-1.3.1.yml`, `.github/workflows/phase-1.4.yml`,
+`.github/workflows/phase-1.5.yml`, `.github/workflows/phase-1.6.yml`,
+`.github/workflows/state-of-art-quality.yml`, `Makefile`, `requirements/*.in`,
+`requirements/*.lock`, `scripts/phase15/legacy_reference.py`, `scripts/phase16/verify.py`.
+
+Reproduzir as sete pipelines vermelhas do checkout novo (run `37768041811`, 08/10/2026,
+`f47a3e6`) e corrigir a causa raiz de cada uma: referência legada do diferencial não
+materializada nos lanes que colectam `test_differential*`, inputs de controlo não
+restaurados, 3 CVEs no `test.lock`, harnesses AUD03 citados mas fora da árvore versionada,
+`pyjwt` ausente do `phase13.lock`, watchdog de 300 s do `api16-verify` e uma corrida
+temporal no teste de shutdown `test_i1_05_sync_close_reconciled_once[False-cancel]`.
+
+**Aceite:** os sete workflows do run de referência passam; cada lane é reexecutada localmente
+com o comando exato do CI (venv novo a partir do lock, `PYTHONPATH` do workflow,
+`fetch-depth: 0`); `pip-audit --strict` limpo nos três locks; nenhum gate enfraquecido,
+nenhum teste removido, ignorado ou com threshold rebaixado; comando completo, exit code e
+artefatos registrados.
+
+**Estado:** Em curso. Correções aplicadas e verificadas localmente (`make validate`,
+`make test` e `make ci` = 0; lanes de fase 1.3 a 1.6 e State-of-Art = 0);
+commit e push autorizados em 08/10/2026 para confirmação em CI. **Evidência:**
+[`ci-lanes-remediation.md`](reports/evidence/auditoria-2026-10-07/ci-lanes-remediation.md) —
+§1–§3 diagnóstico e verificação. §6: o PHASE3 `--verify` fica **vermelho por decisão
+explícita de 08/10/2026 (opção 3: deixar vermelho e registar)**, como gate de promoção
+não cumprido; nenhum gate foi alterado.
 
 ---
 

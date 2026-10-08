@@ -67,6 +67,28 @@ def mode_api() -> int:
     return _run([PYTHON, "-m", "pytest", "-q", str(API_TESTS)])
 
 
+def mode_legacy() -> int:
+    """Focused legacy contract/security regression against the read-only reference."""
+    if _materialize_legacy_reference() != 0:
+        print("<== legacy reference unavailable; legacy lane aborted", flush=True)
+        return 1
+    legacy_src = LEGACY_REFERENCE / "cvg-master-rag-v2" / "src"
+    tests_root = legacy_src / "tests"
+    env = _env()
+    env["PYTHONPATH"] = os.pathsep.join(
+        [str(legacy_src), str(ROOT), env.get("PYTHONPATH", "")])
+    command = [PYTHON, "-m", "pytest", "-q",
+               "-p", "scripts.phase13.legacy_reference_plugin",
+               str(tests_root / "test_phase05_contract.py"),
+               str(tests_root / "test_phase05_security.py"),
+               str(tests_root / "test_phase06_rbac.py"),
+               str(tests_root / "test_p0_closeout.py")]
+    print(f"==> {' '.join(str(part) for part in command)}", flush=True)
+    completed = subprocess.run(command, cwd=ROOT, env=env)
+    print(f"<== exit {completed.returncode}", flush=True)
+    return completed.returncode
+
+
 def _benchmark_paths() -> list[str]:
     reference_src = LEGACY_REFERENCE / "cvg-master-rag-v2" / "src"
     return [str(ROOT / "packages" / name / "src") for name in ("knowledge", "ingestion", "retrieval")] + [
@@ -172,13 +194,16 @@ def mode_full() -> int:
 
 
 MODES = {"units": mode_units, "differential": mode_differential, "acl": mode_acl,
-         "api": mode_api, "benchmark": mode_benchmark, "full": mode_full}
+         "api": mode_api, "legacy": mode_legacy, "benchmark": mode_benchmark, "full": mode_full}
+REFERENCE_MODES = {"units", "differential", "api", "legacy", "full"}
 
 
 def main(argv: list[str]) -> int:
     if len(argv) != 2 or argv[1] not in MODES:
         print(f"usage: phase14.py <{'|'.join(sorted(MODES))}>", flush=True)
         return 2
+    if argv[1] in REFERENCE_MODES and _materialize_legacy_reference() != 0:
+        print("WARN: legacy reference unavailable; parity suites stay fail-closed", flush=True)
     return MODES[argv[1]]()
 
 

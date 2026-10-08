@@ -20,6 +20,11 @@ HISTORY = "docs/progress/release-evidence.json"
 EVIDENCE_DIR = Path("/tmp/rick-production-20261004/release-output13")
 
 
+def setUpModule() -> None:
+    # Fresh checkouts (CI) never created this incident scratch directory.
+    EVIDENCE_DIR.mkdir(parents=True, exist_ok=True)
+
+
 class ReleaseOutputIsolationTests(unittest.TestCase):
     def test_canonical_defaults_and_explicit_consumers_agree(self):
         from scripts.state_of_art.release_evidence_paths import CURRENT_RELEASE_EVIDENCE

@@ -20,6 +20,13 @@ from pyenv import interpreter, test_environment  # noqa: E402
 PYTHON = interpreter()
 
 
+def _materialize_legacy_reference() -> int:
+    completed = subprocess.run(
+        [PYTHON, str(ROOT / "scripts" / "phase15" / "legacy_reference.py")],
+        cwd=ROOT, env=test_environment())
+    return completed.returncode
+
+
 def _env(**overrides: str):
     return test_environment(**overrides)
 
@@ -134,12 +141,15 @@ def mode_benchmark() -> int:
 
 
 MODES = {"test": mode_test, "security": mode_security, "contract": mode_contract, "dev": mode_dev, "benchmark": mode_benchmark}
+REFERENCE_MODES = {"test"}
 
 
 def main(argv: list[str]) -> int:
     if len(argv) != 2 or argv[1] not in MODES:
         print(f"usage: phase13.py <{'|'.join(sorted(MODES))}>", flush=True)
         return 2
+    if argv[1] in REFERENCE_MODES and _materialize_legacy_reference() != 0:
+        print("WARN: legacy reference unavailable; parity suites stay fail-closed", flush=True)
     return MODES[argv[1]]()
 
 

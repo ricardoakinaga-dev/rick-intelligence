@@ -19,6 +19,13 @@ from pyenv import interpreter, test_environment  # noqa: E402
 PYTHON = interpreter()
 
 
+def _materialize_legacy_reference() -> int:
+    completed = subprocess.run(
+        [PYTHON, str(ROOT / "scripts" / "phase15" / "legacy_reference.py")],
+        cwd=ROOT, env=test_environment())
+    return completed.returncode
+
+
 def _env(**overrides: str):
     return test_environment(**overrides)
 
@@ -43,6 +50,29 @@ def mode_differential() -> int:
 
 def mode_api() -> int:
     return _run([PYTHON, "-m", "pytest", "-q", str(API_TESTS)])
+
+
+def mode_legacy_auth() -> int:
+    """Focused legacy CVG auth regression against the read-only reference."""
+    import os
+
+    if _materialize_legacy_reference() != 0:
+        print("<== legacy reference unavailable; legacy-auth lane aborted", flush=True)
+        return 1
+    legacy_src = ROOT / ".runtime" / "legacy-reference" / "cvg-master-rag-v2" / "src"
+    tests_root = legacy_src / "tests"
+    env = _env()
+    env["PYTHONPATH"] = os.pathsep.join(
+        [str(legacy_src), str(ROOT), env.get("PYTHONPATH", "")])
+    print("==> legacy CVG auth regression (focused)", flush=True)
+    completed = subprocess.run(
+        [PYTHON, "-m", "pytest", "-q",
+         "-p", "scripts.phase13.legacy_reference_plugin",
+         str(tests_root / "test_phase05_security.py"),
+         str(tests_root / "test_phase06_rbac.py")],
+        cwd=ROOT, env=env)
+    print(f"<== exit {completed.returncode}", flush=True)
+    return completed.returncode
 
 
 def mode_benchmark() -> int:
@@ -74,13 +104,16 @@ def mode_full() -> int:
 
 
 MODES = {"canonical": mode_canonical, "differential": mode_differential, "api": mode_api,
-         "benchmark": mode_benchmark, "full": mode_full}
+         "legacy-auth": mode_legacy_auth, "benchmark": mode_benchmark, "full": mode_full}
+REFERENCE_MODES = {"differential", "api", "legacy-auth", "full"}
 
 
 def main(argv: list[str]) -> int:
     if len(argv) != 2 or argv[1] not in MODES:
         print(f"usage: phase131.py <{'|'.join(sorted(MODES))}>", flush=True)
         return 2
+    if argv[1] in REFERENCE_MODES and _materialize_legacy_reference() != 0:
+        print("WARN: legacy reference unavailable; parity suites stay fail-closed", flush=True)
     return MODES[argv[1]]()
 
 

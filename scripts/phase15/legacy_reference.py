@@ -8,6 +8,11 @@ matches what they replaced. This script extracts the legacy tree from the git
 object store into `.runtime/legacy-reference/` — a generated, gitignored
 directory — so the comparison stays reproducible from a single SHA.
 
+Because AUD07-02 removed `cvg-master-rag-v2` from `HEAD`, the reference is read
+from `SOURCE_REF`: the last commit that still contained it (`8c35b1f^`).
+History is immutable, so a clean checkout of any later commit can rebuild the
+same bytes; nothing retired returns to the working tree.
+
 Exit codes: 0 extracted (or already current), 1 failure, 2 reference not in
 this repository's history.
 """
@@ -25,20 +30,22 @@ ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_DESTINATION = ROOT / ".runtime" / "legacy-reference"
 LEGACY_COMPONENT = "cvg-master-rag-v2"
 REF_SUFFIX = ".aud07-ref"
+SOURCE_REF = "b52f32c141916a2ea3af1a6b913bd91f380606e0"
 
 
-def head_sha() -> str | None:
+def resolve_ref(ref: str) -> str | None:
     completed = subprocess.run(
-        ["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True, check=False,
+        ["git", "rev-parse", "--verify", f"{ref}^{{commit}}"],
+        cwd=ROOT, capture_output=True, text=True, check=False,
     )
     if completed.returncode:
         return None
     return completed.stdout.strip() or None
 
 
-def component_in_head(sha: str) -> bool:
+def component_in_ref(ref: str) -> bool:
     completed = subprocess.run(
-        ["git", "ls-tree", "-d", "--name-only", sha, "--", LEGACY_COMPONENT],
+        ["git", "ls-tree", "-d", "--name-only", ref, "--", LEGACY_COMPONENT],
         cwd=ROOT, capture_output=True, text=True, check=False,
     )
     return completed.returncode == 0 and LEGACY_COMPONENT in completed.stdout.split()
@@ -59,11 +66,14 @@ def _write_marker(destination: Path, sha: str) -> None:
 
 
 def extract(destination: Path) -> int:
-    sha = head_sha()
+    sha = resolve_ref(SOURCE_REF)
     if not sha:
-        print("FAIL: not a git checkout; cannot materialize the legacy reference", file=sys.stderr)
+        print(
+            "FAIL: SOURCE_REF does not resolve; cannot materialize the legacy reference",
+            file=sys.stderr,
+        )
         return 1
-    if not component_in_head(sha):
+    if not component_in_ref(sha):
         print(
             f"FAIL: {LEGACY_COMPONENT} is absent from {sha}; this repository cannot rebuild "
             "the differential reference",
@@ -103,10 +113,17 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--check", action="store_true", help="report status without extracting")
     args = parser.parse_args(argv)
     if args.check:
-        sha = head_sha()
+        source = resolve_ref(SOURCE_REF)
         current = _read_marker(args.destination)
-        ready = current == sha and (args.destination / LEGACY_COMPONENT / "src").is_dir()
-        print(f"legacy reference ready={ready} sha={current or 'none'} head={sha or 'none'}")
+        ready = (
+            bool(source)
+            and current == source
+            and (args.destination / LEGACY_COMPONENT / "src").is_dir()
+        )
+        print(
+            f"legacy reference ready={ready} marker={current or 'none'} "
+            f"source={source or 'unresolved'}"
+        )
         return 0 if ready else 1
     return extract(args.destination)
 
