@@ -18,9 +18,11 @@ foi revertida por ser artefacto de verificação; checkout limpo = 0 linhas; `ma
 = 0 crescimento; regressão `scripts/phase11/test_untracked_hygiene.py`; E4 prova que, com os
 inputs de CI trackeados, um checkout novo dá `make validate` = 0).
 **AUD07-43 em curso** — as 7 falhas de CI do checkout novo (run `37768041811`, 08/10/2026)
-foram remediadas localmente e confirmadas em CI após push autorizado; o PHASE3 `--verify`
-permanece vermelho **por decisão de 08/10/2026 (deixar vermelho e registar)**, sem alteração
-de gates — ver
+foram remediadas e confirmadas no push `4d2ac2c`: phase-1.3, phase-1.3.1, phase-1.4 e
+phase-1.5 verdes; PHASE3 `--verify` permanece vermelho **por decisão de 08/10/2026
+(deixar vermelho e registar)**, `State of Art / release integrity` segue vermelho por
+evidência de runtime não vinculada (pré-existente desde 10/09) e `phase-1.6` está em
+diagnóstico — sem alteração de gates — ver
 [`ci-lanes-remediation.md`](reports/evidence/auditoria-2026-10-07/ci-lanes-remediation.md).
 **Baseline:** 64,2/100 em 26 áreas, 20 achados (A01–A20); prontidão `NO-GO`.
 

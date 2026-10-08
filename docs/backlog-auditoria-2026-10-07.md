@@ -510,13 +510,16 @@ com o comando exato do CI (venv novo a partir do lock, `PYTHONPATH` do workflow,
 nenhum teste removido, ignorado ou com threshold rebaixado; comando completo, exit code e
 artefatos registrados.
 
-**Estado:** Em curso. Correções aplicadas e verificadas localmente (`make validate`,
-`make test` e `make ci` = 0; lanes de fase 1.3 a 1.6 e State-of-Art = 0);
-commit e push autorizados em 08/10/2026 para confirmação em CI. **Evidência:**
+**Estado:** Em curso. Correções verificadas localmente (`make validate`, `make test` e
+`make ci` = 0) e confirmadas no push `4d2ac2c` (08/10): **phase-1.3, phase-1.3.1,
+phase-1.4 e phase-1.5 verdes** e os 7 jobs do `quality` verdes excepto `PHASE3`.
+Ainda abertos: (a) PHASE3 `--verify` **vermelho por decisão explícita de 08/10/2026
+(opção 3: deixar vermelho e registar)**, sem alteração de gate; (b) `State of Art /
+release integrity`, vermelho desde 10/09 por envelopes de runtime não vinculados —
+mesma classe de (a); (c) `phase-1.6`, `api16-verify` com um check por identificar
+(`failed_checks` acrescentado ao diagnóstico neste mesmo ciclo). **Evidência:**
 [`ci-lanes-remediation.md`](reports/evidence/auditoria-2026-10-07/ci-lanes-remediation.md) —
-§1–§3 diagnóstico e verificação. §6: o PHASE3 `--verify` fica **vermelho por decisão
-explícita de 08/10/2026 (opção 3: deixar vermelho e registar)**, como gate de promoção
-não cumprido; nenhum gate foi alterado.
+§1–§3 diagnóstico, §6 decisão sobre o PHASE3, §7 resultado do push e achados abertos.
 
 ---
 

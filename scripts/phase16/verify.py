@@ -90,6 +90,16 @@ def main() -> int:
         "children_clean": artifact["children_clean"],
         "benchmark_present": artifact["benchmark_present"],
         "artifact": str(output.relative_to(ROOT)),
+        "failed_checks": [
+            {
+                "command": check.get("command"),
+                "exit_code": check.get("exit_code"),
+                "test_pass_count": check.get("test_pass_count"),
+                "timed_out": check.get("timed_out", False),
+            }
+            for check in checks
+            if not check.get("passed")
+        ],
     }, ensure_ascii=False, indent=2))
     return 0 if all(check.get("passed") for check in checks) and artifact["children_clean"] and artifact["benchmark_present"] else 1
 

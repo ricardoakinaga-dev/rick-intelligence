@@ -2,7 +2,8 @@
 
 **Data:** 2026-10-08. **Candidato:** worktree de `/home/ricardo/rick-intelligence`,
 `HEAD = f47a3e62f3f4d237f02b58f788675c984952d103` (*Record AUD07-19 decision and
-clean-checkout proof*) + correções desta página, ainda **não commitadas**.
+clean-checkout proof*) + correções desta página, commitadas e empurradas como
+`4d2ac2c` (*Fix the seven failing CI lanes of the clean checkout*).
 **Ambiente:** Python 3.12.3 (`.runtime/venvs/cvg`), Node v24.20.0 / npm 11.19.0 no host;
 os workflows continuam pinando `3.12.3` / `22.19.0`.
 
@@ -165,4 +166,46 @@ não cumprido, até que haja evidência de runtime fresca sob autoridade. As op�
 seguem intactas para decisão futura.
 
 O restante trabalho desta página está concluído localmente; o commit e o push foram
-autorizados pelo utilizador em 08/10/2026 para confirmação em CI.
+autorizados pelo utilizador em 08/10/2026 e executados como `4d2ac2c`. Os resultados do
+CI desse push estão em §7.
+
+## 7. Resultado do push (`4d2ac2c`, 2026-10-08T23:22:20Z)
+
+| Workflow (run) | Conclusão | Observação |
+|---|---|---|
+| `RICK canonical quality lanes` (`37859057203`) | falha | 7 de 8 jobs verdes (`FAST`, `FRONTEND`, `SECURITY`, `RAG-EVAL`, `CONTRACT`, `SUPPLY-CHAIN`, `UNIT`); falha **só** o job `PHASE3`, por decisão de §6 |
+| `phase-1.3-api-kernel` (`37859057204`) | **sucesso** | era vermelho em `f47a3e6` |
+| `phase-1.3.1-identity-canonicalization` (`37859057299`) | **sucesso** | era vermelho em `f47a3e6` (`pyjwt`) |
+| `phase-1.4-rag-extraction` (`37859057226`) | **sucesso** | era vermelho em `f47a3e6` |
+| `phase-1.5-root-professor` (`37859057185`) | **sucesso** | era vermelho em `f47a3e6` |
+| `phase-1.6-root-ingestion` (`37859057225`) | falha | `make api16-verify` devolveu `checks_passed: false`; a reprodução local fiel ao CI (venv novo a partir de `test.lock`, sem `.runtime/venvs/cvg`) passa os 6 comandos — em curso a identificar o check via `failed_checks` (§7.1) |
+| `State of Art / release integrity` (`37859057262`) | falha | **546 passed / 10 subtests** (os 45 failed de `f47a3e6` resolvidos); falha agora só `release integrity` — §7.2 |
+| `Phase 1.1 Root Foundation` (`37859057232`) | **sucesso** | já era verde |
+
+Balanço: 5 workflows verdes, 3 vermelhos — PHASE3 (decisão §6), State of Art §7.2
+(encontrado e vermelho desde 10/09) e phase-1.6 §7.1 (em diagnóstico).
+
+### 7.1 phase-1.6 — check por identificar
+
+`scripts/phase16/verify.py` engolia a saída de cada comando, pelo que o JSON do CI só
+dizia `checks_passed: false` sem nomear o comando. Este commit acrescenta
+`failed_checks` (comando, `exit_code`, `test_pass_count`, `timed_out`) à saída, sem
+alterar o valor de saída nem nenhum limiar. Reprodução local fiel ao CI dos 6 comandos
+(`make api16-full`, `make api15-full`, `make api14-full`, `make api-security`,
+`make api-contract`, `git diff --check` com venv novo de `requirements/test.lock` e sem
+`.runtime/venvs/cvg`): todos `exit 0` — logo o check que falha no CI só se revela com o
+diagnóstico do próprio CI.
+
+### 7.2 State of Art — envelopes de runtime não vinculados (pré-existente)
+
+O job passou dos 45 testes falhados para **546 passed**, mas
+`release_integrity.py --require-clean --evidence .runtime/release/release-evidence.json`
+rejeita o manifesto com `DIRTY_RELEASE_EVIDENCE_REJECTED`, `FAILED_RUNTIME_REJECTED`,
+`MISSING_EVIDENCE_REJECTED`, `MISSING_GATE_REJECTED`, `WRONG_HASH_REJECTED` e
+`WRONG_TREE_REJECTED`: os envelopes dos gates `redis`, `postgresql`, `frontend-e2e`,
+`accessibility` e `visual` não têm `commit_sha`/`tree_sha`/`checkout_fingerprint`
+vinculados ao manifesto, não estão limpos nem correntes, têm `observed_at` fora da
+janela e `raw_artifacts[0]` ausente. É a mesma classe do PHASE3 de §6 — evidência de
+runtime que só as lanes de runtime sob autoridade podem produzir — e este workflow
+vinha vermelho desde `b52f32c` (10/09/2026), portanto não é regressão deste commit.
+Fica registado como achado aberto com a mesma opção §6: nenhum gate alterado.
