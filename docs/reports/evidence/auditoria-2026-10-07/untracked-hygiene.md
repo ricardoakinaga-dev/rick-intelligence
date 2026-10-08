@@ -90,16 +90,22 @@ falha aí (`exit 2`, 734 linhas `[FAIL]`)**. Duas causas distintas, ambas de ver
 staged+unstaged, (b) os ficheiros hoje `??` e (c) o bundle, corre `make validate` a 0,
 mantendo `git status` só com as mudanças intencionais (703 `A`, 439 `D`, 239 `M`, 1 `R`, 0 `??`).
 
+**E5 (confirmação pós-commit, o teste definitivo):** `git worktree add` a partir de `8c35b1f` —
+`make control-inputs-restore` **exit 0** (1 293 ficheiros restaurados, todos em caminhos
+ignorados: `git status` **1 → 1**, só o `node_modules` de teste), `make validate` **exit 0**,
+`RESULT PASS (pass=12 warn=0 fail=0)`, `sync=HEAD_AHEAD_OF_ORIGIN_MAIN` (informativo). Depois do
+commit o worktree principal está com **`git status --porcelain` = 0 linhas**.
+
 ### Opções
 
 | Opção | O que implica | Estado |
 |---|---|---|
-| **A. Trackear o que falta e commitar o trabalho** | `git add` de `requirements/`, `docs/ci/*.py`, `docs/ci/control-inputs/**` (~29,5 MB) + commit do que já está staged/modificado/deletado (1 382 entradas) | **provado em E4** — checkout novo: `control-inputs-restore` 0 e `make validate` 0. Custo: pack atual de **1,38 MiB** passa a ~+30 MB (o bundle é comprimido e unchangeable por desenho do AUD03-21) |
+| **A. Trackear o que falta e commitar o trabalho** | `git add` de `requirements/`, `docs/ci/*.py`, `docs/ci/control-inputs/**` (~29,5 MB) + commit do que já estava staged/modificado/deletado (1 382 entradas) | **APLICADA** — utilizador escolheu a variante de commit único; **`8c35b1f`** (`Land AUD07-01 through AUD07-19 remediation with CI control inputs`, 1 382 ficheiros, +144 845 / −116 037). Custo: pack de **1,38 MiB** → +~30 MB |
 | **B. Não trackear o bundle; mudar os checks** | exigiria editar `Makefile` + 3 workflows (chamam `control-inputs-restore` e `requirements/test.lock`) e, ainda assim, **660 refs** a `.gauntlet-state-of-art` continuariam por materializar | **não recomendado**: quebra o contrato AUD03-21 e não reproduz os gates em CI |
 | **C. Deixar como está** | — | gates só passam nesta máquina; `quality.yml` (push/PR/cron diário) falha no 1.º passo se correr no GitHub |
 
-**Recomendação: A**, com o commit em fatias (M0/M1, M2, código AUD03–06) ou num só — decisão do
-utilizador; nenhum commit foi feito. Enquanto não se decide, o estado atual continua verde local.
+**Decisão do utilizador (08/10): variante 1 — commit único.** Aplicado em `8c35b1f` e
+confirmado por E5; nada foi publicado (`origin/main` ficou 1 commit atrás).
 
 **Nota para reconciliar com [`fix-gates-1.md`](fix-gates-1.md) §2:** o «checkout limpo» de
 AUD07-09 copiava `git ls-files -co --exclude-standard` do worktree corrente (ou seja, incluía

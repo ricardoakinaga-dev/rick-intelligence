@@ -448,8 +448,10 @@ com 749 de `.gauntlet-state-of-art`) e `requirements/*.lock` nunca foram trackea
 experimento **E4** prova que trackear esses inputs + commitar staged/unstaged/não-rastreados
 dá `control-inputs-restore` 0 e `make validate` 0 (`RESULT PASS 12/0/0`); opções A/B/C e custo
 (+~30 MB num pack de 1,38 MiB) em
-[`untracked-hygiene.md`](reports/evidence/auditoria-2026-10-07/untracked-hygiene.md) — decisão
-de commit pendente do utilizador.
+[`untracked-hygiene.md`](reports/evidence/auditoria-2026-10-07/untracked-hygiene.md).
+**Decisão aplicada:** opção A / commit único **`8c35b1f`** (1 382 ficheiros, inputs de CI
+incluídos); E5 a partir desse commit: `control-inputs-restore` 0, `make validate` 0
+(`RESULT PASS 12/0/0`) e `git status` = 0.
 
 ### AUD07-20 Classificar os 216 testes pulados por motivo e gate
 
