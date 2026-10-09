@@ -1030,7 +1030,8 @@
         "scripts/state_of_art/tests/test_gauntlet_state_boundary.py",
         "scripts/state_of_art/test_review_control_views.py",
         "scripts/state_of_art/validate_quality_bar.py",
-        ".agent/verification.jsonl#VER-PH3-2-CONTROL-RECOVERY-JSON-BOUNDARY-20260910"
+        ".agent/verification.jsonl#VER-PH3-2-CONTROL-RECOVERY-JSON-BOUNDARY-20260910",
+        ".agent/gates/phase-3-2-lab-readiness-blocked-2026-10-09.json"
       ],
       "next_action": {
         "id": "PH3-2-LAB-READINESS:WAIT_RUNTIME",
@@ -1252,7 +1253,11 @@
         ".agent/verification.jsonl#VER-Q24-08-WORKER-SHUTDOWN-LOCAL-20260926T021657Z",
         ".agent/verification.jsonl#VER-Q24-08-WORKER-SHUTDOWN-REVIEW-20260926T021657Z",
         "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-08-worker-shutdown-20260925/README.md",
-        "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-08-worker-shutdown-20260925/manifest.json"
+        "docs/reports/evidence/implementation-q24-2026-09-24/verification-q24-08-worker-shutdown-20260925/manifest.json",
+        "docs/plans/execplan-retomada-2026-10-09.md",
+        "docs/reports/retomada-2026-10-09.md",
+        "docs/reports/retomada-2026-10-09.json",
+        "docs/reports/retomada-final-2026-10-09.json"
       ],
       "next_action": {
         "id": "Q17-01.A:VERIFY-Q17-19A-DEPLOYED-INVENTORY",

@@ -1,6 +1,6 @@
 """Canonical negative matrix (§35): authority, escalation, widening, refresh."""
 
-from conftest import login_as
+from apps.api.tests.support import login_as
 
 
 def test_vet_cannot_gain_documents_by_fallback(client):

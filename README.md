@@ -1,11 +1,10 @@
 # RICK Intelligence
 
-RICK Intelligence is being consolidated from three preserved systems into one
-knowledge-intelligence platform:
-
-- `cvg-master-rag-v2/` — the current Python/FastAPI RAG system and native Next.js UI;
-- `rick-professor/` — the current TypeScript/Fastify Professor compatibility service;
-- `modulo-redis-locker/` — the current JavaScript/Express Redis lease service.
+RICK Intelligence is a knowledge-intelligence platform with a canonical
+FastAPI API, Python worker, Next.js web app and shared domain packages.
+The three original systems were retired from the checkout by AUD07-02/04;
+their source remains recoverable in Git history. Differential tests rebuild
+an isolated reference under `.runtime/legacy-reference/` when needed.
 
 The repository is now in **Phase 3 — Runtime Evidence & Production Promotion**.
 `packages/knowledge`, `packages/ingestion` and `packages/retrieval`
@@ -13,10 +12,9 @@ remain root-owned implementations with differential parity to validated legacy
 behavior; `packages/providers`, `packages/locking`, `packages/evidence`,
 `packages/decision` and `packages/professor` provide typed platform boundaries.
 `apps/api`, `apps/worker` and `apps/web` contain the canonical public,
-durable-job and browser surfaces, while the three legacy systems remain
-byte-identical compatibility/migration surfaces.
+durable-job and browser surfaces.
 
-The current honest classification is **STATE_OF_ART_CANDIDATE**. Local
+The current promotion decision is **NO-GO**. Local
 contracts, deterministic tests, static checks and frontend build evidence are
 substantial; live PostgreSQL/Redis/Qdrant/object-storage execution,
 multi-worker fencing, distributed observability, restore/chaos/soak,
@@ -27,7 +25,11 @@ externally blocked. No production,
 that is `NOT_RUN`, `BLOCKED_EXTERNAL` or failed keeps the candidate below
 promotion.
 
-The active runtime-closure audit is
+The current construction backlog is
+[`backlog-auditoria-2026-10-07.md`](docs/backlog-auditoria-2026-10-07.md), with
+execution tracked in
+[`execplan-retomada-2026-10-09.md`](docs/plans/execplan-retomada-2026-10-09.md).
+The preserved runtime-closure audit is
 [`triple-aaa-runtime-closure-current-audit.md`](docs/reports/triple-aaa-runtime-closure-current-audit.md);
 the predecessor audit remains
 [`current-triple-aaa-gap-audit.md`](docs/reports/current-triple-aaa-gap-audit.md).
@@ -57,22 +59,18 @@ apps/api/              canonical FastAPI boundary (Phase 1.3/1.5)
 apps/worker/            canonical durable worker boundary and runtime
 apps/web/               canonical root web caller and visual-state surface
 packages/              reusable domain and platform packages
-infrastructure/        future deployment, migration, and operations assets
-tests/                 root contract, integration, security, regression, and performance lanes
+infrastructure/        deployment, migration, and operations assets and tests
+tests/                 lane documentation and synthetic RAG attack corpus
 docs/                  architecture, plans, progress, and evidence
 scripts/phase11/       root foundation validators and command orchestration
 scripts/phase15/       Phase 1.5 boundary checks and vertical-slice verification
 scripts/phase16/       bounded ingestion lifecycle, benchmark, and verification
-
-cvg-master-rag-v2/     preserved CVG implementation (not moved in Phase 1.1)
-rick-professor/        preserved Professor implementation (not moved in Phase 1.1)
-modulo-redis-locker/   preserved Locker implementation (not moved in Phase 1.1)
 ```
 
 The intended dependency direction is `apps -> packages -> shared/contracts`.
 Domain packages must not import applications, UI code, or legacy component
-paths. Legacy systems are consumed through explicit contracts/adapters in a
-later phase; direct cross-component imports are not a migration strategy. The
+paths. Historical implementations are used only by differential verification.
+Direct cross-component imports are not a migration strategy. The
 machine-readable rule set lives in
 [`docs/architecture/dependency-boundaries.json`](docs/architecture/dependency-boundaries.json)
 and is checked by `make validate`.
@@ -83,14 +81,14 @@ Run `make help` for the complete list.
 
 | Command | Current behavior |
 | --- | --- |
-| `make bootstrap` | Installs from the preserved lockfiles and prepares the existing CVG local runtime through its current bootstrap script. |
-| `make validate` | Checks current root package boundaries, protected legacy paths, and repository layout. |
-| `make test-fast` | Runs the root validator and focused CVG, Professor, and Locker regression suites. |
-| `make test` | Runs the available full component suites, including the existing frontend smoke command; when the approved CVG dataset is unavailable, that lane is explicitly `BLOCKED_EXTERNAL` and the independent component lanes still run. The command returns `2` for that external block and never fabricates or silently skips the corpus. |
-| `make test-integration` | Uses only disposable loopback Qdrant/Redis state and the existing Phase 0.5 integration probes. |
-| `make lint` | Runs the root static checks, Python compilation, JavaScript syntax check, and existing frontend lint. |
-| `make typecheck` | Runs the existing TypeScript checks/build compiler and Python syntax/import compilation; no new Python type checker is introduced yet. |
-| `make build` | Builds the existing Professor and frontend artifacts and compiles the preserved Python source. |
+| `make bootstrap` | Restores versioned control inputs, installs hash-locked Python dependencies and runs `npm ci --ignore-scripts` in `apps/web`. |
+| `make validate` | Checks root boundaries, retired-component history, toolchain, pinned Actions, control-plane records, evidence layout and the frozen quality bar. |
+| `make test-fast` | Runs validators and their regressions, route/security checks and retrieval ACL tests. |
+| `make test` | Runs canonical domain/API/differential, worker and validator/runner suites. External runtime gates have separate commands. |
+| `make test-integration` | Starts disposable loopback Qdrant/Redis when needed, runs worker/storage/API-health suites, and stops only processes started by the runner. |
+| `make lint` | Runs root static checks, Python compilation and canonical web lint. |
+| `make typecheck` | Runs the web TypeScript compiler, Python compilation and gradual mypy checking for the sources declared in `mypy.ini`. |
+| `make build` | Builds the canonical web application with the root API loopback URL. |
 | `make ci` | Runs the root foundation validation plus fast tests, lint, typecheck, and build. |
 | `make eval` | Runs the deterministic, explicitly non-live Phase 0.5 RAG plumbing evaluation. |
 | `make eval-retrieval`, `make eval-retrieval-pack` | Evaluate the synthetic retrieval pack for ranking, ACL, provenance, claim citation support (`citation_precision`, `citation_recall`, `citation_completeness`, `unsupported_claim_rate`, reviewed `faithfulness`) and descriptive latency; this is not live-provider or clinical evidence. |
@@ -104,12 +102,12 @@ Run `make help` for the complete list.
 | `make api14-acl` | RAG ACL negative matrix. |
 | `make api14-full` | Phase 1.4 units + differential + API matrix + legacy regression. |
 | `make api14-benchmark` | Legacy-vs-root perf budget check. |
-| `make api15-boundaries` | Current root boundary and preservation validator. |
+| `make api15-boundaries` | Current root boundary and retirement/history validator. |
 | `make api15-full` | Phase 1.5 boundaries, contracts, provider, locking, Professor, and root API suites. |
 | `make api16-full` | Phase 1.6 boundaries, domain lifecycle, worker and API suites with coverage floors, and hermetic benchmark. |
 | `make api16-verify` | Sanitized Phase 1.6 matrix plus Phase 1.5/1.4 regression, security, OpenAPI, and whitespace checks. |
 | `make web-validate` | Lints, typechecks, enforces the web unit coverage floor, builds, and runs the canonical browser matrix at 375/768/1440 against the root API loopback. |
-| `make web-e2e` | Runs the canonical browser smoke and writes visual evidence under `artifacts/visual/state-of-art/`. |
+| `make web-e2e` | Runs the production browser matrix and writes current visual/performance evidence under `.runtime/qa/web-e2e/`. Requires `make web-build` first. |
 | `make dev` | Runs the canonical development Compose lifecycle in the foreground; it fails closed when Docker, required environment or reviewed composition inputs are unavailable. |
 | `make up`, `make down`, `make logs` | Operate the selected canonical root Compose file (`RICK_COMPOSE_FILE` may select staging); static configuration is not runtime proof. |
 | `make release-evidence` | Generates the ignored, commit-bound release manifest; the release gate still rejects missing, stale, wrong-hash, blocked or not-run mandatory evidence. |
@@ -125,8 +123,20 @@ Run `make help` for the complete list.
 | `make phase3-performance`, `make phase3-chaos`, `make phase3-soak` | Run explicitly supplied bounded operational harnesses; no harness is treated as a pass. |
 | `make triple-aaa-verify` | Executes the integrated fail-closed Phase 3 packet and writes a redacted ignored result; `0` is reserved for all mandatory lanes passing, `2` means external blocking, `1` means failure. |
 
-For current component-specific commands and runtime prerequisites, see
-[`docs/plans/phase-1.1-monorepo-skeleton.md`](docs/plans/phase-1.1-monorepo-skeleton.md)
+Run Python tests with the interpreter prepared by `make bootstrap`:
+
+```bash
+.runtime/venvs/cvg/bin/python -m pytest apps/api/tests packages apps/worker/tests
+```
+
+The root `conftest.py` discovers canonical sources from `scripts/phase13/pyenv.py`;
+no manual `PYTHONPATH` is needed. From another directory, use the interpreter
+and test directories' absolute paths. Node dependencies belong to `apps/web`.
+The directories under `tests/` document the lanes; executable suites are under
+`apps/*/tests`, `packages/*/tests`, `infrastructure/*/tests` and `scripts/`.
+
+For runtime prerequisites, see
+[`docs/architecture/production-runtime.md`](docs/architecture/production-runtime.md)
 and [`docs/architecture/professor-provider-locking.md`](docs/architecture/professor-provider-locking.md).
 The Phase 2 lifecycle contract and its current gaps are in
 [`docs/architecture/ingestion-lifecycle.md`](docs/architecture/ingestion-lifecycle.md),
@@ -155,5 +165,5 @@ preserved implementation
   -> legacy removal only after equivalence evidence
 ```
 
-The current mapping and exit criteria are in
+The historical extraction mapping is in
 [`docs/architecture/migration-map.md`](docs/architecture/migration-map.md).

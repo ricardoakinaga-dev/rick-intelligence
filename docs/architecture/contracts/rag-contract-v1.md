@@ -1,5 +1,7 @@
 # Canonical RAG contract v1
 
+> **HISTORICAL — snapshot preservado; classificado em 09/10/2026.** Afirmações sobre o checkout e os legados descrevem a data original. Consulte o [índice vigente](../../INDEX.md) para implementação, backlog e evidência atuais.
+
 Status: implemented in the preserved CVG/Professor adapters; provider quality and
 legacy data migration are not claimed. The canonical logical collection is
 `rag_phase0`. The aliases `cvg_master_rag` and `rickvet_documents` normalize to

@@ -6,7 +6,7 @@ from fastapi import FastAPI, Request
 from starlette.requests import ClientDisconnect
 
 from app import create_app
-from conftest import make_settings
+from apps.api.tests.support import make_settings
 from test_transport_observation import exercise, total
 
 

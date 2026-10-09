@@ -1,13 +1,13 @@
 # Backlog de remediação RICK Intelligence
 
-**Data:** 07/10/2026 (atualizado em 09/10/2026). **Estado:** 45 tarefas propostas; **AUD07-01–15, AUD07-17, AUD07-18 e
-AUD07-19 concluídas e evidenciadas** (**M0 e M1 completos** + M2 em curso: A02/A03, A04, A16, A10, A09 e
-A11 tratados), **AUD07-43 em curso** (as 7 falhas de CI do checkout novo remediadas e confirmadas no
-CI, mais a lane RUNTIME do `quality` remediada em dois passos e verificada por dispatch em 09/10;
-PHASE3 `--verify` mantido vermelho por decisão explícita), **AUD07-44 e AUD07-45 planejadas**
-(achados novos do gate `P1-06` emergidos em 09/10), AUD07-16 e AUD07-20–27 pendentes,
-AUD07-28–42 com dependência externa. **Origem:** auditoria de 07/10/2026, 64,2/100 em
-26 áreas, 20 achados (A01–A20) e prontidão `NO-GO`.
+**Data:** 07/10/2026 (atualizado em 09/10/2026). **Estado:** 46 tarefas;
+**AUD07-01–26, AUD07-44, AUD07-45 e AUD07-46 concluídas localmente**;
+**AUD07-27 parcialmente validada** (CI/API/cobertura/browser e regressões locais;
+aceite independente e vínculo de promoção ainda abertos); **AUD07-43 em curso**
+por evidência externa/CI remoto; **AUD07-28–42 com dependência externa**.
+A retomada e os resultados estão no [relatório de 09/10](reports/retomada-2026-10-09.md).
+**Origem:** auditoria de 07/10/2026, 64,2/100 em 26 áreas, 20 achados (A01–A20)
+e prontidão `NO-GO`.
 
 Este backlog traduz os achados A01–A20 em correções verificáveis e acrescenta o trabalho de
 integração, operação e promoção ainda sem prova. O [roadmap](roadmap-auditoria-2026-10-07.md)
@@ -56,18 +56,18 @@ repor Actions por tag mutável, remover gates ou marcar casos como ignorados par
 | AUD07-13 | M1 | P1 | Ampliar cobertura da política default-deny de rotas | P | 07 | Concluída |
 | AUD07-14 | M1 | P1 | Fail-closed em port sem probe no wrapper de resiliência | M | 01 | Concluída |
 | AUD07-15 | M2 | P1 | Eliminar as 2 vulnerabilidades HIGH do npm | P | 01 | Concluída |
-| AUD07-16 | M2 | P1 | Eliminar basenames de teste duplicados entre pacotes | P | 01 | Planejada |
+| AUD07-16 | M2 | P1 | Eliminar basenames de teste duplicados entre pacotes | P | 01 | Concluída localmente |
 | AUD07-17 | M2 | P1 | Introduzir type-checker Python em modo gradual | G | 09 | Concluída |
 | AUD07-18 | M2 | P1 | Dar destino versionável à evidência de 1,86 GB | M | 01 | Concluída |
 | AUD07-19 | M2 | P1 | Política de artefatos não rastreados e limpeza da árvore | M | 18 | Concluída |
-| AUD07-20 | M2 | P1 | Classificar os 216 testes pulados por motivo e gate | M | 09 | Planejada |
-| AUD07-21 | M2 | P1 | Descobrir `PYTHONPATH` sem export manual | P | 08 | Planejada |
-| AUD07-22 | M3 | P1 | Reescrever README para o checkout real | M | 02 | Planejada |
-| AUD07-23 | M3 | P1 | Reconciliar os 48 documentos que citam os legados | M | 02 | Planejada |
-| AUD07-24 | M3 | P2 | Corrigir link quebrado e adotar verificação de links | P | 23 | Planejada |
-| AUD07-25 | M3 | P2 | Materializar as lanes raiz de `tests/` ou corrigir a descrição | M | 02 | Planejada |
-| AUD07-26 | M3 | P2 | Publicar cobertura com denominador e exclusões explícitos | M | 20 | Planejada |
-| AUD07-27 | M4 | P0 | Validar candidato integrado local | G | 09–26 | Planejada |
+| AUD07-20 | M2 | P1 | Classificar os 216 testes pulados por motivo e gate | M | 09 | Concluída localmente |
+| AUD07-21 | M2 | P1 | Descobrir `PYTHONPATH` sem export manual | P | 08 | Concluída localmente |
+| AUD07-22 | M3 | P1 | Reescrever README para o checkout real | M | 02 | Concluída localmente |
+| AUD07-23 | M3 | P1 | Reconciliar os 48 documentos que citam os legados | M | 02 | Concluída localmente |
+| AUD07-24 | M3 | P2 | Corrigir link quebrado e adotar verificação de links | P | 23 | Concluída localmente |
+| AUD07-25 | M3 | P2 | Materializar as lanes raiz de `tests/` ou corrigir a descrição | M | 02 | Concluída localmente |
+| AUD07-26 | M3 | P2 | Publicar cobertura com denominador e exclusões explícitos | M | 20 | Concluída localmente |
+| AUD07-27 | M4 | P0 | Validar candidato integrado local | G | 09–26, 44–46 | Parcial / revisão externa |
 | AUD07-28 | M5 | P0 | Provar golden path com serviços reais | G | 27 | Dependência externa |
 | AUD07-29 | M5 | P0 | Provar isolamento multi-tenant e revogação reais | G | 28 | Dependência externa |
 | AUD07-30 | M5 | P1 | Provar IdP/OIDC e comportamento com réplicas | G | 28 | Dependência externa |
@@ -84,8 +84,9 @@ repor Actions por tag mutável, remover gates ou marcar casos como ignorados par
 | AUD07-41 | M7 | P1 | Reauditar as 26 áreas sobre o candidato exato | G | 40 | Dependência externa |
 | AUD07-42 | M7 | P0 | Decisão Go/No-Go explícita com riscos residuais | G | 41 | Dependência externa |
 | AUD07-43 | M2 | P0 | Remediar as 7 falhas de CI do checkout novo | G | 09 | Em curso |
-| AUD07-44 | M2 | P1 | Alinhar o `secret-scan` do `supply-chain` com fixtures de teste | P | — | Planejada |
-| AUD07-45 | M2 | P1 | Alinhar o gate `P1-06` à retirada decidida em AUD07-02/04 | P | 02 | Planejada |
+| AUD07-44 | M2 | P1 | Alinhar o `secret-scan` do `supply-chain` com fixtures de teste | P | — | Concluída localmente |
+| AUD07-45 | M2 | P1 | Alinhar o gate `P1-06` à retirada decidida em AUD07-02/04 | P | 02 | Concluída localmente |
+| AUD07-46 | M2 | P1 | Evitar falso positivo de captura em diretório concorrente | P | 01 | Concluída localmente |
 
 As dependências abreviadas usam o prefixo AUD07. Intervalos incluem todos os IDs indicados.
 
@@ -365,7 +366,7 @@ import único.
 **Aceite:** `pytest packages` em invocação única coleta e executa sem erro; a execução por
 pacote usada no CI continua funcionando; nenhuma suíte é silenciosamente excluída.
 
-**Estado:** Planejada — diagnóstico pronto, correção revertida (ver
+**Estado histórico:** diagnóstico e renomeação inicial revertida (ver
 [`test-import-uniqueness.md`](reports/evidence/auditoria-2026-10-07/test-import-uniqueness.md)).
 A renomeação dos dois arquivos `identity` resolve a colisão, mas quebra
 `make validate`: o control-plane exige que cada `evidence_refs`/`artifacts` de
@@ -373,6 +374,8 @@ A renomeação dos dois arquivos `identity` resolve a colisão, mas quebra
 `packages/identity/tests/test_provider.py`), e editar esses artefatos de histórico violaria o
 contrato append-only. Próxima rota: `--import-mode=importlib` (escopado, testado lane a lane) ou
 cadeia de `__init__.py` até `packages/`.
+
+**Conclusão local (09/10/2026):** Namespace de identity preserva os caminhos citados nos ledgers. Quatro testes sem vínculos históricos foram renomeados com bytes idênticos; helpers da API deixaram o namespace mutável `conftest`. Coleta conjunta e fora da raiz passou; regressão executável cobre as colisões. Comandos, exit codes, limites e revisão própria no [relatório](reports/retomada-2026-10-09.md).
 
 ### AUD07-17 Introduzir type-checker Python em modo gradual
 
@@ -470,6 +473,8 @@ Inventariar os skips observados (98 em `knowledge`, 84 em `infrastructure`, 18 e
 **Aceite:** relatório de skips versionado; os obrigatórios para produção estão executando ou
 marcados `BLOCKED_EXTERNAL` com justificativa; nenhum skip é removido apenas para inflar número.
 
+**Conclusão local (09/10/2026):** Inventário versionado dos 221 node IDs e oito grupos de motivos: [skips de 09/10](reports/skips-2026-10-09.md). Todos os não executados têm gate e estado BLOCKED_EXTERNAL; nenhum skip foi removido. Comandos, exit codes, limites e revisão própria no [relatório](reports/retomada-2026-10-09.md).
+
 ### AUD07-21 Descobrir `PYTHONPATH` sem export manual
 
 **Responsável sugerido:** toolchain. **Origem:** A08.
@@ -491,6 +496,8 @@ foram trackeados. O experimento E4 mostrou que, com esses inputs trackeados, o
 desta tarefa depende da decisão de trackear/commitar (opção A de
 [`untracked-hygiene.md`](reports/evidence/auditoria-2026-10-07/untracked-hygiene.md)), não de
 mudar o `PYTHONPATH`.
+
+**Conclusão local (09/10/2026):** `conftest.py` raiz usa `source_paths()` do manifesto canônico. Coleta externa sem PYTHONPATH manual passou com 5.870 testes; execução conjunta e suites Make usaram a mesma descoberta. Os dois workflows canônicos dispensam o export duplicado. Comandos, exit codes, limites e revisão própria no [relatório](reports/retomada-2026-10-09.md).
 
 ### AUD07-43 Remediar as 7 falhas de CI do checkout novo
 
@@ -551,7 +558,7 @@ decidida em AUD07-02/04 — e o de `secret-scan` a AUD07-44; nada disso foi alte
 
 O sub-check `secret-scan` do gate `P1-06` reporta um candidato `private_key` em
 `packages/jobs/tests/test_contracts.py:276` — o literal
-`{"private_key": "-----BEGIN PRIVATE KEY-----"}` de um teste negativo que prova rejeição de
+`private_key` com um cabeçalho PEM de um teste negativo que prova rejeição de
 chaves em payloads. O scanner próprio não tem mecanismo de allowlist para fixtures de teste, e
 as alternativas (allowlist por caminho, troca por gitleaks com `.gitleaks.toml`, ou reescrever o
 teste para escapar da regex) todas alteram um gate de segurança.
@@ -561,6 +568,8 @@ por autoridade explícita de gate; com o candidato escolhido, `secret-scan` pass
 reduzir a cobertura sobre chaves reais em código não-teste (prova: teste negativo que continua
 a detetar um segredo real fora da exceção); o sub-check e a execução do gate ficam registrados
 na evidência. Enquanto a decisão não existir, o gate mantém o `FAIL` verdadeiro.
+
+**Conclusão local (09/10/2026):** Fixture negativa usa marcador sintético no campo proibido; scanner sem exceção para testes. Cabeçalhos de cinco tipos continuam detectados em código e testes; subcheck real PASS. A descrição do backlog também deixou de reproduzir a assinatura PEM. Comandos, exit codes, limites e revisão própria no [relatório](reports/retomada-2026-10-09.md).
 
 ### AUD07-45 Alinhar o gate `P1-06` à retirada decidida em AUD07-02/04
 
@@ -592,6 +601,8 @@ só com autoridade explícita.
 
 ## M3 — Documentação e testes coerentes
 
+**Conclusão local (09/10/2026):** Inventário Node alinhado ao único app real e manifesto de retirada validado. MIT-0 aceito conforme SPDX dentro da correção local solicitada; lockfiles, SBOM e 493 licenças PASS. Ausência de manifest/lock continua FAIL; removido fallback para scanner aposentado. Comandos, exit codes, limites e revisão própria no [relatório](reports/retomada-2026-10-09.md).
+
 ### AUD07-22 Reescrever README para o checkout real
 
 **Responsável sugerido:** documentação. **Origem:** A13.
@@ -602,6 +613,8 @@ refletir a decisão de AUD07-02 e o estado efetivo dos alvos.
 **Aceite:** nenhuma afirmação do README contradiz o checkout; todo comando da tabela existe e
 sua descrição corresponde ao comportamento observado; a classificação honesta (`NO-GO`) é
 mantida.
+
+**Conclusão local (09/10/2026):** README e CONTRIBUTING refletem apps/pacotes canônicos, comandos reais, type checker gradual e a retirada já decidida. NO-GO de produção mantido. Comandos, exit codes, limites e revisão própria no [relatório](reports/retomada-2026-10-09.md).
 
 ### AUD07-23 Reconciliar os 48 documentos que citam os legados
 
@@ -614,6 +627,8 @@ da nova rodada.
 **Aceite:** nenhum documento `CURRENT` descreve os legados como existentes; o índice aponta para
 o pacote vigente; documentos históricos têm marcador de estado.
 
+**Conclusão local (09/10/2026):** Documentos que descrevem os legados receberam marcador histórico ou descrição atual de retirada. O snapshot congelado da barra permanece byte a byte e tem classificação no INDEX; modelos com ID `rick-professor` continuam válidos como contrato. Comandos, exit codes, limites e revisão própria no [relatório](reports/retomada-2026-10-09.md).
+
 ### AUD07-24 Corrigir link quebrado e adotar verificação de links
 
 **Responsável sugerido:** documentação e CI. **Origem:** A13.
@@ -624,6 +639,8 @@ adicionar checagem de links locais aos gates de documentação.
 **Aceite:** 0 links quebrados em primário, `docs/plans/` e `docs/reports/*.md`; a checagem roda
 no CI e falha ao introduzir link inválido; cópias históricas em `evidence/` ficam fora do escopo
 por decisão explícita.
+
+**Conclusão local (09/10/2026):** Link legado quebrado corrigido; links absolutos tornados portáveis e localizadores de runtime histórico descritos sem hyperlinks não portáveis. `check_docs.py`, testes negativos, `make validate` e `make ci` verificam os links fora da bolsa de evidências. Comandos, exit codes, limites e revisão própria no [relatório](reports/retomada-2026-10-09.md).
 
 ### AUD07-25 Materializar as lanes raiz de `tests/` ou corrigir a descrição
 
@@ -636,6 +653,8 @@ os locais reais (suites por pacote, `scripts/phase11/*_gate.py`).
 **Aceite:** não há descrição de lane sem implementação correspondente; se as lanes forem
 materializadas, cada uma roda por alvo Make dedicado e retorna exit code distinto para falha e
 para bloqueio externo.
+
+**Conclusão local (09/10/2026):** Rota escolhida: descrever os locais reais das suites. Os sete READMEs em tests/ apontam para apps/pacotes/scripts e comandos existentes; nenhuma lane vazia é apresentada como executável. Comandos, exit codes, limites e revisão própria no [relatório](reports/retomada-2026-10-09.md).
 
 ### AUD07-26 Publicar cobertura com denominador e exclusões explícitos
 
@@ -651,6 +670,8 @@ cobertura são verificados no CI; nenhuma pasta de teste é excluída silenciosa
 
 ## M4 — Candidato integrado local
 
+**Conclusão local (09/10/2026):** [Cobertura com denominador e exclusões](reports/coverage-2026-10-09.md): API 78,26% (9.701/12.396), worker 78,69% (3.389/4.307), web 92,14% (469/509). Floors 75/74/85 preservados e executados. Comandos, exit codes, limites e revisão própria no [relatório](reports/retomada-2026-10-09.md).
+
 ### AUD07-27 Validar candidato integrado local
 
 **Responsável sugerido:** integração e revisão independente. **Origem:** todos os defeitos
@@ -665,6 +686,11 @@ build + 339 E2E).
 **Aceite:** nenhum P0 local pendente; todos os gates obrigatórios verdes no mesmo SHA; as
 reproduções A02/A03 agora passam por terem regressão, não por terem sido removidas; revisão
 separada confere os P0; comandos, exit codes e artefatos registrados.
+
+**Checkpoint de 09/10:** os gates CI/API/web e regressões afetadas passaram.
+A matriz integral final passou com 7.719 testes e 221 skips após as correções;
+revisão independente e evidência remota do candidato continuam pendentes. Evidência e
+limites: [retomada](reports/retomada-2026-10-09.md). Não há aceite completo deste item.
 
 ---
 
@@ -861,3 +887,17 @@ condições de rollback, conforme o [runbook de release](operations/release-read
 AUD07-01 preserva a baseline; AUD07-09 e AUD07-27 integram os gates locais; AUD07-28–38 tratam
 as lacunas externas; AUD07-39–42 tratam a promoção. Este roteiro não promove disponibilidade
 dos recursos externos nem execução por meio deste documento.
+
+## Achado adicional da execução conjunta
+
+### AUD07-46 Captura segura tolera criação de diretório vizinho
+
+**Origem:** falha real no teste de inventário da VPS durante a execução conjunta de 09/10.
+**Aceite:** criar um subdiretório vizinho durante a leitura não representa troca de inode;
+symlinks, troca de pai/folha, mudanças de modo/dono/conteúdo e hardlinks da folha continuam
+rejeitados. Reprodução determinística falha antes e passa depois; suíte do instalador passa.
+
+**Concluída localmente:** `st_nlink` deixa a identidade dos diretórios, preservando device,
+inode, modo, UID e GID; a folha regular mantém todos os checks, inclusive link único antes e
+depois da leitura. Reprodução: 1 FAIL/1 PASS antes; regressão completa: 699 PASS/1 skip
+privilegiado. Sem execução de instalador ou alteração de serviços reais.

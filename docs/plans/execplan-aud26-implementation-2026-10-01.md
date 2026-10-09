@@ -1,5 +1,7 @@
 # ExecPlan — Implementação do roadmap AUD26
 
+> **HISTORICAL — snapshot preservado; classificado em 09/10/2026.** Afirmações sobre o checkout e os legados descrevem a data original. Consulte o [índice vigente](../INDEX.md) para implementação, backlog e evidência atuais.
+
 **Início:** 2026-10-01. **Owner:** lead integrator desta sessão. **Autorização:** usuário pediu executar todas as melhorias do roadmap local. **Estado:** BUILD em progresso; roteiro complementar ao plano canônico `.agent/plans/phase-3-runtime-evidence-production-promotion.md`, sem alterar seus pointers, gates ou ledgers.
 
 ## Objetivo

@@ -6,7 +6,7 @@ import pytest
 from fastapi import FastAPI
 
 from app import _application_lifespan, _shutdown_owned_resources, create_app
-from conftest import make_settings
+from apps.api.tests.support import make_settings
 from dependencies.services import Providers
 from services.chat_service import StubChatBackend
 from services.identity_service import InMemoryIdentityProvider

@@ -1,5 +1,7 @@
 # UI access matrix
 
+> **HISTORICAL — snapshot preservado; classificado em 09/10/2026.** Afirmações sobre o checkout e os legados descrevem a data original. Consulte o [índice vigente](../../INDEX.md) para implementação, backlog e evidência atuais.
+
 The frontend presents the minimum surface needed for each authenticated role;
 the API remains the authority for every action.
 

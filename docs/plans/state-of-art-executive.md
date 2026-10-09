@@ -1,5 +1,7 @@
 # Plano executivo — RICK Intelligence State of the Art / AAA
 
+> **HISTORICAL — snapshot preservado; classificado em 09/10/2026.** Afirmações sobre o checkout e os legados descrevem a data original. Consulte o [índice vigente](../INDEX.md) para implementação, backlog e evidência atuais.
+
 **Status:** execução autorizada e em andamento
 **Data de baseline:** 2026-09-05
 **Modo:** brownfield, migração incremental, qualidade orientada por evidência

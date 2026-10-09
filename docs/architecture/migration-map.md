@@ -1,5 +1,7 @@
 # Phase 1 migration map
 
+> **HISTORICAL — snapshot preservado; classificado em 09/10/2026.** Afirmações sobre o checkout e os legados descrevem a data original. Consulte o [índice vigente](../INDEX.md) para implementação, backlog e evidência atuais.
+
 Status: `PROPOSED`, with Phase 1.1 safety scaffolding only. The current
 implementations remain authoritative until the exit evidence in this map is
 available.

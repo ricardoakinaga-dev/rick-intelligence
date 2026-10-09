@@ -1,5 +1,7 @@
 # Phase 0.5 Independent Review
 
+> **HISTORICAL — snapshot preservado; classificado em 09/10/2026.** Afirmações sobre o checkout e os legados descrevem a data original. Consulte o [índice vigente](../INDEX.md) para implementação, backlog e evidência atuais.
+
 ## Review Result
 
 **NOT PROMOTED.** A fresh read-only review found no P0 or HIGH issue in the

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from app import create_app
-from conftest import make_settings
+from apps.api.tests.support import make_settings
 
 
 def test_configured_local_vector_read_model_survives_factory_restart(tmp_path):

@@ -2,10 +2,10 @@
 
 ## Scope discipline
 
-The root repository coordinates three preserved component repositories. Keep
-their histories and local changes intact. A Phase 1.1 change must not move,
-rewrite, delete, or duplicate runtime code from `cvg-master-rag-v2`,
-`rick-professor`, or `modulo-redis-locker`.
+The root repository owns `apps/`, `packages/` and `infrastructure/`.
+AUD07-02/04 retired the three original components from the checkout; preserve
+their Git history and the isolated differential reference. Do not restore
+retired implementations into application or package source.
 
 Use a strangler migration: define a contract, add an adapter/package, prove
 equivalence, switch one caller, and remove a legacy path only after fresh
@@ -15,12 +15,14 @@ directly into another.
 ## Local workflow
 
 1. Read the applicable `AGENTS.md` before changing a nested component.
-2. Inspect `git status` in the root and in every child repository.
+2. Inspect `git status` in the root and preserve unrelated changes.
 3. Run `make validate` before and after root changes.
 4. Run the narrowest relevant command first, then `make test-fast` and the
    affected component checks.
 5. Run `make ci` for root foundation changes. Run `make test` when the change
-   affects preserved behavior or test orchestration.
+   affects differential behavior or test orchestration. Direct pytest commands
+   use `.runtime/venvs/cvg/bin/python -m pytest`; root source discovery needs no
+   manual environment export.
 6. Record unavailable services, fixture-dependent failures, and external gates;
    never hide them with skips, xfails, mocks at the boundary under test, or
    relaxed thresholds.
@@ -32,8 +34,8 @@ must not import applications, UI modules, or legacy component paths. The
 enforceable source of truth is
 [`docs/architecture/dependency-boundaries.json`](docs/architecture/dependency-boundaries.json).
 
-Root orchestration may invoke preserved component commands, but it must not
-silently alter their source, lockfiles, data, services, or credentials.
+Root orchestration may materialize historical source for differential tests;
+it must not silently alter data, services or credentials.
 
 ## Secrets and data
 

@@ -273,7 +273,7 @@ def test_payload_is_deterministic_bounded_and_rejects_secret_or_raw_content() ->
         {"raw_content": "document body"},
         {"content": "document body"},
         {"provider_result": "full provider response"},
-        {"private_key": "-----BEGIN PRIVATE KEY-----"},
+        {"private_key": "synthetic-key-must-not-be-stored"},
         {"document_text": "document body"},
     ):
         with pytest.raises(JobValidationError):

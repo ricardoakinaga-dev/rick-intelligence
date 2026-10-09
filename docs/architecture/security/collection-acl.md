@@ -1,5 +1,7 @@
 # Collection ACL contract
 
+> **HISTORICAL — snapshot preservado; classificado em 09/10/2026.** Afirmações sobre o checkout e os legados descrevem a data original. Consulte o [índice vigente](../../INDEX.md) para implementação, backlog e evidência atuais.
+
 Collection authorization is evaluated as a conjunction:
 
 ```text

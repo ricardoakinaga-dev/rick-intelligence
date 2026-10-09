@@ -1,5 +1,7 @@
 # RICK Intelligence — arquitetura atual observada
 
+> **HISTORICAL — snapshot preservado; classificado em 09/10/2026.** Afirmações sobre o checkout e os legados descrevem a data original. Consulte o [índice vigente](../INDEX.md) para implementação, backlog e evidência atuais.
+
 Status da evidência: `CURRENT` em 2026-08-31 UTC. Este documento descreve o
 workspace como ele existe agora; não descreve a arquitetura futura como se ela
 já estivesse implementada.

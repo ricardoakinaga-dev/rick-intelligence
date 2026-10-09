@@ -274,7 +274,7 @@ def test_declared_permission_is_what_the_handler_enforces(app, entry):
 @pytest.mark.parametrize("entry", _PROTECTED_ROUTES, ids=lambda entry: f'{entry["method"]} {entry["path"]}')
 def test_session_route_denies_a_session_without_its_permission(client, entry):
     """Live proof: the declared permission is required, not merely documented."""
-    from conftest import login_as
+    from apps.api.tests.support import login_as
 
     key = (entry["method"], entry["path"])
     login_as(client, "vet@example.com")
@@ -305,7 +305,7 @@ def test_session_route_denies_a_session_without_its_permission(client, entry):
 
 def test_self_scoped_routes_serve_the_caller_and_refuse_foreign_targets(client):
     """`scope: "self"` is an explicit decision, and the boundary it names is real."""
-    from conftest import login_as
+    from apps.api.tests.support import login_as
 
     login_as(client, "vet@example.com")
     held = frozenset(client.get("/api/v1/auth/me").json()["permissions"])
@@ -330,7 +330,7 @@ def test_self_scoped_routes_serve_the_caller_and_refuse_foreign_targets(client):
 
 
 def test_self_service_session_routes_work_for_the_caller(client):
-    from conftest import login_as
+    from apps.api.tests.support import login_as
 
     login_as(client, "vet@example.com")
     own = client.get("/api/v1/auth/sessions").json()["items"][0]["session_id"]

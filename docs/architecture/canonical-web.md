@@ -14,8 +14,8 @@ vem de informação útil, não de decoração.
 ## Ownership e fronteira
 
 `apps/web/**` é o único caller visual canônico desta fase. A UI preservada em
-`cvg-master-rag-v2/frontend/**` continua intacta e fala o contrato legado; não
-há imports cruzados entre as duas superfícies.
+`cvg-master-rag-v2/frontend/**` foi retirada do checkout por AUD07-02/04 e
+permanece no histórico Git. Não há imports da implementação legada.
 
 O cliente root consome apenas:
 

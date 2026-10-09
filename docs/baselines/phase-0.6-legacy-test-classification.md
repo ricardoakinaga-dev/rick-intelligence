@@ -1,5 +1,7 @@
 # Phase 0.6 legacy CVG test classification
 
+> **HISTORICAL — snapshot preservado; classificado em 09/10/2026.** Afirmações sobre o checkout e os legados descrevem a data original. Consulte o [índice vigente](../INDEX.md) para implementação, backlog e evidência atuais.
+
 ## Scope and decision rule
 
 This record classifies the frozen Phase 0.5 legacy surface individually. It

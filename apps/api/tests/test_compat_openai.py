@@ -3,7 +3,7 @@
 from fastapi.testclient import TestClient
 
 from app import create_app
-from conftest import make_settings
+from apps.api.tests.support import make_settings
 from dependencies.services import Providers
 from services.audit import InMemoryAuditSink
 from services.chat_service import StubChatBackend
@@ -50,7 +50,7 @@ def test_chat_completion_stream():
 
 def test_platform_and_compat_share_backend(client):
     # Compat client uses same StubChatBackend semantics as platform chat.
-    from conftest import login_as
+    from apps.api.tests.support import login_as
 
     login_as(client, "vet@example.com")
     platform = client.post("/api/v1/chat", json={"message": "O que é mastite?"})

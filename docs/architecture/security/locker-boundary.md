@@ -1,5 +1,7 @@
 # Redis Locker security boundary
 
+> **HISTORICAL — snapshot preservado; classificado em 09/10/2026.** Afirmações sobre o checkout e os legados descrevem a data original. Consulte o [índice vigente](../../INDEX.md) para implementação, backlog e evidência atuais.
+
 **Decision:** Redis Locker is an internal-only deployment component. It is a
 small HTTP adapter for owner-safe Redis lock operations; it is not an
 application identity provider and it does not currently authenticate HTTP
@@ -8,7 +10,7 @@ callers.
 This decision closes the `PH06-LOCKER` deployment-boundary requirement from the
 [Phase 0.6 promotion plan](../../../.agent/plans/phase-0.6-promotion-closure.md).
 It applies to the preserved component boundary at
-[`modulo-redis-locker/`](../../../modulo-redis-locker/) and to every deployment
+`modulo-redis-locker/` (`../../../modulo-redis-locker/`; histórico Git) and to every deployment
 example that runs it.
 
 ## Observed implementation and evidence status
@@ -133,8 +135,8 @@ component contract, not a substitute for authentication.
 
 The source examples are:
 
-- [`rick-professor/deploy/docker-compose.example.yml`](../../../rick-professor/deploy/docker-compose.example.yml)
-- [`modulo-redis-locker/README.md`](../../../modulo-redis-locker/README.md)
+- `rick-professor/deploy/docker-compose.example.yml` (`../../../rick-professor/deploy/docker-compose.example.yml`; histórico Git)
+- `modulo-redis-locker/README.md` (`../../../modulo-redis-locker/README.md`; histórico Git)
 
 ## Application-auth expectations
 

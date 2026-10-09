@@ -528,6 +528,7 @@ def _canonical_control_fixture(root):
         'docs/ci/restore_control_inputs.py', 'docs/ci/check_control_plane.py',
         'scripts/phase15/check_boundaries.py', 'scripts/phase11/check_toolchain.py',
         'scripts/phase11/check_workflow_actions.py', 'scripts/phase11/check_canonical_ci.py',
+        'scripts/phase11/check_docs.py',
         'scripts/phase11/evidence_store.py',
         'scripts/state_of_art/validate_quality_bar.py', 'infrastructure/scripts/migrate.py',
         'infrastructure/scripts/backup-restore-check.py', 'infrastructure/scripts/backup_restore.py',

@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import pytest
 
 from app import _shutdown_owned_resources, create_app
-from conftest import make_settings
+from apps.api.tests.support import make_settings
 from services.external_composition import SyncEmbeddingAdapter, ExternalCompositionError, build_external_providers
 from test_external_composition import settings, canonical_redis_capabilities, Redis, HttpTransport
 

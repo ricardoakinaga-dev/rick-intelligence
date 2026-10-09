@@ -2,7 +2,7 @@ import json
 import pytest
 from fastapi.testclient import TestClient
 from app import create_app
-from conftest import make_settings, login_as
+from apps.api.tests.support import make_settings, login_as
 from dependencies.services import Providers
 from services.identity_service import InMemoryIdentityProvider
 from services.audit import InMemoryAuditSink

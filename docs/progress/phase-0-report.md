@@ -1,5 +1,7 @@
 # RICK Intelligence — Phase 0 report
 
+> **HISTORICAL — snapshot preservado; classificado em 09/10/2026.** Afirmações sobre o checkout e os legados descrevem a data original. Consulte o [índice vigente](../INDEX.md) para implementação, backlog e evidência atuais.
+
 Date: 2026-08-31 UTC  
 Scope: current workspace at `/home/ricardo/Área de trabalho/rick-intelligence`  
 Decision status: `PARTIAL — NOT PROMOTED`  

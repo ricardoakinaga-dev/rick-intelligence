@@ -22,7 +22,7 @@ from services.postgres_audit import PostgresAuditSink
 from services.sqlite_audit import SQLiteAuditSink
 from test_aud03_atomic_audit import actor, request
 from test_aud03_audit_postgres_live import lab, runtime, fail_completed_outbox
-from conftest import make_settings
+from apps.api.tests.support import make_settings
 
 
 @pytest.fixture(params=["memory", "sqlite", "postgres"])

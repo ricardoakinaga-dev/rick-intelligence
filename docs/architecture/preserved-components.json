@@ -1,29 +1,31 @@
 {
   "schema_version": "phase-1.1-preserved-components.v1",
+  "status": "RETIRED",
+  "decision": "AUD07-02/AUD07-04",
   "policy": {
-    "root_snapshot_required": true,
-    "independent_git_metadata": "validated_when_present",
-    "clean_checkout_behavior": "A clean root checkout validates the tracked child snapshot; a workspace with nested Git metadata also validates each independent child HEAD.",
+    "root_snapshot_required": false,
+    "independent_git_metadata": "preserved_in_root_history",
+    "clean_checkout_behavior": "Retired paths must be absent from the checkout and recoverable in root Git history; scripts/phase15/check_boundaries.py validates this policy.",
     "runtime_mutation": false
   },
   "components": [
     {
       "id": "cvg",
       "path": "cvg-master-rag-v2",
-      "role": "preserved CVG runtime",
-      "root_snapshot_required": true
+      "role": "retired CVG runtime, retained in Git history",
+      "root_snapshot_required": false
     },
     {
       "id": "professor",
       "path": "rick-professor",
-      "role": "preserved Professor provider service",
-      "root_snapshot_required": true
+      "role": "retired Professor provider service, retained in Git history",
+      "root_snapshot_required": false
     },
     {
       "id": "locker",
       "path": "modulo-redis-locker",
-      "role": "preserved Redis locking service",
-      "root_snapshot_required": true
+      "role": "retired Redis locking service, retained in Git history",
+      "root_snapshot_required": false
     }
   ]
 }

@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "observed_at": "2026-10-09T10:39:25.590967+00:00",
+  "candidate_base": "96efd7ca9e50adab517a52a507cc408e2bfdb263",
+  "results": [
+    {
+      "summary": {
+        "covered_statements": 9701,
+        "excluded_lines": 41,
+        "minimum_statements_percent": 75,
+        "schema_version": 1,
+        "scope": "apps/api/src/**/*.py",
+        "source_file_count": 56,
+        "statements_percent": 78.26,
+        "suite": "api",
+        "total_statements": 12396
+      },
+      "artifact": ".runtime/qa/api-summary.json",
+      "sha256": "9a63166ab8c2c467795053a5364cb1ab6e1b88da01cbed438b183baa285e26de"
+    },
+    {
+      "summary": {
+        "covered_lines": 3389,
+        "lines_percent": 78.69,
+        "minimum_lines_percent": 74,
+        "schema_version": 1,
+        "scope": "apps/worker/*.py (excluding tests)",
+        "source_file_count": 11,
+        "suite": "worker",
+        "total_lines": 4307
+      },
+      "artifact": ".runtime/qa/worker-summary.json",
+      "sha256": "7e6d8d6261f0d72427df2652c110543c3d48ca0f888b688d51140f7eb88de89f"
+    },
+    {
+      "summary": {
+        "covered_lines": 469,
+        "lines_percent": 92.14,
+        "minimum_lines_percent": 85,
+        "schema_version": 1,
+        "scope": "apps/web/{components/app-shell.tsx,components/cases/case-workspace.tsx,components/session-provider.tsx,components/ui.tsx,lib/api-error.ts,lib/chat-response.ts,lib/navigation.ts,lib/permissions.ts,lib/presentation.ts,lib/session-scope.ts}",
+        "source_file_count": 10,
+        "suite": "web",
+        "total_lines": 509
+      },
+      "artifact": ".runtime/qa/web-summary.json",
+      "sha256": "b578bc941f4af437b3342844cb61bb57a215b484a5dcb9cfe35870f3b0f4e29b"
+    }
+  ],
+  "limitations": "Separate denominators; package and distributed runtime coverage is not included. No combined percentage is claimed."
+}

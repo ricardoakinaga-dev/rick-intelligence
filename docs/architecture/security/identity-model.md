@@ -1,5 +1,7 @@
 # Identity and session model
 
+> **HISTORICAL — snapshot preservado; classificado em 09/10/2026.** Afirmações sobre o checkout e os legados descrevem a data original. Consulte o [índice vigente](../../INDEX.md) para implementação, backlog e evidência atuais.
+
 ## Identity
 
 The CVG enterprise identity is a persisted user record associated with a home

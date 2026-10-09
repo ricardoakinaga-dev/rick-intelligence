@@ -652,6 +652,8 @@ def mode_test_fast() -> int:
             "CI runner and workflow-validator regressions",
             ["-m", "pytest", "-q", "-p", "no:cacheprovider",
              str(ROOT / "scripts" / "phase11" / "test_check_workflow_actions.py"),
+             str(ROOT / "scripts" / "phase11" / "test_check_docs.py"),
+             str(ROOT / "scripts" / "phase11" / "test_pytest_discovery.py"),
              str(ROOT / "scripts" / "phase11" / "test_compose_lifecycle.py")],
             env=canonical_env(),
             timeout=600,
@@ -878,6 +880,8 @@ def mode_ci() -> int:
 def mode_validate() -> int:
     cases = [
         root_check_case(),
+        python_case("portable documentation links (AUD07-24)",
+                    ["scripts/phase11/check_docs.py"], timeout=120),
         python_case(
             "evidence store policy (AUD07-18)",
             ["scripts/phase11/evidence_store.py", "check"],

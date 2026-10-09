@@ -8,7 +8,7 @@ from threading import Event
 from fastapi.testclient import TestClient
 
 from app import create_app
-from conftest import make_settings
+from apps.api.tests.support import make_settings
 
 
 def _client(**overrides) -> TestClient:

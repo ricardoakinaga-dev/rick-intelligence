@@ -4,7 +4,7 @@ import threading
 import anyio
 import pytest
 from app import create_app
-from conftest import make_settings
+from apps.api.tests.support import make_settings
 from core import streaming
 from services.chat_service import ChatApplicationService
 from dependencies.identity import require_authenticated

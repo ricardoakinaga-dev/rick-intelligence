@@ -450,7 +450,7 @@ def _sse(response):
 def test_http_json_sse_history_and_idempotent_replay_have_identical_policy_sources(providers):
     from app import create_app
     from fastapi.testclient import TestClient
-    from conftest import login_as
+    from apps.api.tests.support import login_as
     from services.chat_history import InMemoryChatHistoryStore
 
     backend, store, _, provider = _backend()
@@ -502,7 +502,7 @@ def test_http_json_sse_history_and_idempotent_replay_have_identical_policy_sourc
 def test_http_with_real_local_retrieval_reaches_provider_and_rejects_request_labels(providers):
     from app import create_app
     from fastapi.testclient import TestClient
-    from conftest import login_as
+    from apps.api.tests.support import login_as
     from rick_retrieval import DeterministicHashEmbedding
     from services.retrieval_service import RetrievalApplicationService
 
@@ -536,7 +536,7 @@ def test_http_with_real_local_retrieval_reaches_provider_and_rejects_request_lab
 def test_http_revocation_emits_error_and_partial_history_without_approved_completion(providers):
     from app import create_app
     from fastapi.testclient import TestClient
-    from conftest import login_as
+    from apps.api.tests.support import login_as
     from services.chat_history import InMemoryChatHistoryStore
 
     store = _knowledge()
@@ -572,7 +572,7 @@ def test_http_revocation_emits_error_and_partial_history_without_approved_comple
 def test_idempotent_chat_replay_fails_after_current_collection_grant_is_revoked(providers):
     from app import create_app
     from fastapi.testclient import TestClient
-    from conftest import login_as
+    from apps.api.tests.support import login_as
     from services.chat_history import InMemoryChatHistoryStore
 
     store = _knowledge()
@@ -603,7 +603,7 @@ def test_idempotent_chat_replay_fails_after_current_collection_grant_is_revoked(
 def test_stream_withholds_provider_text_until_live_grant_revalidation(providers):
     from app import create_app
     from fastapi.testclient import TestClient
-    from conftest import login_as
+    from apps.api.tests.support import login_as
     from services.chat_history import InMemoryChatHistoryStore
 
     store = _knowledge()
@@ -646,7 +646,7 @@ def test_stream_withholds_provider_text_until_live_grant_revalidation(providers)
 def test_idempotent_chat_replay_revalidates_current_publication(providers):
     from app import create_app
     from fastapi.testclient import TestClient
-    from conftest import login_as
+    from apps.api.tests.support import login_as
     from services.chat_history import InMemoryChatHistoryStore
 
     store = _knowledge()

@@ -22,7 +22,6 @@ jobs:
     timeout-minutes: 10
     env:
       PYTHONDONTWRITEBYTECODE: "1"
-      PYTHONPATH: apps/api/src:apps/worker:packages/contracts/src:packages/jobs/src:packages/authorization/src:packages/identity/src:packages/observability/src:packages/knowledge/src:packages/ingestion/src:packages/retrieval/src:packages/providers/src:packages/locking/src:packages/professor/src:packages/evidence/src:packages/decision/src:packages/storage/src
     permissions:
       contents: read
     steps:

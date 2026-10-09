@@ -1,6 +1,6 @@
 """Negative security matrix (§51): roles × routes."""
 
-from conftest import login_as
+from apps.api.tests.support import login_as
 
 
 def test_anonymous_admin_is_401(client):

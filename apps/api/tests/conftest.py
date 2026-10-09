@@ -15,17 +15,11 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app import create_app
-from core.config import ApiSettings
+from apps.api.tests.support import login_as, make_settings
 from dependencies.services import Providers
 from services.audit import InMemoryAuditSink
 from services.chat_service import StubChatBackend
 from services.identity_service import InMemoryIdentityProvider
-
-
-def make_settings(**overrides):
-    base = dict(cors_allowed_origins=("http://localhost:3000",), session_cookie_secure=False)
-    base.update(overrides)
-    return ApiSettings(**base)
 
 
 @pytest.fixture()
@@ -58,9 +52,3 @@ def app(providers):
 def client(app):
     with TestClient(app, raise_server_exceptions=False) as client:
         yield client
-
-
-def login_as(client: TestClient, email: str, password: str = "password123"):
-    resp = client.post("/api/v1/auth/login", json={"email": email, "password": password, "tenant_id": "default"})
-    assert resp.status_code == 200, resp.text
-    return resp

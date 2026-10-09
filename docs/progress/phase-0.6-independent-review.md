@@ -1,5 +1,7 @@
 # Phase 0.6 — Independent Review
 
+> **HISTORICAL — snapshot preservado; classificado em 09/10/2026.** Afirmações sobre o checkout e os legados descrevem a data original. Consulte o [índice vigente](../INDEX.md) para implementação, backlog e evidência atuais.
+
 ## Review provenance
 
 This is the final fresh review by the read-only reviewer **Descartes**. The

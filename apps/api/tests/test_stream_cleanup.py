@@ -7,7 +7,7 @@ import pytest
 from starlette.responses import StreamingResponse
 
 from app import create_app
-from conftest import make_settings
+from apps.api.tests.support import make_settings
 from core import streaming
 from test_transport_observation import scope, total
 

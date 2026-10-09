@@ -46,6 +46,33 @@ def test_sticky_tmp_parent_and_private_child_are_supported(tmp_path):
     assert contracts.capture(p, private=True) == b'TEST ONLY'
     assert Path('/tmp').stat().st_mode & 0o1000
 
+def test_capture_allows_unrelated_subdirectory_creation_during_read(tmp_path, monkeypatch):
+    p = tmp_path/'input'; p.write_bytes(b'TEST ONLY'); p.chmod(0o600)
+    original = contracts.os.read; changed = []
+    def racing_read(fd, size):
+        data = original(fd, size)
+        if not changed:
+            changed.append(True)
+            (tmp_path/'unrelated-sibling').mkdir(mode=0o700)
+        return data
+    monkeypatch.setattr(contracts.os, 'read', racing_read)
+    assert contracts.capture(p, private=True) == b'TEST ONLY'
+    assert changed
+
+def test_capture_still_refuses_leaf_hardlink_creation_during_read(tmp_path, monkeypatch):
+    p = tmp_path/'input'; p.write_bytes(b'TEST ONLY'); p.chmod(0o600)
+    original = contracts.os.read; changed = []
+    def racing_read(fd, size):
+        data = original(fd, size)
+        if not changed:
+            changed.append(True)
+            os.link(p, tmp_path/'alias')
+        return data
+    monkeypatch.setattr(contracts.os, 'read', racing_read)
+    with pytest.raises(contracts.Refusal, match='changed'):
+        contracts.capture(p, private=True)
+    assert changed
+
 @pytest.mark.parametrize('bad', ['hardlink_private', 'special_mode', 'oversize', 'double_slash', 'dot'])
 def test_regular_role_and_lexical_bounds(tmp_path, bad):
     p = tmp_path/'input'; p.write_bytes(b'TEST ONLY'); p.chmod(0o600)

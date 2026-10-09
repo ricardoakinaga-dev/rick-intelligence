@@ -1,5 +1,7 @@
 # Phase 1.1 — Monorepo Skeleton & Migration Safety
 
+> **HISTORICAL — snapshot preservado; classificado em 09/10/2026.** Afirmações sobre o checkout e os legados descrevem a data original. Consulte o [índice vigente](../INDEX.md) para implementação, backlog e evidência atuais.
+
 Status: `VERIFIED_CANDIDATE` (opened and verified 2026-08-31). This is the
 user-authorized first Phase 1 slice. It is intentionally limited to a root
 skeleton, contracts, commands, documentation, and safety checks. It does not

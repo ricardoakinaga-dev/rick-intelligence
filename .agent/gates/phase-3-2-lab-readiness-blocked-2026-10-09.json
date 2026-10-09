@@ -1,0 +1,105 @@
+{
+  "record_id": "GATE-PH3-2-LAB-READINESS-IMPLEMENTATION-READY-002",
+  "timestamp": "2026-10-09T10:56:59.707732Z",
+  "gate_id": "IMPLEMENTATION_READY",
+  "scope": "Phase 3.2 disposable real integration lab readiness and deterministic Compose lifecycle",
+  "scope_ref": "PH3-2-LAB-READINESS",
+  "version": 2,
+  "criteria": [
+    {
+      "id": "IR-001",
+      "description": "The exact Phase 3 prompt, frozen source HEAD and current audit are recorded without changing the frozen acceptance bar",
+      "required": true,
+      "status": "PASS",
+      "evidence_refs": [
+        "docs/prompts/phase-3-runtime-evidence-production-promotion-2026-09-09.txt",
+        "docs/reports/phase-3-runtime-evidence-current-audit.md",
+        ".agent/plans/phase-3-runtime-evidence-production-promotion.md"
+      ],
+      "confidence": "HIGH",
+      "limitations": "Entry and implementation-readiness evidence only; no runtime or release promotion is claimed"
+    },
+    {
+      "id": "IR-002",
+      "description": "The public Phase 3 plan defines ordered P0/P1/P2 runtime, evidence, review and authority gates",
+      "required": true,
+      "status": "PASS",
+      "evidence_refs": [
+        "docs/plans/phase-3-runtime-evidence-production-promotion.md",
+        ".agent/plans/phase-3-runtime-evidence-production-promotion.md"
+      ],
+      "confidence": "HIGH",
+      "limitations": "The plan does not assert that blocked external services or human decisions already exist"
+    },
+    {
+      "id": "IR-003",
+      "description": "A current authorized disposable startup/readiness/teardown and private endpoint configuration must be bound to the candidate before lab entry can be classified ready",
+      "required": true,
+      "status": "BLOCKED",
+      "evidence_refs": [
+        "docs/reports/retomada-2026-10-09.md"
+      ],
+      "confidence": "HIGH",
+      "limitations": "Existing lab health was observed read-only; no candidate-bound startup/teardown or private runtime authority proof was executed in this recovery."
+    }
+  ],
+  "evidence": [
+    "docs/reports/retomada-2026-10-09.md"
+  ],
+  "confidence": "HIGH",
+  "gaps": [
+    "September 30 conditions expired without candidate-bound execution evidence; both remain unresolved blocking obligations."
+  ],
+  "conditions": [
+    {
+      "id": "COND-PH3-2-DOCKER-RUNTIME",
+      "description": "The disposable Docker daemon and approved runtime endpoints must be available before live readiness or P0 runtime evidence is classified",
+      "non_blocking": false,
+      "impact": "Without a disposable daemon, Compose startup, health/readiness probes and teardown remain unexecuted external evidence",
+      "owner": "Codex lead",
+      "due_or_trigger": "Administrative recheck in seven days, or immediately when authorized disposable runtime evidence is supplied; live lab entry remains BLOCKED until proof exists.",
+      "due_at": "2026-10-16T10:56:59.707732Z",
+      "verification_method": "Run make up and make down against the approved disposable daemon and retain bounded health/log observations",
+      "evidence_refs": [
+        "docs/reports/retomada-2026-10-09.md"
+      ],
+      "status": "OPEN",
+      "residual_risk": "MEDIUM",
+      "authority_state": "NOT_REQUIRED"
+    },
+    {
+      "id": "COND-PH3-2-RUNTIME-SECRETS",
+      "description": "Disposable runtime secrets and endpoint authority must be injected only through the approved private configuration path",
+      "non_blocking": false,
+      "impact": "No live external service or provider evidence may be inferred from placeholder environment examples",
+      "owner": "Codex lead",
+      "due_or_trigger": "Administrative recheck in seven days, or immediately when authorized disposable runtime evidence is supplied; live lab entry remains BLOCKED until proof exists.",
+      "due_at": "2026-10-16T10:56:59.707732Z",
+      "verification_method": "Bind the private disposable env file, verify the selected Compose project and run the live endpoint probes without committing credentials",
+      "evidence_refs": [
+        "docs/reports/retomada-2026-10-09.md"
+      ],
+      "status": "OPEN",
+      "residual_risk": "MEDIUM",
+      "authority_state": "NOT_REQUIRED"
+    }
+  ],
+  "authority": {
+    "required": false,
+    "state": "NOT_REQUIRED",
+    "actor": "Codex lead",
+    "scope": "Phase 3.2 disposable real integration lab readiness and deterministic Compose lifecycle",
+    "decision": "Recording a blocked local recovery decision requires no new authority. No external runtime or production approval is asserted.",
+    "evidence_ref": "docs/reports/retomada-2026-10-09.md",
+    "expires_or_revalidates": "Any Compose topology, host permission, external runtime or promotion scope change"
+  },
+  "residual_risk": "MEDIUM",
+  "decision": "BLOCKED",
+  "next_action": "Keep lab entry blocked; obtain candidate-bound approved private disposable configuration and startup/readiness/teardown evidence before reopening.",
+  "revalidation_triggers": [
+    "A Compose service, healthcheck, image, project or volume changes",
+    "The host Docker socket or environment authority changes",
+    "A live startup or teardown result is observed"
+  ],
+  "supersedes": "GATE-PH3-2-LAB-READINESS-IMPLEMENTATION-READY-001"
+}

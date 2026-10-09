@@ -104,8 +104,16 @@ def capture(path: Path, *, private: bool = False) -> bytes:
             raise Refusal('input changed during capture')
         for directory, name, original in bindings:
             current = os.stat(name, dir_fd=directory, follow_symlinks=False)
+            # A directory's link count changes when an unrelated child is
+            # created/removed (including another private test root in /tmp).
+            # Its device/inode and protected owner/mode bind its identity.
+            # Regular inputs still require exactly one link, both before and
+            # after reading; changing that leaf is never accepted.
+            binding_fields = ('st_dev','st_ino','st_mode','st_uid','st_gid')
+            if not stat.S_ISDIR(original.st_mode):
+                binding_fields += ('st_nlink',)
             if any(getattr(current, k) != getattr(original, k) for k in
-                   ('st_dev','st_ino','st_mode','st_uid','st_gid','st_nlink')):
+                   binding_fields):
                 raise Refusal('input parent or leaf replaced during capture')
         return b''.join(chunks)
     except OSError:

@@ -1,0 +1,10 @@
+{
+  "observed_at": "2026-10-09T11:22:48.695636+00:00",
+  "command": "env -u PYTHONPATH make ci",
+  "result": "PASS",
+  "exit_code": 0,
+  "source_fingerprint": "f106e4c8ce95cc7581f14fbd5275650dd3b7cc6de2e252e92279629c9c5fd1c2",
+  "log_locator": ".runtime/qa/retomada-20261009/ci-complete.log",
+  "log_sha256": "0a9ef09e1cdf214fd31848fb9202fa31a35606de61b3b1fb5e8d759a6565b754",
+  "limitations": "Local CI only; remote, independent review and production gates remain open."
+}

@@ -6,7 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app import create_app
-from conftest import make_settings
+from apps.api.tests.support import make_settings
 from core.lifecycle import DependencyState, evaluate_checks, evaluate_readiness, safe_dependency_state
 
 

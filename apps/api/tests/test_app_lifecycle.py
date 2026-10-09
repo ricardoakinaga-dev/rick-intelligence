@@ -14,7 +14,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app import _shutdown_owned_resources, create_app
-from conftest import make_settings
+from apps.api.tests.support import make_settings
 from dependencies.services import Providers
 from services.audit import InMemoryAuditSink
 from services.chat_service import StubChatBackend

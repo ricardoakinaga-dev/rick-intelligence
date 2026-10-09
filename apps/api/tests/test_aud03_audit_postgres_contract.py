@@ -16,7 +16,7 @@ from services.audit import InMemoryAuditSink
 from services.postgres_identity import PostgresIdentityProvider
 from test_postgres_admin_mutations import _Connection, _Cursor
 from test_aud03_atomic_audit import actor, request
-from conftest import make_settings
+from apps.api.tests.support import make_settings
 from rick_knowledge import InMemoryKnowledgeStore
 
 

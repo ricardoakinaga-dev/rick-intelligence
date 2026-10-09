@@ -48,12 +48,9 @@ VIEWPORTS: tuple[dict[str, int], ...] = (
     {"name": "tablet", "width": 768, "height": 1024},
     {"name": "desktop", "width": 1440, "height": 1000},
 )
-NODE_COMPONENTS = (
-    "apps/web",
-    "modulo-redis-locker",
-    "rick-professor",
-    "cvg-master-rag-v2/frontend",
-)
+# AUD07-02/04 retired the three legacy components. The canonical web app is
+# still mandatory: _missing_node_components rejects an absent package.json.
+NODE_COMPONENTS = ("apps/web",)
 EXIT_PASS = 0
 EXIT_FAIL = 1
 EXIT_BLOCKED = 2
@@ -1227,6 +1224,9 @@ def check_sbom(root: Path, evidence_dir: Path, *, npm: str | None = None, syft: 
         return _check("sbom", "FAIL", "no canonical Node component with package.json was found")
     if missing_packages:
         return _check("sbom", "FAIL", "one or more canonical Node components are missing package manifests", observations={"missing_components": missing_packages})
+    missing_locks = [relative for relative, _, lock_path, _ in components if not lock_path.is_file()]
+    if missing_locks:
+        return _check("sbom", "FAIL", "one or more canonical Node components are missing lockfiles", observations={"missing_lockfiles": missing_locks})
     reports: list[str] = []
     failures: list[str] = []
     blocked: list[str] = []
@@ -1294,12 +1294,6 @@ def check_secrets(root: Path, evidence_dir: Path, *, python: str | None = None, 
         if result.returncode == 1:
             return _check("secret-scan", "FAIL", "gitleaks found one or more secret candidates", evidence=[_relative(root, report_path)], tool="gitleaks")
         return _check("secret-scan", "FAIL", "gitleaks failed without a trustworthy clean result", evidence=[], tool="gitleaks", observations={"output_tail": _command_tail(result)})
-    scanner = root / "cvg-master-rag-v2/src/scripts/scan_secrets.py"
-    if python and scanner.is_file() and root.resolve() == ROOT.resolve():
-        result = _run_command([python, str(scanner)], cwd=root, timeout=timeout)
-        if result.returncode == 0:
-            return _check("secret-scan", "PASS", "repository dependency-free high-signal secret scanner passed", evidence=[_relative(root, scanner)], tool="repository-secret-scanner")
-        return _check("secret-scan", "FAIL", "repository dependency-free secret scanner found candidates", evidence=[_relative(root, scanner)], tool="repository-secret-scanner", observations={"output_tail": _command_tail(result)})
     findings = _secret_scan_files(root)
     if findings:
         return _check("secret-scan", "FAIL", "dependency-free high-signal secret scan found candidates", evidence=[], tool="built-in-static-scanner", observations={"finding_count": len(findings), "findings": findings[:24]})
@@ -1307,7 +1301,7 @@ def check_secrets(root: Path, evidence_dir: Path, *, python: str | None = None, 
 
 
 _ALLOWED_LICENSE = re.compile(
-    r"^(?:MIT|ISC|Apache-2\.0|BSD(?:-[0-9]+-Clause|-Clause)?|0BSD|Zlib|MPL-2\.0|LGPL-(?:2\.0|2\.1|3\.0)(?:-or-later)?|GPL-(?:2\.0|3\.0)(?:-or-later)?|CC0-1\.0|CC-BY-4\.0|Unlicense|Python-2\.0|BlueOak-1\.0\.0|WTFPL)$",
+    r"^(?:MIT(?:-0)?|ISC|Apache-2\.0|BSD(?:-[0-9]+-Clause|-Clause)?|0BSD|Zlib|MPL-2\.0|LGPL-(?:2\.0|2\.1|3\.0)(?:-or-later)?|GPL-(?:2\.0|3\.0)(?:-or-later)?|CC0-1\.0|CC-BY-4\.0|Unlicense|Python-2\.0|BlueOak-1\.0\.0|WTFPL)$",
     re.IGNORECASE,
 )
 

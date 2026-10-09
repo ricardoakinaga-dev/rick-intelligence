@@ -1,6 +1,6 @@
 """Error contract: safe envelope, no leaks, stable codes."""
 
-from conftest import login_as
+from apps.api.tests.support import login_as
 
 
 def test_404_envelope_has_request_id(client):

@@ -1,0 +1,300 @@
+{
+  "schema_version": 1,
+  "observed_at": "2026-10-09T11:21:15.794412Z",
+  "candidate_base": "96efd7ca9e50adab517a52a507cc408e2bfdb263",
+  "scope": "Final expanded local Python matrix and exact changed code/configuration; earlier API/web/static/CI results retained in initial manifest.",
+  "command": "env -u PYTHONPATH PYTHONDONTWRITEBYTECODE=1 .runtime/venvs/cvg/bin/python -m pytest -q apps/api/tests packages apps/worker/tests scripts infrastructure -rs --junitxml=.runtime/qa/retomada-20261009/python-junit-complete.xml",
+  "exit_code": 0,
+  "result": "PASS",
+  "passed": 7719,
+  "skipped": 221,
+  "subtests_passed": 88,
+  "warnings": 75,
+  "duration_seconds": 463.96,
+  "source_sha256": {
+    ".github/workflows/quality.yml": "e579371e317473ccccacb5969721ccb7d2c78e9ea90323ff79c109f2c9b2a87f",
+    ".github/workflows/state-of-art-quality.yml": "db7fe9bded2fe4c92d9bce638596f74a923e296fb443894d8a10202ee93d705a",
+    "CONTRIBUTING.md": "f1283cd0294111fbc04f59e3013a2c8f9937503d08540abb4f58f79ee311c901",
+    "Makefile": "de5c9226ed7350ce9b4ef44793f7c6caeba0c4d2294f8b0a3566d8311a4643bd",
+    "README.md": "c009f7243d4cd8e0744ec2e6b73c10e869abec001347ff7da4196a9665f181cd",
+    "apps/api/tests/conftest.py": "a1a4d75463787329a0e9d92a3ca983d1de15e53337d9dae52aad3ddeaed71296",
+    "apps/api/tests/support.py": "d2bac830fc8257d3c9dfc8ae43eb8d3af6ed3886ad14161e9d339af11e40ae6a",
+    "apps/api/tests/test_admin_audit_outbox_routes.py": "cb449cc70cc874d0707df3a5ac52a20b4085eb88e5840eb325735377b267461f",
+    "apps/api/tests/test_api_deployment_composition.py": "db3cdb536398c87761daf40d7f09663538543372e58019aa90935095589baf8f",
+    "apps/api/tests/test_app_lifecycle.py": "7cb050a66d553d4f068c8fa49e1f9f6dbbe76bef343e5ad26d83f1d7c63cb6ec",
+    "apps/api/tests/test_aud03_admin_recovery.py": "dee4491d3fa962e041f58cb8f3b646d1d9951e2c56d97d23e2123df00c545990",
+    "apps/api/tests/test_aud03_atomic_audit.py": "0edaf0c4102f0906194c6417d051835b7cdb23c1945070157df7a96b78c712e4",
+    "apps/api/tests/test_aud03_audit_execution_fence.py": "77083aaedef09728f423d35357f61dc5b86b6ebd54bd25b648d84e3fdf93e2ff",
+    "apps/api/tests/test_aud03_audit_postgres_contract.py": "1474591b11519ba2a06effb2712d6bc7f673c3ead72b2055129ada46217d674d",
+    "apps/api/tests/test_aud03_audit_postgres_live.py": "1bc4b9ba8acb267b641347dca4bb713cfba9d8a63cfd9b32f263b1110b2c69ad",
+    "apps/api/tests/test_audit_factory.py": "ba3eb5d3f7e6549231b6e2928f89b93ca5ace8c7439bbb0717ab2db0c05cb5fe",
+    "apps/api/tests/test_auth.py": "dcde3d944ff291239f2e64389ba899661e67686128a188441eb6a261250b8fdd",
+    "apps/api/tests/test_canonical_negatives.py": "903d513b46a9f2e28c2e50a488f443a316950b8578ef11a2c95136a9b6f22a5a",
+    "apps/api/tests/test_cases.py": "85084fc00a11c595b90fe7fe87755f7917284897eeed3dbc2c355620fc87ee53",
+    "apps/api/tests/test_chat_history.py": "c503ac733e72cf8162230b58df9f794b17b4bf9cbd7ee3d380800d658244f1ce",
+    "apps/api/tests/test_compat_openai.py": "1c761b57bf4a18b61c55a931a31352d98528b5d63e888ee85dae691e251d1131",
+    "apps/api/tests/test_decision_policy_publication.py": "e519f9a50ef68bac802750476e1a78c395819b9c2f4746d05b1ab43fcd4966d7",
+    "apps/api/tests/test_deployment_composition.py": null,
+    "apps/api/tests/test_differential_auth.py": "5c333356a0668331dd4e9a69877f6ca2e9434250c87b7c2c8907e7465e5f9596",
+    "apps/api/tests/test_dual_equivalence.py": "039837d2139b8edabe8a30226fb5d5f7e4e2a6b02c6e94c505ebc2cba0195a76",
+    "apps/api/tests/test_errors.py": "15fa40a0e92b354763a47653f44782841c0a77ec5e68957180e7c1a84911dc8f",
+    "apps/api/tests/test_health.py": "5d08108e751417151efd4ad38015b03a7803d196aaef6d37f022e137e4e8d746",
+    "apps/api/tests/test_http_contract.py": "02b43b593f7289fc992369bc052b38cfa89ae3cbee223afff83d7c95017aa6a3",
+    "apps/api/tests/test_idempotency_scope.py": "625b0b43c195117b4a3ea01f1f3e4cdfd6fb079d26509bd0ad0699911b3709d0",
+    "apps/api/tests/test_in_memory_admin_mutations.py": "0b5ebfdfe087ac714023d5fc2f0ef17733899751f2f4a970ffa7aea5b7d4c53d",
+    "apps/api/tests/test_negative_security.py": "7d298daa52a9e2b66ca23e29b655085eea693a13c37edd183454cace97ddf71d",
+    "apps/api/tests/test_nested_stream_cleanup.py": "14cdf177c3a30b7f2d19cf613b3210f11ac94019448a1689cee8895b54ac79f9",
+    "apps/api/tests/test_phase16_health.py": "f0689e4d12b597d0b5db41a011434a9e1648f1af05424a1b3478f9172a009aed",
+    "apps/api/tests/test_phase16_root.py": "503b109a6d47fafe82324952c7180ede037474181ecdd5f2f95428949308ac30",
+    "apps/api/tests/test_provider_isolation.py": "bb3022e80a505326d64883f8faf8ac05df9e0eea776810bac35040f51a47e3f8",
+    "apps/api/tests/test_provider_rework10_lifecycle.py": "233720b679c3a47c011c421e90dd5f9d0919c0448551e43aecc65308207fae5c",
+    "apps/api/tests/test_provider_rework3_lifecycle.py": "c4d16f5c50a8a3ad333c00e09a242b3f3f472e8ff27316da2cea65c3cc9e0637",
+    "apps/api/tests/test_readiness_flags.py": "57efd1786b077d005ae895faff2e24cb356eeb1db2253b5c6e42d159a954380d",
+    "apps/api/tests/test_rec_foundation.py": "5c689b8a7d9b15ca4f464ee245bce3e94a829acfda6e59b48c3674a306954c1e",
+    "apps/api/tests/test_retry_multipart_contract.py": "1ae1059afd0e9a0804446078933c8e814c2fae92977625a7b03360c9b76c4a2a",
+    "apps/api/tests/test_route_policy.py": "2aa836ea35d3636df0754e896d842ec1317d5ddef83f86359f8d229f5a1edcec",
+    "apps/api/tests/test_search_endpoint.py": "b6155f184766c98dd34437df299bd0e565e483d9c0a455a77173fd4707e80c62",
+    "apps/api/tests/test_search_lifecycle.py": "c51782249ec3a4bee2f8831cce5719095171ba0cbf4b5fb537c8f62f390cce26",
+    "apps/api/tests/test_security_hardening.py": "31ed34f87f24b97da6dcd4cc271e5d86328f221669adb75670ed31b447785d1d",
+    "apps/api/tests/test_server_error_transport.py": "eae43b7c3a201e3866d6328232e4c753c84b4b8b29151df4271cdf2ceceba712",
+    "apps/api/tests/test_stream_cleanup.py": "620d0308b1b18c721bc64dab58443525a524956a66303c3b12bfb9c730de8f4a",
+    "apps/api/tests/test_streaming.py": "f2006e47a06e831c4ddba645705384f0769387d6bd9c3a516341bb4b8dcad7ae",
+    "apps/api/tests/test_telemetry.py": "cc009ca87a522a8d0b7f769da99cd3dd39b6a24ecf9d83f3d695ce4be2392d88",
+    "apps/api/tests/test_transport_observation.py": "85153d3c0ad278cef85bb63d5bc2ed9097695166cde49246f2c374981fd87742",
+    "apps/api/tests/test_vector_factory.py": "06604944b83bed2ed3bd78629a659301acbbe1a4482f4749985f44c42d85117c",
+    "apps/worker/tests/test_provider_rework3_lifecycle.py": null,
+    "apps/worker/tests/test_worker_provider_rework3_lifecycle.py": "4880b51b0a3f24ccfb533274527ae528a94ec4023f2d7431cad907d6b0910e41",
+    "conftest.py": "e2dc4a31f2daac64cd02c7a24be6a9769f71a998f4077a066b89affbfd22fb74",
+    "infrastructure/vps/contracts.py": "ba9587aa6db070d1e50294f5315e0b8d720f745388c4158b6e5684a9cb524aee",
+    "infrastructure/vps/tests/test_production_rework9.py": null,
+    "infrastructure/vps/tests/test_rework2.py": "2e4cf59471d69fd4d9154e6e75b959484baadef1cfa44acfd451233dad334298",
+    "infrastructure/vps/tests/test_vps_production_rework9.py": "8e231253d0833ea56bde00f27a695621d3bf170575ec7f0740f04216beb07ec5",
+    "packages/identity/__init__.py": "23283b1bc427c55eea1e65b5a836147287b1df2a0aee6b2d192c88ebdbae7157",
+    "packages/identity/tests/__init__.py": "62a9b52028b63791c360274b44e388c0626168d164084bf38bd6655e10cdbf0a",
+    "packages/jobs/tests/test_contracts.py": "b1cd250a8c9b0bf6b305435c5c990cb8b841b87acf75e6c38fe59909099861f8",
+    "packages/locking/tests/test_locking_rate_limit.py": "526761ffb248127ae88b61d98f2e0528dbb6d7ca0635327f386529190efda6cf",
+    "packages/locking/tests/test_rate_limit.py": null,
+    "pytest.ini": "567709edb1ae0cdf3bd8ea256ffcf1eda22d892624407d0a79758949f1590f59",
+    "scripts/phase11/check_docs.py": "0746864c3d5b868810e3e981180996713f76beb760dbe497f774505e7bd7acad",
+    "scripts/phase11/check_skeleton.py": "8bfa7e663d363e78647277fbb21320499cac4d4b39b6309879a271bec326bc53",
+    "scripts/phase11/frontend_supply_runtime_gate.py": "c57ca34ee5c04efa67211e620288a5d0fee88bebe4dcd4ff5c912b6100b36839",
+    "scripts/phase11/runner.py": "7602dfe5b455584680287089c53c1f8226f3ff6633208fd493f3f6b9302efa9a",
+    "scripts/phase11/test_check_canonical_ci.py": "1e1488a6c780439fa3babf14690b95610a4d2891c31367a94c7f168b3bd0d49b",
+    "scripts/phase11/test_check_docs.py": "09349acdc4a752e5f17f5b28449d7d0d3377cb7018aa4e8f7b4ec93d64260a5e",
+    "scripts/phase11/test_check_skeleton.py": "0d2eff11c2d290648350841389551f838cf1cc1cd5545f4735ddf51aabf0b7c1",
+    "scripts/phase11/test_pytest_discovery.py": "5e8a0810c3310cb8de63d6ec648c057b0a4c039f2bc2ea7ab6569f1ff2c56144",
+    "scripts/phase15/check_boundaries.py": "78faf8689a97a295589b913c17b01a3590de0ec3854d0dbe4b7e2aad0906caa5",
+    "scripts/state_of_art/generate_release_evidence.py": "cc1c30adea6dd14146f66f71ab1ec5a9fdd0077b73b552305add3f9b011fd267",
+    "scripts/state_of_art/test_controller_recovery.py": "1b4602da205415be25bb6f93c333b7485d6117810352d4ec551e72531bbbe325",
+    "scripts/state_of_art/tests/test_frontend_supply_runtime.py": "cbb2dab5f276ff1b1115e2f8a7abd16e28c44b0b44e698eb2df03f15fd1f5cec",
+    "scripts/state_of_art/tests/test_generate_release_evidence.py": "171e7a4e63846359a1684fd4b78f36d1421167cb8719f448e8385bd0f7235b26",
+    "tests/concurrency/README.md": "faa3a020ca28fdb52bcf41f3fe6901f03eb567af2d2e89eeaed582603d5006e1",
+    "tests/contract/README.md": "d119dd838e723c6c49d8b41918cc301cbf5fad43cc4aedc69cf02d5de5613e49",
+    "tests/e2e/README.md": "4be5a1376f3e16746f5b798b8c2d94b2f86588cc799afca726293b1afc94f751",
+    "tests/integration/README.md": "f038e8901fb1f38a7511f6bbf4e109b6a2d6f268df3d2763a0db9f9dfb871e51",
+    "tests/performance/README.md": "d34cb8006db4c06e0a6ec766d79d060077282154ddf22ba82e7a341b01835eae",
+    "tests/regression/README.md": "ff0937e19eaaffa750128f4a424b4852a17212ddb05a8a1fd563419baf80916d",
+    "tests/security/README.md": "d4b655c1e13b071537821f781af02144a0f24a4928959c9062b30b92e42d2f11"
+  },
+  "source_fingerprint": "f106e4c8ce95cc7581f14fbd5275650dd3b7cc6de2e252e92279629c9c5fd1c2",
+  "logs": {
+    "api-test.log": {
+      "sha256": "1eedf7401c2e9721248ef8ea7f58cce09cc6697f9679b2f4891fb88c00e83ba6",
+      "bytes": 2784
+    },
+    "api16-full-corrected.log": {
+      "sha256": "903e74cef0557677fe1e8a5ba593e98201d3cb1ebe3345724a03709531e0693c",
+      "bytes": 3286
+    },
+    "api16-full-final.log": {
+      "sha256": "121be5c619316c79dc149f2c1462b54855ebe7f93a67a885c9e33383ecf31214",
+      "bytes": 3049
+    },
+    "api16-full-verified.log": {
+      "sha256": "0131e08727b0f34017a8f60a2670e27f9813596f464b8125b38f3e4d3127ad09",
+      "bytes": 22621
+    },
+    "api16-full.log": {
+      "sha256": "0020ee010bebab038565b1957bb3dbd4021a624f3bee6d4578cbf4511efbde38",
+      "bytes": 828
+    },
+    "capture-race-red.log": {
+      "sha256": "0e9545f6d8061b8d9167c6e35c3864617c82f44f85ef651a374fd886ac925e04",
+      "bytes": 4715
+    },
+    "ci-corrected.log": {
+      "sha256": "2efc3853d47ddfb97c0a225b1a6186e1ba0fd9d5b3ce6c14324b532a94f30a42",
+      "bytes": 12181
+    },
+    "ci-final-source.log": {
+      "sha256": "e8b72b801486c389304a02bc364fd4bd72a6be328aba641b620399ee629c533f",
+      "bytes": 18168
+    },
+    "ci-handoff.log": {
+      "sha256": "e9a85e53f6ab4d475729f8d0e872db8634de772a9529b88a148aa37c1ce72f37",
+      "bytes": 18169
+    },
+    "ci-verified.log": {
+      "sha256": "589035cde1ffa9f301b31f3b36ad9338823f27e5135f92b8dd577779f4e567fa",
+      "bytes": 18168
+    },
+    "ci.log": {
+      "sha256": "93b4fbd8021629b2245caf27539eeeb93eaa159a45c5afc0cee746e37bf001e4",
+      "bytes": 18465
+    },
+    "collect-external-final.log": {
+      "sha256": "50e27c235a250990bda1655b1653050ac9b13a275538a8b9c8e325f7e57e8c14",
+      "bytes": 543740
+    },
+    "collect-external.log": {
+      "sha256": "8bda4611e25b3643167b0b945dd46842060065e8649ae0952c6ad3df004c7e3d",
+      "bytes": 785485
+    },
+    "collect-handoff.log": {
+      "sha256": "a3c1a6e1a30c48459ca3f15b854ad1b6a6048ac04c154a197e27a5255f554708",
+      "bytes": 1049947
+    },
+    "collect-namespace-final.log": {
+      "sha256": "4dc3423d658298c86dad3fe26918b8cdb064336ee6b406792ed5e54ec010818f",
+      "bytes": 784225
+    },
+    "collect-namespace.log": {
+      "sha256": "f3b00caf6969a6cbceef1bfcd60c43edec9c35ed9c931e4e9c268aeb7183bda6",
+      "bytes": 784755
+    },
+    "control-restore-handoff.log": {
+      "sha256": "1a095ba2b04bf87af2076f631f28b0cc2676fa11dfd26b718f26542ecf0a54f6",
+      "bytes": 219
+    },
+    "controller-fixtures-complete.log": {
+      "sha256": "a977c2c84b2371132067481130efd3fb53891384fee3703d2b0f7a3dfcec3b7d",
+      "bytes": 99
+    },
+    "controller-fixtures-corrected.log": {
+      "sha256": "fba5257bb6cd3f89f0c10043c84948befac99b875d3d033636fa53337b1595db",
+      "bytes": 7902
+    },
+    "controller-fixtures-verified.log": {
+      "sha256": "d8cde61d3ce240ed8ad0586789fae93426349162f3273906db50a6ebde78244a",
+      "bytes": 6951
+    },
+    "discovery-docs.log": {
+      "sha256": "5e0a654b2a8894a51f27007e13b02aac8649f509a7bc09b22bc68325683bf4b2",
+      "bytes": 98
+    },
+    "existing-lab-health.json": {
+      "sha256": "d44698a335d6efc4b9b59ed8c1cba554a1ba6b709b53d54fc259bc11b38e29cf",
+      "bytes": 598
+    },
+    "final-focused.log": {
+      "sha256": "c1057e119b8f1ba27ed2db846784924278dd8927263d937d0a2d89433155f42a",
+      "bytes": 512
+    },
+    "python-complete.log": {
+      "sha256": "7d9b71b21c149fc979e06bb8bb3bfc20e91d46166d00d1fd7f79a21ee8d6e79a",
+      "bytes": 24260
+    },
+    "python-handoff.log": {
+      "sha256": "096c49c3ee75b76100d2db8d867c87b7b2a1d8c93c39723229d5847bb58279a6",
+      "bytes": 30043
+    },
+    "python-integrated-final.log": {
+      "sha256": "55ba2b4159a84b357154aba393cd6b14782a7739fb5385cca23d1d659a51c59c",
+      "bytes": 31725
+    },
+    "python-integrated.log": {
+      "sha256": "fa1d15dd8ebd07d12b0e2fcead2dc957191575e872f6326fbcc0b5de893b6002",
+      "bytes": 28482
+    },
+    "python-junit-complete.xml": {
+      "sha256": "1a3d272b81cb21df7a4a2782c8f0007272622011096e4868d9a9c168aa0d0bcf",
+      "bytes": 1430626
+    },
+    "python-junit-handoff.xml": {
+      "sha256": "575bc149d46d5d396f87d3023efcc2ccae9d77b4e6fefc550932d4615d8b8869",
+      "bytes": 1436477
+    },
+    "python-junit-verified.xml": {
+      "sha256": "0d8f0f70b30d3ed2100c963cc3b4345af8bef76233d6eea54307d828b6f17edf",
+      "bytes": 1412311
+    },
+    "python-junit.xml": {
+      "sha256": "da16f242cb6d80e3566f53aaa67ee8879630549c2c9ec6ef3fe420ca128945df",
+      "bytes": 1415376
+    },
+    "python-verified.log": {
+      "sha256": "9772c8f35ec21f2656c60e4670e46578e6121b7b9b7ea555ea2d39f2de96dbb5",
+      "bytes": 29117
+    },
+    "sbom-apps-web.json": {
+      "sha256": "e192de2100cacceb311dcf3484ab34095e86d9042b9157d098efe3f70b49d9d4",
+      "bytes": 461978
+    },
+    "static-contracts.log": {
+      "sha256": "eba2a40aac791526a5c83f09c7854cf84bb0f0e0d53a1acef5cd4fbf5d7f4520",
+      "bytes": 41418
+    },
+    "supply-static.json": {
+      "sha256": "557699bc25b089d729b31faf0aa45f728b7950e6f1f855f9b6d5f1984c4b7254",
+      "bytes": 1629
+    },
+    "supply-tests-final.log": {
+      "sha256": "20cd0d64c199953a16d5d302f2dd15e203dc6c78b308a07a5168957d32342eef",
+      "bytes": 99
+    },
+    "supply-tests.log": {
+      "sha256": "a4e0c4d7f4ba4e0e24066c70ce61e02bcc72a1a6d90719dc76fd438665cb56ac",
+      "bytes": 1220
+    },
+    "validate-control-final.log": {
+      "sha256": "7316c1964c0374e79632b63f90807c30e4e7628514035525dca1ecacce700d51",
+      "bytes": 3282
+    },
+    "validate-current.log": {
+      "sha256": "0b6fcd62b305f5dfa623ad43cf5d5c2bb302cd43ab41bc7f079fa8a44a139a39",
+      "bytes": 3282
+    },
+    "validate-final-candidate.log": {
+      "sha256": "64f96484ad282b5e8f3c25689db96ac8712c6e7e564af07bd6ea1e35b8fc87f6",
+      "bytes": 3282
+    },
+    "validate-final.log": {
+      "sha256": "ed75deccb8a0f330cbea52a7fd8c3d37b6a11882043eecf218de275a3b8995ad",
+      "bytes": 3136
+    },
+    "validate-handoff.log": {
+      "sha256": "940a7db5e38cf188af83369094d9dec6cd8bd7ca58598780477932deb8f7b96b",
+      "bytes": 225
+    },
+    "validate-integrated.log": {
+      "sha256": "903e74cef0557677fe1e8a5ba593e98201d3cb1ebe3345724a03709531e0693c",
+      "bytes": 3286
+    },
+    "validate-reconciled.log": {
+      "sha256": "822f2aa1d8b8db7f507447e21ba70902a65b1639bbbc73d83ac2eb742698b715",
+      "bytes": 2962
+    },
+    "validate.log": {
+      "sha256": "73e6804eb850e00da4dedd975ceb84f06670e5731ee4959c599ee319b33e86ea",
+      "bytes": 4313
+    },
+    "vps-inventory-focused.log": {
+      "sha256": "000683dc404943fcc1d2760c904210506e84267a1bcbb4d9b8f3b0a5ef92cc3d",
+      "bytes": 113
+    },
+    "vps-verified.log": {
+      "sha256": "cf232447ad5402145e989617a3a122b7fe20acc7b1f035ccd0e620cc6384e43b",
+      "bytes": 1038
+    },
+    "web-validate.log": {
+      "sha256": "c3820b0e614d0d0d61039cfb0d9732690984c9affc00da3d72e9021c40899444",
+      "bytes": 49439
+    }
+  },
+  "limitations": [
+    "SELF review only",
+    "221 external/privileged skips",
+    "No deployment, push or remote dispatch",
+    "Remote exact candidate proof, independent review and production remain open"
+  ]
+}

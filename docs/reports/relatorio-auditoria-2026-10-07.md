@@ -1,5 +1,7 @@
 # Auditoria do RICK Intelligence — 07/10/2026
 
+> **HISTORICAL — snapshot preservado; classificado em 09/10/2026.** Afirmações sobre o checkout e os legados descrevem a data original. Consulte o [índice vigente](../INDEX.md) para implementação, backlog e evidência atuais.
+
 ## 1. Parecer executivo
 
 **Nota geral do recorte auditado: 64,2/100 (64/100 arredondada). Produção: `NO-GO`.**

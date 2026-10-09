@@ -2,7 +2,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from conftest import login_as
+from apps.api.tests.support import login_as
 
 
 def test_persisted_history_json_decoder_rejects_oversized_and_nonfinite_values():

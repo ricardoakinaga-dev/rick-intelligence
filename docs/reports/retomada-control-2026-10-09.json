@@ -1,0 +1,31 @@
+{
+  "observed_at": "2026-10-09T10:57:45.286750Z",
+  "procedure": "Regenerate derived views with python3 scripts/state_of_art/review_control_views.py --write; make validate",
+  "result": "PASS",
+  "exit_code": 0,
+  "logs": {
+    "validate-handoff.log": {
+      "sha256": "940a7db5e38cf188af83369094d9dec6cd8bd7ca58598780477932deb8f7b96b",
+      "result": "FAIL",
+      "exit_code": 2
+    },
+    "control-restore-handoff.log": {
+      "sha256": "1a095ba2b04bf87af2076f631f28b0cc2676fa11dfd26b718f26542ecf0a54f6",
+      "result": "FAIL",
+      "exit_code": 2
+    },
+    "validate-reconciled.log": {
+      "sha256": "822f2aa1d8b8db7f507447e21ba70902a65b1639bbbc73d83ac2eb742698b715",
+      "result": "FAIL",
+      "exit_code": 2
+    },
+    "validate-control-final.log": {
+      "sha256": "7316c1964c0374e79632b63f90807c30e4e7628514035525dca1ecacce700d51",
+      "result": "PASS",
+      "exit_code": 0
+    }
+  },
+  "gate": ".agent/gates/phase-3-2-lab-readiness-blocked-2026-10-09.json",
+  "gate_result": "BLOCKED",
+  "limitations": "Control validation is structural; it does not approve the blocked lab, complete combined suite, independent review or promotion."
+}

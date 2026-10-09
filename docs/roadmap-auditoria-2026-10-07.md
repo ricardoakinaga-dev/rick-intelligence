@@ -1,5 +1,15 @@
 # Roadmap de remediação RICK Intelligence
 
+**Atualização de execução — 09/10/2026:** AUD07-01–26 e 44–46 concluídas localmente.
+M3 tem documentação, links, skips e cobertura verificados. M2 conserva os gates
+remotos de AUD07-43; M4 tem CI/API/web e regressões locais aprovados, com revisão
+independente e vínculo do candidato ainda pendentes. O
+[relatório da retomada](reports/retomada-2026-10-09.md) registra três
+tentativas conjuntas que falharam, suas correções e a matriz final de 7.719
+testes aprovados com 221 skips. Promoção `NO-GO`.
+Os parágrafos de baseline abaixo preservam o corte anterior; o
+[backlog](backlog-auditoria-2026-10-07.md) contém o estado atual por tarefa.
+
 **Data:** 07/10/2026. **Estado:** planejamento proposto a partir da auditoria de 07/10/2026;
 **M0 e M1 concluídos** (AUD07-01–14: A02/A03 fechados e discriminados, A04 coberto pela
 política default-deny de rotas, A16 fail-closed no wrapper de resiliência) — ver
@@ -39,7 +49,7 @@ reproduzidos (A02, A03) têm regressões discriminantes. A entrega final depende
 sobre serviços externos, evidência operacional selada e decisão de promoção vinculada ao
 candidato.
 
-O [backlog desta rodada](backlog-auditoria-2026-10-07.md) detalha **45 tarefas AUD07** com
+O [backlog desta rodada](backlog-auditoria-2026-10-07.md) detalha **46 tarefas AUD07** com
 dependências e critérios de aceite. O [relatório da auditoria](reports/relatorio-auditoria-2026-10-07.md)
 preserva notas, achados A01–A20, comandos, exit codes e limites. Este planejamento não altera os
 estados de execução em `.agent/` nem inicia as correções.

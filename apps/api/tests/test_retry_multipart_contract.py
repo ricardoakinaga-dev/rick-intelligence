@@ -14,7 +14,7 @@ from fastapi.testclient import TestClient
 from starlette.datastructures import UploadFile
 
 from app import create_app
-from conftest import make_settings
+from apps.api.tests.support import make_settings
 
 
 class CapturingIngestion:

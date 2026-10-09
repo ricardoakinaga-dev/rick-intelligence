@@ -7,6 +7,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from urllib.parse import unquote, urlsplit
 
 ROOT = Path(__file__).resolve().parents[2]
 spec = importlib.util.spec_from_file_location("archive_controller", ROOT / "scripts/state_of_art/archive_controller.py")
@@ -21,14 +22,52 @@ def copy_recorded_artifacts(root):
     Resolve real recorded artifacts, never create placeholders that could turn
     a broken source reference into a passing fixture.
     """
+    # An isolated fixture shares authentic Git objects read-only so historical
+    # retired references resolve exactly as they do in the real checkout.
+    # No retired implementation or placeholder is restored into its tree.
+    subprocess.run(["git", "init", "--quiet", str(root)], check=True)
+    objects = subprocess.check_output(
+        ["git", "rev-parse", "--path-format=absolute", "--git-path", "objects"],
+        cwd=ROOT, text=True,
+    ).strip()
+    alternates = root / ".git/objects/info/alternates"
+    alternates.parent.mkdir(parents=True, exist_ok=True)
+    alternates.write_text(objects + "\n")
+    source_head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+    subprocess.run(["git", "update-ref", "refs/history/source-checkout", source_head], cwd=root, check=True)
     records = [json.loads(line) for line in (ROOT / ".agent/verification.jsonl").read_text().splitlines() if line]
-    for relative in {reference.split("#", 1)[0] for record in records for reference in record["artifacts"]}:
+    references = {reference.split("#", 1)[0] for record in records for reference in record["artifacts"]}
+    def recorded_references(value):
+        if isinstance(value, dict):
+            for key, nested in value.items():
+                if key in {"evidence_refs", "instruction_scope_refs", "evidence"} and isinstance(nested, list):
+                    references.update(reference.split("#", 1)[0] for reference in nested)
+                elif key == "evidence_ref" and isinstance(nested, str):
+                    references.add(nested.split("#", 1)[0])
+                recorded_references(nested)
+        elif isinstance(value, list):
+            for nested in value:
+                recorded_references(nested)
+    for path in [ROOT / ".agent/state.json", ROOT / ".agent/backlog.json", *sorted((ROOT / ".agent/gates").glob("*.json"))]:
+        recorded_references(json.loads(path.read_text()))
+    for relative in sorted(references):
+        parsed = urlsplit(relative)
+        if parsed.scheme or parsed.netloc:
+            continue
+        relative = unquote(parsed.path)
         source = archive_module.scoped_path(ROOT, relative)
-        if not source.is_file() or source.is_symlink():
-            raise ValueError(f"fixture evidence must resolve to an existing regular file: {relative}")
+        if not source.exists() and relative.startswith(("cvg-master-rag-v2/", "rick-professor/", "modulo-redis-locker/")):
+            history = subprocess.check_output(["git", "rev-list", "-1", "--all", "--", relative], cwd=root, text=True)
+            if history.strip():
+                continue
+        if not source.exists() or source.is_symlink():
+            raise ValueError(f"fixture evidence must resolve to an existing artifact: {relative}")
         target = archive_module.scoped_path(root, relative)
         target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(source, target)
+        if source.is_dir():
+            shutil.copytree(source, target, dirs_exist_ok=True, symlinks=True)
+        else:
+            shutil.copy2(source, target)
 
 
 class ArchiveTests(unittest.TestCase):
@@ -119,7 +158,7 @@ class CanonicalControllerTests(unittest.TestCase):
             for relative in (".agent", "docs", "scripts/control_plane/vendor", ".gauntlet-state-of-art",
                              ".gauntlet", ".orchestrate", ".orchestrate-state-of-art", ".review-control-history"):
                 shutil.copytree(ROOT / relative, root / relative)
-            for relative in ("cvg-master-rag-v2/AGENTS.md", "docs/architecture/controller-recovery.md",
+            for relative in ("docs/architecture/controller-recovery.md",
                              "docs/ci/check_control_plane.py", "scripts/state_of_art/archive_controller.py",
                              "scripts/state_of_art/review_control_views.py", "scripts/state_of_art/json_boundary.py"):
                 target = root / relative
@@ -173,9 +212,6 @@ class CanonicalControllerTests(unittest.TestCase):
             shutil.copytree(ROOT / ".agent", root / ".agent")
             shutil.copytree(ROOT / "docs", root / "docs")
             shutil.copytree(ROOT / ".gauntlet-state-of-art/reports", root / ".gauntlet-state-of-art/reports")
-            child = root / "cvg-master-rag-v2/AGENTS.md"
-            child.parent.mkdir()
-            shutil.copy2(ROOT / "cvg-master-rag-v2/AGENTS.md", child)
             copy_recorded_artifacts(root)
             def check():
                 return subprocess.run([sys.executable, str(CHECKER), str(root), "--quiet"],

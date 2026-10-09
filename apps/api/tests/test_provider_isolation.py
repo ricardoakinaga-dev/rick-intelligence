@@ -12,7 +12,7 @@ from fastapi.testclient import TestClient
 from starlette.requests import Request
 
 from app import create_app
-from conftest import make_settings, login_as
+from apps.api.tests.support import make_settings, login_as
 from dependencies.services import Providers, get_providers, get_settings
 from services.audit import InMemoryAuditSink
 from services.chat_service import StubChatBackend

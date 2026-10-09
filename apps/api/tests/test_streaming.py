@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from conftest import login_as
+from apps.api.tests.support import login_as
 
 
 def _chat_session():

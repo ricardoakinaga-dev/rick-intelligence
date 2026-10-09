@@ -98,7 +98,7 @@ control-inputs-restore:
 control-inputs-check:
 	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) "$(ROOT)/docs/ci/restore_control_inputs.py" --check
 
-validate: control-inputs-check
+validate: control-inputs-check docs-check
 	$(PYTHON) "$(ROOT)/scripts/phase15/check_boundaries.py"
 	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) "$(ROOT)/scripts/phase11/check_toolchain.py"
 	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) "$(ROOT)/scripts/phase11/check_workflow_actions.py"
@@ -108,6 +108,10 @@ validate: control-inputs-check
 
 quality-bar-static:
 	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) "$(ROOT)/scripts/state_of_art/validate_quality_bar.py"
+
+.PHONY: docs-check
+docs-check:
+	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) "$(ROOT)/scripts/phase11/check_docs.py"
 
 dev:
 	$(PYTHON) "$(PHASE11_RUNNER)" dev

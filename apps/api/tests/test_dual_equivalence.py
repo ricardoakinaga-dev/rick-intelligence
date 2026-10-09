@@ -3,7 +3,7 @@
 import json
 from pathlib import Path
 
-from conftest import login_as
+from apps.api.tests.support import login_as
 
 GOLDEN_DIR = Path(__file__).parent / "golden"
 
@@ -12,7 +12,7 @@ def test_chat_and_compat_semantic_parity(client):
     from fastapi.testclient import TestClient
 
     from app import create_app
-    from conftest import make_settings
+    from apps.api.tests.support import make_settings
     from dependencies.services import Providers
     from services.audit import InMemoryAuditSink
     from services.chat_service import StubChatBackend

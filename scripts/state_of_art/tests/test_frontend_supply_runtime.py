@@ -196,6 +196,24 @@ def test_missing_npm_keeps_lockfile_result_not_run(tmp_path: Path) -> None:
     assert result["result"] == "NOT_RUN"
 
 
+@pytest.mark.parametrize("missing", ["package.json", "package-lock.json"])
+def test_canonical_node_component_cannot_disappear(tmp_path: Path, missing: str) -> None:
+    _write_node_component(tmp_path)
+    (tmp_path / "apps/web" / missing).unlink()
+    assert gate.check_lockfiles(tmp_path, npm=None)["status"] == "FAIL"
+    assert gate.check_sbom(tmp_path, tmp_path / "evidence", npm=None)["status"] == "FAIL"
+    assert gate.check_licenses(tmp_path)["status"] == "FAIL"
+
+
+def test_node_inventory_matches_tracked_canonical_manifests() -> None:
+    manifests = {
+        path.parent.relative_to(ROOT).as_posix()
+        for path in gate._git_files(ROOT)
+        if path.name == "package.json"
+    }
+    assert set(gate.NODE_COMPONENTS) == manifests == {"apps/web"}
+
+
 def test_sbom_parser_requires_non_empty_cyclonedx_components() -> None:
     assert gate._parse_sbom(json.dumps({"bomFormat": "CycloneDX", "components": [{"name": "react"}]}))[0] is True  # noqa: SLF001
     assert gate._parse_sbom(json.dumps({"bomFormat": "CycloneDX", "components": []}))[0] is False  # noqa: SLF001
@@ -224,11 +242,24 @@ def test_secret_scan_passes_dependency_free_clean_input(tmp_path: Path) -> None:
     assert result["tool"] == "built-in-static-scanner"
 
 
+@pytest.mark.parametrize("relative", ["src/credentials.py", "tests/test_credentials.py"])
+@pytest.mark.parametrize("key_type", ["", "RSA ", "EC ", "OPENSSH ", "DSA "])
+def test_private_key_detection_has_no_test_path_exception(tmp_path: Path, relative: str, key_type: str) -> None:
+    path = tmp_path / relative
+    path.parent.mkdir(parents=True)
+    header = "-----BEGIN " + key_type + "PRIVATE KEY" + "-----"
+    path.write_text(header + "\nsynthetic-body\n", encoding="utf-8")
+    result = gate.check_secrets(tmp_path, tmp_path / "evidence", python=None, gitleaks=None)
+    assert result["status"] == "FAIL"
+    assert result["observations"]["findings"] == [{"path": relative, "line": 1, "kind": "private_key"}]
+    assert header not in json.dumps(result)
+
+
 def test_license_allowlist_rejects_unknown_and_accepts_spdx(tmp_path: Path) -> None:
     _write_node_component(tmp_path)
     lock_path = tmp_path / "apps/web/package-lock.json"
     lock = json.loads(lock_path.read_text(encoding="utf-8"))
-    lock["packages"]["node_modules/react"]["license"] = "MIT"
+    lock["packages"]["node_modules/react"]["license"] = "MIT-0"
     lock_path.write_text(json.dumps(lock), encoding="utf-8")
     assert gate.check_licenses(tmp_path)["status"] == "PASS"
     lock["packages"]["node_modules/react"]["license"] = "Custom-Proprietary"

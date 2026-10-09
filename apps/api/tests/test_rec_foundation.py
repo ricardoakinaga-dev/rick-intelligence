@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 
 from app import create_app
 from core.config import ApiSettings
-from conftest import login_as, make_settings
+from apps.api.tests.support import login_as, make_settings
 from routes.auth import _public_session
 from rick_contracts.security import SessionSnapshot
 

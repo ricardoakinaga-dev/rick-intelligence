@@ -103,7 +103,7 @@ DEFAULT_ARTIFACTS = (
     "apps/api/tests/test_app_lifecycle.py",
     "apps/api/tests/test_external_composition.py",
     "apps/api/tests/test_postgres_ingestion.py",
-    "apps/api/tests/test_deployment_composition.py",
+    "apps/api/tests/test_api_deployment_composition.py",
     "apps/api/tests/test_object_store_transport.py",
     "apps/api/tests/test_health.py",
     "apps/api/tests/test_phase16_health.py",

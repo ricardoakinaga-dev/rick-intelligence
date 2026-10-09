@@ -4,7 +4,7 @@ from routes.admin import create_user, CreateUserRequest
 from services.postgres_identity import PostgresIdentityProvider
 from services.audit import InMemoryAuditSink
 from dependencies.services import Providers
-from conftest import make_settings
+from apps.api.tests.support import make_settings
 from test_aud03_atomic_audit import actor, request
 from test_aud03_audit_postgres_contract import TransactionConnection
 

@@ -456,9 +456,12 @@ def test_final_promotion_report_matches_prompt_section_and_scorecard_contract() 
     assert "**Decision:** `NO-GO / NOT PROMOTED`." in text
 
 
-def test_canonical_workflows_keep_pythonpath_entries_contiguous() -> None:
+def test_canonical_workflows_use_shared_source_discovery_without_exports() -> None:
+    from scripts.phase13.pyenv import source_paths
+
     root = Path(__file__).parents[3]
+    assert {path.relative_to(root).as_posix() for path in source_paths()} == set(CANONICAL_PYTHONPATH.split(":"))
+    assert "from scripts.phase13.pyenv import source_paths" in (root / "conftest.py").read_text()
     for relative in (".github/workflows/quality.yml", ".github/workflows/state-of-art-quality.yml"):
         text = (root / relative).read_text(encoding="utf-8")
-        assert f"PYTHONPATH: {CANONICAL_PYTHONPATH}" in text
-        assert "PYTHONPATH: >-" not in text
+        assert "PYTHONPATH:" not in text

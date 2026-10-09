@@ -3,7 +3,7 @@
 from fastapi.testclient import TestClient
 
 from app import create_app
-from conftest import make_settings
+from apps.api.tests.support import make_settings
 from core.telemetry import ApiTelemetry, MAX_HISTOGRAM_SAMPLES, MAX_TELEMETRY_EVENTS
 
 

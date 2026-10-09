@@ -16,7 +16,7 @@ from services.audit import InMemoryAuditSink
 from services.identity_service import InMemoryIdentityProvider
 from services.audit_operations import run_operation, OperationLedger
 from services.sqlite_audit import SQLiteAuditSink
-from conftest import make_settings
+from apps.api.tests.support import make_settings
 
 
 class BrokenAudit(InMemoryAuditSink):

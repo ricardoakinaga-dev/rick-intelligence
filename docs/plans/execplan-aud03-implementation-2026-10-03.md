@@ -1,5 +1,7 @@
 # ExecPlan AUD03 — implementação integral do roadmap
 
+> **HISTORICAL — snapshot preservado; classificado em 09/10/2026.** Afirmações sobre o checkout e os legados descrevem a data original. Consulte o [índice vigente](../INDEX.md) para implementação, backlog e evidência atuais.
+
 ## Purpose / Big Picture
 
 Implementar as 36 tarefas do [backlog AUD03](../backlog-auditoria-2026-10-03.md), segundo os oito marcos do [roadmap](../roadmap-auditoria-2026-10-03.md). A conclusão exige correções locais, CI reproduzível, integração real, operação e decisão verificável de promoção. O escopo permanece integral mesmo quando uma dependência externa impedir um marco.

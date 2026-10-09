@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
 from app import create_app
-from conftest import login_as, make_settings
+from apps.api.tests.support import login_as, make_settings
 from dependencies.services import Providers
 from rick_contracts.cases import CaseCreateRequest
 from rick_contracts.security import SessionSnapshot

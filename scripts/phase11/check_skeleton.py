@@ -154,11 +154,11 @@ def _check_preservation_manifest(errors: list[str]) -> None:
     if not isinstance(policy, dict):
         errors.append("preserved component manifest policy is not an object")
     else:
-        if policy.get("root_snapshot_required") is not True:
-            errors.append("preserved component manifest must require the root snapshot")
-        if policy.get("independent_git_metadata") != "validated_when_present":
+        if policy.get("root_snapshot_required") is not False:
+            errors.append("retired component manifest must not require a current snapshot")
+        if policy.get("independent_git_metadata") != "preserved_in_root_history":
             errors.append(
-                "preserved component manifest must validate independent Git metadata when present"
+                "retired component manifest must preserve root history"
             )
 
     components = manifest.get("components")
@@ -176,8 +176,10 @@ def _check_preservation_manifest(errors: list[str]) -> None:
             errors.append("preserved component manifest contains a component without a path")
             continue
         paths.append(path)
-        if component.get("root_snapshot_required") is not True:
-            errors.append(f"preserved component does not require root snapshot: {path}")
+        if component.get("root_snapshot_required") is not False:
+            errors.append(f"retired component requires a current snapshot: {path}")
+    if manifest.get("status") != "RETIRED" or manifest.get("decision") != "AUD07-02/AUD07-04":
+        errors.append("component retirement must record the AUD07-02/AUD07-04 decision")
     if sorted(paths) != sorted(LEGACY_DIRS):
         errors.append("preserved component manifest does not enumerate exactly the legacy paths")
 

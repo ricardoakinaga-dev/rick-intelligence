@@ -1,5 +1,7 @@
 # Relatório de auditoria de funcionamento — RICK Intelligence
 
+> **HISTORICAL — snapshot preservado; classificado em 09/10/2026.** Afirmações sobre o checkout e os legados descrevem a data original. Consulte o [índice vigente](../INDEX.md) para implementação, backlog e evidência atuais.
+
 **Data:** 2026-09-08  
 **Revisão auditada:** `66781cb`  
 **Escopo:** aplicação canônica em `apps/web`, `apps/api` e `packages`, os componentes preservados em `cvg-master-rag-v2`, contratos de compatibilidade com OpenWebUI, documentação arquitetural, testes e renders reais.
@@ -132,7 +134,7 @@ As fontes abaixo permitem revisar as conclusões sem depender apenas deste texto
 - [cliente API root](../../apps/web/lib/api.ts): não possui operações de usuários nem histórico no frontend;
 - [rotas administrativas](../../apps/api/src/routes/admin.py): listagem/criação parcial de usuários, sessões vazias e jobs processuais;
 - [serviço de chat](../../apps/api/src/services/chat_service.py): `StubChatBackend` determinístico e sem chamadas ao provider;
-- [admin legado](../../cvg-master-rag-v2/frontend/app/admin/page.tsx): demonstra a superfície de tenants, usuários, edição, remoção e avaliação que ficou fora do root.
+- Admin legado (`cvg-master-rag-v2/frontend/app/admin/page.tsx`, preservado no histórico Git após AUD07-02/04): demonstrava a superfície de tenants, usuários, edição, remoção e avaliação que ficou fora do root naquele snapshot.
 
 ## Arquitetura que deve ser construída
 

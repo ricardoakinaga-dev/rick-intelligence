@@ -3,7 +3,7 @@
 from fastapi.testclient import TestClient
 
 from app import create_app
-from conftest import login_as, make_settings
+from apps.api.tests.support import login_as, make_settings
 from core.lifecycle import DependencyState
 from dependencies.services import Providers
 from services.audit import InMemoryAuditSink

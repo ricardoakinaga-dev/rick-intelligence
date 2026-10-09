@@ -11,7 +11,7 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
-from conftest import login_as, make_settings
+from apps.api.tests.support import login_as, make_settings
 from rick_knowledge import Collection, Document, InMemoryKnowledgeStore, SQLiteKnowledgeStore
 from rick_retrieval import DeterministicHashEmbedding, QdrantBackend
 from services.knowledge_service import (

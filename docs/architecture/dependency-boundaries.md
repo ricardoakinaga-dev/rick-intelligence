@@ -1,5 +1,7 @@
 # Dependency boundaries
 
+> **HISTORICAL — snapshot preservado; classificado em 09/10/2026.** Afirmações sobre o checkout e os legados descrevem a data original. Consulte o [índice vigente](../INDEX.md) para implementação, backlog e evidência atuais.
+
 Status: `CURRENT` for the Phase 1.1 skeleton. The machine-readable contract in
 [`dependency-boundaries.json`](dependency-boundaries.json) is normative; this
 document explains its intent and migration controls.

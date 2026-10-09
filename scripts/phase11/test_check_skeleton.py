@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+from copy import deepcopy
 from unittest import mock
 from pathlib import Path
 
@@ -12,15 +13,26 @@ from scripts.phase11 import check_skeleton
 
 
 class SkeletonValidatorTests(unittest.TestCase):
-    def test_preservation_policy_allows_clean_root_checkouts(self) -> None:
+    def test_retirement_policy_preserves_history_without_current_snapshots(self) -> None:
         manifest = check_skeleton._load_json(check_skeleton.PRESERVATION_MANIFEST, [])
 
         self.assertEqual(manifest["schema_version"], "phase-1.1-preserved-components.v1")
         self.assertEqual(
             manifest["policy"]["independent_git_metadata"],
-            "validated_when_present",
+            "preserved_in_root_history",
         )
-        self.assertTrue(manifest["policy"]["root_snapshot_required"])
+        self.assertFalse(manifest["policy"]["root_snapshot_required"])
+        errors: list[str] = []
+        check_skeleton._check_preservation_manifest(errors)
+        self.assertEqual(errors, [])
+
+    def test_retirement_manifest_rejects_reintroduced_snapshot_requirement(self) -> None:
+        manifest = deepcopy(check_skeleton._load_json(check_skeleton.PRESERVATION_MANIFEST, []))
+        manifest["components"][0]["root_snapshot_required"] = True
+        errors: list[str] = []
+        with mock.patch.object(check_skeleton, "_load_json", return_value=manifest):
+            check_skeleton._check_preservation_manifest(errors)
+        self.assertTrue(any("requires a current snapshot" in error for error in errors))
 
     def test_strict_json_rejects_duplicate_manifest_fields(self) -> None:
         with tempfile.TemporaryDirectory(prefix="phase11-json-boundary-") as temporary:

@@ -21,7 +21,7 @@ from routes.sessions import RevokeRequest, revoke_sessions
 from services.postgres_audit import PostgresAuditSink
 from services.postgres_identity import PostgresIdentityProvider
 from test_aud03_atomic_audit import actor, request
-from conftest import make_settings
+from apps.api.tests.support import make_settings
 from rick_identity import hash_password
 from rick_knowledge import PostgresKnowledgeStore
 

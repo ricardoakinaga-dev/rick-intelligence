@@ -1,6 +1,6 @@
 # Root toolchain contract
 
-Status: `CURRENT` for Phase 1.1, observed 2026-08-31; reconciled for component
+Status: `CURRENT`, observed 2026-08-31; reconciled for component
 retirement on 2026-10-07 (AUD07-04).
 
 The machine-readable source for the root pins is [`toolchain.json`](../../toolchain.json).

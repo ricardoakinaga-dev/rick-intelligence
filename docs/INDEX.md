@@ -1,7 +1,7 @@
 # Índice canônico de documentação
 
 **Status:** CURRENT para o checkout auditado.
-**Última consolidação:** auditoria local de 07/10/2026, baseline 64,2/100 em 26 áreas e 20 achados (A01–A20); promoção `NO-GO`. **Remediação em andamento:** AUD07-01–15, AUD07-17, AUD07-18 e AUD07-19 concluídas e evidenciadas (M0 e M1 completos: A02, A03, A04, A16; M2 em curso: A10 no npm, A09 no typecheck, A11 na evidência de 1,86 GB e na higiene do worktree; o restante segue pendente). A nota descreve o corte auditado; alterações posteriores precisam de nova validação. O scorecard de 03/10/2026 permanece como baseline histórica desta rodada, com escopo e número de áreas diferentes — não comparável diretamente.
+**Última consolidação:** retomada local de 09/10/2026. AUD07-01–26, 44–46 concluídas localmente; AUD07-27 parcial por revisão independente e vínculo de evidência ao candidato; AUD07-43 mantém gates externos abertos. O [relatório da retomada](reports/retomada-2026-10-09.md) registra os resultados atuais. A auditoria de 07/10 permanece baseline histórica de 64,2/100 em 26 áreas, sem recalcular a nota. Promoção `NO-GO`. O scorecard de 03/10 tem escopo diferente e não é diretamente comparável.
 **Regra:** documentos com status `HISTORICAL`, `REFERENCE / NOT_RUN` ou fase anterior não comprovam o estado executável atual.
 
 ## Autoridades atuais
@@ -12,23 +12,26 @@
 | Contribuição e segurança operacional | [CONTRIBUTING](../CONTRIBUTING.md) | CURRENT |
 | Arquitetura executável | [system-architecture.md](architecture/system-architecture.md) e [production-runtime.md](architecture/production-runtime.md) | CURRENT, runtime externo NOT_RUN |
 | Limites de dependência | [dependency-boundaries.json](architecture/dependency-boundaries.json) | CURRENT como regra automatizada |
-| Segurança e autorização | [authorization.md](architecture/authorization.md) e [security/](architecture/security/) | CURRENT, integração externa pendente |
+| Segurança e autorização | [authorization.md](architecture/authorization.md) e [production-runtime.md](architecture/production-runtime.md) | CURRENT, integração externa pendente; `security/` preserva decisões e evidências dos legados |
 | Operação e promoção | [release-readiness.md](operations/release-readiness.md) | REFERENCE / NOT_RUN |
 | Snapshot desta auditoria | [relatório de 07/10/2026](reports/relatorio-auditoria-2026-10-07.md) | CURRENT como baseline; escore técnico local; promoção NO-GO |
 | Roadmap desta auditoria | [roadmap-auditoria-2026-10-07.md](roadmap-auditoria-2026-10-07.md) | CURRENT como planejamento de referência |
-| Backlog desta auditoria | [backlog-auditoria-2026-10-07.md](backlog-auditoria-2026-10-07.md) | CURRENT como contrato de escopo e aceite; 45 tarefas AUD07, **AUD07-01–15 e AUD07-17 concluídas, AUD07-43 em curso, AUD07-44/45 planejadas** |
+| Backlog desta auditoria | [backlog-auditoria-2026-10-07.md](backlog-auditoria-2026-10-07.md) | CURRENT como contrato de escopo e aceite; 46 tarefas AUD07, **AUD07-01–26 e 44–46 concluídas localmente; 27 parcial; 28–43 dependem de evidência externa** |
 | Snapshot anterior (AUD03) | [scorecard de 03/10/2026](reports/evidence/auditoria-2026-10-03/scorecard.json) | HISTORICAL como baseline anterior; escopo de 29 áreas, não comparável |
 | Roadmap anterior (AUD03) | [roadmap-auditoria-2026-10-03.md](roadmap-auditoria-2026-10-03.md) | HISTORICAL; preservado para rastreabilidade |
 | Backlog anterior (AUD03) | [backlog-auditoria-2026-10-03.md](backlog-auditoria-2026-10-03.md) | HISTORICAL; 36 tarefas AUD03 sem encerramento automático |
 | Plano de implementação AUD03 | [execplan-aud03-implementation-2026-10-03.md](plans/execplan-aud03-implementation-2026-10-03.md) | IN_PROGRESS; registros de execução separados do planejamento; aceite global não demonstrado |
 | Checkpoint das 36 tarefas AUD03 | [execution-checkpoint-v2.json](reports/evidence/implementation-aud03-2026-10-03/execution-checkpoint-v2.json) | Continuação local; nenhum aceite integral declarado; v1 preservado como predecessor; conferir hashes e revisões antes de retomar |
 | Plano de implementação AUD26 | [execplan-aud26-implementation-2026-10-01.md](plans/execplan-aud26-implementation-2026-10-01.md) | Programa anterior preservado; consultar seus próprios registros de execução |
+| Retomada atual da construção | [plano de 09/10](plans/execplan-retomada-2026-10-09.md) e [relatório](reports/retomada-2026-10-09.md) | Correções locais AUD07; conferir resultados definitivos no relatório |
+| Testes externos não executados | [inventário de skips](reports/skips-2026-10-09.md) | 221 node IDs classificados por dependência e gate |
+| Auditoria congelada da barra | [current-triple-aaa-gap-audit.md](reports/current-triple-aaa-gap-audit.md) | HISTORICAL, bytes imutáveis exigidos pelo quality bar; o título original não estabelece frescor |
 
 ## Evidências e relatórios
 
 - [Relatório da auditoria atual](reports/relatorio-auditoria-2026-10-07.md): notas das 26 áreas, achados A01–A20, comandos, exit codes e limites.
 - [Roadmap atual](roadmap-auditoria-2026-10-07.md): oito marcos M0–M7, sequência, gates de passagem e dependências externas.
-- [Backlog atual](backlog-auditoria-2026-10-07.md): 45 tarefas AUD07 com prioridades, dependências, tamanhos relativos e critérios de aceite.
+- [Backlog atual](backlog-auditoria-2026-10-07.md): 46 tarefas AUD07 com prioridades, dependências, tamanhos relativos e critérios de aceite.
 - [Evidência M0 (AUD07-03–09)](reports/evidence/auditoria-2026-10-07/fix-gates-1.md): gates por alvo, `make ci` em checkout limpo com dependências só dos locks.
 - [Evidência M1 (AUD07-10–12)](reports/evidence/auditoria-2026-10-07/fix-gates-2.md): correções de idempotência e de lifecycle, discriminação por reversão, cobertura de lanes e correções de `PYTHONPATH`.
 - [Evidência AUD07-13 (política default-deny de rotas)](reports/evidence/auditoria-2026-10-07/route-policy.md): paridade registro ↔ handler via `ROUTERS`, imposição declarada vs. executada, limite de escopo próprio, discriminação por reversão e gates do candidato.

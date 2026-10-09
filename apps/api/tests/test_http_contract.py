@@ -1,6 +1,6 @@
 """Request IDs, security headers, CORS, request limits, rate limiting."""
 
-from conftest import login_as
+from apps.api.tests.support import login_as
 
 
 def test_request_id_headers(client):
@@ -46,7 +46,7 @@ def test_request_size_limit(app, providers):
     from fastapi.testclient import TestClient
 
     from app import create_app
-    from conftest import make_settings
+    from apps.api.tests.support import make_settings
     from dependencies.services import Providers as P
     from services.audit import InMemoryAuditSink
     from services.chat_service import StubChatBackend

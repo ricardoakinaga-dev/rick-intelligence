@@ -1,5 +1,7 @@
 # Phase 0.6 — Promotion Closure
 
+> **HISTORICAL — snapshot preservado; classificado em 09/10/2026.** Afirmações sobre o checkout e os legados descrevem a data original. Consulte o [índice vigente](../INDEX.md) para implementação, backlog e evidência atuais.
+
 ## Executive Summary
 
 Phase 0.6 closed the concrete RBAC, session-snapshot, veterinarian access,

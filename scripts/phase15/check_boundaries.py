@@ -23,6 +23,8 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 LEGACY_PATHS = ("cvg-master-rag-v2", "rick-professor", "modulo-redis-locker")
 ROOT_PACKAGES = ("contracts", "knowledge", "ingestion", "retrieval", "authorization", "identity", "providers", "locking", "professor")
 FORBIDDEN_MODULE_PREFIXES = ("apps", "cvg_master_rag_v2", "modulo_redis_locker")
@@ -121,6 +123,11 @@ def _git(*args: str) -> tuple[int, str, str]:
 def check_preservation(root: Path = ROOT) -> list[str]:
     """The retired components must be absent from the tree, not absent from history."""
     errors: list[str] = []
+    # The manifest is still a current consumer of the retirement decision.
+    # Validate it as well as the tree so it cannot silently demand old snapshots.
+    from scripts.phase11 import check_skeleton
+
+    check_skeleton._check_preservation_manifest(errors)
     for component in LEGACY_PATHS:
         path = root / component
         if path.exists():
