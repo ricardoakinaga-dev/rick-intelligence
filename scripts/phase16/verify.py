@@ -67,10 +67,25 @@ def main() -> int:
         ["make", "api-contract"],
         ["git", "diff", "--check"],
     ]
-    checks = [_run(command) for command in commands]
-    for check in checks:
+    checks = []
+    for command in commands:
+        check = _run(command)
         if check.get("passed"):
             check.pop("output_tail", None)
+        checks.append(check)
+        print(
+            "CHECK "
+            + json.dumps(
+                {
+                    "command": command,
+                    "exit_code": check.get("exit_code"),
+                    "passed": check.get("passed"),
+                    "test_pass_count": check.get("test_pass_count"),
+                },
+                ensure_ascii=False,
+            ),
+            flush=True,
+        )
     child_status = {child: _git_status(child) for child in CHILDREN}
     benchmark_path = ROOT / "docs" / "progress" / "phase-1.6-perf.json"
     benchmark = json.loads(benchmark_path.read_text(encoding="utf-8")) if benchmark_path.is_file() else None
@@ -100,6 +115,7 @@ def main() -> int:
                 "exit_code": check.get("exit_code"),
                 "test_pass_count": check.get("test_pass_count"),
                 "timed_out": check.get("timed_out", False),
+                "output_tail": check.get("output_tail", ""),
             }
             for check in checks
             if not check.get("passed")
