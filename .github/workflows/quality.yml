@@ -537,6 +537,8 @@ jobs:
       - name: Install canonical web dependencies
         working-directory: apps/web
         run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Restore versioned control inputs
+        run: make control-inputs-restore
       - name: Run the integrated fail-closed verification packet
         run: make triple-aaa-verify
       - name: Export the current prompt matrix bound to this runtime packet
