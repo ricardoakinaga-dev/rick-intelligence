@@ -21,8 +21,8 @@ inputs de CI trackeados, um checkout novo dá `make validate` = 0).
 foram remediadas e confirmadas no push `4d2ac2c`: phase-1.3, phase-1.3.1, phase-1.4 e
 phase-1.5 verdes; PHASE3 `--verify` permanece vermelho **por decisão de 08/10/2026
 (deixar vermelho e registar)**, `State of Art / release integrity` segue vermelho por
-evidência de runtime não vinculada (pré-existente desde 10/09) e `phase-1.6` está em
-diagnóstico — sem alteração de gates — ver
+evidência de runtime não vinculada (pré-existente desde 10/09); `phase-1.6` falhava por
+faltar o `npm ci` de `apps/web` no job e foi corrigido — sem alteração de gates — ver
 [`ci-lanes-remediation.md`](reports/evidence/auditoria-2026-10-07/ci-lanes-remediation.md).
 **Baseline:** 64,2/100 em 26 áreas, 20 achados (A01–A20); prontidão `NO-GO`.
 

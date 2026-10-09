@@ -185,16 +185,31 @@ CI desse push estão em §7.
 Balanço: 5 workflows verdes, 3 vermelhos — PHASE3 (decisão §6), State of Art §7.2
 (encontrado e vermelho desde 10/09) e phase-1.6 §7.1 (em diagnóstico).
 
-### 7.1 phase-1.6 — check por identificar
+### 7.1 phase-1.6 — parser TypeScript em falta no job
 
 `scripts/phase16/verify.py` engolia a saída de cada comando, pelo que o JSON do CI só
-dizia `checks_passed: false` sem nomear o comando. Este commit acrescenta
-`failed_checks` (comando, `exit_code`, `test_pass_count`, `timed_out`) à saída, sem
-alterar o valor de saída nem nenhum limiar. Reprodução local fiel ao CI dos 6 comandos
-(`make api16-full`, `make api15-full`, `make api14-full`, `make api-security`,
-`make api-contract`, `git diff --check` com venv novo de `requirements/test.lock` e sem
-`.runtime/venvs/cvg`): todos `exit 0` — logo o check que falha no CI só se revela com o
-diagnóstico do próprio CI.
+dizia `checks_passed: false` sem nomear o comando. O ciclo seguinte acrescentou
+`failed_checks` (comando, `exit_code`, `test_pass_count`, `timed_out`, `output_tail`) e
+uma linha `CHECK` por comando à saída — sem alterar o valor de saída nem nenhum limiar —
+e revelou:
+
+- `make api16-full` → `exit 2`, `test_pass_count 0`, falha em `validate`;
+- `make api15-full` → `exit 2`, `test_pass_count 0`, falha em `api15-boundaries`;
+- em ambos: `check_boundaries.py` → `"status": "FAIL"` com erro
+  `"TypeScript boundary parser failed; install the pinned apps/web dependencies"`.
+
+**Causa raiz:** o job `phase-1.6` era o único que executa `validate`/`api15-boundaries`
+sem instalar as dependências pinadas de `apps/web` — `quality` (3×), `phase-1.1` (2×),
+`phase-1.5` e `state-of-art-quality` têm o passo `npm ci`; `phase-1.6` não tinha. A
+reprodução local fiel ao CI (venv novo de `test.lock`, sem `.runtime/venvs/cvg`) passava
+os 6 comandos porque o anfitrião já tem `apps/web/node_modules`.
+
+**Correção:** `.github/workflows/phase-1.6.yml` ganhou o mesmo par de passos dos outros
+workflows — `actions/setup-node@49933ea5…` (v4.4.0) com `node-version: "22.19.0"` e
+cache npm sobre `apps/web/package-lock.json`, seguido de
+`npm ci --ignore-scripts --no-audit --no-fund` em `apps/web` —, colocado entre a
+instalação de `requirements/test.lock` e `make control-inputs-restore`. Nenhum limiar,
+teste ou gate foi alterado.
 
 ### 7.2 State of Art — envelopes de runtime não vinculados (pré-existente)
 
