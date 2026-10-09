@@ -510,15 +510,15 @@ com o comando exato do CI (venv novo a partir do lock, `PYTHONPATH` do workflow,
 nenhum teste removido, ignorado ou com threshold rebaixado; comando completo, exit code e
 artefatos registrados.
 
-**Estado:** Em curso. Correções verificadas localmente (`make validate`, `make test` e
-`make ci` = 0) e confirmadas no push `4d2ac2c` (08/10): **phase-1.3, phase-1.3.1,
-phase-1.4 e phase-1.5 verdes** e os 7 jobs do `quality` verdes excepto `PHASE3`.
-Ainda abertos: (a) PHASE3 `--verify` **vermelho por decisão explícita de 08/10/2026
-(opção 3: deixar vermelho e registar)**, sem alteração de gate; (b) `State of Art /
-release integrity`, vermelho desde 10/09 por envelopes de runtime não vinculados —
-mesma classe de (a); (c) `phase-1.6`, que falhava por o job não instalar as dependências pinadas de
-`apps/web` antes de `validate` — corrigido com o mesmo par de passos `setup-node` +
-`npm ci` dos outros workflows, mantendo o diagnóstico `failed_checks`/`CHECK`.`
+**Estado:** Em curso (confirmação em CI concluída). Correções verificadas localmente
+(`make validate`, `make test` e `make ci` = 0) e confirmadas no CI: **6 das 7 pipelines
+vermelhas de `f47a3e6` ficaram verdes** — `phase-1.3`, `phase-1.3.1`, `phase-1.4`,
+`phase-1.5` e `phase-1.6` (run `37864065077`) a verde e os 7 jobs do `quality` a verde
+excepto `PHASE3`. `State of Art` teve os 45 testes corrigidos (546 passed) mas mantém o
+seu gate de evidência de runtime. Ainda abertos: (a) PHASE3 `--verify` **vermelho por
+decisão explícita de 08/10/2026 (opção 3: deixar vermelho e registar)** e (b)
+`State of Art / release integrity`, vermelho desde 10/09 por envelopes de runtime não
+vinculados — mesma classe de (a); nenhum limiar, teste ou gate foi alterado.
  **Evidência:**
 [`ci-lanes-remediation.md`](reports/evidence/auditoria-2026-10-07/ci-lanes-remediation.md) —
 §1–§3 diagnóstico, §6 decisão sobre o PHASE3, §7 resultado do push e achados abertos.

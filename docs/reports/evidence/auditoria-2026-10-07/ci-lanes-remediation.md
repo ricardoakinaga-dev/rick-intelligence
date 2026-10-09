@@ -178,12 +178,29 @@ CI desse push estão em §7.
 | `phase-1.3.1-identity-canonicalization` (`37859057299`) | **sucesso** | era vermelho em `f47a3e6` (`pyjwt`) |
 | `phase-1.4-rag-extraction` (`37859057226`) | **sucesso** | era vermelho em `f47a3e6` |
 | `phase-1.5-root-professor` (`37859057185`) | **sucesso** | era vermelho em `f47a3e6` |
-| `phase-1.6-root-ingestion` (`37859057225`) | falha | `make api16-verify` devolveu `checks_passed: false`; a reprodução local fiel ao CI (venv novo a partir de `test.lock`, sem `.runtime/venvs/cvg`) passa os 6 comandos — em curso a identificar o check via `failed_checks` (§7.1) |
+| `phase-1.6-root-ingestion` (`37859057225`) | falha | `make api16-verify` devolveu `checks_passed: false` — diagnosticado e corrigido em §7.1; **verde no run `37864065077` (`7608f77`)** |
 | `State of Art / release integrity` (`37859057262`) | falha | **546 passed / 10 subtests** (os 45 failed de `f47a3e6` resolvidos); falha agora só `release integrity` — §7.2 |
 | `Phase 1.1 Root Foundation` (`37859057232`) | **sucesso** | já era verde |
 
-Balanço: 5 workflows verdes, 3 vermelhos — PHASE3 (decisão §6), State of Art §7.2
-(encontrado e vermelho desde 10/09) e phase-1.6 §7.1 (em diagnóstico).
+Balanço do push inicial: 5 workflows verdes, 3 vermelhos.
+
+## 8. Estado final após as correções de §7 (runs de `7608f77`)
+
+| Workflow | Conclusão |
+|---|---|
+| `RICK canonical quality lanes` (`37864065133`) | 7 de 8 jobs verdes (`UNIT`, `CONTRACT`, `RAG-EVAL`, `FAST`, `FRONTEND`, `SECURITY`, `SUPPLY-CHAIN`); só `PHASE3` vermelho **por decisão de §6** |
+| `phase-1.6-root-ingestion` (`37864065077`) | **sucesso** (correção de §7.1) |
+| `Phase 1.1 Root Foundation` (`37864065087`) | **sucesso** |
+| `State of Art / release integrity` (`37864065017`) | falha — só `release integrity`; §7.2 (pré-existente desde 10/09) |
+| `phase-1.3`, `phase-1.3.1`, `phase-1.4`, `phase-1.5` | **sucesso** no run `4d2ac2c` (não reexecutados por filtros de caminho nos commits seguintes) |
+
+Das 7 pipelines vermelhas de `f47a3e6`, 6 ficaram verdes (5 lanes de fase + os 7 jobs do
+`quality` excepto `PHASE3`, que ficou vermelho por decisão explícita) e 1 (`State of
+Art`) ficou com os testes corrigidos mas retém o seu gate de evidência de runtime, que
+já falhava antes deste trabalho. Nenhum limiar, teste ou gate foi alterado; as três
+alterações de suporte acrescentadas neste ciclo (`failed_checks`/`CHECK` no
+`verify.py`, `output_tail` e o passo `npm ci` do `phase-1.6`) só tornaram o falhanço
+diagnóstico e igualaram o job ao dos restantes workflows.
 
 ### 7.1 phase-1.6 — parser TypeScript em falta no job
 
