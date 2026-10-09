@@ -41,6 +41,7 @@ def _run(command: list[str], timeout: int = 900) -> dict[str, object]:
             "exit_code": completed.returncode,
             "passed": completed.returncode == 0,
             "test_pass_count": sum(int(value) for value in passed_match),
+            "output_tail": output[-4000:],
         }
     except subprocess.TimeoutExpired:
         return {"command": command, "exit_code": 124, "passed": False, "timed_out": True}
@@ -67,6 +68,9 @@ def main() -> int:
         ["git", "diff", "--check"],
     ]
     checks = [_run(command) for command in commands]
+    for check in checks:
+        if check.get("passed"):
+            check.pop("output_tail", None)
     child_status = {child: _git_status(child) for child in CHILDREN}
     benchmark_path = ROOT / "docs" / "progress" / "phase-1.6-perf.json"
     benchmark = json.loads(benchmark_path.read_text(encoding="utf-8")) if benchmark_path.is_file() else None
