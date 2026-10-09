@@ -529,6 +529,14 @@ jobs:
         run: |
           python -m pip install --disable-pip-version-check --no-cache-dir --require-hashes --only-binary=:all: -r requirements/test.lock
           python -m pip check
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Install canonical web dependencies
+        working-directory: apps/web
+        run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Run the integrated fail-closed verification packet
         run: make triple-aaa-verify
       - name: Export the current prompt matrix bound to this runtime packet
