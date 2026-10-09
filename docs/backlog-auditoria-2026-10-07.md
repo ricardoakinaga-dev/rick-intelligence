@@ -1,10 +1,12 @@
 # Backlog de remediação RICK Intelligence
 
-**Data:** 07/10/2026 (atualizado em 08/10/2026). **Estado:** 43 tarefas propostas; **AUD07-01–15, AUD07-17, AUD07-18 e
+**Data:** 07/10/2026 (atualizado em 09/10/2026). **Estado:** 45 tarefas propostas; **AUD07-01–15, AUD07-17, AUD07-18 e
 AUD07-19 concluídas e evidenciadas** (**M0 e M1 completos** + M2 em curso: A02/A03, A04, A16, A10, A09 e
-A11 tratados), **AUD07-43 em curso** (as 7 falhas de CI do checkout novo remediadas localmente e
-push autorizado em 08/10; PHASE3 `--verify` mantido vermelho por decisão explícita),
-AUD07-16 e AUD07-20–27 pendentes, AUD07-28–42 com dependência externa. **Origem:** auditoria de 07/10/2026, 64,2/100 em
+A11 tratados), **AUD07-43 em curso** (as 7 falhas de CI do checkout novo remediadas e confirmadas no
+CI, mais a lane RUNTIME do `quality` remediada em dois passos e verificada por dispatch em 09/10;
+PHASE3 `--verify` mantido vermelho por decisão explícita), **AUD07-44 e AUD07-45 planejadas**
+(achados novos do gate `P1-06` emergidos em 09/10), AUD07-16 e AUD07-20–27 pendentes,
+AUD07-28–42 com dependência externa. **Origem:** auditoria de 07/10/2026, 64,2/100 em
 26 áreas, 20 achados (A01–A20) e prontidão `NO-GO`.
 
 Este backlog traduz os achados A01–A20 em correções verificáveis e acrescenta o trabalho de
@@ -82,6 +84,8 @@ repor Actions por tag mutável, remover gates ou marcar casos como ignorados par
 | AUD07-41 | M7 | P1 | Reauditar as 26 áreas sobre o candidato exato | G | 40 | Dependência externa |
 | AUD07-42 | M7 | P0 | Decisão Go/No-Go explícita com riscos residuais | G | 41 | Dependência externa |
 | AUD07-43 | M2 | P0 | Remediar as 7 falhas de CI do checkout novo | G | 09 | Em curso |
+| AUD07-44 | M2 | P1 | Alinhar o `secret-scan` do `supply-chain` com fixtures de teste | P | — | Planejada |
+| AUD07-45 | M2 | P1 | Alinhar o gate `P1-06` à retirada decidida em AUD07-02/04 | P | 02 | Planejada |
 
 As dependências abreviadas usam o prefixo AUD07. Intervalos incluem todos os IDs indicados.
 
@@ -519,9 +523,70 @@ seu gate de evidência de runtime. Ainda abertos: (a) PHASE3 `--verify` **vermel
 decisão explícita de 08/10/2026 (opção 3: deixar vermelho e registar)** e (b)
 `State of Art / release integrity`, vermelho desde 10/09 por envelopes de runtime não
 vinculados — mesma classe de (a); nenhum limiar, teste ou gate foi alterado.
+
+Em 09/10/2026 a mesma tarefa cobriu também a lane RUNTIME do job `quality`: o job falhava oito
+lanes locais no CI (`web-lint`, `web-typecheck`, `web-build` por ausência de `npm ci` e
+`control-plane` por ausência de `make control-inputs-restore`; `domain`, `worker`, `api-root` e
+`api-contract` já tinham ficado verdes com as correções de §2). Commits `a9ee017` (+8 linhas) e
+`ce7a579` (+2 linhas) em `.github/workflows/quality.yml`; verificação ao vivo por
+`workflow_dispatch` reduziu os bloqueios de **33 → 26 → 25** (`37871005009`, `37872405794`) e a
+lane já não apresenta nenhum defeito local. Os sub-checks de `supply-chain` que ainda falham
+(`lockfiles`, `sbom`, `licenses`) pertencem a AUD07-45 — consumidor órfão da retirada já
+decidida em AUD07-02/04 — e o de `secret-scan` a AUD07-44; nada disso foi alterado.
  **Evidência:**
 [`ci-lanes-remediation.md`](reports/evidence/auditoria-2026-10-07/ci-lanes-remediation.md) —
-§1–§3 diagnóstico, §6 decisão sobre o PHASE3, §7 resultado do push e achados abertos.
+§1–§3 diagnóstico, §6 decisão sobre o PHASE3, §7 resultado do push e achados abertos,
+§9 lane RUNTIME (diagnóstico, duas correções, verificação ao vivo e decomposição de
+`supply-chain`).
+
+---
+
+### AUD07-44 Alinhar o `secret-scan` do `supply-chain` com fixtures de teste
+
+**Responsável sugerido:** segurança e CI. **Origem:** achado novo de 09/10/2026, §9.3 da
+[evidência AUD07-43](reports/evidence/auditoria-2026-10-07/ci-lanes-remediation.md).
+**Fontes:** `scripts/phase11/frontend_supply_runtime_gate.py` (`_HIGH_SIGNAL_SECRETS`,
+`_secret_scan_files`, `check_secrets`),
+`packages/jobs/tests/test_contracts.py`.
+
+O sub-check `secret-scan` do gate `P1-06` reporta um candidato `private_key` em
+`packages/jobs/tests/test_contracts.py:276` — o literal
+`{"private_key": "-----BEGIN PRIVATE KEY-----"}` de um teste negativo que prova rejeição de
+chaves em payloads. O scanner próprio não tem mecanismo de allowlist para fixtures de teste, e
+as alternativas (allowlist por caminho, troca por gitleaks com `.gitleaks.toml`, ou reescrever o
+teste para escapar da regex) todas alteram um gate de segurança.
+
+**Aceite:** a decisão está registrada com justificativa e responsável; qualquer alteração passa
+por autoridade explícita de gate; com o candidato escolhido, `secret-scan` passa a `PASS` sem
+reduzir a cobertura sobre chaves reais em código não-teste (prova: teste negativo que continua
+a detetar um segredo real fora da exceção); o sub-check e a execução do gate ficam registrados
+na evidência. Enquanto a decisão não existir, o gate mantém o `FAIL` verdadeiro.
+
+### AUD07-45 Alinhar o gate `P1-06` à retirada decidida em AUD07-02/04
+
+**Responsável sugerido:** supply-chain e CI. **Origem:** achado novo de 09/10/2026, §9.3 da
+[evidência AUD07-43](reports/evidence/auditoria-2026-10-07/ci-lanes-remediation.md).
+**Fontes:** `scripts/phase11/frontend_supply_runtime_gate.py` (`NODE_COMPONENTS`,
+`_ALLOWED_LICENSE`, `check_lockfiles`, `check_licenses`),
+`docs/architecture/preserved-components.json`,
+`docs/architecture/toolchain.md`, `docs/ci/README.md`.
+
+AUD07-02 está `Concluída (retirada)` e `toolchain.md`/`ci/README.md` registam que os três
+componentes (`cvg-master-rag-v2`, `rick-professor`, `modulo-redis-locker`) foram aposentados
+por AUD07-02 e AUD07-04. Sobrou consumidor: `NODE_COMPONENTS` ainda os declara, pelo que
+`lockfiles`, `sbom` e `licenses` falham estruturalmente contra caminhos inexistentes
+(`git ls-files` = 0 entradas), e `preserved-components.json` mantém
+`root_snapshot_required: true` para eles. Em separado, o único `denied` de `licenses` é
+`@csstools/color-helpers` = `MIT-0` em `apps/web`, licença permissiva ausente de
+`_ALLOWED_LICENSE`.
+
+**Aceite:** `NODE_COMPONENTS`, `preserved-components.json` e quaisquer consumidores restantes
+estão alinhados à decisão de retirada, com a remoção justificada e sem deixar referência
+órfã; a decisão sobre `MIT-0` (aceitar na allowlist ou substituir a dependência) fica
+registrada; `make validate` = 0; o gate continua a falhar se um componente Node real perder o
+`package.json`/lockfile (teste negativo); nenhuma cobertura é removida sem contrapartida
+registrada; execução e saída do gate anotadas na evidência. Alteração de cobertura de gate
+só com autoridade explícita.
 
 ---
 

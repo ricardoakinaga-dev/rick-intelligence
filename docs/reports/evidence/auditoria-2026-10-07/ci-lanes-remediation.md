@@ -241,3 +241,103 @@ janela e `raw_artifacts[0]` ausente. É a mesma classe do PHASE3 de §6 — evid
 runtime que só as lanes de runtime sob autoridade podem produzir — e este workflow
 vinha vermelho desde `b52f32c` (10/09/2026), portanto não é regressão deste commit.
 Fica registado como achado aberto com a mesma opção §6: nenhum gate alterado.
+
+## 9. Lane RUNTIME do job `quality` — duas remediações e verificação ao vivo (09/10/2026)
+
+### 9.1 Diagnóstico: packet local vs packet do CI
+
+O job `quality` só executa as cinco lanes de runtime (`RUNTIME`, `FRONTEND-RUNTIME`,
+`PERFORMANCE`, `CHAOS`, `SOAK`) em `workflow_dispatch`/`schedule`. Reproduzi o packet localmente
+no checkout limpo e comparei com o packet gerado pelo próprio CI:
+
+| Packet | Geração | Classificação | Bloqueios |
+| --- | --- | --- | --- |
+| CI, schedule `37765169700` (`b52f32c`) | 2026-10-08T10:42:51Z | `DEVELOPMENT` | 33 |
+| Local, `6f83e7c` | 2026-10-09T01:21:05Z | `DEVELOPMENT` | 26 |
+| Dispatch `37871005009` (`a9ee017`) | 2026-10-09T01:51:07Z | `DEVELOPMENT` | 26 |
+| Dispatch `37872405794` (`ce7a579`) | 2026-10-09T02:09:18Z | `DEVELOPMENT` | **25** |
+
+As oito lanes locais que falhavam no CI dividem-se em duas causas, ambas de ambiente do job:
+
+- **`web-lint`, `web-typecheck`, `web-build`** — o job `RUNTIME` instalava apenas
+  `requirements/test.lock` e corria `make triple-aaa-verify`, cujos lanes web executam
+  `cd apps/web && npm run …`. Sem `npm ci` os três falhavam. O job `FRONTEND-RUNTIME` já tinha
+  o par de passos; `RUNTIME` não. Mesma classe da §7.1.
+- **`control-plane`** (`make validate`) — o primeiro subcomando de `validate` é
+  `control-inputs-check` (`restore_control_inputs.py --check`), que rejeita inputs em falta; o
+  job `RUNTIME` nunca corria `make control-inputs-restore` (o job `FAST` sim). Idêntico à classe
+  corrigida em §2.
+- `domain`, `worker`, `api-root`, `api-contract` já não falhavam: ficaram verdes com as
+  correções A–G de §2 (verificado: `make api16-domain api16-worker api16-root` = 1704 passed,
+  `make api-contract` = `OpenAPI OK: 55 paths`, `make web-lint web-typecheck` = 0).
+
+### 9.2 Correções e verificação ao vivo
+
+| Commit | Alteração | Linhas |
+| --- | --- | --- |
+| `a9ee017` | `Install web dependencies in the Phase 3 runtime job` | +8 (`setup-node@49933ea5…` com cache npm + `npm ci --ignore-scripts --no-audit --no-fund` em `apps/web`) |
+| `ce7a579` | `Restore control inputs in the Phase 3 runtime job` | +2 (`make control-inputs-restore` antes de `make triple-aaa-verify`) |
+
+Verificação por `workflow_dispatch` sobre o `quality.yml` (repo público, sem custo):
+
+- `37871005009` (`a9ee017`): bloqueios **33 → 26**; desbloqueadas ao vivo `api-contract`,
+  `api-root`, `domain`, `worker`, `web-build`, `web-lint`, `web-typecheck`.
+- `37872405794` (`ce7a579`): bloqueios **26 → 25**; desbloqueado `control-plane`.
+- Nos dois dispatches: `FAST`, `UNIT`, `CONTRACT`, `RAG-EVAL`, `SECURITY`, `SUPPLY-CHAIN` e
+  `FRONTEND` = `success`; `PHASE3` = `failure` (§6, não consome artefactos de runtime);
+  `FRONTEND-RUNTIME`, `PERFORMANCE`, `CHAOS`, `SOAK` = `failure` por autoridade externa
+  (`RICK_*`/Docker, `blocked_return_codes={2}`); `NIGHTLY` e `RELEASE` = `skipped` por desenho
+  (`NIGHTLY` só em `schedule`; `RELEASE` exige lanes de runtime e o ambiente
+  `triple-aaa-promotion`).
+- Os runs de push (`37870998102`, `37872381448`) terminaram `cancelled`: entram no mesmo
+  `concurrency group` `rick-quality-…` com `cancel-in-progress: true`. Sem perda de cobertura,
+  os jobs correram todos nos dispatches.
+
+Estado final da lane RUNTIME (`37872405794`): 4 `FAIL` + 21 `BLOCKED_EXTERNAL`.
+Os `FAIL` são `release-evidence-generation` (local, downstream: `make release-evidence`
+relata `FAIL` verdadeiro enquanto gates obrigatórios falham) e os externos
+`release-integrity`, `phase3-evidence-verify` e `supply-chain`.
+
+**Verificação local após cada alteração:** YAML analisado e `make validate` = 0 em ambas;
+nenhum limiar, teste ou gate alterado.
+
+### 9.3 Decomposição do `FAIL` de `supply-chain` (4 sub-checks estáticos)
+
+Regenerei `.runtime/phase-3/supply-chain-runtime-evidence.json` no dispatch `37872405794`
+(`freshness: CURRENT`, `commit_sha ce7a579…`, `clean_worktree: true`, `finished_at`
+2026-10-09T02:09:07Z) e as quatro falhas estáticas são:
+
+| Sub-check | Observação | Origem |
+| --- | --- | --- |
+| `lockfiles` | `missing: ["modulo-redis-locker", "rick-professor", "cvg-master-rag-v2/frontend"]` | **AUD07-45** (consumidor órfão de AUD07-02/04) |
+| `sbom` | `missing_components`: os mesmos três | **AUD07-45** |
+| `licenses` | `missing_lockfiles`: os mesmos três; único `denied` é `@csstools/color-helpers` = `MIT-0` em `apps/web` | **AUD07-45** (allowlist de SPDX) |
+| `secret-scan` | 1 candidato: `private_key` em `packages/jobs/tests/test_contracts.py:276` | **AUD07-44** |
+
+**A decisão sobre os três legados já existe:** AUD07-02 está `Concluída (retirada)` e
+`docs/architecture/toolchain.md:23` e `docs/ci/README.md:26` registam que "the Phase 0.6
+workflow and the three components it guarded (`cvg-master-rag-v2`, `rick-professor`,
+`modulo-redis-locker`) were retired by AUD07-02 and AUD07-04". Os diretórios não existem na
+árvore (`git ls-files` = 0 entradas). O que falta é despachar os consumidores que ficaram
+para trás: `NODE_COMPONENTS` em `scripts/phase11/frontend_supply_runtime_gate.py:51` ainda os
+declara como componentes Node canónicos — o gate exige `package.json` e `package-lock.json`
+para caminhos que nunca mais existirão, pelo que `lockfiles`, `sbom` e `licenses` ficam
+estruturalmente `FAIL`. `docs/architecture/preserved-components.json` declara-os ainda com
+`root_snapshot_required: true`. Não foi feita nenhuma alteração a `NODE_COMPONENTS`, ao
+manifesto nem à allowlist: alinhar cobertura de um gate é alteração de gate e exige
+autoridade (AUD07-45).
+
+O `secret-scan` usa `_HIGH_SIGNAL_SECRETS` (`private_key` = `-----BEGIN (?:RSA \|EC \|OPENSSH
+\|DSA )?PRIVATE KEY-----`) sem mecanismo de allowlist para fixtures; o literal pertence a um
+teste negativo que verifica a rejeição de chaves em payloads (`test_payload_is_deterministic_
+bounded_and_rejects_secret_or_raw_content`). Qualquer correção aqui muda um gate de segurança
+e fica registada como **AUD07-44** em vez de aplicada.
+
+### 9.4 Estado
+
+A lane RUNTIME já não apresenta nenhum defeito local: as oito falhas do CI de 08/10/2026 foram
+remediadas, restando `release-evidence-generation` (downstream) e as lanes externas. Os achados
+abertos continuam a ser (a) PHASE3 `--verify` — opção 3 de §6, (b) `State of Art / release
+integrity` — §7.2, e agora (c) **AUD07-44** (`secret-scan` × fixture de teste) e (d)
+**AUD07-45** (`NODE_COMPONENTS` e allowlist `MIT-0` do gate `P1-06` não alinhados à retirada
+já decidida em AUD07-02/04).

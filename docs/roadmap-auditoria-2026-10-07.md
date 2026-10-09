@@ -24,6 +24,12 @@ vermelho **por decisão de 08/10/2026 (deixar vermelho e registar)** e
 `State of Art / release integrity` segue vermelho por evidência de runtime não vinculada
 (pré-existente desde 10/09) — sem alteração de gates — ver
 [`ci-lanes-remediation.md`](reports/evidence/auditoria-2026-10-07/ci-lanes-remediation.md).
+Em 09/10/2026 a mesma tarefa cobriu a lane RUNTIME do `quality` (job que só corre em
+dispatch/schedule): `a9ee017` adicionou `npm ci` e `ce7a579` adicionou
+`make control-inputs-restore` ao job, e dois dispatches ao vivo reduziram os bloqueios do
+packet de **33 → 26 → 25**, sem defeito local restante; o que sobra do `supply-chain` está
+registado como **AUD07-44** (`secret-scan` × fixture) e **AUD07-45** (`NODE_COMPONENTS`/allowlist
+não alinhados à retirada de AUD07-02/04), nenhum gate alterado.
 **Baseline:** 64,2/100 em 26 áreas, 20 achados (A01–A20); prontidão `NO-GO`.
 
 Este roadmap organiza o caminho do checkout atual até um candidato promovível a produção. A
@@ -33,7 +39,7 @@ reproduzidos (A02, A03) têm regressões discriminantes. A entrega final depende
 sobre serviços externos, evidência operacional selada e decisão de promoção vinculada ao
 candidato.
 
-O [backlog desta rodada](backlog-auditoria-2026-10-07.md) detalha **43 tarefas AUD07** com
+O [backlog desta rodada](backlog-auditoria-2026-10-07.md) detalha **45 tarefas AUD07** com
 dependências e critérios de aceite. O [relatório da auditoria](reports/relatorio-auditoria-2026-10-07.md)
 preserva notas, achados A01–A20, comandos, exit codes e limites. Este planejamento não altera os
 estados de execução em `.agent/` nem inicia as correções.
