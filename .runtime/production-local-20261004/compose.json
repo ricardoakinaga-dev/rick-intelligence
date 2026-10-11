@@ -1,0 +1,238 @@
+{
+  "name": "rick-local-test-20261004",
+  "services": {
+    "postgres": {
+      "image": "sha256:3c5c8892d184f738f4fe282d14ddaa613a38f00f4189d2d94725ebe6f2909ddb",
+      "pull_policy": "never",
+      "labels": {
+        "rick.local.owner": "production-local-20261004",
+        "rick.local.purpose": "user-program-test"
+      },
+      "networks": [
+        "private"
+      ],
+      "restart": "unless-stopped",
+      "mem_limit": "512m",
+      "cpus": 1.0,
+      "environment": {
+        "POSTGRES_DB": "rick_local",
+        "POSTGRES_USER": "rick",
+        "POSTGRES_PASSWORD": "${POSTGRES_PASSWORD:?local secret}"
+      },
+      "volumes": [
+        "postgres-data:/var/lib/postgresql/data"
+      ],
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "pg_isready -U rick -d rick_local"
+        ],
+        "interval": "5s",
+        "timeout": "3s",
+        "retries": 12
+      }
+    },
+    "redis": {
+      "image": "sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499",
+      "pull_policy": "never",
+      "labels": {
+        "rick.local.owner": "production-local-20261004",
+        "rick.local.purpose": "user-program-test"
+      },
+      "networks": [
+        "private"
+      ],
+      "restart": "unless-stopped",
+      "mem_limit": "512m",
+      "cpus": 1.0,
+      "environment": {
+        "REDIS_PASSWORD": "${REDIS_PASSWORD:?local secret}"
+      },
+      "command": [
+        "sh",
+        "-c",
+        "exec redis-server --appendonly yes --requirepass \"$REDIS_PASSWORD\""
+      ],
+      "volumes": [
+        "redis-data:/data"
+      ]
+    },
+    "qdrant": {
+      "image": "sha256:05fecce7dce45d1254e0468bc037e8210e187fd56fa847688b012293d5f08aae",
+      "pull_policy": "never",
+      "labels": {
+        "rick.local.owner": "production-local-20261004",
+        "rick.local.purpose": "user-program-test"
+      },
+      "networks": [
+        "private"
+      ],
+      "restart": "unless-stopped",
+      "mem_limit": "512m",
+      "cpus": 1.0,
+      "environment": {
+        "QDRANT__SERVICE__API_KEY": "${QDRANT_API_KEY:?local secret}"
+      },
+      "volumes": [
+        "qdrant-data:/qdrant/storage"
+      ]
+    },
+    "object-store": {
+      "image": "sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e",
+      "pull_policy": "never",
+      "labels": {
+        "rick.local.owner": "production-local-20261004",
+        "rick.local.purpose": "user-program-test"
+      },
+      "networks": [
+        "private"
+      ],
+      "restart": "unless-stopped",
+      "mem_limit": "512m",
+      "cpus": 1.0,
+      "environment": {
+        "MINIO_ROOT_USER": "${MINIO_ROOT_USER:?local secret}",
+        "MINIO_ROOT_PASSWORD": "${MINIO_ROOT_PASSWORD:?local secret}"
+      },
+      "command": [
+        "server",
+        "/data",
+        "--console-address",
+        ":9001"
+      ],
+      "volumes": [
+        "object-data:/data"
+      ]
+    },
+    "web": {
+      "image": "sha256:f69e01ea5adcb85608ee6cbf75d32118f336d7219c74662c5524108caadf016a",
+      "pull_policy": "never",
+      "labels": {
+        "rick.local.owner": "production-local-20261004",
+        "rick.local.purpose": "user-program-test"
+      },
+      "networks": [
+        "private"
+      ],
+      "restart": "unless-stopped",
+      "mem_limit": "512m",
+      "cpus": 1.0,
+      "ports": [
+        "127.0.0.1:19300:3000"
+      ],
+      "environment": {
+        "RICK_API_INTERNAL_URL": "http://api:8000"
+      },
+      "read_only": true,
+      "tmpfs": [
+        "/tmp:rw,nosuid,size=64m"
+      ],
+      "init": true,
+      "cap_drop": [
+        "ALL"
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ]
+    },
+    "api": {
+      "image": "sha256:119af0f86a4a09563bfe218070055695c6a45a0a608fb78b9fcf0d02c6d45d47",
+      "pull_policy": "never",
+      "env_file": [
+        "app.env"
+      ],
+      "labels": {
+        "rick.local.owner": "production-local-20261004",
+        "rick.local.purpose": "user-program-test"
+      },
+      "networks": [
+        "private"
+      ],
+      "restart": "unless-stopped",
+      "mem_limit": "768m",
+      "cpus": 1.0,
+      "init": true,
+      "read_only": true,
+      "tmpfs": [
+        "/tmp:rw,nosuid,size=128m"
+      ],
+      "cap_drop": [
+        "ALL"
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "volumes": [
+        "./local_composition.py:/opt/rick/apps/worker/local_composition.py:ro"
+      ],
+      "ports": [
+        "127.0.0.1:19800:8000"
+      ]
+    },
+    "worker": {
+      "image": "sha256:d27865fc38071811db58b82e0ab3f1888808932f67009baf241b7a18cf2aff68",
+      "pull_policy": "never",
+      "env_file": [
+        "app.env"
+      ],
+      "labels": {
+        "rick.local.owner": "production-local-20261004",
+        "rick.local.purpose": "user-program-test"
+      },
+      "networks": [
+        "private"
+      ],
+      "restart": "unless-stopped",
+      "mem_limit": "768m",
+      "cpus": 1.0,
+      "init": true,
+      "read_only": true,
+      "tmpfs": [
+        "/tmp:rw,nosuid,size=128m"
+      ],
+      "cap_drop": [
+        "ALL"
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "volumes": [
+        "./local_composition.py:/opt/rick/apps/worker/local_composition.py:ro"
+      ]
+    }
+  },
+  "networks": {
+    "private": {
+      "labels": {
+        "rick.local.owner": "production-local-20261004",
+        "rick.local.purpose": "user-program-test"
+      }
+    }
+  },
+  "volumes": {
+    "postgres-data": {
+      "labels": {
+        "rick.local.owner": "production-local-20261004",
+        "rick.local.purpose": "user-program-test"
+      }
+    },
+    "redis-data": {
+      "labels": {
+        "rick.local.owner": "production-local-20261004",
+        "rick.local.purpose": "user-program-test"
+      }
+    },
+    "qdrant-data": {
+      "labels": {
+        "rick.local.owner": "production-local-20261004",
+        "rick.local.purpose": "user-program-test"
+      }
+    },
+    "object-data": {
+      "labels": {
+        "rick.local.owner": "production-local-20261004",
+        "rick.local.purpose": "user-program-test"
+      }
+    }
+  }
+}

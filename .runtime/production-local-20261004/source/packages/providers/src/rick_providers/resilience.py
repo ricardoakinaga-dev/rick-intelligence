@@ -1,0 +1,354 @@
+"""Provider resilience policy kept outside the HTTP adapter.
+
+The wrapper applies bounded input budgets and a small circuit breaker without
+logging or retaining prompts. It is intentionally dependency-free and can wrap
+either the live OpenAI-compatible client or a deterministic test double.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import time
+import uuid
+import inspect
+import logging
+from collections.abc import AsyncIterator, Mapping, Sequence
+from threading import RLock
+from typing import Any, Callable
+
+from rick_providers.sampling import Temperature, USE_DEFAULT_TEMPERATURE
+
+from rick_contracts.providers import (
+    ChatCompletionChunk,
+    ChatCompletionResult,
+    EmbeddingResult,
+    ProviderMessage,
+    ProviderToolCallDelta,
+    ProviderToolCallDeltaFunction,
+)
+from rick_providers.cleanup import CleanupError, await_io, bounded_cleanup, FACADE_CLEANUP_SECONDS
+from rick_providers.errors import ProviderError, provider_error
+from rick_providers.protocols import AsyncProvider
+
+
+class ProviderBudgetError(ValueError):
+    """Raised only at the local policy boundary for an over-budget request."""
+
+
+class ResilientProvider:
+    """Bounded async provider facade with finite failure isolation."""
+
+    def __init__(
+        self,
+        provider: AsyncProvider,
+        *,
+        failure_threshold: int = 3,
+        cooldown_seconds: float = 30.0,
+        max_messages: int = 64,
+        max_prompt_chars: int = 100_000,
+        max_embedding_chars: int = 1_000_000,
+        max_tool_calls: int = 32,
+        clock: Callable[[], float] = time.monotonic,
+    ) -> None:
+        if provider is None or not callable(getattr(provider, "chat_completion", None)) or not callable(getattr(provider, "get_embedding", None)):
+            raise ValueError("provider is invalid")
+        if type(failure_threshold) is not int or not 1 <= failure_threshold <= 32:
+            raise ValueError("failure_threshold is out of range")
+        if isinstance(cooldown_seconds, bool) or not isinstance(cooldown_seconds, (int, float)) or not 0.1 <= float(cooldown_seconds) <= 86_400:
+            raise ValueError("cooldown_seconds is out of range")
+        for name, value, maximum in (
+            ("max_messages", max_messages, 1_024),
+            ("max_prompt_chars", max_prompt_chars, 1_000_000),
+            ("max_embedding_chars", max_embedding_chars, 1_000_000),
+        ):
+            if type(value) is not int or not 1 <= value <= maximum:
+                raise ValueError(f"{name} is out of range")
+        if type(max_tool_calls) is not int or not 0 <= max_tool_calls <= 32:
+            raise ValueError("max_tool_calls is out of range")
+        if not callable(clock):
+            raise ValueError("clock is invalid")
+        self.provider = provider
+        self.provider_kind = getattr(provider, "provider_kind", "resilient")
+        self.is_test_provider = getattr(provider, "is_test_provider", False)
+        self.production_safe = getattr(provider, "production_safe", self.is_test_provider is not True)
+        self.failure_threshold = failure_threshold
+        self.cooldown_seconds = float(cooldown_seconds)
+        self.max_messages = max_messages
+        self.max_prompt_chars = max_prompt_chars
+        self.max_embedding_chars = max_embedding_chars
+        self.max_tool_calls = max_tool_calls
+        self._clock = clock
+        self._lock = RLock()
+        self._consecutive_failures = 0
+        self._open_until = 0.0
+
+    @property
+    def is_open(self) -> bool:
+        with self._lock:
+            return self._is_open_locked()
+
+    def readiness_check(self) -> bool:
+        """Report local circuit state without performing provider I/O."""
+
+        return not self.is_open
+
+    async def health_check(self) -> bool:
+        """Run the underlying provider's live probe, failing closed.
+
+        ``readiness_check`` remains a cheap local signal for callers that need
+        to avoid I/O.  The canonical API readiness composition registers this
+        method explicitly so an open network path cannot be reported healthy
+        merely because the circuit is closed.
+        """
+
+        if self.is_open:
+            return False
+        target = getattr(self.provider, "health_check", None)
+        if not callable(target):
+            return self.readiness_check()
+        try:
+            result = target()
+            if inspect.isawaitable(result):
+                result = await result
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            return False
+        return result is True
+
+    def _is_open_locked(self) -> bool:
+        if self._open_until <= 0:
+            return False
+        if float(self._clock()) >= self._open_until:
+            self._open_until = 0.0
+            self._consecutive_failures = 0
+            return False
+        return True
+
+    def _correlation(self, requested: str | None) -> str:
+        if isinstance(requested, str) and requested and len(requested) <= 128 and all(ord(char) >= 0x20 and ord(char) != 0x7F for char in requested):
+            return requested
+        return str(uuid.uuid4())
+
+    def _guard(self, operation: str, correlation_id: str | None) -> str:
+        correlation = self._correlation(correlation_id)
+        with self._lock:
+            if self._is_open_locked():
+                raise provider_error("unavailable", operation, correlation, 0)
+        return correlation
+
+    def _record_success(self) -> None:
+        with self._lock:
+            self._consecutive_failures = 0
+            self._open_until = 0.0
+
+    def _record_failure(self, error: ProviderError) -> None:
+        if not error.retryable:
+            return
+        with self._lock:
+            self._consecutive_failures += 1
+            if self._consecutive_failures >= self.failure_threshold:
+                self._open_until = float(self._clock()) + self.cooldown_seconds
+
+    def _validate_prompt(self, model_or_messages: object, messages: object) -> None:
+        candidate = messages
+        if candidate is None and not isinstance(model_or_messages, str):
+            candidate = model_or_messages
+        if isinstance(candidate, (str, bytes)) or not isinstance(candidate, Sequence) or len(candidate) > self.max_messages:
+            raise ProviderBudgetError("provider message budget exceeded")
+        total = 0
+        for item in candidate:
+            content = item.content if isinstance(item, ProviderMessage) else item.get("content") if isinstance(item, Mapping) else None
+            if not isinstance(content, str):
+                continue
+            total += len(content)
+            if total > self.max_prompt_chars:
+                raise ProviderBudgetError("provider prompt budget exceeded")
+
+    def _validate_tools(self, tools: Sequence[Mapping[str, object]] | None) -> None:
+        """Bound tool definitions before a request reaches the provider."""
+
+        if tools is None:
+            return
+        if isinstance(tools, (str, bytes)) or not isinstance(tools, Sequence):
+            raise ProviderBudgetError("provider tool budget exceeded")
+        if len(tools) > self.max_tool_calls:
+            raise ProviderBudgetError("provider tool budget exceeded")
+
+    def _validate_result_tool_budget(self, result: ChatCompletionResult) -> ChatCompletionResult:
+        """Reject an oversized provider tool response at the local boundary."""
+
+        if result.tool_calls is not None and len(result.tool_calls) > self.max_tool_calls:
+            raise ProviderBudgetError("provider tool-call budget exceeded")
+        return result
+
+    async def chat_completion(
+        self,
+        model_or_messages: str | Sequence[ProviderMessage | Mapping[str, object]] | None = None,
+        messages: Sequence[ProviderMessage | Mapping[str, object]] | None = None,
+        temperature: Temperature = USE_DEFAULT_TEMPERATURE,
+        response_format: Mapping[str, object] | None = None,
+        tools: Sequence[Mapping[str, object]] | None = None,
+        *,
+        model: str | None = None,
+        correlation_id: str | None = None,
+    ) -> ChatCompletionResult:
+        self._validate_prompt(model_or_messages, messages)
+        self._validate_tools(tools)
+        correlation = self._guard("chat_completion", correlation_id)
+        try:
+            result = await self.provider.chat_completion(
+                model_or_messages,
+                messages,
+                **({} if temperature is USE_DEFAULT_TEMPERATURE else {"temperature": temperature}),
+                response_format=response_format,
+                tools=tools,
+                model=model,
+                correlation_id=correlation,
+            )
+        except ProviderError as exc:
+            self._record_failure(exc)
+            raise
+        else:
+            self._record_success()
+            return self._validate_result_tool_budget(result)
+
+    async def get_embedding(
+        self,
+        text: str,
+        *,
+        model: str | None = None,
+        correlation_id: str | None = None,
+    ) -> EmbeddingResult:
+        if not isinstance(text, str) or not text.strip() or len(text) > self.max_embedding_chars:
+            raise ProviderBudgetError("provider embedding budget exceeded")
+        correlation = self._guard("embeddings", correlation_id)
+        try:
+            result = await self.provider.get_embedding(text, model=model, correlation_id=correlation)
+        except ProviderError as exc:
+            self._record_failure(exc)
+            raise
+        else:
+            self._record_success()
+            return result
+
+    def chat_completion_stream(
+        self,
+        model_or_messages: str | Sequence[ProviderMessage | Mapping[str, object]] | None = None,
+        messages: Sequence[ProviderMessage | Mapping[str, object]] | None = None,
+        temperature: Temperature = USE_DEFAULT_TEMPERATURE,
+        response_format: Mapping[str, object] | None = None,
+        tools: Sequence[Mapping[str, object]] | None = None,
+        *, model: str | None = None, correlation_id: str | None = None,
+    ) -> AsyncIterator[ChatCompletionChunk]:
+        return self._chat_completion_stream(
+            model_or_messages, messages, temperature, response_format, tools,
+            model=model, correlation_id=correlation_id,
+        )
+
+    async def _chat_completion_stream(
+        self,
+        model_or_messages: str | Sequence[ProviderMessage | Mapping[str, object]] | None,
+        messages: Sequence[ProviderMessage | Mapping[str, object]] | None,
+        temperature: Temperature,
+        response_format: Mapping[str, object] | None,
+        tools: Sequence[Mapping[str, object]] | None,
+        *, model: str | None, correlation_id: str | None,
+    ) -> AsyncIterator[ChatCompletionChunk]:
+        self._validate_prompt(model_or_messages, messages)
+        self._validate_tools(tools)
+        correlation = self._guard("chat_completion", correlation_id)
+        target = getattr(self.provider, "chat_completion_stream", None)
+        if not callable(target):
+            result = await self.chat_completion(
+                model_or_messages, messages, temperature, response_format, tools,
+                model=model, correlation_id=correlation,
+            )
+            self._validate_result_tool_budget(result)
+            yield ChatCompletionChunk(
+                model=result.model, delta=result.content, finish_reason=result.finish_reason,
+                tool_calls=(
+                    [
+                        ProviderToolCallDelta(
+                            index=index,
+                            id=call.id,
+                            type=call.type,
+                            function=ProviderToolCallDeltaFunction(
+                                name=call.function.name,
+                                arguments=call.function.arguments,
+                            ),
+                        )
+                        for index, call in enumerate(result.tool_calls or [])
+                    ]
+                    or None
+                ),
+                correlation_id=result.correlation_id, usage=result.usage,
+            )
+            return
+        try:
+            stream = target(
+                model_or_messages, messages,
+                **({} if temperature is USE_DEFAULT_TEMPERATURE else {"temperature": temperature}),
+                response_format=response_format, tools=tools,
+                model=model, correlation_id=correlation,
+            )
+            if inspect.isawaitable(stream):
+                stream = await stream
+            iterator = aiter(stream)
+            terminal = None
+            first_failure = None
+            try:
+                tool_call_indices: set[int] = set()
+                while True:
+                    try:
+                        chunk = await await_io(anext(iterator), None, drain_budget=FACADE_CLEANUP_SECONDS)
+                    except StopAsyncIteration:
+                        break
+                    if not isinstance(chunk, ChatCompletionChunk):
+                        chunk = ChatCompletionChunk.model_validate(chunk)
+                    for tool_call in chunk.tool_calls or []:
+                        tool_call_indices.add(tool_call.index)
+                    if len(tool_call_indices) > self.max_tool_calls:
+                        raise ProviderBudgetError("provider tool-call budget exceeded")
+                    if chunk.finish_reason is not None:
+                        terminal = chunk
+                    else:
+                        yield chunk
+            except BaseException as exc:
+                first_failure = exc
+                raise
+            finally:
+                resources = [iterator] if iterator is stream else [iterator, stream]
+                closers = [resource.aclose for resource in resources if callable(getattr(resource, "aclose", None))]
+                try:
+                    await bounded_cleanup(closers, budget=FACADE_CLEANUP_SECONDS)
+                except CleanupError:
+                    if first_failure is not None:
+                        logging.getLogger(__name__).error(
+                            "provider_facade_cleanup_after_failure code=%s",
+                            first_failure.code if isinstance(first_failure, ProviderError) else type(first_failure).__name__,
+                        )
+                    if isinstance(first_failure, asyncio.CancelledError):
+                        raise first_failure from None
+                    raise
+        except asyncio.CancelledError:
+            raise
+        except ProviderBudgetError:
+            raise
+        except CleanupError:
+            raise provider_error("internal_error", "chat_completion", correlation, 0) from None
+        except ProviderError as exc:
+            self._record_failure(exc)
+            raise
+        else:
+            self._record_success()
+            if terminal is not None:
+                yield terminal
+
+    async def aclose(self) -> None:
+        closer = getattr(self.provider, "aclose", None)
+        if callable(closer):
+            await bounded_cleanup([closer], budget=FACADE_CLEANUP_SECONDS)
+
+
+__all__ = ["ProviderBudgetError", "ResilientProvider"]

@@ -1,0 +1,1581 @@
+{
+  "origin_main": "c6fb3f0ae8e485960d3d54c2a3294ce476e2781d",
+  "snapshot_source_head": "b52f32c141916a2ea3af1a6b913bd91f380606e0",
+  "snapshot_files": [
+    {
+      "path": "infrastructure/scripts/migrate.py",
+      "sha256": "a76c5a53889234c889422e0796709e5804765b6fe19f3e70472cdfcc43a0efcb",
+      "git_blob_oid": "8fee097bbf22c1a935b5014cb87ff728dfe85671",
+      "status": "unpublished_snapshot_candidate",
+      "origin_history_path": null
+    },
+    {
+      "path": "infrastructure/compose/bootstrap_qdrant.py",
+      "sha256": "657de5f3db23c0673457b3f969caeff99bdaa1e1c9115d9b933b9df8b8effd9f",
+      "git_blob_oid": "4a824d01721bc9a7a5525e6278bcf233a8ede1a5",
+      "status": "identical_origin_main",
+      "origin_history_path": "infrastructure/compose/bootstrap_qdrant.py"
+    },
+    {
+      "path": "infrastructure/docker/rollout-policy.json",
+      "sha256": "a10ba4e5ed23f62e2f64d133706e5da83e9032829f87b2b4df0f1d25c44bd08c",
+      "git_blob_oid": "82e224ffac6725aced8eea50afcbaac0f3a51614",
+      "status": "identical_origin_main",
+      "origin_history_path": "infrastructure/docker/rollout-policy.json"
+    },
+    {
+      "path": "infrastructure/docker/web.Dockerfile",
+      "sha256": "41c8018cb30ed7ec3de23dc5e7f82fce4ef38b4428b1e74b9d81d367d233236d",
+      "git_blob_oid": "8f11d5e79cfb521193cf536e4ea810484e55db63",
+      "status": "identical_origin_main",
+      "origin_history_path": "infrastructure/docker/web.Dockerfile"
+    },
+    {
+      "path": "infrastructure/docker/worker-entrypoint.py",
+      "sha256": "95f66e89ff3d09422b4db59e504d7b5183e37233925eaa53824f1795b8f7f5d4",
+      "git_blob_oid": "8de27262015ef7127dc7cd8b42a9d46da9bd93d8",
+      "status": "identical_origin_main",
+      "origin_history_path": "infrastructure/docker/worker-entrypoint.py"
+    },
+    {
+      "path": "infrastructure/docker/check_release.py",
+      "sha256": "03cc1c4aa058647d48e8bffef7c2aa81bf78b9f9a22ffef43fd8d77bc7dbc668",
+      "git_blob_oid": "a6313eb10738528152604ce12528a3c54c2cf909",
+      "status": "identical_origin_main",
+      "origin_history_path": "infrastructure/docker/check_release.py"
+    },
+    {
+      "path": "infrastructure/docker/worker.Dockerfile",
+      "sha256": "f0a4e87660bf8fc6f484b014997ce00bc32f2938f558e6d8348dc83fb87cf5b2",
+      "git_blob_oid": "52d3610247d9f51149f91fd06607a88258a5f40d",
+      "status": "identical_origin_main",
+      "origin_history_path": "infrastructure/docker/worker.Dockerfile"
+    },
+    {
+      "path": "infrastructure/docker/RUNBOOK.md",
+      "sha256": "9578ef9752d615ea5fbda0ef6a17579205d6dcfc8e798cf0db5c22f8595453d5",
+      "git_blob_oid": "15deae34e443272636b3722af8911407c386c34e",
+      "status": "identical_origin_main",
+      "origin_history_path": "infrastructure/docker/RUNBOOK.md"
+    },
+    {
+      "path": "infrastructure/docker/release-manifest.json",
+      "sha256": "888581f51037bcb6891321e96d826b0e111e1057b92b865688b720331c7960c7",
+      "git_blob_oid": "fa7e93fac388bd26f70caca986e381c66ede9b82",
+      "status": "identical_origin_main",
+      "origin_history_path": "infrastructure/docker/release-manifest.json"
+    },
+    {
+      "path": "infrastructure/docker/README.md",
+      "sha256": "1b71bc9f21acb416ae1096457d91654c3865155af4fa3a41420da3c1d6c7ba55",
+      "git_blob_oid": "c95f5a30cfbf6da042ef23dad3e5784aa6c8ada7",
+      "status": "identical_origin_main",
+      "origin_history_path": "infrastructure/docker/README.md"
+    },
+    {
+      "path": "infrastructure/docker/api.Dockerfile",
+      "sha256": "9544b50320196eceb147fa186f4acf34ee8381ca06d5b635ac961d13054e9cc7",
+      "git_blob_oid": "1280b1549fca0088e3d04089d29631e0e784cf94",
+      "status": "identical_origin_main",
+      "origin_history_path": "infrastructure/docker/api.Dockerfile"
+    },
+    {
+      "path": "infrastructure/migrations/0003_product_contract_extensions.sql",
+      "sha256": "d6d6413a45f93a5a65146d20221721bc60d5131f86ec29c0fd848cac351ae14a",
+      "git_blob_oid": "337d1e535c0a47c4e0597779056bcd77bc4f077a",
+      "status": "identical_origin_main",
+      "origin_history_path": "infrastructure/migrations/0003_product_contract_extensions.sql"
+    },
+    {
+      "path": "infrastructure/migrations/0004_durable_jobs_contract.sql",
+      "sha256": "0621c726c6eaae17fba0a72a209452964eb6320c38f2ebc60966b1d562731274",
+      "git_blob_oid": "5a8d9cfbf5558e5692c51736bf9d65ae82194e29",
+      "status": "identical_origin_main",
+      "origin_history_path": "infrastructure/migrations/0004_durable_jobs_contract.sql"
+    },
+    {
+      "path": "infrastructure/migrations/0002_product_schema.sql",
+      "sha256": "0bd4a31e3a821de3efcdaad621674aafc9215b0acb84a55fb681fc9fd6054312",
+      "git_blob_oid": "6061cd62effa25a3674628ebf2a393720ee8a8f6",
+      "status": "identical_origin_main",
+      "origin_history_path": "infrastructure/migrations/0002_product_schema.sql"
+    },
+    {
+      "path": "infrastructure/migrations/0005_rewrite_legacy_jobs.sql",
+      "sha256": "58878320223f9f30d42aea840c7e58795eb5c448daf90a0877adedc781cc9774",
+      "git_blob_oid": "255530aca0f2d7a0d18e073fc4f51270a5679765",
+      "status": "identical_origin_main",
+      "origin_history_path": "infrastructure/migrations/0005_rewrite_legacy_jobs.sql"
+    },
+    {
+      "path": "infrastructure/migrations/0001_control_plane.sql",
+      "sha256": "07113ff4a5e00e9986b1584864eb097e67a6daa66285895b9d6993f6bf116195",
+      "git_blob_oid": "d09cfe1c6aa776845f79273fde991d0a4ba9ae42",
+      "status": "identical_origin_main",
+      "origin_history_path": "infrastructure/migrations/0001_control_plane.sql"
+    },
+    {
+      "path": "infrastructure/migrations/0009_publication_recovery.sql",
+      "sha256": "9a27d70f0a8ad829f68c88f904c0e998fb324dcc8dc973757234b2963223a1aa",
+      "git_blob_oid": "1ef1c9013930399817d1c81c5efd9d4781501e17",
+      "status": "identical_origin_main",
+      "origin_history_path": "infrastructure/migrations/0009_publication_recovery.sql"
+    },
+    {
+      "path": "infrastructure/migrations/0004_operation_guard.sql.inc",
+      "sha256": "9691a200e4746e0cc69b035c7a81ac1ede8cab3053ab24b354294d9725afa1e2",
+      "git_blob_oid": "9157e1c54f825f8a667516438d8e52c90f13bbe7",
+      "status": "identical_origin_main",
+      "origin_history_path": "infrastructure/migrations/0004_operation_guard.sql.inc"
+    },
+    {
+      "path": "infrastructure/migrations/0007_admin_audit_reconciliation.sql",
+      "sha256": "4af11b3250c3b5f3d2ea1e3a1042883ccf3cb703370daa6011cd4c2c748ae6e2",
+      "git_blob_oid": "2e4de2427000d90c806d89ef462eb62d2599667a",
+      "status": "identical_origin_main",
+      "origin_history_path": "infrastructure/migrations/0007_admin_audit_reconciliation.sql"
+    },
+    {
+      "path": "infrastructure/migrations/README.md",
+      "sha256": "333aaedd7bdf8077e9071270b4ee60b34adf937170aa1d04db7d75729395f132",
+      "git_blob_oid": "84bf76e394b04349ca1fe41fa99c843e3e65ceca",
+      "status": "identical_origin_main",
+      "origin_history_path": "infrastructure/migrations/README.md"
+    },
+    {
+      "path": "infrastructure/migrations/0008_composite_scope_constraints.sql",
+      "sha256": "94f1ede25b4c849f6b70fec6e19dcb97662b7f213e6523d832e27bb6109db0fe",
+      "git_blob_oid": "6ee3778fd1dc0b08f143a00b8b9c8757a7ff1c6d",
+      "status": "identical_origin_main",
+      "origin_history_path": "infrastructure/migrations/0008_composite_scope_constraints.sql"
+    },
+    {
+      "path": "infrastructure/migrations/0006_document_lineage_contract.sql",
+      "sha256": "2d35f6e5a784258150baf68c0e88cbdb1f7b733034af662d694a45956eb8ffdd",
+      "git_blob_oid": "2b7fb9a658675a6410631f9543228e71e0f44e61",
+      "status": "identical_origin_main",
+      "origin_history_path": "infrastructure/migrations/0006_document_lineage_contract.sql"
+    },
+    {
+      "path": "requirements/runtime.lock",
+      "sha256": "8dc58f04067faf64a9fc3cebc6767764a88b3e094cf33e999c4a0c5f5da064b3",
+      "git_blob_oid": "82c52c4342b70647cebdb71b6f0f4f410ce99e75",
+      "status": "unpublished_snapshot_candidate",
+      "origin_history_path": null
+    },
+    {
+      "path": "apps/web/next-env.d.ts",
+      "sha256": "85ae5aee75f011967cf2d25cbc342f62d69314e9d925f7f4aa3456fc2cffcca6",
+      "git_blob_oid": "830fb594ca2970a827555c28a253b097367e08d8",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/web/next-env.d.ts"
+    },
+    {
+      "path": "apps/web/next.config.mjs",
+      "sha256": "b3773985ba25ac59a2d45c86af583e907f2351231fae889d3d961e284b68bcd3",
+      "git_blob_oid": "0d742bf1515075a01e1bf0c49f8d586f16e9fa5c",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/web/next.config.mjs"
+    },
+    {
+      "path": "apps/web/middleware.ts",
+      "sha256": "3e862b724bc1dc039fa117f05a509710777281263552d15686799e89b9af4050",
+      "git_blob_oid": "d76d29e1724e18206258ecded07d18deb3c1d54d",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/web/middleware.ts"
+    },
+    {
+      "path": "apps/web/package-lock.json",
+      "sha256": "af69ee8861c32d6bdbb8d515c7cd934571ab2ce43f713aa0e3c83a3590fb1fd1",
+      "git_blob_oid": "0ad78cc58a85a60f9287cbeed99d8982f24bf533",
+      "status": "unpublished_snapshot_candidate",
+      "origin_history_path": null
+    },
+    {
+      "path": "apps/web/eslint.config.mjs",
+      "sha256": "c53efff9ff4679fb229095c893d0b02f30f90fe6b7fa54d1862e36f3bee1d83c",
+      "git_blob_oid": "3480b32d49657e3f1204e57a01229faaa2d8cf10",
+      "status": "historical_published_content",
+      "origin_history_path": "apps/web/eslint.config.mjs"
+    },
+    {
+      "path": "apps/web/tsconfig.json",
+      "sha256": "527ab135cfecd31645208539d1324a6f212b2305f5532ef50f6344d1363ffde7",
+      "git_blob_oid": "359d27beb92ed93de09221ce07790132c729f970",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/web/tsconfig.json"
+    },
+    {
+      "path": "apps/web/package.json",
+      "sha256": "9ad775e480e3904fcc095cb057ea63e1df558a7c3ecc181c680bcb50c7227968",
+      "git_blob_oid": "3288eeac87218ee2724569943ef628f7da01569d",
+      "status": "unpublished_snapshot_candidate",
+      "origin_history_path": null
+    },
+    {
+      "path": "apps/web/lib/session-scope.ts",
+      "sha256": "05693d11eef59b59339734df03ded95da6ae52ad670c976f0e54295a7f28d8a7",
+      "git_blob_oid": "9851aa16629160adfcd742bb84d61ece490840f4",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/web/lib/session-scope.ts"
+    },
+    {
+      "path": "apps/web/lib/api.ts",
+      "sha256": "e29b1dcd49fbacdc7279956928a7f59f48e9b3a3b3be47c19a05d47c740a783c",
+      "git_blob_oid": "509efd0b9451d06389e5343e6d72148e1d676248",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/web/lib/api.ts"
+    },
+    {
+      "path": "apps/web/lib/chat-response.ts",
+      "sha256": "33190fd9e254ac798aeb46db627563dfaec752089b4656c24c686f73ca98c84a",
+      "git_blob_oid": "26d91193fb452a9abb7fd8af83e4384a27a55afd",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/web/lib/chat-response.ts"
+    },
+    {
+      "path": "apps/web/lib/navigation.ts",
+      "sha256": "b62d1e24783f45490a3516607195146559a1011655188d123c03e9d4e64b132d",
+      "git_blob_oid": "5b45603e114fa70bbef00ef6486ac3c030dbb461",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/web/lib/navigation.ts"
+    },
+    {
+      "path": "apps/web/lib/presentation.ts",
+      "sha256": "b6acf7a310fb56a26d5fe78c7ff9bbd25ba6198607500f193aa9e4e5e01db48c",
+      "git_blob_oid": "8dc3341e34e94207253e3ae13ed8d53994d2844b",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/web/lib/presentation.ts"
+    },
+    {
+      "path": "apps/web/lib/permissions.ts",
+      "sha256": "d1391e768ba13b90ace1849f76430a10765e03bd08dcecc9584810984335b6a2",
+      "git_blob_oid": "e52081ec4a431c68bc1535c6e3dadadc0bc8858d",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/web/lib/permissions.ts"
+    },
+    {
+      "path": "apps/web/lib/api-error.ts",
+      "sha256": "9a8a3c760ad19d4f1309f38b4014c294d4faf424b2b4c07a8ef6d3479988bc47",
+      "git_blob_oid": "421cb2e7c5935f15756ff76a1933298a4e735d79",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/web/lib/api-error.ts"
+    },
+    {
+      "path": "apps/web/lib/network.ts",
+      "sha256": "5978fc0bd5451ddfc7b3a5cacf4904c822ca255300bdd1f8944e064246e0ddf2",
+      "git_blob_oid": "25a02b27eca6909bdc6ebbd60bd6163112cb7182",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/web/lib/network.ts"
+    },
+    {
+      "path": "apps/web/app/icon.svg",
+      "sha256": "962470b68cb682bca73b4bc4f9ce92a974b6458a4feb5674254c64ab003ebb1b",
+      "git_blob_oid": "b6f8988e70e08763da18d4ed01664ad04f2c2a6b",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/web/app/icon.svg"
+    },
+    {
+      "path": "apps/web/app/page.tsx",
+      "sha256": "cb51d0d04c712ace32116c46a0e2df0073dd1747da5fff4f36df2b5a4da28ad3",
+      "git_blob_oid": "75b495f5976b256eed54e864dbd969d70af1ba5e",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/web/app/page.tsx"
+    },
+    {
+      "path": "apps/web/app/error.tsx",
+      "sha256": "c4ad21c77688147b7e2dedefcdf35d4a3a2020a3f5927fbc7ee639306b4cdce5",
+      "git_blob_oid": "27bdebd42ab9987f6b597a3e899f8f135f538ba0",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/web/app/error.tsx"
+    },
+    {
+      "path": "apps/web/app/layout.tsx",
+      "sha256": "cdcd27ce78203ef0641dbb16546e05d24131e47a9fb145d8f04bab46772ec00d",
+      "git_blob_oid": "3cb5497e1d3d7510a9c19bdda9d59f575eea987f",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/web/app/layout.tsx"
+    },
+    {
+      "path": "apps/web/app/loading.tsx",
+      "sha256": "406b6668c4f0621b20ef294029b1ad9661b3bd30866178e06e0e1f7944b6b365",
+      "git_blob_oid": "35b572bb40e5e0d72fa2368d427a604d708a3b64",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/web/app/loading.tsx"
+    },
+    {
+      "path": "apps/web/app/globals.css",
+      "sha256": "022b4f50c3023d826f07c0c6251d3fc98d0864f0dd931788b8e6a691738a8db7",
+      "git_blob_oid": "b46fafd35d709c580f4d75986f725a548f97a2c4",
+      "status": "unpublished_snapshot_candidate",
+      "origin_history_path": null
+    },
+    {
+      "path": "apps/web/app/login/page.tsx",
+      "sha256": "6a7c841f029c2ac265b13efffe9989b902389dbc7ec5c460c3392eb018dd2b4b",
+      "git_blob_oid": "1edba00afa88d88f095cb90382a2ec2f1b6a74f8",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/web/app/login/page.tsx"
+    },
+    {
+      "path": "apps/web/app/app/page.tsx",
+      "sha256": "f746769a12acd698039b1d62565dad210612056ce9967c6c16d365112f011e79",
+      "git_blob_oid": "4fb66957dfcb0ddccd96992057024698eeea4d76",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/web/app/app/page.tsx"
+    },
+    {
+      "path": "apps/web/app/app/chat/page.tsx",
+      "sha256": "a3b4f2d1805c7fe5762aabf912bc367aee971a8148ea7b02587676c7b22c312e",
+      "git_blob_oid": "4199de5a5c5b3a53fb637b083399409d37179217",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/web/app/app/chat/page.tsx"
+    },
+    {
+      "path": "apps/web/app/app/documents/page.tsx",
+      "sha256": "8bae4393c4dc030d2ec7fa0b174547a9174e3fa273589149f75f6a72a85b72b5",
+      "git_blob_oid": "c9caaa54861f7efc42adb080947c9a73dfd20871",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/web/app/app/documents/page.tsx"
+    },
+    {
+      "path": "apps/web/app/app/cases/page.tsx",
+      "sha256": "0d35e949182f3d9551a06c9bb7a839485176b344582bfecc39268993fa028b47",
+      "git_blob_oid": "c0250dc57df7b7200acbef60e8c5bd4d5a854496",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/web/app/app/cases/page.tsx"
+    },
+    {
+      "path": "apps/web/app/app/search/page.tsx",
+      "sha256": "8e2666557294ff4ec0f0e02cfafc331a3f7d27ef4737211d94cdacdb4bdd255b",
+      "git_blob_oid": "39755d307b9105c1cb55cfb710fa5236d48089d6",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/web/app/app/search/page.tsx"
+    },
+    {
+      "path": "apps/web/app/admin/page.tsx",
+      "sha256": "49f801ac614c75d6fc3dc5d8a99abb640c291735e517abba630432e3456a3740",
+      "git_blob_oid": "0673f9a3fb1b6404e087c9bcff8d1a765d004522",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/web/app/admin/page.tsx"
+    },
+    {
+      "path": "apps/web/types/api.ts",
+      "sha256": "bc908699b7275d68f3256984330d58ad5a1f0adafc50b2b14f716879f08c712a",
+      "git_blob_oid": "8bf689c7a051bbd0381d81a5e166edb7d7c231c0",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/web/types/api.ts"
+    },
+    {
+      "path": "apps/web/components/ui.tsx",
+      "sha256": "660a64d3ce36c3245b83b588de6cb67ebffba3fa5045604a2cb905ddbab19cbe",
+      "git_blob_oid": "0ceba94d740960c5e37c3a4f4cc6d9acffd85fba",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/web/components/ui.tsx"
+    },
+    {
+      "path": "apps/web/components/network-status.tsx",
+      "sha256": "a2158102dfca58a886da203c3b4490f64f4ab01ec44056b2a231626fbb454eb7",
+      "git_blob_oid": "6637a0fc0f1f3a0dde5baec418b274b15d8bb06f",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/web/components/network-status.tsx"
+    },
+    {
+      "path": "apps/web/components/chat-sources.tsx",
+      "sha256": "fd160222bac4cb890601ba6d9491265b4c45074288d852c512bafe47971e111a",
+      "git_blob_oid": "473cb19deb4e5964a938babc67b1cae93a263d8e",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/web/components/chat-sources.tsx"
+    },
+    {
+      "path": "apps/web/components/session-provider.tsx",
+      "sha256": "9e9c682b65fbe08bc39dd4dae66a0f4180c28ecebfb93341f0089c964dc5a397",
+      "git_blob_oid": "5e6a7137c2f92e12c262b5547fc1db5d20a610ae",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/web/components/session-provider.tsx"
+    },
+    {
+      "path": "apps/web/components/app-shell.tsx",
+      "sha256": "65c6d8f0cb8f9179f53270d07b207216f660d20fadeb40111d9702ef9473c530",
+      "git_blob_oid": "bedfb0b7c3041e421f64111fb3ad7b03e1377773",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/web/components/app-shell.tsx"
+    },
+    {
+      "path": "apps/web/components/collections/collection-management.tsx",
+      "sha256": "f71ed16a6230780866e29c56c2e745b23fe7a476c05845b8596f0e825effc179",
+      "git_blob_oid": "6cb4323a637c679206594a73415cf898ecd1fedc",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/web/components/collections/collection-management.tsx"
+    },
+    {
+      "path": "apps/web/components/chat/chat-adapter.ts",
+      "sha256": "4b7c12602095e62dc6e8753c78bb064433f44fda28ee78cd6a9714fc98a78f89",
+      "git_blob_oid": "417ddcc605c39fd5692be36f31e467945b73b885",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/web/components/chat/chat-adapter.ts"
+    },
+    {
+      "path": "apps/web/components/chat/chat-workspace.module.css",
+      "sha256": "828e3b2139dea7171416fea4196ed5ebd08a8ee9ad3b43241bbe2a38b26a0738",
+      "git_blob_oid": "906045666cea480769f30b5750892d71671eb2c1",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/web/components/chat/chat-workspace.module.css"
+    },
+    {
+      "path": "apps/web/components/chat/chat-workspace.tsx",
+      "sha256": "64961561d84579bb274879f9c78c85fbf382f196eec5727bd52b8b5d71c0ff18",
+      "git_blob_oid": "ccdc0df6be3e3cbdea366134791511e245b462ad",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/web/components/chat/chat-workspace.tsx"
+    },
+    {
+      "path": "apps/web/components/cases/case-workspace.tsx",
+      "sha256": "f848d8b549aadc4e5df875a191e3985d0c6a4872609b83986314afaa9baddf2c",
+      "git_blob_oid": "4808b4f2e80d969ed29b5566ad47382b6fe884be",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/web/components/cases/case-workspace.tsx"
+    },
+    {
+      "path": "apps/web/components/admin/admin-management.tsx",
+      "sha256": "40d68d1bd30703bdc98e97ae3689c5ca07a68e9c78eed0a0656dc8f47632b5a7",
+      "git_blob_oid": "97fe79884c00d0354cfc70f5540538ac0d83bca3",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/web/components/admin/admin-management.tsx"
+    },
+    {
+      "path": "apps/api/pyproject.toml",
+      "sha256": "479be6367485764a9e66c5e083a8c905648414aec51cd7f2ba288c5041e461f7",
+      "git_blob_oid": "144ebfec5f07d99420c89cb6e254c708a1e912cb",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/api/pyproject.toml"
+    },
+    {
+      "path": "apps/api/src/models.py",
+      "sha256": "243e60bbe24c83d1804f71d77bb1f6c608da1fc0977e23758cfc3c8c72e7f86d",
+      "git_blob_oid": "a2900c57782913980813e2cd9a7b07fd2a842a43",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/api/src/models.py"
+    },
+    {
+      "path": "apps/api/src/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "git_blob_oid": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/api/src/__init__.py"
+    },
+    {
+      "path": "apps/api/src/main.py",
+      "sha256": "29bebcead817ab418eed36af1aabd91091dc45cfa8e0fd8870219ee20d01adf5",
+      "git_blob_oid": "3d36d0734515fe28f3eeef6083072a7dec7d2e15",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/api/src/main.py"
+    },
+    {
+      "path": "apps/api/src/app.py",
+      "sha256": "24169eed33648bf9915788b079549ffae0d0032bf161292fca85774ff6729d67",
+      "git_blob_oid": "825dae746d1afb141226c0bb37f8c3541bb0f74b",
+      "status": "unpublished_snapshot_candidate",
+      "origin_history_path": null
+    },
+    {
+      "path": "apps/api/src/core/otel.py",
+      "sha256": "d92e87ba0a8fc813793087d5c3e06f81fdf26ead81634857e90e9483757b274d",
+      "git_blob_oid": "dcf39ddb776d8c0c53f1f2c7d821cc9d550fe019",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/api/src/core/otel.py"
+    },
+    {
+      "path": "apps/api/src/core/telemetry.py",
+      "sha256": "1d42db55303844ee9888a577d520fee6192475977864e4fca7449cd46ccf62f9",
+      "git_blob_oid": "ee313fce86fea52abfefca5affe9c4933b59705f",
+      "status": "unpublished_snapshot_candidate",
+      "origin_history_path": null
+    },
+    {
+      "path": "apps/api/src/core/csrf.py",
+      "sha256": "0bf062c841a954cf94dcd985da162e51649ad14f4685e993561d275d71afb1b2",
+      "git_blob_oid": "24e30fef97be7c8291dbc17e0955c6f2696e56ed",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/api/src/core/csrf.py"
+    },
+    {
+      "path": "apps/api/src/core/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "git_blob_oid": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/api/src/__init__.py"
+    },
+    {
+      "path": "apps/api/src/core/lifecycle.py",
+      "sha256": "cbbdb0b61a395539ee7301b8036013212b3c8e0c08e891737e0b1a910405272f",
+      "git_blob_oid": "b73bfa164e13a9cd3a47409d9ad40e9c62f39336",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/api/src/core/lifecycle.py"
+    },
+    {
+      "path": "apps/api/src/core/rate_limit.py",
+      "sha256": "bd55429c5ce5d1e2248cecaf5e04e74e25219149a3bf0dc820cce7259d774eaf",
+      "git_blob_oid": "b09e7eba0ad4e7bc2128466bf373cfa42f27fd28",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/api/src/core/rate_limit.py"
+    },
+    {
+      "path": "apps/api/src/core/config.py",
+      "sha256": "eda9952edbb87e4ba24f1b993314316608194273f766753c138a6ee43b421d8d",
+      "git_blob_oid": "7a5da1d3459b857cb6c7828a3f7c8334ba51509d",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/api/src/core/config.py"
+    },
+    {
+      "path": "apps/api/src/core/errors.py",
+      "sha256": "cbd301f386c44b6f59f0b840778a3eaeeaf5d5e5a68545ce6335cd1d3df461f2",
+      "git_blob_oid": "0318f73fd2d562541fcc11f67030b1e90991d53f",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/api/src/core/errors.py"
+    },
+    {
+      "path": "apps/api/src/core/middleware.py",
+      "sha256": "1d73cd0fd8fc88b099a25212ccb6cb3051683bb64c64faaadcd49f7096d90c2e",
+      "git_blob_oid": "a85923fb775f8fe1d84ff41b5f13f651674d7ba3",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/api/src/core/middleware.py"
+    },
+    {
+      "path": "apps/api/src/core/streaming.py",
+      "sha256": "74e5b47b1deedd27ada9255e71396a339feb7dd349acc93e2f18344f3356837d",
+      "git_blob_oid": "d06408273233b662d70aeb40cd98182540546fe3",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/api/src/core/streaming.py"
+    },
+    {
+      "path": "apps/api/src/core/security.py",
+      "sha256": "2c47678fa15495ddfa2ca179636313603fc55dd5a84011c059b4bfb9a4d3ea1c",
+      "git_blob_oid": "a78d35151cba9c27e093c223f381d72669c28c63",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/api/src/core/security.py"
+    },
+    {
+      "path": "apps/api/src/core/transport.py",
+      "sha256": "61141dc9ec2008a1fddaf0c6d29797cb09314e49e6d51c6b8a5ffeefe8f57f0a",
+      "git_blob_oid": "e4fe9cfec26fecb7a1189df60186615ff319869c",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/api/src/core/transport.py"
+    },
+    {
+      "path": "apps/api/src/core/request_context.py",
+      "sha256": "4a2ab1909563f50f726cddc40b37746c5ca3c5335a9656c9df64400be53afb24",
+      "git_blob_oid": "2c3a8aa171550f06965ccec72b760d50030efe51",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/api/src/core/request_context.py"
+    },
+    {
+      "path": "apps/api/src/services/audit_operations.py",
+      "sha256": "d319843c5da75a5971e0c2894c7f59e816a805b8b7349ab7d2ab7d1c2d13d86b",
+      "git_blob_oid": "2663156894377463ce579913a7a9931b8622315f",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/api/src/services/audit_operations.py"
+    },
+    {
+      "path": "apps/api/src/services/postgres_chat_history.py",
+      "sha256": "d57ad332153b116c2062930ff056e50bfa0060da0de4e73b07cf48b8da30e231",
+      "git_blob_oid": "0cf324b1c2d53cd4376d73c7689076a928984e8c",
+      "status": "unpublished_snapshot_candidate",
+      "origin_history_path": null
+    },
+    {
+      "path": "apps/api/src/services/json_boundary.py",
+      "sha256": "457547403dbff857c8b9835438b4a091b8b54783712c2bd97838c42f254b4ca3",
+      "git_blob_oid": "f518c0ea4179a2f203ad4e59fdd7bafc1a3b6612",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/api/src/services/json_boundary.py"
+    },
+    {
+      "path": "apps/api/src/services/professor_backend.py",
+      "sha256": "113e65c27452e6a943fc4f1ab545698e8b055c0a93300bba83e70008b7d77337",
+      "git_blob_oid": "17f74c20e5f87247ebfdcb8d0e9436e7099b8a44",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/api/src/services/professor_backend.py"
+    },
+    {
+      "path": "apps/api/src/services/sqlite_audit.py",
+      "sha256": "c2352cdb97987e055055b04ce99f416ebaa6a8a59d5fc88602d8114ae0fee1f4",
+      "git_blob_oid": "34dd5acfbee5dccef361962342f05edd96834c00",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/api/src/services/sqlite_audit.py"
+    },
+    {
+      "path": "apps/api/src/services/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "git_blob_oid": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/api/src/__init__.py"
+    },
+    {
+      "path": "apps/api/src/services/object_store_transport.py",
+      "sha256": "7921bb775b093d5ee910cf2a5af8a05b2da89f3903722d59a5f4c17bc646bc47",
+      "git_blob_oid": "bc9bc984251decf1b206de47ebd097f0529fb85d",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/api/src/services/object_store_transport.py"
+    },
+    {
+      "path": "apps/api/src/services/chat_service.py",
+      "sha256": "c21ff10852d81eb86fcc8fa76a8bce916c13f54269e2f2bdca7ec22572b23c20",
+      "git_blob_oid": "0a6f488205d49e53d9155862cb09aa2b4bb59aea",
+      "status": "unpublished_snapshot_candidate",
+      "origin_history_path": null
+    },
+    {
+      "path": "apps/api/src/services/chat_history.py",
+      "sha256": "2e97dbfd33cf7093122f701c473814011bbd2c252dbc33f015309380608eea62",
+      "git_blob_oid": "edb9397e1b86dfd71f857ef4f0189180e33d2e7c",
+      "status": "unpublished_snapshot_candidate",
+      "origin_history_path": null
+    },
+    {
+      "path": "apps/api/src/services/postgres_audit.py",
+      "sha256": "33e66c14537449d0a4983ff7ac210532519b13360aadc0b2cd3dd6434a66fc33",
+      "git_blob_oid": "ec733fe6836fcb129e42f2362feaa242582ebba6",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/api/src/services/postgres_audit.py"
+    },
+    {
+      "path": "apps/api/src/services/retrieval_service.py",
+      "sha256": "4f3d47ab7884ed1149f8ee88a226f90a7114544cf3fb6ebd86c855a85709d052",
+      "git_blob_oid": "e80ef3bf7e12497a8ad97ee57a774dba160d154b",
+      "status": "unpublished_snapshot_candidate",
+      "origin_history_path": null
+    },
+    {
+      "path": "apps/api/src/services/external_composition.py",
+      "sha256": "2180a7ced9ffc7d31d9073640d843e63f0345b676e36c69b8198c2465a5e11e7",
+      "git_blob_oid": "0894d646948f8b88e533f2571d887d7e0f72d9f6",
+      "status": "unpublished_snapshot_candidate",
+      "origin_history_path": null
+    },
+    {
+      "path": "apps/api/src/services/postgres_ingestion.py",
+      "sha256": "2ea3228caa8b2d5b60385163c6cd89edebfc95438941012dcdb87da177af0a6f",
+      "git_blob_oid": "7ace5dc7a650f9762800759199cca5454f2fcb0f",
+      "status": "unpublished_snapshot_candidate",
+      "origin_history_path": null
+    },
+    {
+      "path": "apps/api/src/services/authorization_service.py",
+      "sha256": "ed4600a9a4bd963c27313342cbefa84d800799c03aa5f8a930aa6192b88f22f9",
+      "git_blob_oid": "d48ce20fc3d9a22298b70b0cd76c8a0b6ff6222f",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/api/src/services/authorization_service.py"
+    },
+    {
+      "path": "apps/api/src/services/postgres_identity.py",
+      "sha256": "004de824f06f59c030ec766e9a68944a047a3c92dda3f7dc29a976229ddc4d55",
+      "git_blob_oid": "df2c54baefbde8072f069fea5dcf1d824f66bd1a",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/api/src/services/postgres_identity.py"
+    },
+    {
+      "path": "apps/api/src/services/case_store.py",
+      "sha256": "295b39dbac77c453a5c3c9497c4981fbb3ac874b67a171b43c3068a6f9cfdc42",
+      "git_blob_oid": "092008e2d37e7f9b3b29c8e1ce4ecd6da2637141",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/api/src/services/case_store.py"
+    },
+    {
+      "path": "apps/api/src/services/job_journal.py",
+      "sha256": "bdfc0a7a3d07efc4307671d39baa0e203624fe4822d78dffacc1808e98fe466f",
+      "git_blob_oid": "91a98581fe3de6ab0832eaf262c08147617f08ee",
+      "status": "unpublished_snapshot_candidate",
+      "origin_history_path": null
+    },
+    {
+      "path": "apps/api/src/services/ingestion_service.py",
+      "sha256": "4bcc8a4e44a4aa476543a63d4853bafd67607d3cc6476d4bb037ce7178ba4503",
+      "git_blob_oid": "c6e0687c511df2a290ed68ef0d6669ffcf551e66",
+      "status": "unpublished_snapshot_candidate",
+      "origin_history_path": null
+    },
+    {
+      "path": "apps/api/src/services/audit.py",
+      "sha256": "959362cd090281099c89def6e70c336447a2f6403972f4b070f74d6f3feb94a9",
+      "git_blob_oid": "5aa1a346b76f643089c07f456de4d0cdbeda6229",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/api/src/services/audit.py"
+    },
+    {
+      "path": "apps/api/src/services/identity_service.py",
+      "sha256": "8b746b5dde44b17b6127a66659a6b7bbe75511e96862f7f78f50c642d29f2db1",
+      "git_blob_oid": "d37d26c87dbef76d2cfeea8166fa987bdecfe62d",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/api/src/services/identity_service.py"
+    },
+    {
+      "path": "apps/api/src/services/knowledge_service.py",
+      "sha256": "7a92504e1bbd74381de468b7aefe1f523a09d421855b51151dbe59fbb7a48164",
+      "git_blob_oid": "a600b1b29bb63235858d4219bb75b9774dcddce8",
+      "status": "unpublished_snapshot_candidate",
+      "origin_history_path": null
+    },
+    {
+      "path": "apps/api/src/dependencies/identity.py",
+      "sha256": "6ece7ee4e00df2d23391182abd1db15fbe2034adb3386ecccd6f569fae32c008",
+      "git_blob_oid": "2a49e65bdfda406bb703f0c5df29bd3aa70108e1",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/api/src/dependencies/identity.py"
+    },
+    {
+      "path": "apps/api/src/dependencies/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "git_blob_oid": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/api/src/__init__.py"
+    },
+    {
+      "path": "apps/api/src/dependencies/services.py",
+      "sha256": "651214a2927093664e14aed1c98bddb2a9c097c12c6f946d95edb02a116c3c4f",
+      "git_blob_oid": "36b70297915488b6e9f7a94c8d4027c2ada0e702",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/api/src/dependencies/services.py"
+    },
+    {
+      "path": "apps/api/src/dependencies/request.py",
+      "sha256": "10c6f68ff5f6247039becb0960c7db3c2f76f64107669c4408cd429cf352e5a5",
+      "git_blob_oid": "3c00ee51852304452c85d4aa6fdf5fc0cee64d8c",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/api/src/dependencies/request.py"
+    },
+    {
+      "path": "apps/api/src/adapters/__init__.py",
+      "sha256": "56121193c578b6291fe26121e23ea9022d912fe0c3776b2f361d973c80d2025b",
+      "git_blob_oid": "85cdd83ed50be6dcee6ea087bfd6d9282ed765ec",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/api/src/adapters/__init__.py"
+    },
+    {
+      "path": "apps/api/src/adapters/legacy/auth_facade.py",
+      "sha256": "75461dbae592eaefc064dcde19b9d4f2c3f130a06b9265394a4fcf9d5abf0994",
+      "git_blob_oid": "3c5e87903244ed13418c25a20919e10c498b0383",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/api/src/adapters/legacy/auth_facade.py"
+    },
+    {
+      "path": "apps/api/src/adapters/legacy/cvg.py",
+      "sha256": "dd66a689a2b850c617ed7e01fafcfd57cb406b8e76e54d885b539ff217eeb694",
+      "git_blob_oid": "4cbeb4f475cdadd9ff595c38c93fdf6f3579471f",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/api/src/adapters/legacy/cvg.py"
+    },
+    {
+      "path": "apps/api/src/adapters/legacy/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "git_blob_oid": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/api/src/__init__.py"
+    },
+    {
+      "path": "apps/api/src/routes/knowledge.py",
+      "sha256": "baaab37b872ab36cd085af7438e5316df2e9c1ff7adb6e798b746ddcf77995e3",
+      "git_blob_oid": "8b0614491217ac53992ee295a9cdd93c7e6e44e4",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/api/src/routes/knowledge.py"
+    },
+    {
+      "path": "apps/api/src/routes/health.py",
+      "sha256": "1157241574d12df80b3a62b45dfad8a8f60c25040eb7354ff196c3a9fe086fdb",
+      "git_blob_oid": "06295cceb9f26ce113bf3160965017c1662a6d0e",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/api/src/routes/health.py"
+    },
+    {
+      "path": "apps/api/src/routes/__init__.py",
+      "sha256": "f63c6453869b7bdee7b09084cbd6b8f80ef82de7a89ba5f2df86569de71da7f6",
+      "git_blob_oid": "7523817ea1cd45860da5833ab99b069bf612a318",
+      "status": "unpublished_snapshot_candidate",
+      "origin_history_path": null
+    },
+    {
+      "path": "apps/api/src/routes/compatibility_openai.py",
+      "sha256": "37172a44da60746ca35f88eafba291c860234f862ae2d92cbbdf01782710b68c",
+      "git_blob_oid": "0e1fe5145fb5c2b547383d9a2c7f1febbd6a4895",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/api/src/routes/compatibility_openai.py"
+    },
+    {
+      "path": "apps/api/src/routes/chat.py",
+      "sha256": "2ddf86206f45b64ba3d9b0e1f6dd82315bc61b4d44e20f6fb752c5fbfe56f80a",
+      "git_blob_oid": "2564fc0351980f3d762c4993ee42a210a2e3287a",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/api/src/routes/chat.py"
+    },
+    {
+      "path": "apps/api/src/routes/cases.py",
+      "sha256": "cf82c2203af627bacced4352912f6c6fa60bb9d683d414ec5e50dd16290a04a8",
+      "git_blob_oid": "0bee9f8a4e880bfd9edab8efb3e8f6fa0c3b061b",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/api/src/routes/cases.py"
+    },
+    {
+      "path": "apps/api/src/routes/auth.py",
+      "sha256": "9608246c0f35783eb908e78d1b6ed9ee3f7473c92bbc1e4dc9259d8c01ca3944",
+      "git_blob_oid": "8870126e3bd8a9187846b1e740b245f19ddd57b0",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/api/src/routes/auth.py"
+    },
+    {
+      "path": "apps/api/src/routes/sessions.py",
+      "sha256": "110dfbc319593fd8132d2dd8d1a2d505ef7beb2d46a8348e3f5a44272d60ca64",
+      "git_blob_oid": "0c4670f5490c226c1cd4390bdfcd1a65e33e027d",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/api/src/routes/sessions.py"
+    },
+    {
+      "path": "apps/api/src/routes/search.py",
+      "sha256": "3ae0a951d5d8060612b8768f01c9b30145085c2413859d3a30471a452f8e7d97",
+      "git_blob_oid": "bf30597e932f421356a5d26aa8a6ff292a7af3ff",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/api/src/routes/search.py"
+    },
+    {
+      "path": "apps/api/src/routes/admin.py",
+      "sha256": "8199ad99401c3e62bbddb6d53ab1a0adf8611b3047acadd6d2456eab10e6fe6f",
+      "git_blob_oid": "8f0c59077d156099251db143a03ef39e764500d9",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/api/src/routes/admin.py"
+    },
+    {
+      "path": "apps/worker/postgres_queue.py",
+      "sha256": "5adc2f8bb6e1d752f26373161c9c641be4e62fa5ecde42cbb35c0ca7067ec3c8",
+      "git_blob_oid": "5c1bc59b8d9ef8c6fcf25fa1eba8cb1b30f60c37",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/worker/postgres_queue.py"
+    },
+    {
+      "path": "apps/worker/canonical_queue.py",
+      "sha256": "d05798ab4711e6514154eca8063671c5353b13ad6a5fd2db2546c40aae5e4e93",
+      "git_blob_oid": "c1c8340eed670ee0eac3835dd5428807d3c25a6b",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/worker/canonical_queue.py"
+    },
+    {
+      "path": "apps/worker/postgres_jobs.py",
+      "sha256": "af0ee4549211814acd16a7fad3d718ad9e244c4cd107f13c13f9b15b02a474fe",
+      "git_blob_oid": "eafa46a7898235f06c2e04b3e87753a3b3082549",
+      "status": "unpublished_snapshot_candidate",
+      "origin_history_path": null
+    },
+    {
+      "path": "apps/worker/__init__.py",
+      "sha256": "99acf445958d2905b7e037b03764567a9555a36fb5c4b8c1201c55642f46535b",
+      "git_blob_oid": "d6ae9a8616cf135e9946767ac8bf1fd1ff2a27a1",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/worker/__init__.py"
+    },
+    {
+      "path": "apps/worker/admin_audit_outbox.py",
+      "sha256": "046595f9da759a3fc3f08eff1233cb5d53665d444301c053932124b51d76ee3a",
+      "git_blob_oid": "773d1b99149b9136eb1382086cdba15f016ac15e",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/worker/admin_audit_outbox.py"
+    },
+    {
+      "path": "apps/worker/durable_queue.py",
+      "sha256": "80c5d493e6ad51296417f0b7e0a71e8dba9a82a400dc4d6a435635a7025b99f8",
+      "git_blob_oid": "a1fc1e85c071e4b8d59f5a8b1b8260bc1f89a50d",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/worker/durable_queue.py"
+    },
+    {
+      "path": "apps/worker/runtime.py",
+      "sha256": "1edb6b9f89628a814fe45308eda0b022683e73a4ef2f26ff458400274db48b0f",
+      "git_blob_oid": "0348eaf57f7c9c0c40d4c8d9e21212c7ea942b9b",
+      "status": "unpublished_snapshot_candidate",
+      "origin_history_path": null
+    },
+    {
+      "path": "apps/worker/external_ingestion.py",
+      "sha256": "786681a4036681cab617f495b5371ce6e3ca835adaa11f01df0eee84dd840add",
+      "git_blob_oid": "5e31d4666031b8d2c6ae77744b40d4d72c473b07",
+      "status": "unpublished_snapshot_candidate",
+      "origin_history_path": null
+    },
+    {
+      "path": "apps/worker/runner.py",
+      "sha256": "95aa19f38f74e3f14cce5210846f20dfbd4b790f61643c83b74de329e64077bb",
+      "git_blob_oid": "b9664ead375c4c3efe1ec2905aa0a3fd8cbbc4e4",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/worker/runner.py"
+    },
+    {
+      "path": "apps/worker/deployment_composition.py",
+      "sha256": "4858f8aaf802653da1be0d604a6ba5c1cbfdebf248b4b700af9aa74ace4d7156",
+      "git_blob_oid": "dd5b0348d71c0cc51b2903eb1561542f1c4faa6a",
+      "status": "unpublished_snapshot_candidate",
+      "origin_history_path": null
+    },
+    {
+      "path": "apps/worker/postgres_runner.py",
+      "sha256": "8f05165895e2bbf5b3f56a525f28a53b447ee5a9b09404af78f12b0f71668962",
+      "git_blob_oid": "24e3637e9245d87f8b965adf7bafb38a0653bc3b",
+      "status": "identical_origin_main",
+      "origin_history_path": "apps/worker/postgres_runner.py"
+    },
+    {
+      "path": "packages/ingestion/src/rick_ingestion/jobs.py",
+      "sha256": "404cf3cc56661ccf8d0592554656d209724e39ce80da770995073a321b2b365c",
+      "git_blob_oid": "d8e0538b3ece8d312748cc9724627bdb39858b4f",
+      "status": "historical_published_content",
+      "origin_history_path": "packages/ingestion/src/rick_ingestion/jobs.py"
+    },
+    {
+      "path": "packages/ingestion/src/rick_ingestion/pipeline.py",
+      "sha256": "93365391e97abe512994eae9ba885901581be03a57a9f390321a8bc6ff87af01",
+      "git_blob_oid": "74b00b03983c7cf58784ddbc8f243a4239560d7b",
+      "status": "unpublished_snapshot_candidate",
+      "origin_history_path": null
+    },
+    {
+      "path": "packages/ingestion/src/rick_ingestion/admission.py",
+      "sha256": "64701c32835626ebfac86e172b524d59c9a421c46c4c42a7907d2e05ead43c6e",
+      "git_blob_oid": "7b3c0ca96a5e0b1bb08dafb7e9847dda8f319a22",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/ingestion/src/rick_ingestion/admission.py"
+    },
+    {
+      "path": "packages/ingestion/src/rick_ingestion/__init__.py",
+      "sha256": "a59f2cd781af9b695a6b7cecf58d7e6fd2cc6238c29d0de10ad9c27b1f7134b3",
+      "git_blob_oid": "2825ea45e11505069f661cacadce7029c234b9cc",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/ingestion/src/rick_ingestion/__init__.py"
+    },
+    {
+      "path": "packages/ingestion/src/rick_ingestion/chunking.py",
+      "sha256": "b4b16864b515f9efc6ca9e092bff3d0028add6835b252333e3acb3469649ec03",
+      "git_blob_oid": "960f9741f60baa2b8dddd4b4145eb17e05df7b97",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/ingestion/src/rick_ingestion/chunking.py"
+    },
+    {
+      "path": "packages/ingestion/src/rick_ingestion/parsers.py",
+      "sha256": "40f40a9c80f5886ffe3575c265ecbbe098cb920eb9c89d55696665261d27d867",
+      "git_blob_oid": "d9115d576f16e6ba35b4a1484646e3c2509d50c5",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/ingestion/src/rick_ingestion/parsers.py"
+    },
+    {
+      "path": "packages/contracts/src/rick_contracts/professor.py",
+      "sha256": "50530950acd90a99bdc7535af6feb70338c41e9705e4f87fb79966554f461c5a",
+      "git_blob_oid": "057be85bd76fc664d9ee537526a58663fad7ec93",
+      "status": "historical_published_content",
+      "origin_history_path": "packages/contracts/src/rick_contracts/professor.py"
+    },
+    {
+      "path": "packages/contracts/src/rick_contracts/__init__.py",
+      "sha256": "12b30f2d8d72ccea774a527a7fe9222c9e9046372eccc67d1c931eb22cc43a5e",
+      "git_blob_oid": "8191e1750f2e1d0150597de8b36d14bee3a87a2c",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/contracts/src/rick_contracts/__init__.py"
+    },
+    {
+      "path": "packages/contracts/src/rick_contracts/chat.py",
+      "sha256": "4f1c3123e68c21ea1081da5ee56d44f042da7b12d23be95874be5d6e2ba4e183",
+      "git_blob_oid": "df952ba76010250753ce357382771fc983cd452a",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/contracts/src/rick_contracts/chat.py"
+    },
+    {
+      "path": "packages/contracts/src/rick_contracts/providers.py",
+      "sha256": "c660c352af96639a3063c7aafe721d72a789811944ad1b462dc0eaf24e43d65a",
+      "git_blob_oid": "2805cdf920e2fb941005927806fad0bcce3772dc",
+      "status": "unpublished_snapshot_candidate",
+      "origin_history_path": null
+    },
+    {
+      "path": "packages/contracts/src/rick_contracts/pagination.py",
+      "sha256": "aa4ad116ee918c7e9b3735522e230f80df88ec31edfaa8db1da87aaefc6637b3",
+      "git_blob_oid": "b4de3f202e2e16700d2470c057914262b5c4c3ed",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/contracts/src/rick_contracts/pagination.py"
+    },
+    {
+      "path": "packages/contracts/src/rick_contracts/errors.py",
+      "sha256": "6f15366d29907c3620cd59b72a6c23ffba88d5194fcd77a9d098d89463c2430d",
+      "git_blob_oid": "931bb87f2fc4680922b06ea9d480da1f9726b5c8",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/contracts/src/rick_contracts/errors.py"
+    },
+    {
+      "path": "packages/contracts/src/rick_contracts/cases.py",
+      "sha256": "f9777ae807604aa2570d8d355c63b8d7c58dc1b598ef6c3cc9b2b3321a1ef9a9",
+      "git_blob_oid": "4aa8eee01df2fda8ee097dee811e0c7cb217fbcc",
+      "status": "historical_published_content",
+      "origin_history_path": "packages/contracts/src/rick_contracts/cases.py"
+    },
+    {
+      "path": "packages/contracts/src/rick_contracts/base.py",
+      "sha256": "3aac801d1357bf91f810d874e5c00d0adc0047c0c4bcd3ffe41589456285f4db",
+      "git_blob_oid": "228ba2bad8fbc6b5efd79a350c304fe20483c3fb",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/contracts/src/rick_contracts/base.py"
+    },
+    {
+      "path": "packages/contracts/src/rick_contracts/security.py",
+      "sha256": "334d63187de42be3a98eb7336a59ec165875d45a7e2cd2573b404f5b18713a7d",
+      "git_blob_oid": "1f1b958a8826dc2a95c0906268a662d0948d1161",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/contracts/src/rick_contracts/security.py"
+    },
+    {
+      "path": "packages/contracts/src/rick_contracts/locking.py",
+      "sha256": "b74fe9f53761c88c5b10766ec13c1604193cd1abf288083cb5f24143b3281a12",
+      "git_blob_oid": "14f19530624fd68268594fa5aae5c5520f7d53fc",
+      "status": "historical_published_content",
+      "origin_history_path": "packages/contracts/src/rick_contracts/locking.py"
+    },
+    {
+      "path": "packages/contracts/src/rick_contracts/rag.py",
+      "sha256": "24d64a234a1d52290b1e1ea26989d5452b34a6654461df9b92fee0c7f63cad33",
+      "git_blob_oid": "a8e1a9818498008314c03b05c83c17474a04a146",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/contracts/src/rick_contracts/rag.py"
+    },
+    {
+      "path": "packages/evidence/src/rick_evidence/models.py",
+      "sha256": "8cbed30ee8c5f31b7f35dd8dbe51de19ef2f4a23817c6cd101cf7b554d2c3efa",
+      "git_blob_oid": "8cb75e83c3e1aada7ddc9d571efd11647141c453",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/evidence/src/rick_evidence/models.py"
+    },
+    {
+      "path": "packages/evidence/src/rick_evidence/__init__.py",
+      "sha256": "ba98d21489a740d1ad62d8c17b83510ea4f71324d8dc1f2d145b867298b2a074",
+      "git_blob_oid": "71fe66ffa00a6d41f59b75f61a09d193777dc9cf",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/evidence/src/rick_evidence/__init__.py"
+    },
+    {
+      "path": "packages/evidence/src/rick_evidence/validator.py",
+      "sha256": "a619f1fa9d4e41f2213b6e92fcbc2b3a3c009304be752004b8c77618616a0eca",
+      "git_blob_oid": "acad037d5fc53ae54e7522b13c965a67c73ce3c1",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/evidence/src/rick_evidence/validator.py"
+    },
+    {
+      "path": "packages/identity/src/rick_identity/postgres.py",
+      "sha256": "199ed00ac0837b0336a304d0edfaa015b840c684d77fd0384e90300f83ab9f8a",
+      "git_blob_oid": "c59d3acadd7e1cbe471863d3becb5d9e95065f17",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/identity/src/rick_identity/postgres.py"
+    },
+    {
+      "path": "packages/identity/src/rick_identity/__init__.py",
+      "sha256": "d16803fbaf03d7b1b6773dbf20eb56d56733ba962e17ced9e90686d08c9f27d0",
+      "git_blob_oid": "44237223dc6a8986560b1325a89315eda38f33c8",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/identity/src/rick_identity/__init__.py"
+    },
+    {
+      "path": "packages/identity/src/rick_identity/snapshots.py",
+      "sha256": "c35e3d60bc4e42431a620c9af9dc664424b4100a81bbfafb3798070c0f10327c",
+      "git_blob_oid": "bcdf2d3c980fb550d356daecdd8738bdd7342fd2",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/identity/src/rick_identity/snapshots.py"
+    },
+    {
+      "path": "packages/identity/src/rick_identity/stores.py",
+      "sha256": "cad4d4d40bfa69c393bae02675f831b2910ed4762e9ec074087db98af1350a4f",
+      "git_blob_oid": "3df49cdf3df5a9b6921a7aff1550a53ec6451a9c",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/identity/src/rick_identity/stores.py"
+    },
+    {
+      "path": "packages/identity/src/rick_identity/protocols.py",
+      "sha256": "8214b8370b66848f276d4a77e0d8900797b25bab238ffa7667585d21b23142fc",
+      "git_blob_oid": "f10f0f3c7aa15130935616936240cc524043f31b",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/identity/src/rick_identity/protocols.py"
+    },
+    {
+      "path": "packages/identity/src/rick_identity/oidc.py",
+      "sha256": "b8a1affeb40e45fa71a8f165b80bd643206831cd934b9d0058a6a42bef015200",
+      "git_blob_oid": "2777b2100492dc0ce14bc51f1bae9eb1ec2c8af2",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/identity/src/rick_identity/oidc.py"
+    },
+    {
+      "path": "packages/identity/src/rick_identity/passwords.py",
+      "sha256": "29bdcf6213f7fb868d53ddce4d1c8b21565a4efe2c2ba86d4e84593ab79dfacf",
+      "git_blob_oid": "b3a86cb059e50fd61cfb3ad072ca387abeccc283",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/identity/src/rick_identity/passwords.py"
+    },
+    {
+      "path": "packages/identity/src/rick_identity/provider.py",
+      "sha256": "60334e8cf9b40d2e6b4ca65b40bd2331becee30a297cdfd48b259553368f635d",
+      "git_blob_oid": "98f6ebca5c8907004b95cc30f404552361a8d76f",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/identity/src/rick_identity/provider.py"
+    },
+    {
+      "path": "packages/knowledge/src/rick_knowledge/sqlite_store.py",
+      "sha256": "b5cea2e2bc98a984bbc0700c4f9bea4161032b6f275f57c0ab25d12587cbd8e8",
+      "git_blob_oid": "d603217ee9308814e5333d6fd9dff41ebf0cdf90",
+      "status": "unpublished_snapshot_candidate",
+      "origin_history_path": null
+    },
+    {
+      "path": "packages/knowledge/src/rick_knowledge/json_boundary.py",
+      "sha256": "1c1b122187f1bf87aacfe3e60128778692c797340ab8dbcc0d779ee6562c971a",
+      "git_blob_oid": "99fbb3cefa827acfe6147deb5f1aea5bd4e96c55",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/knowledge/src/rick_knowledge/json_boundary.py"
+    },
+    {
+      "path": "packages/knowledge/src/rick_knowledge/store.py",
+      "sha256": "ba936557c5980698db485c2a15a1bcdf7b7605856bf9a94a5b9fbc74c866eca4",
+      "git_blob_oid": "24328501fa590d80d920ce6262048289a0ada031",
+      "status": "unpublished_snapshot_candidate",
+      "origin_history_path": null
+    },
+    {
+      "path": "packages/knowledge/src/rick_knowledge/models.py",
+      "sha256": "33a53a6b46c778d8218f99b5af24b5f3702a14f717fd15fd82179a4f4cfb4d42",
+      "git_blob_oid": "04832f1d87a6fc6d4adbf212dcb810e7441aa8e1",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/knowledge/src/rick_knowledge/models.py"
+    },
+    {
+      "path": "packages/knowledge/src/rick_knowledge/identity.py",
+      "sha256": "1ede6c0d79039a69bbc417a62c77d071f1024e97f595cc7bb0cf34a1ad7b1481",
+      "git_blob_oid": "076bafa9e97fbde74b64183cda9dfb3fb235db07",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/knowledge/src/rick_knowledge/identity.py"
+    },
+    {
+      "path": "packages/knowledge/src/rick_knowledge/__init__.py",
+      "sha256": "ccdfe2e6850ad555fe88b3abe78d487af81b40c5e60d40077f623f71bb495f02",
+      "git_blob_oid": "002e353100ac71b076f27c6884b684c26067de08",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/knowledge/src/rick_knowledge/__init__.py"
+    },
+    {
+      "path": "packages/knowledge/src/rick_knowledge/payload.py",
+      "sha256": "ae2d964376207015accedd38fd37bd44074444b7cde5ec39b9cfe2a881fb0e69",
+      "git_blob_oid": "b1fd6e28d8312ab84861a8c1efc3308fc5e3d704",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/knowledge/src/rick_knowledge/payload.py"
+    },
+    {
+      "path": "packages/knowledge/src/rick_knowledge/fencing.py",
+      "sha256": "9236102c285318e09066c7e52ae6301df2375f912b5acce97ea7429b18bf7b9d",
+      "git_blob_oid": "b69e6599ad617e8ac6ef07235881f66e26b53d80",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/knowledge/src/rick_knowledge/fencing.py"
+    },
+    {
+      "path": "packages/knowledge/src/rick_knowledge/publication.py",
+      "sha256": "f56737a34b52060af56abef2837a04a2a1169d9ed20bb6b5a19a375e9e585f87",
+      "git_blob_oid": "2966be0df848849e6a0267159409974762f94114",
+      "status": "unpublished_snapshot_candidate",
+      "origin_history_path": null
+    },
+    {
+      "path": "packages/knowledge/src/rick_knowledge/postgres_store.py",
+      "sha256": "0ca7aeb5916bac8ca7df71e470006763a6c91448fdd75fa418c40298574f4ab7",
+      "git_blob_oid": "817b00fe46a737abd011e293096bfa676720c194",
+      "status": "unpublished_snapshot_candidate",
+      "origin_history_path": null
+    },
+    {
+      "path": "packages/jobs/src/rick_jobs/contracts.py",
+      "sha256": "874ecf0d6e73135c1a87db6de711fd829abc746dc724a6d0a23f302cb0ec36ce",
+      "git_blob_oid": "4c089f6e77f2bbbd2c24ce4c0f8415ed841fbcfb",
+      "status": "historical_published_content",
+      "origin_history_path": "packages/jobs/src/rick_jobs/contracts.py"
+    },
+    {
+      "path": "packages/jobs/src/rick_jobs/__init__.py",
+      "sha256": "78409e3711cec54c7ef9b32b5d96b1c4ce9ee5e5c3ea36a6e77f1e398577f998",
+      "git_blob_oid": "5f56e3e1b1dd53fed753bc0dbfe4458bc5bdccd9",
+      "status": "historical_published_content",
+      "origin_history_path": "packages/jobs/src/rick_jobs/__init__.py"
+    },
+    {
+      "path": "packages/storage/src/rick_storage/validation.py",
+      "sha256": "adcceaf9da55970ebb59cff98847e9aa0fe7657e68ae6fc5c64258ca6851b80a",
+      "git_blob_oid": "ea02d2cc6950cc99b37b16775ef6d55be6b7da3e",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/storage/src/rick_storage/validation.py"
+    },
+    {
+      "path": "packages/storage/src/rick_storage/models.py",
+      "sha256": "a6dfd86c9b50030bc1cd9c10dcf55eed791287de26c486ce2d4f21aa10639701",
+      "git_blob_oid": "5f0064a006d5459a4b6c780b3b1597a9439a43ee",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/storage/src/rick_storage/models.py"
+    },
+    {
+      "path": "packages/storage/src/rick_storage/__init__.py",
+      "sha256": "c67398fcd81087ef495b59c44af72f1ab9f8578284071adb1051798081ccdfef",
+      "git_blob_oid": "c8648e1034c5c52642f22d367bbfae43669c266c",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/storage/src/rick_storage/__init__.py"
+    },
+    {
+      "path": "packages/storage/src/rick_storage/errors.py",
+      "sha256": "e7767c2733967a8a2f5c390cdac5007c9b165ad17247c2cca28247cd09ec895e",
+      "git_blob_oid": "733dc7dc0afd53a247c696a0001a4eeec2a33bb9",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/storage/src/rick_storage/errors.py"
+    },
+    {
+      "path": "packages/storage/src/rick_storage/object_store.py",
+      "sha256": "f81be07d280f38214a23bd3dfc211367da2b92bedacd932540e5610bf861d87c",
+      "git_blob_oid": "2512d0e1cfa836cf8230e412473907e2c74c3ffc",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/storage/src/rick_storage/object_store.py"
+    },
+    {
+      "path": "packages/storage/src/rick_storage/s3_object_store.py",
+      "sha256": "fe26dcb37ea3a4153729876e5257d578990bc0721dea88f17df6fe18c80de091",
+      "git_blob_oid": "73010d38892322ac0119aa46291680a7da91b44a",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/storage/src/rick_storage/s3_object_store.py"
+    },
+    {
+      "path": "packages/storage/src/rick_storage/protocols.py",
+      "sha256": "19c548029920ab76665ed30732a1589c9ee7502796cd26323d851dd35e146725",
+      "git_blob_oid": "11e02b44a4e26ccbf57cabe5b046edadfac045f3",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/storage/src/rick_storage/protocols.py"
+    },
+    {
+      "path": "packages/locking/src/rick_locking/validation.py",
+      "sha256": "d8a1fa7a13c0c0ee237194300e6030b41f33a21a0a6948dac0cd1b29ce047426",
+      "git_blob_oid": "1cd32fe7e89b5efb0df817d565ab1fc4c0894ea3",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/locking/src/rick_locking/validation.py"
+    },
+    {
+      "path": "packages/locking/src/rick_locking/redis_config.py",
+      "sha256": "fbd049e61a92568d3dd5f4c263982a49c1af91849006e296f92d11ed63600248",
+      "git_blob_oid": "7be723678464fcd278fcf2f17d97d3eb6e33ba20",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/locking/src/rick_locking/redis_config.py"
+    },
+    {
+      "path": "packages/locking/src/rick_locking/memory.py",
+      "sha256": "7caf38e707e86987e11cb438c71fa60a53eb09c357749248e37b5afa4a2b7dd1",
+      "git_blob_oid": "e07f5b1719eb7408dc4aa86ff3a6208fc389c94c",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/locking/src/rick_locking/memory.py"
+    },
+    {
+      "path": "packages/locking/src/rick_locking/__init__.py",
+      "sha256": "e0831294706d936d9d1d3bc05ed0706c6ec6a509a6bed1a64d28c406a8428ce0",
+      "git_blob_oid": "385be4d45bbfd4564f06a019398e0aa0c5e0742e",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/locking/src/rick_locking/__init__.py"
+    },
+    {
+      "path": "packages/locking/src/rick_locking/client.py",
+      "sha256": "3b6bc8840e5f7a407ac636114f6c4bac51a67db7596f7d92f92c97b531526ff8",
+      "git_blob_oid": "64bc164c3cfd6d88312d180dabd6f315ab171ed8",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/locking/src/rick_locking/client.py"
+    },
+    {
+      "path": "packages/locking/src/rick_locking/heartbeat.py",
+      "sha256": "548a1bf4d8937a87fcd3f4d0784e96fcc5f60a620d8cef79212b21abe18852e8",
+      "git_blob_oid": "e29a7dde8e9319d78353e450087a20f4bcdda84e",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/locking/src/rick_locking/heartbeat.py"
+    },
+    {
+      "path": "packages/locking/src/rick_locking/rate_limit.py",
+      "sha256": "77ed19a10d25cb2989779517878bae797e246621b446c553242219864d2989f5",
+      "git_blob_oid": "fce5dab6a1d67a35a826777fa4818ee83df7bb5c",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/locking/src/rick_locking/rate_limit.py"
+    },
+    {
+      "path": "packages/locking/src/rick_locking/errors.py",
+      "sha256": "01b2a3d035818bf23cacad279b2d274fb455cd04fd77e4df2394eefa2b29e3d7",
+      "git_blob_oid": "33c1d9852726ce056e540c4f327f5aa4c698e395",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/locking/src/rick_locking/errors.py"
+    },
+    {
+      "path": "packages/locking/src/rick_locking/redis.py",
+      "sha256": "50e1ac3afa1adc83c4165c462ec8e3923355a855c7dd02417913bc22bba3e6c1",
+      "git_blob_oid": "b7bd1867004f50b47123fb78a3dc03b7bdfc35d8",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/locking/src/rick_locking/redis.py"
+    },
+    {
+      "path": "packages/locking/src/rick_locking/http.py",
+      "sha256": "9d27c1cdb11e2248025d2de8cc32cfdf68b55cc3c47124b0d8fda8ee89e6985d",
+      "git_blob_oid": "4b0bde94df94337c15fb6f7e4c15b0d3959c448f",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/locking/src/rick_locking/http.py"
+    },
+    {
+      "path": "packages/locking/src/rick_locking/protocols.py",
+      "sha256": "e136036300dd279f5cb9cb56c5156c26517b82f03693ec7c77cb1986b53ad0aa",
+      "git_blob_oid": "5edb0635e77fb2957bb88a34bf9a71ae66b15524",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/locking/src/rick_locking/protocols.py"
+    },
+    {
+      "path": "packages/retrieval/src/rick_retrieval/pipeline.py",
+      "sha256": "2a4c4017c5be6194d4d405415e9de1e3928488fccf470864fd5af3f71feefca9",
+      "git_blob_oid": "984050f7698f8953f201e063be1f79b727aae1d6",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/retrieval/src/rick_retrieval/pipeline.py"
+    },
+    {
+      "path": "packages/retrieval/src/rick_retrieval/backends.py",
+      "sha256": "cd6b73165d3b0a36ffe749238f1b3c07d5990c2b968de73dbf68dd5a702ed34d",
+      "git_blob_oid": "4c6dd0eaec6f98efe7a1d4df3542247cd77f7ba7",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/retrieval/src/rick_retrieval/backends.py"
+    },
+    {
+      "path": "packages/retrieval/src/rick_retrieval/__init__.py",
+      "sha256": "7e9a2782b2e5448aecdd76f22b85d4939b248d75cfb026ebf564e295801d076b",
+      "git_blob_oid": "94d34dfc410cf45ed4383845a9e5b109afa69e08",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/retrieval/src/rick_retrieval/__init__.py"
+    },
+    {
+      "path": "packages/retrieval/src/rick_retrieval/sqlite_vector_store.py",
+      "sha256": "2d14bbc3a7d67ac6055a3b3f2de4c9641b573000b29acd20febbd292523aca29",
+      "git_blob_oid": "c17072921153673335a41ac9c9ab9276044c261a",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/retrieval/src/rick_retrieval/sqlite_vector_store.py"
+    },
+    {
+      "path": "packages/retrieval/src/rick_retrieval/rerank.py",
+      "sha256": "20ed4bdb0f594a6df1309c475a1102c9b9216ebea65c8ae4a5635bb7cc23a746",
+      "git_blob_oid": "0454b2055d1f27c3dcb60f8c4f46432626b98310",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/retrieval/src/rick_retrieval/rerank.py"
+    },
+    {
+      "path": "packages/retrieval/src/rick_retrieval/qdrant.py",
+      "sha256": "f5b3ff7e5e4ac5ef16358363c1efa8c447debc3b3e3fbf2bda020514c96bd527",
+      "git_blob_oid": "8c81603e5340f084b28b12e5b2588c0544381ba6",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/retrieval/src/rick_retrieval/qdrant.py"
+    },
+    {
+      "path": "packages/retrieval/src/rick_retrieval/sparse.py",
+      "sha256": "d7147347c55ecdf82c599b1eaa97641d65a1d2abd08b678f47c2249d738a4838",
+      "git_blob_oid": "7c5d5a85c35342c9c61d5a915bbbbcb01049c8ef",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/retrieval/src/rick_retrieval/sparse.py"
+    },
+    {
+      "path": "packages/retrieval/src/rick_retrieval/vectordb.py",
+      "sha256": "4d80fea5bfa3268a8ae16249627dd464c60b0681bdc7e39e5a1ab18d8aead6bf",
+      "git_blob_oid": "64c3171187e14427e353e6a72ac4e495690b104e",
+      "status": "historical_published_content",
+      "origin_history_path": "packages/retrieval/src/rick_retrieval/vectordb.py"
+    },
+    {
+      "path": "packages/retrieval/src/rick_retrieval/fusion.py",
+      "sha256": "210530a5804cc10280ab9d97bec1ad8ebee94025206a1a117a029fabd8ae5260",
+      "git_blob_oid": "c885a097ba15cbe1cccae712e01ccc42eb4aa4a4",
+      "status": "historical_published_content",
+      "origin_history_path": "packages/retrieval/src/rick_retrieval/fusion.py"
+    },
+    {
+      "path": "packages/observability/src/rick_observability/redaction.py",
+      "sha256": "1cdb333beaf1903fc028973592506f19946a7b66bdb1e8471cef88e381150872",
+      "git_blob_oid": "7946c62b93e057e57ca9d7c676725ebe2c23b1b0",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/observability/src/rick_observability/redaction.py"
+    },
+    {
+      "path": "packages/observability/src/rick_observability/tracing.py",
+      "sha256": "50b67a8277cfc189d07fd22f4794cdb6303172e4858e4bb8040ed6d0f0245214",
+      "git_blob_oid": "b95ca0674440177599feaee96f17fc7d8fb24783",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/observability/src/rick_observability/tracing.py"
+    },
+    {
+      "path": "packages/observability/src/rick_observability/__init__.py",
+      "sha256": "6372c7e47e789e461b62d5f80c0fb3535c7c0f7ecf762603a39a7032e5fced8a",
+      "git_blob_oid": "5726a32455a4c580be4a9eb94b4cc8dbffd5293b",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/observability/src/rick_observability/__init__.py"
+    },
+    {
+      "path": "packages/observability/src/rick_observability/metrics.py",
+      "sha256": "1efb51508829f6f6700067adde4b07d76a3359ce43c4d1ebab8e9c834dca308f",
+      "git_blob_oid": "5d9183d35e0c4c665edc58e270be6cddc40d5639",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/observability/src/rick_observability/metrics.py"
+    },
+    {
+      "path": "packages/observability/src/rick_observability/events.py",
+      "sha256": "673b3d7b4c86a451eb9fe5278e4fe602678d6946813ea0fa39aeca9b5a9a9c15",
+      "git_blob_oid": "83ad6d14ee1847116e079e7cbc0d1598e00e166e",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/observability/src/rick_observability/events.py"
+    },
+    {
+      "path": "packages/observability/src/rick_observability/slo.py",
+      "sha256": "055b9e540d2303cd49b6f28919eef11847f36f06251c73c65eb21e085ace6524",
+      "git_blob_oid": "c54efaced7b57ad8649522aaf50273b6570844e3",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/observability/src/rick_observability/slo.py"
+    },
+    {
+      "path": "packages/providers/src/rick_providers/resilience.py",
+      "sha256": "69fd99791f811f1c70de5540db95350ee7e404290be0679d82d5115e7011c288",
+      "git_blob_oid": "cdea7bc67739e6245201cd920bd6d71d4d60307e",
+      "status": "unpublished_snapshot_candidate",
+      "origin_history_path": null
+    },
+    {
+      "path": "packages/providers/src/rick_providers/anthropic.py",
+      "sha256": "e1d830311859587bd91d0c5642fc56144b3214eea99a2101b79a8f2e0f155589",
+      "git_blob_oid": "0ec8bbdffb3f6680ee91d80e8fd0e0aea0f468cd",
+      "status": "unpublished_snapshot_candidate",
+      "origin_history_path": null
+    },
+    {
+      "path": "packages/providers/src/rick_providers/deterministic.py",
+      "sha256": "d574beea47729454864e09eeb3080af44d3079fc69c911a53db48ede6a1d871e",
+      "git_blob_oid": "7dc924a1c6d7691f3e1b4a21b5425652c96c9729",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/providers/src/rick_providers/deterministic.py"
+    },
+    {
+      "path": "packages/providers/src/rick_providers/__init__.py",
+      "sha256": "b207a893b71ee95a9940cc626842f648cc10e87fed252ad51d705a194b5c9376",
+      "git_blob_oid": "b802b1eec85cf581f50f2a849e9b9094654cf339",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/providers/src/rick_providers/__init__.py"
+    },
+    {
+      "path": "packages/providers/src/rick_providers/client.py",
+      "sha256": "328bc6fc6e620001fb04d06023441796105a33707d73da328d77c931da1a1c1c",
+      "git_blob_oid": "fbb35bfd062fbea83fa1d5a013a353d9a769a01b",
+      "status": "unpublished_snapshot_candidate",
+      "origin_history_path": null
+    },
+    {
+      "path": "packages/providers/src/rick_providers/py.typed",
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+      "git_blob_oid": "8b137891791fe96927ad78e64b0aad7bded08bdc",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/providers/src/rick_providers/py.typed"
+    },
+    {
+      "path": "packages/providers/src/rick_providers/cleanup.py",
+      "sha256": "5b2cc6e2ec6ae4f6d36903caae6cd6d86d453ebe87fb2a47ae87c269ed576e22",
+      "git_blob_oid": "e87f5590df2dc6ba870037238c6cc53d8644a240",
+      "status": "unpublished_snapshot_candidate",
+      "origin_history_path": null
+    },
+    {
+      "path": "packages/providers/src/rick_providers/config.py",
+      "sha256": "b4af12dae164f4d45962984cf200421523c10b63fa6b5e7c8082a2d09fb1c329",
+      "git_blob_oid": "2ad1c7a4873f586578c92861d992bda81a580380",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/providers/src/rick_providers/config.py"
+    },
+    {
+      "path": "packages/providers/src/rick_providers/errors.py",
+      "sha256": "82fd8eb300521aaecd1efb747f4f456e1e1bcc7ce12375daa72b54e6033d91b7",
+      "git_blob_oid": "feff4a2d858af6d2d61d9ffb998664c0cc74fbdc",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/providers/src/rick_providers/errors.py"
+    },
+    {
+      "path": "packages/providers/src/rick_providers/sampling.py",
+      "sha256": "34e661baef37761ba862746f2387f5126618a9691b18e5e36056d6b7f866363e",
+      "git_blob_oid": "acd7cbae5548d5350463aa7d21863fc9eff74c7f",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/providers/src/rick_providers/sampling.py"
+    },
+    {
+      "path": "packages/providers/src/rick_providers/factory.py",
+      "sha256": "b21e72175bf6fe01642fb578fc48599ce25cb6f848d744983e43433d0510db2f",
+      "git_blob_oid": "150a7859276f87a98b0d42bed9b7cd7aca772f07",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/providers/src/rick_providers/factory.py"
+    },
+    {
+      "path": "packages/providers/src/rick_providers/protocols.py",
+      "sha256": "e2b4c3faeaa532de488b818b92a4d3b3d1d9bd4c2687b5c5349076fe01c680e6",
+      "git_blob_oid": "58d76cb5722de8e54470e02015b542833f988b19",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/providers/src/rick_providers/protocols.py"
+    },
+    {
+      "path": "packages/professor/src/rick_professor/orchestration.py",
+      "sha256": "05bbbf2090d68cd81f71da2138e5d6866e89b700e69d50ed9cebb423fc9d0dec",
+      "git_blob_oid": "e631db0a532728bd07d02781d8f7ff7544fa553c",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/professor/src/rick_professor/orchestration.py"
+    },
+    {
+      "path": "packages/professor/src/rick_professor/__init__.py",
+      "sha256": "7df3a532ecd8533fc2843a39beba9f1a797b3c3c54b8c3b2fdac07c972bb9aea",
+      "git_blob_oid": "f74d2b8220e4bc3094b9b4755c6782f495558fdb",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/professor/src/rick_professor/__init__.py"
+    },
+    {
+      "path": "packages/professor/src/rick_professor/protocols.py",
+      "sha256": "ad499dc0e52f4f483ac46175986c166a241176706e17f89d937c73f52ff40063",
+      "git_blob_oid": "90b35f5b121fcddbd477ba4117d366a5c97a7675",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/professor/src/rick_professor/protocols.py"
+    },
+    {
+      "path": "packages/decision/src/rick_decision/request_policy.py",
+      "sha256": "adf65ca0ba4a5d38c4bf9315d87fcacca76a28433925af43d3ce29924c227065",
+      "git_blob_oid": "d9b64d9f3a20a960bc9f0d51f3adfe81949b280d",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/decision/src/rick_decision/request_policy.py"
+    },
+    {
+      "path": "packages/decision/src/rick_decision/contracts.py",
+      "sha256": "e3e19fddd25a6a7d7ee8e4859a4e223940e23ed20faee1255196201a286f5a83",
+      "git_blob_oid": "659f3347f640b6e671687fdcf6258e4ed5d77920",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/decision/src/rick_decision/contracts.py"
+    },
+    {
+      "path": "packages/decision/src/rick_decision/__init__.py",
+      "sha256": "e729ddb2d38b912b4e0be6f9edc43373141a10f76bc5e7752653e19a91bdade4",
+      "git_blob_oid": "e7c36cbd59e0f1f68516cb370ccd4d690a51f5f8",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/decision/src/rick_decision/__init__.py"
+    },
+    {
+      "path": "packages/decision/src/rick_decision/layer.py",
+      "sha256": "5f6bd9adf10b872ba149ff3f2af84bd96d298200422d3da967a10fec962bd57c",
+      "git_blob_oid": "7932b0c381e426fda2feefe7dfe38c63cdad365d",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/decision/src/rick_decision/layer.py"
+    },
+    {
+      "path": "packages/authorization/src/rick_authorization/__init__.py",
+      "sha256": "149b3d4dd43780d7e9e6a61b9766d5bef35964906592eec9b6fa5a16d02da17b",
+      "git_blob_oid": "466aacfb8d9a4f299ff57f4d5b403a1b08c15cf1",
+      "status": "identical_origin_main",
+      "origin_history_path": "packages/authorization/src/rick_authorization/__init__.py"
+    },
+    {
+      "path": "packages/authorization/src/rick_authorization/policy.py",
+      "sha256": "e54341d6050e08987d8f176aa467d80e64fc72e1d7602a0e279dc398e5d1f22f",
+      "git_blob_oid": "54f93b8e3c7c8a1111740a1a84710368f68af310",
+      "status": "unpublished_snapshot_candidate",
+      "origin_history_path": null
+    }
+  ]
+}
