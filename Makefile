@@ -402,8 +402,9 @@ web-build:
 	cd "$(WEB_DIR)" && RICK_API_INTERNAL_URL="http://127.0.0.1:$${RICK_API_TEST_PORT:-8001}" npm run build
 
 web-e2e:
-	@mkdir -p "$(ROOT)/.runtime/tmp/playwright"
-	cd "$(WEB_DIR)" && TMPDIR="$(ROOT)/.runtime/tmp/playwright" RICK_WEB_E2E_PRODUCTION=1 RICK_VISUAL_EVIDENCE_DIR="$(WEB_CURRENT_EVIDENCE_DIR)/production-test-results" RICK_PERFORMANCE_EVIDENCE_DIR="$(WEB_CURRENT_EVIDENCE_DIR)/performance" npm run test:e2e
+	@E2E_TMP="$${RICK_WEB_E2E_TMPDIR:-$$(mktemp -d /tmp/rick-e2e.XXXXXX)}"; \
+	cd "$(WEB_DIR)" && TMPDIR="$$E2E_TMP" RICK_WEB_E2E_PRODUCTION=1 RICK_VISUAL_EVIDENCE_DIR="$(WEB_CURRENT_EVIDENCE_DIR)/production-test-results" RICK_PERFORMANCE_EVIDENCE_DIR="$(WEB_CURRENT_EVIDENCE_DIR)/performance" npm run test:e2e; \
+	status=$$?; rm -rf "$$E2E_TMP"; exit $$status
 	@printf '%s\n' 'viewport matrix: 375/768/1440; no planned or executable skips'
 	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) "$(ROOT)/scripts/state_of_art/summarize_web_performance.py" --input "$(WEB_CURRENT_EVIDENCE_DIR)/performance" --output "$(WEB_CURRENT_EVIDENCE_DIR)/performance-summary.json"
 

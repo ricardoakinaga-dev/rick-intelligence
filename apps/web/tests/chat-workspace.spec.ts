@@ -276,7 +276,9 @@ test("offline during an admitted send preserves retry identity and fences the la
   await page.context().setOffline(true);
   await expect(page.locator('[data-network-state="offline"]')).toBeVisible();
   await expect(composer).toHaveValue(question);
-  await expect(composer).toBeDisabled();
+  // Drafting is local and remains editable offline; the explicit retry below
+  // is the only submit path and keeps the same idempotency key.
+  await expect(composer).toBeEnabled();
   expect(requests).toHaveLength(1);
   await page.screenshot({ path: testInfo.outputPath("offline-during-send.png"), fullPage: true, animations: "disabled" });
   await page.context().setOffline(false);

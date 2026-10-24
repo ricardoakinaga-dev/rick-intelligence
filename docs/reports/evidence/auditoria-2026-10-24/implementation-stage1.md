@@ -137,3 +137,15 @@ O gate API foi repetido e passou: **1.877 passed, 18 skipped, 75,65% combinado**
 | AUD24-043 | API branch **75,65%** (1.877 passed, exit 0) e worker **75,93%** (857 passed, exit 0); floors 75/74 preservados |
 | AUD24-044 | `BLOCKED_EXTERNAL` por D04 (corpus/labels/direitos/thresholds) |
 | AUD24-045 | E2E/axe em execução; AT real `NOT_RUN` |
+
+## 12. Browser E2E e toolchain limpo (24/10)
+
+| Verificação | Resultado |
+|---|---|
+| AUD24 matrix (chat/sessão/recuperação) em 375/768/1440 | **39/39 passed** |
+| Accessibility/shell (inclui axe e foco/teclado) em 375/768/1440 | **33/33 passed** |
+| Web unit/coverage em Node 22.19/npm 10.9.3 | **265 passed**, 91,95% linhas, 80,49% branches |
+| `npm ci` limpo + typecheck + build em Node 22.19/npm 10.9.3 | exit 0 |
+| Full 363 matrix | `NOT_RUN`: primeira tentativa falhou por **socket path too long** do Chrome no TMPDIR longo do repo; corrigido no `make web-e2e` (tmp curto), mas a matriz completa não foi reexecutada |
+
+O login ganhou o campo de workspace em um controle recolhível; o botão “Entrar” continua no primeiro viewport em 375/768/1440, e a cópia de organização foi preservada (testes 6/6 e 33/33).
