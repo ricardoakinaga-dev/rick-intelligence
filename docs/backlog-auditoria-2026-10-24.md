@@ -299,7 +299,7 @@ Este documento é **especificação**, não ledger de execução. Os 29 contrato
 **Entrega:** pack estratificado com corpus/labels/direitos aprovados; métricas de retrieval, citação e faithfulness; limitações e revisão humana; nenhum caso clínico real sem autorização.
 **Aceite:** pack aprovado pela autoridade de domínio; resultados reproduzíveis; métricas e denominadores explícitos; 2 casos sintéticos deixam de ser a única prova.
 **Evidência:** manifesto do pack + relatório + revisão.
-**Status local (24/10):** `BLOCKED_EXTERNAL` — corpus/labels/direitos/thresholds dependem de D04; nenhum pack sintético foi apresentado como representativo.
+**Status local (24/10):** `BLOCKED_EXTERNAL` — caminho sintético público aprovado, mas corpus/labels/thresholds exigem revisor de domínio; ver [pacote D04](<operations/d04-aud24-corpus-decision.md>).
 **Achado:** AUD24 (dimensão 12).
 
 #### AUD24-045 — Auditoria de acessibilidade e tecnologia assistiva
@@ -308,7 +308,7 @@ Este documento é **especificação**, não ledger de execução. Os 29 contrato
 **Entrega:** auditoria por teclado, leitor de tela, zoom, contraste e foco nos fluxos críticos; correções; relatório de lacunas.
 **Aceite:** nenhum bloqueio crítico nos fluxos principais; lacunas documentadas; evidência de browser/AT, sem alegar WCAG global.
 **Evidência:** relatório + capturas + achados.
-**Status local (24/10):** full E2E **363/363** em 375/768/1440 (inclui axe, foco, teclado, visual e performance); leitor de tela/AT real `NOT_RUN`.
+**Status local (24/10):** full E2E **363/363** em 375/768/1440 (axe, foco, teclado, visual, performance). Smoke Orca/AT-SPI provou o transporte até Chrome, mas não é auditoria humana; AT real segue `NOT_RUN`. Ver [smoke](<reports/evidence/auditoria-2026-10-24/accessibility-at-spi-smoke.md>).
 **Achado:** AUD24 (dimensão 15); extensão de PROD12-025/041.
 
 ## 5. Herança PROD12 — referência, não duplicação
