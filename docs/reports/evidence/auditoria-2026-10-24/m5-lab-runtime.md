@@ -63,6 +63,6 @@ Comando: `make redis-multi-replica-runtime` com dois processos `apps/api` reais 
 **PASS:** dois processos independentes; boundary HTTP canônico.
 **FAIL:** isolamento de tenant; bucket atômico compartilhado; replay cross-replica; bypass; TTL do bucket.
 
-Observações: `login` 0/4 permitidos, `recovery`/`chat`/`compatibility` 1/4; TTL do bucket vazio. A hipótese mais forte é que o **store de idempotência/replay é local ao processo**, enquanto o bucket é Redis: o replay cross-replica consome um segundo token em vez de devolver a decisão original; o login também parece usar chave por IP/tenant e foi consumido pelo bootstrap. Isso é um **defeito/gap de arquitetura multi-réplica**, não um artefato de container.
+Observações: `login` 0/4 permitidos, `recovery`/`chat`/`compatibility` 1/4; TTL do bucket vazio. Investigação posterior com dois clientes Redis reais mostrou que o **store compartilhado já funciona** (ver [shared-replay-a.md](shared-replay-a.md)): o replay não consome segundo token. O FAIL do gate HTTP vem de o harness reenviar o **X-Request-ID do chamador**, enquanto a API usa nonce server-owned por segurança; além disso, o bootstrap consome o bucket de login por IP. É **divergência do harness/contrato**, não ausência do store. A API não foi alterada para confiar no ID do cliente.
 
 **Não foi corrigido nesta rodada** e não foi convertido em PASS. Permanece como investigação M5/M6.
