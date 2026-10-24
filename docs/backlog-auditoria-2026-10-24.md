@@ -243,6 +243,7 @@ Este documento é **especificação**, não ledger de execução. Os 29 contrato
 **Entrega:** executor Linux descartável com UID/GID/sticky/namespace representativos; execução da lane; classificação de cada falha; nenhuma mudança de DAC/ownership do host.
 **Aceite:** lane executada no executor; 277 falhas reconciliadas por causa e disposição; nenhuma suprimida; procedimento reproduzível.
 **Evidência:** relatório da lane + ambiente + negativos.
+**Status local (24/10):** `BLOCKED_EXTERNAL`; executor representativo não disponível. A falha local é de ownership/namespace, não prova de 277 defeitos.
 **Achado:** AUD24-12; extensão de PROD12-003/AUD15-T003.
 
 #### AUD24-034 — CI remoto e evidência vinculada
@@ -251,6 +252,7 @@ Este documento é **especificação**, não ledger de execução. Os 29 contrato
 **Entrega:** execução dos lanes no CI remoto sobre o SHA do candidato; artefatos/envelopes vinculados; comparação local↔remoto.
 **Aceite:** lanes obrigatórios verdes no remoto; evidência aponta para o SHA exato; nenhuma alegação “local-only” como release.
 **Evidência:** run IDs + artefatos + SHA.
+**Status local (24/10):** `BLOCKED_EXTERNAL`; sem push/credenciais de CI remoto. Candidato apenas em commits locais.
 **Achado:** AUD24-03/06/12.
 
 ### E4 — Qualidade e documentação

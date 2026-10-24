@@ -149,3 +149,15 @@ O gate API foi repetido e passou: **1.877 passed, 18 skipped, 75,65% combinado**
 | Full 363 matrix | `NOT_RUN`: primeira tentativa falhou por **socket path too long** do Chrome no TMPDIR longo do repo; corrigido no `make web-e2e` (tmp curto), mas a matriz completa não foi reexecutada |
 
 O login ganhou o campo de workspace em um controle recolhível; o botão “Entrar” continua no primeiro viewport em 375/768/1440, e a cópia de organização foi preservada (testes 6/6 e 33/33).
+
+## 13. Disposições externas de M3/M4
+
+| Item | Disposição | Autoridade/limite |
+|---|---|---|
+| AUD24-033 VPS lane | `BLOCKED_EXTERNAL` | Executor com UID/GID/namespace representativos não disponível; a lane local falha por barreira de ownership, não por 277 defeitos independentes |
+| AUD24-034 CI remoto | `BLOCKED_EXTERNAL` | Sem push/credenciais de CI remoto nesta sessão; o candidato está apenas em commits locais |
+| Release integrity | `FAIL` esperado | `release_integrity --require-clean` rejeita envelopes runtime `NOT_RUN`; manifest gerado, sem GO |
+| AUD24-044 pack RAG | `BLOCKED_EXTERNAL` | D04: corpus, direitos, labels e thresholds não aprovados; nenhum pack sintético é apresentado como representativo |
+| AUD24-045 AT | `PARCIAL` | Axe, foco e teclado 33/33 em 375/768/1440; leitor de tela/AT real `NOT_RUN` |
+
+**Conclusão:** o escopo local executável de M0–M3 está coberto e commitado; M4 tem 044/AT dependentes de autoridade externa. O goal não é marcado completo sem aceite humano e sem essas provas.
