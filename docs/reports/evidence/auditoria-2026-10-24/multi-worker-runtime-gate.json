@@ -1,0 +1,117 @@
+{
+  "crash_matrix": {
+    "after_claim": "PASS",
+    "after_commit": "PASS",
+    "after_heartbeat": "PASS",
+    "after_publish": "PASS",
+    "before_publish": "PASS",
+    "before_result": "PASS",
+    "during_handler": "PASS",
+    "in_transaction": "PASS"
+  },
+  "crash_matrix_complete": true,
+  "production_safe": true,
+  "results": [
+    {
+      "name": "migrations",
+      "result": "PASS"
+    },
+    {
+      "detail": "two distinct RealWorkerRuntime processes used independent database sessions",
+      "name": "PROCESS_ISOLATION",
+      "result": "PASS"
+    },
+    {
+      "detail": "exactly one worker claimed the queued job",
+      "name": "ONE_OWNER_CLAIM",
+      "result": "PASS"
+    },
+    {
+      "detail": "the winning worker renewed its durable lease",
+      "name": "HEARTBEAT_FENCING",
+      "result": "PASS"
+    },
+    {
+      "detail": "the durable outbox contains exactly one publication event",
+      "name": "SINGLE_PUBLICATION",
+      "result": "PASS"
+    },
+    {
+      "detail": "the durable outbox contains one idempotent publication event",
+      "name": "PUBLICATION_OUTBOX_FENCE",
+      "result": "PASS"
+    },
+    {
+      "detail": "real worker terminated before result commit; lease expiry reclaimed the job with one durable publication",
+      "name": "CRASH_AFTER_CLAIM",
+      "result": "PASS"
+    },
+    {
+      "detail": "a second process reclaimed the expired durable lease",
+      "name": "LEASE_RECLAIM_AFTER_EXPIRY",
+      "result": "PASS"
+    },
+    {
+      "detail": "the crashed worker's stale lease could not acknowledge after the terminal mutation",
+      "name": "STALE_WORKER_ACK_REJECTED",
+      "result": "PASS"
+    },
+    {
+      "detail": "the stale worker attempt left the durable outbox publication count unchanged",
+      "name": "STALE_WORKER_PUBLISH_REJECTED",
+      "result": "PASS"
+    },
+    {
+      "detail": "state, lease, attempt, audit and outbox invariants held after recovery",
+      "name": "CRASH_RECOVERY_SUCCEEDS",
+      "result": "PASS"
+    },
+    {
+      "detail": "crash recovery retained exactly one durable publication event",
+      "name": "DUPLICATE_PUBLICATION_REJECTED",
+      "result": "PASS"
+    },
+    {
+      "detail": "real worker terminated before result commit; lease expiry reclaimed the job with one durable publication",
+      "name": "CRASH_AFTER_HEARTBEAT",
+      "result": "PASS"
+    },
+    {
+      "detail": "real worker terminated before result commit; lease expiry reclaimed the job with one durable publication",
+      "name": "CRASH_DURING_HANDLER",
+      "result": "PASS"
+    },
+    {
+      "detail": "real worker terminated before result commit; lease expiry reclaimed the job with one durable publication",
+      "name": "CRASH_BEFORE_RESULT",
+      "result": "PASS"
+    },
+    {
+      "detail": "real worker terminated before result commit; lease expiry reclaimed the job with one durable publication",
+      "name": "CRASH_IN_TRANSACTION",
+      "result": "PASS"
+    },
+    {
+      "detail": "real worker terminated after the result transaction committed; durable state, attempt, audit and outbox were retained",
+      "name": "CRASH_AFTER_COMMIT",
+      "result": "PASS"
+    },
+    {
+      "detail": "real worker terminated before result commit; lease expiry reclaimed the job with one durable publication",
+      "name": "CRASH_BEFORE_PUBLISH",
+      "result": "PASS"
+    },
+    {
+      "detail": "real worker terminated before result commit; lease expiry reclaimed the job with one durable publication",
+      "name": "CRASH_AFTER_PUBLISH",
+      "result": "PASS"
+    },
+    {
+      "name": "health",
+      "result": "PASS"
+    }
+  ],
+  "runtime_claim": true,
+  "schema_version": "phase3-multi-worker-runtime-gate.v1",
+  "status": "PASS"
+}

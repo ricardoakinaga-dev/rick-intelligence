@@ -45,3 +45,13 @@ Comando: `make object-qdrant-runtime` com endpoint/bucket/região/credenciais lo
 - Não executei golden ingestion E2E, multi-worker, restore integrado, provider real, observabilidade distribuída, carga/chaos/soak ou release. Esses gates exigem composições/harnesses adicionais e não são inferidos deste PASS.
 - Containers são efêmeros e loopback; não são prova de topologia de produção.
 - O lab não autoriza promoção; `NO-GO` permanece.
+
+## 6. Multi-worker runtime (PASS)
+
+Comando: `make multi-worker-runtime` com o mesmo PostgreSQL descartável.
+
+**Resultado: PASS**, `production_safe=true`, `runtime_claim=true`, matriz de crash **8/8**: `after_claim`, `after_heartbeat`, `during_handler`, `before_result`, `in_transaction`, `after_commit`, `before_publish`, `after_publish`.
+
+Provas: dois processos com sessões independentes; exatamente um dono do claim; heartbeat fencing; uma única publicação durável; crash após claim/heartbeat/handler/transação; lease expirado recuperado; ack/publicação do worker obsoleto rejeitados; estado/lease/attempt/audit/outbox consistentes após recuperação; publicação duplicada rejeitada.
+
+Artefato: [multi-worker-runtime-gate.json](multi-worker-runtime-gate.json).
