@@ -308,7 +308,7 @@ Este documento é **especificação**, não ledger de execução. Os 29 contrato
 **Entrega:** auditoria por teclado, leitor de tela, zoom, contraste e foco nos fluxos críticos; correções; relatório de lacunas.
 **Aceite:** nenhum bloqueio crítico nos fluxos principais; lacunas documentadas; evidência de browser/AT, sem alegar WCAG global.
 **Evidência:** relatório + capturas + achados.
-**Status local (24/10):** E2E/axe e teclado **33/33** na matriz 375/768/1440; leitor de tela/AT real `NOT_RUN`.
+**Status local (24/10):** full E2E **363/363** em 375/768/1440 (inclui axe, foco, teclado, visual e performance); leitor de tela/AT real `NOT_RUN`.
 **Achado:** AUD24 (dimensão 15); extensão de PROD12-025/041.
 
 ## 5. Herança PROD12 — referência, não duplicação

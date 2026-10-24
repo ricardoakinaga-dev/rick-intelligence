@@ -146,7 +146,7 @@ O gate API foi repetido e passou: **1.877 passed, 18 skipped, 75,65% combinado**
 | Accessibility/shell (inclui axe e foco/teclado) em 375/768/1440 | **33/33 passed** |
 | Web unit/coverage em Node 22.19/npm 10.9.3 | **265 passed**, 91,95% linhas, 80,49% branches |
 | `npm ci` limpo + typecheck + build em Node 22.19/npm 10.9.3 | exit 0 |
-| Full 363 matrix | `NOT_RUN`: primeira tentativa falhou por **socket path too long** do Chrome no TMPDIR longo do repo; corrigido no `make web-e2e` (tmp curto), mas a matriz completa não foi reexecutada |
+| Full 363 matrix | **363/363 passed**, 4,8 min, 375/768/1440, 0 skips; performance PASS (LCP max 888ms, CLS 0.0022) após correção do TMPDIR curto do Chrome |
 
 O login ganhou o campo de workspace em um controle recolhível; o botão “Entrar” continua no primeiro viewport em 375/768/1440, e a cópia de organização foi preservada (testes 6/6 e 33/33).
 
@@ -158,6 +158,6 @@ O login ganhou o campo de workspace em um controle recolhível; o botão “Entr
 | AUD24-034 CI remoto | `BLOCKED_EXTERNAL` | Sem push/credenciais de CI remoto nesta sessão; o candidato está apenas em commits locais |
 | Release integrity | `FAIL` esperado | `release_integrity --require-clean` rejeita envelopes runtime `NOT_RUN`; manifest gerado, sem GO |
 | AUD24-044 pack RAG | `BLOCKED_EXTERNAL` | D04: corpus, direitos, labels e thresholds não aprovados; nenhum pack sintético é apresentado como representativo |
-| AUD24-045 AT | `PARCIAL` | Axe, foco e teclado 33/33 em 375/768/1440; leitor de tela/AT real `NOT_RUN` |
+| AUD24-045 AT | `PARCIAL` | Full E2E 363/363 inclui axe, foco, teclado e visual em 375/768/1440; leitor de tela/AT real `NOT_RUN` |
 
 **Conclusão:** o escopo local executável de M0–M3 está coberto e commitado; M4 tem 044/AT dependentes de autoridade externa. O goal não é marcado completo sem aceite humano e sem essas provas.
