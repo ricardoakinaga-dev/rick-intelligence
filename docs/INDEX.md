@@ -24,7 +24,7 @@
 | Snapshot mais recente de auditoria | [relatório AUD24](<reports/relatorio-auditoria-2026-10-24.md>) | SNAPSHOT observado em 24/10; 74,7/100; NO-GO, sem reexecução externa |
 | Decisão de auditoria/revogação | [ADR-024](<architecture/adr/ADR-024-audit-outcome-and-revocation-ordering.md>) | RATIFICADA em 24/10; A+ em duas etapas; produção não autorizada |
 | Replay Redis compartilhado (A) | [evidência](<reports/evidence/auditoria-2026-10-24/shared-replay-a.md>) | Dois clientes, mesmo request ID não duplica token |
-| Pack RAG candidato | [evidência](<reports/evidence/auditoria-2026-10-24/rag-pack-candidate.md>) | 12 casos sintéticos; thresholds PASS; revisão de domínio pendente |
+| Pack RAG candidato | [revisão do agente](<reports/evidence/auditoria-2026-10-24/rag-pack-review-agent-20261024.md>) | **REJEITADO** como representativo; apenas smoke de schema |
 | Decisão D04 AUD24 | [pacote de corpus](<operations/d04-aud24-corpus-decision.md>) | PROPOSTO; revisão de domínio pendente |
 | Smoke Orca/AT-SPI | [evidência](<reports/evidence/auditoria-2026-10-24/accessibility-at-spi-smoke.md>) | PARCIAL; transporte AT-SPI provado, auditoria humana NOT_RUN |
 | Lab Docker M5 | [evidência](<reports/evidence/auditoria-2026-10-24/m5-lab-runtime.md>) | PostgreSQL/Redis/S3/Qdrant e **multi-worker 8/8 crash points PASS** em containers |

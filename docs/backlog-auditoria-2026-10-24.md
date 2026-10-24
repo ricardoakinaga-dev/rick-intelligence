@@ -299,7 +299,7 @@ Este documento é **especificação**, não ledger de execução. Os 29 contrato
 **Entrega:** pack estratificado com corpus/labels/direitos aprovados; métricas de retrieval, citação e faithfulness; limitações e revisão humana; nenhum caso clínico real sem autorização.
 **Aceite:** pack aprovado pela autoridade de domínio; resultados reproduzíveis; métricas e denominadores explícitos; 2 casos sintéticos deixam de ser a única prova.
 **Evidência:** manifesto do pack + relatório + revisão.
-**Status local (24/10):** candidato de **12 casos** em `docs/evaluation/packs/aud24-synthetic-v1/` passou todos os thresholds estruturais; labels ainda exigem revisor de domínio. AUD24-044 continua `BLOCKED_EXTERNAL`; ver [D04](<operations/d04-aud24-corpus-decision.md>) e [evidência](<reports/evidence/auditoria-2026-10-24/rag-pack-candidate.md>).
+**Status local (24/10):** candidato de 12 casos foi **REJEITADO pelo agente revisor** como representativo (corpus sem texto, checksums/fontes inválidos, casos clonados, abstenção/ACL não exercitadas, thresholds divergentes). Serve apenas como smoke de schema. AUD24-044 continua `BLOCKED_EXTERNAL`; ver [revisão](<reports/evidence/auditoria-2026-10-24/rag-pack-review-agent-20261024.md>).
 **Achado:** AUD24 (dimensão 12).
 
 #### AUD24-045 — Auditoria de acessibilidade e tecnologia assistiva
@@ -308,7 +308,7 @@ Este documento é **especificação**, não ledger de execução. Os 29 contrato
 **Entrega:** auditoria por teclado, leitor de tela, zoom, contraste e foco nos fluxos críticos; correções; relatório de lacunas.
 **Aceite:** nenhum bloqueio crítico nos fluxos principais; lacunas documentadas; evidência de browser/AT, sem alegar WCAG global.
 **Evidência:** relatório + capturas + achados.
-**Status local (24/10):** full E2E **363/363** em 375/768/1440 (axe, foco, teclado, visual, performance). Smoke Orca/AT-SPI provou o transporte até Chrome, mas não é auditoria humana; AT real segue `NOT_RUN`. Ver [smoke](<reports/evidence/auditoria-2026-10-24/accessibility-at-spi-smoke.md>).
+**Status local (24/10):** full E2E **363/363** e smoke funcional **33/33** em 375/768/1440. O usuário aceitou o smoke funcional como teto e dispensou AT humano; residual de WCAG/leitor de tela registrado, sem alegação de acessibilidade plena. Ver [smoke](<reports/evidence/auditoria-2026-10-24/accessibility-at-spi-smoke.md>).
 **Achado:** AUD24 (dimensão 15); extensão de PROD12-025/041.
 
 ## 5. Herança PROD12 — referência, não duplicação

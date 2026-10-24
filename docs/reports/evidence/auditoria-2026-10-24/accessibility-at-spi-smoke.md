@@ -26,3 +26,9 @@
 - Não houve navegação sistemática da aplicação RICK, travessia de todos os fluxos, leitura por áudio, teste com usuário cego ou avaliação WCAG.
 - O browser acessível usado no smoke foi uma instância existente do Chrome, não a matriz RICK completa.
 - A evidência é **parcial**; AUD24-045 continua aberto para um revisor humano/AT real.
+
+## Decisão humana de 24/10
+
+O usuário autorizou **apenas o smoke teste funcional** e aceitou esse teto para AUD24-045, sem auditoria humana/leitor de tela completo. O smoke executado em 375/768/1440 (`copy-recovery` + `canonical-shell`, incluindo axe, foco e teclado) passou **33/33**.
+
+**Residual aceito:** não há avaliação com usuário cego, leitor de tela em fluxo completo, áudio ou conformidade WCAG formal. O aceite é de escopo, não uma alegação de acessibilidade plena.
