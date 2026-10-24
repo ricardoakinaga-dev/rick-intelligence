@@ -37,4 +37,6 @@ O pack mede o comportamento do pipeline de retrieval/citação/abstenção, não
 
 ## 5. Estado atual
 
-**Nenhum pack novo foi aprovado ou executado.** O pack existente `rec22-local-v2` continua sendo 2 casos sintéticos estruturais. AUD24-044 permanece `BLOCKED_EXTERNAL` até a revisão acima.
+Um **candidato técnico** de 12 casos foi criado em `docs/evaluation/packs/aud24-synthetic-v1/` e passou todos os thresholds estruturais (hit@1, recall@2, ACL 0, citações, claims, p95 11 ms). Ele **não** foi aprovado por domínio e não é representativo de produção.
+
+AUD24-044 permanece `BLOCKED_EXTERNAL` até a revisão acima. Evidência: [rag-pack-candidate.md](../reports/evidence/auditoria-2026-10-24/rag-pack-candidate.md).

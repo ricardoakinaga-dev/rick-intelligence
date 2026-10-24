@@ -299,7 +299,7 @@ Este documento é **especificação**, não ledger de execução. Os 29 contrato
 **Entrega:** pack estratificado com corpus/labels/direitos aprovados; métricas de retrieval, citação e faithfulness; limitações e revisão humana; nenhum caso clínico real sem autorização.
 **Aceite:** pack aprovado pela autoridade de domínio; resultados reproduzíveis; métricas e denominadores explícitos; 2 casos sintéticos deixam de ser a única prova.
 **Evidência:** manifesto do pack + relatório + revisão.
-**Status local (24/10):** `BLOCKED_EXTERNAL` — caminho sintético público aprovado, mas corpus/labels/thresholds exigem revisor de domínio; ver [pacote D04](<operations/d04-aud24-corpus-decision.md>).
+**Status local (24/10):** candidato de **12 casos** em `docs/evaluation/packs/aud24-synthetic-v1/` passou todos os thresholds estruturais; labels ainda exigem revisor de domínio. AUD24-044 continua `BLOCKED_EXTERNAL`; ver [D04](<operations/d04-aud24-corpus-decision.md>) e [evidência](<reports/evidence/auditoria-2026-10-24/rag-pack-candidate.md>).
 **Achado:** AUD24 (dimensão 12).
 
 #### AUD24-045 — Auditoria de acessibilidade e tecnologia assistiva

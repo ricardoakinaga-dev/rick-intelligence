@@ -1,0 +1,80 @@
+{
+  "schema_version": "retrieval-evaluation-pack.v1",
+  "pack_id": "aud24-synthetic-v1",
+  "version": "1.0.0",
+  "fixture": "cases.json",
+  "k_values": [
+    1,
+    2,
+    3
+  ],
+  "metadata": {
+    "corpus_id": "aud24-synthetic-corpus-v1",
+    "corpus_version": "2026-10-24",
+    "model_id": "offline-ranker-aud24",
+    "provenance": "synthetic structural cases authored for AUD24; no patient data, no third-party clinical corpus; domain review pending",
+    "license": "synthetic"
+  },
+  "thresholds": [
+    {
+      "id": "ranking-hit-at-1",
+      "metric_path": "metrics.ranking.hit_at_k.1.value",
+      "operator": ">=",
+      "value": 1.0
+    },
+    {
+      "id": "ranking-recall-at-2",
+      "metric_path": "metrics.ranking.recall_at_k.2.value",
+      "operator": ">=",
+      "value": 1.0
+    },
+    {
+      "id": "acl-leakage-count",
+      "metric_path": "metrics.acl_leakage.leakage_count",
+      "operator": "==",
+      "value": 0
+    },
+    {
+      "id": "citation-coverage",
+      "metric_path": "metrics.citation_source_coverage.citation_coverage.value",
+      "operator": ">=",
+      "value": 1.0
+    },
+    {
+      "id": "citation-precision",
+      "metric_path": "metrics.citation_support.citation_precision.value",
+      "operator": ">=",
+      "value": 1.0
+    },
+    {
+      "id": "citation-recall",
+      "metric_path": "metrics.citation_support.citation_recall.value",
+      "operator": ">=",
+      "value": 1.0
+    },
+    {
+      "id": "citation-completeness",
+      "metric_path": "metrics.citation_support.citation_completeness.value",
+      "operator": ">=",
+      "value": 1.0
+    },
+    {
+      "id": "unsupported-claim-rate",
+      "metric_path": "metrics.citation_support.unsupported_claim_rate.value",
+      "operator": "<=",
+      "value": 0.0
+    },
+    {
+      "id": "faithfulness",
+      "metric_path": "metrics.citation_support.faithfulness.value",
+      "operator": ">=",
+      "value": 1.0
+    },
+    {
+      "id": "fixture-p95-latency",
+      "metric_path": "metrics.latency.p95",
+      "operator": "<=",
+      "value": 100
+    }
+  ]
+}

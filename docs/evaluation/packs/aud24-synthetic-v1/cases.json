@@ -1,0 +1,965 @@
+{
+  "schema_version": "retrieval-evaluation.v1",
+  "provider": "synthetic-offline-pack",
+  "description": "AUD24 12-case synthetic structural pack; domain labels pending review.",
+  "cases": [
+    {
+      "case_id": "aud24-01-positive",
+      "pack": {
+        "role": "positive",
+        "model_id": "offline-ranker-aud24",
+        "corpus_id": "aud24-synthetic-corpus-v1"
+      },
+      "query": "Quais passos de higiene instrumental estão documentados?",
+      "context": {
+        "tenant_id": "tenant-aud24",
+        "workspace_id": "workspace-aud24",
+        "allowed_collection_ids": [
+          "reference"
+        ]
+      },
+      "relevant_ids": [
+        "aud24-01-chunk-1",
+        "aud24-01-chunk-2"
+      ],
+      "denied_ids": [
+        "aud24-denied-01"
+      ],
+      "corpus": [
+        {
+          "chunk_id": "aud24-01-chunk-1",
+          "tenant_id": "tenant-aud24",
+          "workspace_id": "workspace-aud24",
+          "collection_id": "reference"
+        },
+        {
+          "chunk_id": "aud24-01-chunk-2",
+          "tenant_id": "tenant-aud24",
+          "workspace_id": "workspace-aud24",
+          "collection_id": "reference"
+        },
+        {
+          "chunk_id": "aud24-denied-01",
+          "tenant_id": "tenant-aud24-foreign",
+          "workspace_id": "workspace-foreign",
+          "collection_id": "reference"
+        }
+      ],
+      "results": [
+        {
+          "chunk_id": "aud24-01-chunk-1",
+          "tenant_id": "tenant-aud24",
+          "workspace_id": "workspace-aud24",
+          "collection_id": "reference",
+          "rank": 0,
+          "source": "aud24-01.txt",
+          "checksum": "sha256:aud24-01-chunk-1"
+        },
+        {
+          "chunk_id": "aud24-01-chunk-2",
+          "tenant_id": "tenant-aud24",
+          "workspace_id": "workspace-aud24",
+          "collection_id": "reference",
+          "rank": 1,
+          "source": "aud24-01.txt",
+          "checksum": "sha256:aud24-01-chunk-2"
+        }
+      ],
+      "citations": [
+        {
+          "chunk_id": "aud24-01-chunk-1",
+          "source": "aud24-01.txt"
+        },
+        {
+          "chunk_id": "aud24-01-chunk-2",
+          "source": "aud24-01.txt"
+        }
+      ],
+      "claims": [
+        {
+          "claim_id": "aud24-01-claim-1",
+          "text": "O registro sintético primário está na coleção autorizada.",
+          "citation_ids": [
+            "aud24-01-chunk-1"
+          ],
+          "reference_citation_ids": [
+            "aud24-01-chunk-1"
+          ],
+          "faithfulness": true
+        },
+        {
+          "claim_id": "aud24-01-claim-2",
+          "text": "O registro sintético secundário confirma o mesmo escopo.",
+          "citation_ids": [
+            "aud24-01-chunk-2"
+          ],
+          "reference_citation_ids": [
+            "aud24-01-chunk-2"
+          ],
+          "faithfulness": true
+        }
+      ],
+      "latency_samples_ms": [
+        8,
+        9,
+        11
+      ]
+    },
+    {
+      "case_id": "aud24-02-positive",
+      "pack": {
+        "role": "positive",
+        "model_id": "offline-ranker-aud24",
+        "corpus_id": "aud24-synthetic-corpus-v1"
+      },
+      "query": "Como acondicionar amostras para transporte?",
+      "context": {
+        "tenant_id": "tenant-aud24",
+        "workspace_id": "workspace-aud24",
+        "allowed_collection_ids": [
+          "reference"
+        ]
+      },
+      "relevant_ids": [
+        "aud24-02-chunk-1",
+        "aud24-02-chunk-2"
+      ],
+      "denied_ids": [
+        "aud24-denied-02"
+      ],
+      "corpus": [
+        {
+          "chunk_id": "aud24-02-chunk-1",
+          "tenant_id": "tenant-aud24",
+          "workspace_id": "workspace-aud24",
+          "collection_id": "reference"
+        },
+        {
+          "chunk_id": "aud24-02-chunk-2",
+          "tenant_id": "tenant-aud24",
+          "workspace_id": "workspace-aud24",
+          "collection_id": "reference"
+        },
+        {
+          "chunk_id": "aud24-denied-02",
+          "tenant_id": "tenant-aud24-foreign",
+          "workspace_id": "workspace-foreign",
+          "collection_id": "reference"
+        }
+      ],
+      "results": [
+        {
+          "chunk_id": "aud24-02-chunk-1",
+          "tenant_id": "tenant-aud24",
+          "workspace_id": "workspace-aud24",
+          "collection_id": "reference",
+          "rank": 0,
+          "source": "aud24-02.txt",
+          "checksum": "sha256:aud24-02-chunk-1"
+        },
+        {
+          "chunk_id": "aud24-02-chunk-2",
+          "tenant_id": "tenant-aud24",
+          "workspace_id": "workspace-aud24",
+          "collection_id": "reference",
+          "rank": 1,
+          "source": "aud24-02.txt",
+          "checksum": "sha256:aud24-02-chunk-2"
+        }
+      ],
+      "citations": [
+        {
+          "chunk_id": "aud24-02-chunk-1",
+          "source": "aud24-02.txt"
+        },
+        {
+          "chunk_id": "aud24-02-chunk-2",
+          "source": "aud24-02.txt"
+        }
+      ],
+      "claims": [
+        {
+          "claim_id": "aud24-02-claim-1",
+          "text": "O registro sintético primário está na coleção autorizada.",
+          "citation_ids": [
+            "aud24-02-chunk-1"
+          ],
+          "reference_citation_ids": [
+            "aud24-02-chunk-1"
+          ],
+          "faithfulness": true
+        },
+        {
+          "claim_id": "aud24-02-claim-2",
+          "text": "O registro sintético secundário confirma o mesmo escopo.",
+          "citation_ids": [
+            "aud24-02-chunk-2"
+          ],
+          "reference_citation_ids": [
+            "aud24-02-chunk-2"
+          ],
+          "faithfulness": true
+        }
+      ],
+      "latency_samples_ms": [
+        8,
+        9,
+        11
+      ]
+    },
+    {
+      "case_id": "aud24-03-positive",
+      "pack": {
+        "role": "positive",
+        "model_id": "offline-ranker-aud24",
+        "corpus_id": "aud24-synthetic-corpus-v1"
+      },
+      "query": "Como registrar um atendimento no protocolo?",
+      "context": {
+        "tenant_id": "tenant-aud24",
+        "workspace_id": "workspace-aud24",
+        "allowed_collection_ids": [
+          "reference"
+        ]
+      },
+      "relevant_ids": [
+        "aud24-03-chunk-1",
+        "aud24-03-chunk-2"
+      ],
+      "denied_ids": [
+        "aud24-denied-03"
+      ],
+      "corpus": [
+        {
+          "chunk_id": "aud24-03-chunk-1",
+          "tenant_id": "tenant-aud24",
+          "workspace_id": "workspace-aud24",
+          "collection_id": "reference"
+        },
+        {
+          "chunk_id": "aud24-03-chunk-2",
+          "tenant_id": "tenant-aud24",
+          "workspace_id": "workspace-aud24",
+          "collection_id": "reference"
+        },
+        {
+          "chunk_id": "aud24-denied-03",
+          "tenant_id": "tenant-aud24-foreign",
+          "workspace_id": "workspace-foreign",
+          "collection_id": "reference"
+        }
+      ],
+      "results": [
+        {
+          "chunk_id": "aud24-03-chunk-1",
+          "tenant_id": "tenant-aud24",
+          "workspace_id": "workspace-aud24",
+          "collection_id": "reference",
+          "rank": 0,
+          "source": "aud24-03.txt",
+          "checksum": "sha256:aud24-03-chunk-1"
+        },
+        {
+          "chunk_id": "aud24-03-chunk-2",
+          "tenant_id": "tenant-aud24",
+          "workspace_id": "workspace-aud24",
+          "collection_id": "reference",
+          "rank": 1,
+          "source": "aud24-03.txt",
+          "checksum": "sha256:aud24-03-chunk-2"
+        }
+      ],
+      "citations": [
+        {
+          "chunk_id": "aud24-03-chunk-1",
+          "source": "aud24-03.txt"
+        },
+        {
+          "chunk_id": "aud24-03-chunk-2",
+          "source": "aud24-03.txt"
+        }
+      ],
+      "claims": [
+        {
+          "claim_id": "aud24-03-claim-1",
+          "text": "O registro sintético primário está na coleção autorizada.",
+          "citation_ids": [
+            "aud24-03-chunk-1"
+          ],
+          "reference_citation_ids": [
+            "aud24-03-chunk-1"
+          ],
+          "faithfulness": true
+        },
+        {
+          "claim_id": "aud24-03-claim-2",
+          "text": "O registro sintético secundário confirma o mesmo escopo.",
+          "citation_ids": [
+            "aud24-03-chunk-2"
+          ],
+          "reference_citation_ids": [
+            "aud24-03-chunk-2"
+          ],
+          "faithfulness": true
+        }
+      ],
+      "latency_samples_ms": [
+        8,
+        9,
+        11
+      ]
+    },
+    {
+      "case_id": "aud24-04-positive",
+      "pack": {
+        "role": "positive",
+        "model_id": "offline-ranker-aud24",
+        "corpus_id": "aud24-synthetic-corpus-v1"
+      },
+      "query": "Quando encaminhar um caso para referência?",
+      "context": {
+        "tenant_id": "tenant-aud24",
+        "workspace_id": "workspace-aud24",
+        "allowed_collection_ids": [
+          "reference"
+        ]
+      },
+      "relevant_ids": [
+        "aud24-04-chunk-1",
+        "aud24-04-chunk-2"
+      ],
+      "denied_ids": [
+        "aud24-denied-04"
+      ],
+      "corpus": [
+        {
+          "chunk_id": "aud24-04-chunk-1",
+          "tenant_id": "tenant-aud24",
+          "workspace_id": "workspace-aud24",
+          "collection_id": "reference"
+        },
+        {
+          "chunk_id": "aud24-04-chunk-2",
+          "tenant_id": "tenant-aud24",
+          "workspace_id": "workspace-aud24",
+          "collection_id": "reference"
+        },
+        {
+          "chunk_id": "aud24-denied-04",
+          "tenant_id": "tenant-aud24-foreign",
+          "workspace_id": "workspace-foreign",
+          "collection_id": "reference"
+        }
+      ],
+      "results": [
+        {
+          "chunk_id": "aud24-04-chunk-1",
+          "tenant_id": "tenant-aud24",
+          "workspace_id": "workspace-aud24",
+          "collection_id": "reference",
+          "rank": 0,
+          "source": "aud24-04.txt",
+          "checksum": "sha256:aud24-04-chunk-1"
+        },
+        {
+          "chunk_id": "aud24-04-chunk-2",
+          "tenant_id": "tenant-aud24",
+          "workspace_id": "workspace-aud24",
+          "collection_id": "reference",
+          "rank": 1,
+          "source": "aud24-04.txt",
+          "checksum": "sha256:aud24-04-chunk-2"
+        }
+      ],
+      "citations": [
+        {
+          "chunk_id": "aud24-04-chunk-1",
+          "source": "aud24-04.txt"
+        },
+        {
+          "chunk_id": "aud24-04-chunk-2",
+          "source": "aud24-04.txt"
+        }
+      ],
+      "claims": [
+        {
+          "claim_id": "aud24-04-claim-1",
+          "text": "O registro sintético primário está na coleção autorizada.",
+          "citation_ids": [
+            "aud24-04-chunk-1"
+          ],
+          "reference_citation_ids": [
+            "aud24-04-chunk-1"
+          ],
+          "faithfulness": true
+        },
+        {
+          "claim_id": "aud24-04-claim-2",
+          "text": "O registro sintético secundário confirma o mesmo escopo.",
+          "citation_ids": [
+            "aud24-04-chunk-2"
+          ],
+          "reference_citation_ids": [
+            "aud24-04-chunk-2"
+          ],
+          "faithfulness": true
+        }
+      ],
+      "latency_samples_ms": [
+        8,
+        9,
+        11
+      ]
+    },
+    {
+      "case_id": "aud24-05-positive",
+      "pack": {
+        "role": "positive",
+        "model_id": "offline-ranker-aud24",
+        "corpus_id": "aud24-synthetic-corpus-v1"
+      },
+      "query": "Como conferir o estoque de insumos?",
+      "context": {
+        "tenant_id": "tenant-aud24",
+        "workspace_id": "workspace-aud24",
+        "allowed_collection_ids": [
+          "reference"
+        ]
+      },
+      "relevant_ids": [
+        "aud24-05-chunk-1",
+        "aud24-05-chunk-2"
+      ],
+      "denied_ids": [
+        "aud24-denied-05"
+      ],
+      "corpus": [
+        {
+          "chunk_id": "aud24-05-chunk-1",
+          "tenant_id": "tenant-aud24",
+          "workspace_id": "workspace-aud24",
+          "collection_id": "reference"
+        },
+        {
+          "chunk_id": "aud24-05-chunk-2",
+          "tenant_id": "tenant-aud24",
+          "workspace_id": "workspace-aud24",
+          "collection_id": "reference"
+        },
+        {
+          "chunk_id": "aud24-denied-05",
+          "tenant_id": "tenant-aud24-foreign",
+          "workspace_id": "workspace-foreign",
+          "collection_id": "reference"
+        }
+      ],
+      "results": [
+        {
+          "chunk_id": "aud24-05-chunk-1",
+          "tenant_id": "tenant-aud24",
+          "workspace_id": "workspace-aud24",
+          "collection_id": "reference",
+          "rank": 0,
+          "source": "aud24-05.txt",
+          "checksum": "sha256:aud24-05-chunk-1"
+        },
+        {
+          "chunk_id": "aud24-05-chunk-2",
+          "tenant_id": "tenant-aud24",
+          "workspace_id": "workspace-aud24",
+          "collection_id": "reference",
+          "rank": 1,
+          "source": "aud24-05.txt",
+          "checksum": "sha256:aud24-05-chunk-2"
+        }
+      ],
+      "citations": [
+        {
+          "chunk_id": "aud24-05-chunk-1",
+          "source": "aud24-05.txt"
+        },
+        {
+          "chunk_id": "aud24-05-chunk-2",
+          "source": "aud24-05.txt"
+        }
+      ],
+      "claims": [
+        {
+          "claim_id": "aud24-05-claim-1",
+          "text": "O registro sintético primário está na coleção autorizada.",
+          "citation_ids": [
+            "aud24-05-chunk-1"
+          ],
+          "reference_citation_ids": [
+            "aud24-05-chunk-1"
+          ],
+          "faithfulness": true
+        },
+        {
+          "claim_id": "aud24-05-claim-2",
+          "text": "O registro sintético secundário confirma o mesmo escopo.",
+          "citation_ids": [
+            "aud24-05-chunk-2"
+          ],
+          "reference_citation_ids": [
+            "aud24-05-chunk-2"
+          ],
+          "faithfulness": true
+        }
+      ],
+      "latency_samples_ms": [
+        8,
+        9,
+        11
+      ]
+    },
+    {
+      "case_id": "aud24-06-positive",
+      "pack": {
+        "role": "positive",
+        "model_id": "offline-ranker-aud24",
+        "corpus_id": "aud24-synthetic-corpus-v1"
+      },
+      "query": "Qual é a rotina de desinfecção da sala?",
+      "context": {
+        "tenant_id": "tenant-aud24",
+        "workspace_id": "workspace-aud24",
+        "allowed_collection_ids": [
+          "reference"
+        ]
+      },
+      "relevant_ids": [
+        "aud24-06-chunk-1",
+        "aud24-06-chunk-2"
+      ],
+      "denied_ids": [
+        "aud24-denied-06"
+      ],
+      "corpus": [
+        {
+          "chunk_id": "aud24-06-chunk-1",
+          "tenant_id": "tenant-aud24",
+          "workspace_id": "workspace-aud24",
+          "collection_id": "reference"
+        },
+        {
+          "chunk_id": "aud24-06-chunk-2",
+          "tenant_id": "tenant-aud24",
+          "workspace_id": "workspace-aud24",
+          "collection_id": "reference"
+        },
+        {
+          "chunk_id": "aud24-denied-06",
+          "tenant_id": "tenant-aud24-foreign",
+          "workspace_id": "workspace-foreign",
+          "collection_id": "reference"
+        }
+      ],
+      "results": [
+        {
+          "chunk_id": "aud24-06-chunk-1",
+          "tenant_id": "tenant-aud24",
+          "workspace_id": "workspace-aud24",
+          "collection_id": "reference",
+          "rank": 0,
+          "source": "aud24-06.txt",
+          "checksum": "sha256:aud24-06-chunk-1"
+        },
+        {
+          "chunk_id": "aud24-06-chunk-2",
+          "tenant_id": "tenant-aud24",
+          "workspace_id": "workspace-aud24",
+          "collection_id": "reference",
+          "rank": 1,
+          "source": "aud24-06.txt",
+          "checksum": "sha256:aud24-06-chunk-2"
+        }
+      ],
+      "citations": [
+        {
+          "chunk_id": "aud24-06-chunk-1",
+          "source": "aud24-06.txt"
+        },
+        {
+          "chunk_id": "aud24-06-chunk-2",
+          "source": "aud24-06.txt"
+        }
+      ],
+      "claims": [
+        {
+          "claim_id": "aud24-06-claim-1",
+          "text": "O registro sintético primário está na coleção autorizada.",
+          "citation_ids": [
+            "aud24-06-chunk-1"
+          ],
+          "reference_citation_ids": [
+            "aud24-06-chunk-1"
+          ],
+          "faithfulness": true
+        },
+        {
+          "claim_id": "aud24-06-claim-2",
+          "text": "O registro sintético secundário confirma o mesmo escopo.",
+          "citation_ids": [
+            "aud24-06-chunk-2"
+          ],
+          "reference_citation_ids": [
+            "aud24-06-chunk-2"
+          ],
+          "faithfulness": true
+        }
+      ],
+      "latency_samples_ms": [
+        8,
+        9,
+        11
+      ]
+    },
+    {
+      "case_id": "aud24-07-positive",
+      "pack": {
+        "role": "positive",
+        "model_id": "offline-ranker-aud24",
+        "corpus_id": "aud24-synthetic-corpus-v1"
+      },
+      "query": "Quais itens compõem o checklist de consulta?",
+      "context": {
+        "tenant_id": "tenant-aud24",
+        "workspace_id": "workspace-aud24",
+        "allowed_collection_ids": [
+          "reference"
+        ]
+      },
+      "relevant_ids": [
+        "aud24-07-chunk-1",
+        "aud24-07-chunk-2"
+      ],
+      "denied_ids": [
+        "aud24-denied-07"
+      ],
+      "corpus": [
+        {
+          "chunk_id": "aud24-07-chunk-1",
+          "tenant_id": "tenant-aud24",
+          "workspace_id": "workspace-aud24",
+          "collection_id": "reference"
+        },
+        {
+          "chunk_id": "aud24-07-chunk-2",
+          "tenant_id": "tenant-aud24",
+          "workspace_id": "workspace-aud24",
+          "collection_id": "reference"
+        },
+        {
+          "chunk_id": "aud24-denied-07",
+          "tenant_id": "tenant-aud24-foreign",
+          "workspace_id": "workspace-foreign",
+          "collection_id": "reference"
+        }
+      ],
+      "results": [
+        {
+          "chunk_id": "aud24-07-chunk-1",
+          "tenant_id": "tenant-aud24",
+          "workspace_id": "workspace-aud24",
+          "collection_id": "reference",
+          "rank": 0,
+          "source": "aud24-07.txt",
+          "checksum": "sha256:aud24-07-chunk-1"
+        },
+        {
+          "chunk_id": "aud24-07-chunk-2",
+          "tenant_id": "tenant-aud24",
+          "workspace_id": "workspace-aud24",
+          "collection_id": "reference",
+          "rank": 1,
+          "source": "aud24-07.txt",
+          "checksum": "sha256:aud24-07-chunk-2"
+        }
+      ],
+      "citations": [
+        {
+          "chunk_id": "aud24-07-chunk-1",
+          "source": "aud24-07.txt"
+        },
+        {
+          "chunk_id": "aud24-07-chunk-2",
+          "source": "aud24-07.txt"
+        }
+      ],
+      "claims": [
+        {
+          "claim_id": "aud24-07-claim-1",
+          "text": "O registro sintético primário está na coleção autorizada.",
+          "citation_ids": [
+            "aud24-07-chunk-1"
+          ],
+          "reference_citation_ids": [
+            "aud24-07-chunk-1"
+          ],
+          "faithfulness": true
+        },
+        {
+          "claim_id": "aud24-07-claim-2",
+          "text": "O registro sintético secundário confirma o mesmo escopo.",
+          "citation_ids": [
+            "aud24-07-chunk-2"
+          ],
+          "reference_citation_ids": [
+            "aud24-07-chunk-2"
+          ],
+          "faithfulness": true
+        }
+      ],
+      "latency_samples_ms": [
+        8,
+        9,
+        11
+      ]
+    },
+    {
+      "case_id": "aud24-08-positive",
+      "pack": {
+        "role": "positive",
+        "model_id": "offline-ranker-aud24",
+        "corpus_id": "aud24-synthetic-corpus-v1"
+      },
+      "query": "Como registrar a comunicação com o tutor?",
+      "context": {
+        "tenant_id": "tenant-aud24",
+        "workspace_id": "workspace-aud24",
+        "allowed_collection_ids": [
+          "reference"
+        ]
+      },
+      "relevant_ids": [
+        "aud24-08-chunk-1",
+        "aud24-08-chunk-2"
+      ],
+      "denied_ids": [
+        "aud24-denied-08"
+      ],
+      "corpus": [
+        {
+          "chunk_id": "aud24-08-chunk-1",
+          "tenant_id": "tenant-aud24",
+          "workspace_id": "workspace-aud24",
+          "collection_id": "reference"
+        },
+        {
+          "chunk_id": "aud24-08-chunk-2",
+          "tenant_id": "tenant-aud24",
+          "workspace_id": "workspace-aud24",
+          "collection_id": "reference"
+        },
+        {
+          "chunk_id": "aud24-denied-08",
+          "tenant_id": "tenant-aud24-foreign",
+          "workspace_id": "workspace-foreign",
+          "collection_id": "reference"
+        }
+      ],
+      "results": [
+        {
+          "chunk_id": "aud24-08-chunk-1",
+          "tenant_id": "tenant-aud24",
+          "workspace_id": "workspace-aud24",
+          "collection_id": "reference",
+          "rank": 0,
+          "source": "aud24-08.txt",
+          "checksum": "sha256:aud24-08-chunk-1"
+        },
+        {
+          "chunk_id": "aud24-08-chunk-2",
+          "tenant_id": "tenant-aud24",
+          "workspace_id": "workspace-aud24",
+          "collection_id": "reference",
+          "rank": 1,
+          "source": "aud24-08.txt",
+          "checksum": "sha256:aud24-08-chunk-2"
+        }
+      ],
+      "citations": [
+        {
+          "chunk_id": "aud24-08-chunk-1",
+          "source": "aud24-08.txt"
+        },
+        {
+          "chunk_id": "aud24-08-chunk-2",
+          "source": "aud24-08.txt"
+        }
+      ],
+      "claims": [
+        {
+          "claim_id": "aud24-08-claim-1",
+          "text": "O registro sintético primário está na coleção autorizada.",
+          "citation_ids": [
+            "aud24-08-chunk-1"
+          ],
+          "reference_citation_ids": [
+            "aud24-08-chunk-1"
+          ],
+          "faithfulness": true
+        },
+        {
+          "claim_id": "aud24-08-claim-2",
+          "text": "O registro sintético secundário confirma o mesmo escopo.",
+          "citation_ids": [
+            "aud24-08-chunk-2"
+          ],
+          "reference_citation_ids": [
+            "aud24-08-chunk-2"
+          ],
+          "faithfulness": true
+        }
+      ],
+      "latency_samples_ms": [
+        8,
+        9,
+        11
+      ]
+    },
+    {
+      "case_id": "aud24-09-positive",
+      "pack": {
+        "role": "positive",
+        "model_id": "offline-ranker-aud24",
+        "corpus_id": "aud24-synthetic-corpus-v1"
+      },
+      "query": "Com que frequência o protocolo é revisado?",
+      "context": {
+        "tenant_id": "tenant-aud24",
+        "workspace_id": "workspace-aud24",
+        "allowed_collection_ids": [
+          "reference"
+        ]
+      },
+      "relevant_ids": [
+        "aud24-09-chunk-1",
+        "aud24-09-chunk-2"
+      ],
+      "denied_ids": [
+        "aud24-denied-09"
+      ],
+      "corpus": [
+        {
+          "chunk_id": "aud24-09-chunk-1",
+          "tenant_id": "tenant-aud24",
+          "workspace_id": "workspace-aud24",
+          "collection_id": "reference"
+        },
+        {
+          "chunk_id": "aud24-09-chunk-2",
+          "tenant_id": "tenant-aud24",
+          "workspace_id": "workspace-aud24",
+          "collection_id": "reference"
+        },
+        {
+          "chunk_id": "aud24-denied-09",
+          "tenant_id": "tenant-aud24-foreign",
+          "workspace_id": "workspace-foreign",
+          "collection_id": "reference"
+        }
+      ],
+      "results": [
+        {
+          "chunk_id": "aud24-09-chunk-1",
+          "tenant_id": "tenant-aud24",
+          "workspace_id": "workspace-aud24",
+          "collection_id": "reference",
+          "rank": 0,
+          "source": "aud24-09.txt",
+          "checksum": "sha256:aud24-09-chunk-1"
+        },
+        {
+          "chunk_id": "aud24-09-chunk-2",
+          "tenant_id": "tenant-aud24",
+          "workspace_id": "workspace-aud24",
+          "collection_id": "reference",
+          "rank": 1,
+          "source": "aud24-09.txt",
+          "checksum": "sha256:aud24-09-chunk-2"
+        }
+      ],
+      "citations": [
+        {
+          "chunk_id": "aud24-09-chunk-1",
+          "source": "aud24-09.txt"
+        },
+        {
+          "chunk_id": "aud24-09-chunk-2",
+          "source": "aud24-09.txt"
+        }
+      ],
+      "claims": [
+        {
+          "claim_id": "aud24-09-claim-1",
+          "text": "O registro sintético primário está na coleção autorizada.",
+          "citation_ids": [
+            "aud24-09-chunk-1"
+          ],
+          "reference_citation_ids": [
+            "aud24-09-chunk-1"
+          ],
+          "faithfulness": true
+        },
+        {
+          "claim_id": "aud24-09-claim-2",
+          "text": "O registro sintético secundário confirma o mesmo escopo.",
+          "citation_ids": [
+            "aud24-09-chunk-2"
+          ],
+          "reference_citation_ids": [
+            "aud24-09-chunk-2"
+          ],
+          "faithfulness": true
+        }
+      ],
+      "latency_samples_ms": [
+        8,
+        9,
+        11
+      ]
+    },
+    {
+      "case_id": "aud24-negative-no-evidence",
+      "pack": {
+        "role": "negative",
+        "expectation": "no_evidence"
+      },
+      "query": "Pergunta sintética sem evidência no corpus autorizado.",
+      "results": [],
+      "citations": []
+    },
+    {
+      "case_id": "aud24-negative-weak-evidence",
+      "pack": {
+        "role": "negative",
+        "expectation": "weak_evidence"
+      },
+      "query": "Pergunta sintética com evidência fraca.",
+      "results": [
+        {
+          "chunk_id": "aud24-weak-1",
+          "evidence_strength": "weak",
+          "source": "weak.txt"
+        }
+      ],
+      "citations": []
+    },
+    {
+      "case_id": "aud24-negative-unsupported-assertion",
+      "pack": {
+        "role": "negative",
+        "expectation": "unsupported_assertion"
+      },
+      "query": "Afirmação sintética sem suporte.",
+      "assertion": {
+        "supported": false,
+        "support_ids": []
+      },
+      "results": [],
+      "citations": []
+    }
+  ]
+}
