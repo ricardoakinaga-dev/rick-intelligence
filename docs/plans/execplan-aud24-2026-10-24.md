@@ -5,7 +5,7 @@
 **Estado:** `PROPOSTO` — planejamento; não é ledger de execução, não adota tarefas no controlador e não autoriza produção. **Decisão AUD24-D1 ratificada em 24/10/2026:** [ADR-024](../architecture/adr/ADR-024-audit-outcome-and-revocation-ordering.md) (A+ em duas etapas; OIDC fora do perfil de produção).
 **Baseline:** [auditoria AUD24](<../reports/relatorio-auditoria-2026-10-24.md>) — **74,7/100**, produção `NO-GO`, HEAD `48e383c`, worktree com 109 entradas.
 **Artefatos irmãos:** [roadmap](<../roadmap-auditoria-2026-10-24.md>) e [backlog](<../backlog-auditoria-2026-10-24.md>).
-**Status local em 24/10/2026:** G0 `PASS`; AUD24-001/002/003, 010/011/012 (etapas 1–2), 013–018, 020–025, 030, 040 e 042 executados e verificados localmente. Pendentes: 031–034, 041, 043–045 e M5–M7; PostgreSQL/IdP/browser reais `NOT_RUN`. **Nenhum aceite, release ou promoção.**
+**Status local em 24/10/2026:** G0 `PASS`; AUD24-001/002/003, 010/011/012 (etapas 1–2), 013–018, 020–025, 030, 040 e 042 executados e verificados localmente. Pendentes: 033–034, 044–045 e M5–M7; 031/032/041/043 concluídos localmente; PostgreSQL/IdP/AT reais `NOT_RUN`. **Nenhum aceite, release ou promoção.**
 
 ## 1. Sumário executivo
 

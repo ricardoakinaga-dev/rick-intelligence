@@ -92,7 +92,7 @@ Implementar a etapa 2 do ADR-024 (tabela `rick_audit_operations`, escrita transa
 
 **Testes focados:** 312 passed/16 skipped no conjunto de identidade/composição/reconciler; suíte núcleo **6.040 passed, 137 skipped, 0 failed**; `make api-coverage` verde (79,22%, floor 75; 1.875 passed, 18 skipped); `make lint`/`make typecheck` verdes.
 
-**Residual:** PostgreSQL/IdP reais e worker de outbox não executados; a mesma transação do reset é code-reviewed, não exercitada contra claim table real; `AUD24-018` (tipagem/unificação de eventos) permanece P2.
+**Residual:** PostgreSQL/IdP reais e worker de outbox não executados; a mesma transação do reset é code-reviewed, não exercitada contra claim table real. AUD24-018 concluído localmente (AuditEvent + allow-list).
 
 ## 8. Identidade — AUD24-013 a 017 (M1)
 
@@ -125,3 +125,15 @@ Implementar a etapa 2 do ADR-024 (tabela `rick_audit_operations`, escrita transa
 | Web | 80,38% branches | já coberto |
 
 O gate API foi repetido e passou: **1.877 passed, 18 skipped, 75,65% combinado**, `make api-coverage` exit 0. O gate worker está em execução; a medição isolada foi 76%. A medição de branches não reduziu nenhum floor de linhas.
+
+
+## 11. M3/M4 — toolchain, drift e branches (24/10)
+
+| Item | Resultado |
+|---|---|
+| AUD24-031 | Commit local `8a966c4`; worktree **CLEAN**; `make validate` PASS; release/promoção ainda não autorizados |
+| AUD24-032 | Node **22.19.0**/npm **10.9.3** em `.runtime/toolchain`; typecheck 0; **265** testes web; Playwright TMPDIR workspace-local |
+| AUD24-041 | `RESPONSE_CONTRACT_PATHS` + `contract-drift.test.ts`; 2 testes; paths de recovery/confirm corrigidos |
+| AUD24-043 | API branch **75,65%** (1.877 passed, exit 0) e worker **75,93%** (857 passed, exit 0); floors 75/74 preservados |
+| AUD24-044 | `BLOCKED_EXTERNAL` por D04 (corpus/labels/direitos/thresholds) |
+| AUD24-045 | E2E/axe em execução; AT real `NOT_RUN` |

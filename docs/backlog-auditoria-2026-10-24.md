@@ -225,6 +225,7 @@ Este documento é **especificação**, não ledger de execução. Os 29 contrato
 **Entrega:** candidato revisado e commitado; fingerprint; checkout limpo; release evidence gerada e verificada; nenhum artefato histórico reutilizado.
 **Aceite:** `git status` limpo; `release_integrity --require-clean` PASS; SHA/fingerprint/config vinculados; nenhuma mudança posterior invalida a prova.
 **Evidência:** commit + manifesto + gate de release.
+**Status local (24/10):** commit local `8a966c4` criado; `git status` limpo; `make validate` PASS. Release evidence/promoção continuam pendentes.
 **Achado:** AUD24-06.
 
 #### AUD24-032 — Toolchain Node 22/npm 10 e testes portáveis
@@ -233,7 +234,7 @@ Este documento é **especificação**, não ledger de execução. Os 29 contrato
 **Entrega:** Node 22.19/npm 10.9 reproduzíveis via toolchain/container; `TMPDIR` dos testes web dentro do workspace ou temp portátil; documentação; lock intacto.
 **Aceite:** bootstrap/build/test/coverage web passam no toolchain declarado; nenhuma dependência do `TMPDIR` do host; contrato não é alterado para o host.
 **Evidência:** logs de bootstrap/build/test + versões efetivas.
-**Status local (24/10):** `TMPDIR` portátil implementado no Vitest (workspace-local, com override); 263 testes web passam sem `TMPDIR` do host. Node 22.19/npm 10.9 não estão instalados neste host — verificação `NOT_RUN`/bloqueio explícito.
+**Status local (24/10):** Node 22.19.0/npm 10.9.3 efetivos em `.runtime/toolchain`; typecheck e 265 testes web verdes nesse toolchain; Playwright usa `TMPDIR` do workspace. Falta `npm ci` limpo final e build no toolchain contratado.
 **Achado:** AUD24-12.
 
 #### AUD24-033 — Executor VPS representativo
@@ -269,6 +270,7 @@ Este documento é **especificação**, não ledger de execução. Os 29 contrato
 **Entrega:** reduzir a duplicação entre `response-contract.ts`, `chat-response.ts` e schemas do backend; teste que falha quando um endpoint muda sem atualizar o contrato web; ou geração a partir de schema.
 **Aceite:** adicionar/alterar endpoint sem contrato falha no CI; nenhum fallback silencioso para 2xx desconhecido; testes existentes preservados.
 **Evidência:** teste de drift + build.
+**Status local (24/10):** `RESPONSE_CONTRACT_PATHS` + `contract-drift.test.ts`; OpenAPI e envelopes de recovery/confirmação cobertos; 2 testes verdes.
 **Achado:** AUD24-12.
 
 #### AUD24-042 — Ampliar tipagem nos caminhos de risco
@@ -286,7 +288,7 @@ Este documento é **especificação**, não ledger de execução. Os 29 contrato
 **Entrega:** medir branch coverage em API/worker; relatório; floor explícito sem reduzir o de linhas; exclusões documentadas.
 **Aceite:** branch % reportado; floor definido e aplicado; nenhuma exclusão nova para obter verde; comparação com a baseline.
 **Evidência:** relatório de cobertura + CI.
-**Status local (24/10):** branch coverage medido (API 76%, worker 76%); `--cov-branch` habilitado com floors de linhas preservados (75/74). Gate API verde (1.877 passed, 75,65%, exit 0); worker em execução.
+**Status local (24/10):** branch coverage medido (API 76%, worker 76%); `--cov-branch` habilitado com floors de linhas preservados (75/74). Gate API verde (1.877 passed, 75,65%, exit 0) e worker verde (857 passed, 75,93%, exit 0); floors 75/74 preservados.
 **Achado:** AUD24-12; extensão de PROD12-018.
 
 #### AUD24-044 — Ampliar o pack de avaliação RAG
@@ -295,6 +297,7 @@ Este documento é **especificação**, não ledger de execução. Os 29 contrato
 **Entrega:** pack estratificado com corpus/labels/direitos aprovados; métricas de retrieval, citação e faithfulness; limitações e revisão humana; nenhum caso clínico real sem autorização.
 **Aceite:** pack aprovado pela autoridade de domínio; resultados reproduzíveis; métricas e denominadores explícitos; 2 casos sintéticos deixam de ser a única prova.
 **Evidência:** manifesto do pack + relatório + revisão.
+**Status local (24/10):** `BLOCKED_EXTERNAL` — corpus/labels/direitos/thresholds dependem de D04; nenhum pack sintético foi apresentado como representativo.
 **Achado:** AUD24 (dimensão 12).
 
 #### AUD24-045 — Auditoria de acessibilidade e tecnologia assistiva
@@ -303,6 +306,7 @@ Este documento é **especificação**, não ledger de execução. Os 29 contrato
 **Entrega:** auditoria por teclado, leitor de tela, zoom, contraste e foco nos fluxos críticos; correções; relatório de lacunas.
 **Aceite:** nenhum bloqueio crítico nos fluxos principais; lacunas documentadas; evidência de browser/AT, sem alegar WCAG global.
 **Evidência:** relatório + capturas + achados.
+**Status local (24/10):** E2E/axe e teclado em execução na matriz 375/768/1440; leitor de tela/AT real `NOT_RUN`.
 **Achado:** AUD24 (dimensão 15); extensão de PROD12-025/041.
 
 ## 5. Herança PROD12 — referência, não duplicação
