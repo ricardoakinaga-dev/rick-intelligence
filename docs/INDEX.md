@@ -23,6 +23,7 @@
 | Backlog para produção | [backlog-producao-2026-10-12.md](backlog-producao-2026-10-12.md) | Especificação de 56 contratos; adoção anterior em TODO registrada no plano ativo; status/aceite somente no controlador, sem encerramento pelo planejamento AUD15 |
 | Snapshot mais recente de auditoria | [relatório AUD24](<reports/relatorio-auditoria-2026-10-24.md>) | SNAPSHOT observado em 24/10; 74,7/100; NO-GO, sem reexecução externa |
 | Decisão de auditoria/revogação | [ADR-024](<architecture/adr/ADR-024-audit-outcome-and-revocation-ordering.md>) | RATIFICADA em 24/10; A+ em duas etapas; produção não autorizada |
+| Lab Docker M5 | [evidência](<reports/evidence/auditoria-2026-10-24/m5-lab-runtime.md>) | PostgreSQL/Redis/S3/Qdrant reais em containers; crash/fault harness pendentes |
 | Pacote externo AUD24 | [M5–M7](<operations/aud24-m5-m7-external-package.md>) | PREPARADO; authority matrix, comandos, aborto e bloqueios D01–D07 |
 | Primeira onda AUD24 | [escopo executável](<plans/aud24-first-wave-2026-10-24.md>) | PREPARADO; AUD24-001/003, gate G0, sem executar |
 | Plano executivo AUD24 | [plano de 24/10](<plans/execplan-aud24-2026-10-24.md>) | PROPOSTO; workstreams, decisões humanas, gates e primeiros 10 dias |

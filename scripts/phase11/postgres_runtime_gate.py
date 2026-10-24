@@ -25,7 +25,16 @@ import uuid
 ROOT = Path(__file__).resolve().parents[2]
 MIGRATIONS = ROOT / "infrastructure/migrations"
 DEFAULT_OUTPUT = ".runtime/phase-2/postgres-runtime-gate.json"
-EXPECTED_MIGRATIONS = ("0001", "0002", "0003", "0004", "0005", "0006")
+def _expected_migrations() -> tuple[str, ...]:
+    """Read the canonical numbered migrations instead of freezing a stale set."""
+    return tuple(sorted(
+        path.name[:4]
+        for path in MIGRATIONS.glob("[0-9][0-9][0-9][0-9]_*.sql")
+        if path.is_file()
+    ))
+
+
+EXPECTED_MIGRATIONS = _expected_migrations()
 EXPECTED_CONSTRAINTS = {
     "rick_ingestion_jobs_contract_state_ck",
     "rick_ingestion_jobs_contract_payload_ck",
@@ -174,7 +183,7 @@ def _schema_checks(connection: object) -> list[GateResult]:
             GateResult(
                 "migration-history",
                 "PASS" if tuple(versions) == EXPECTED_MIGRATIONS else "FAIL",
-                "six ordered migration records" if tuple(versions) == EXPECTED_MIGRATIONS else "migration history is incomplete or reordered",
+                f"{len(EXPECTED_MIGRATIONS)} ordered migration records" if tuple(versions) == EXPECTED_MIGRATIONS else "migration history is incomplete or reordered",
             )
         )
         constraints = {
@@ -376,7 +385,12 @@ def _queue_checks(psycopg: object, dsn: str, scope: tuple[str, str, str], run_id
     with psycopg.connect(dsn) as connection:
         with connection.cursor() as cur:
             cur.execute(
-                "UPDATE rick_ingestion_jobs SET lease_until=clock_timestamp()-INTERVAL '1 second' WHERE job_id=%s",
+                # Expire the lease while preserving the schema invariant
+                # lease_until > lease_acquired_at (AUD24 local runtime lab).
+                "UPDATE rick_ingestion_jobs "
+                "SET lease_acquired_at=clock_timestamp()-INTERVAL '2 seconds', "
+                "    lease_until=clock_timestamp()-INTERVAL '1 second' "
+                "WHERE job_id=%s",
                 (str(job_a.job_id),),
             )
         connection.commit()
