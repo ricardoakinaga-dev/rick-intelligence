@@ -9,6 +9,10 @@ import { resolve } from "node:path";
 // current application's code. It exercises authority changes without adding
 // test controls or globals to the shipped product.
 async function mount(page: Page) {
+  // Keep the real application origin for browser storage/authority checks; this
+  // intercepted document adds no fixture route or bypass to the shipped app.
+  await page.route("**/__aud03-component-boundary", route => route.fulfill({ contentType: "text/html", body: "<!doctype html><html lang='pt-BR'><body></body></html>" }));
+  await page.goto("/__aud03-component-boundary");
   await page.context().setOffline(true);
   const result = await build({
     absWorkingDir: process.cwd(),
@@ -67,7 +71,8 @@ for (const pendingKind of ["list", "detail"] as const) {
     await page.evaluate((kind) => {
       const harness = window as unknown as { session: Record<string, unknown>; renderCase: () => void; release: () => void; settled: boolean };
       harness.session = { authenticated: true, user_id: "u", session_id: "s", tenant_id: "t", workspace_id: "w", role: "VETERINARIAN", permissions: ["cases.read"] };
-      const item = { case_id: "private", title: "PRIVATE CASE", summary: "PRIVATE SUMMARY", status: "open", owner_user_id: "u", updated_at: 1, clinical_scope_status: "human_only", hypotheses: [], evidence: [] };
+      // Complete public CaseRecord envelope; malformed fixtures must not prevent the detail request under test.
+      const item = { contract_version: "clinical-case-contract-v1", clinical_scope_status: "record_review_feedback_only", case_id: "private", tenant_id: "t", workspace_id: "w", owner_user_id: "u", title: "PRIVATE CASE", summary: "PRIVATE SUMMARY", record: "Human-authored record", status: "open", created_by_user_id: "u", created_at: 1, updated_by_user_id: "u", updated_at: 1, hypotheses: [], evidence: [], tags: [], agent_model: null, review_count: 0, feedback_count: 0, last_request_id: null, last_review_at: null, last_feedback_at: null };
       window.fetch = async (input) => {
         const path = String(input);
         const list = path.startsWith("/api/v1/cases?");

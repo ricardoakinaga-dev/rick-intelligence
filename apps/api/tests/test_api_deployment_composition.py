@@ -38,7 +38,8 @@ def test_builtin_production_factory_does_not_infer_identity_approval(monkeypatch
         deployment_composition._build_inputs(settings)
 
 
-def test_worker_factory_returns_a_lifecycle_owner(monkeypatch):
+@pytest.mark.parametrize("confirmation", [True, None, False])
+def test_worker_factory_returns_a_lifecycle_owner(monkeypatch, confirmation):
     class Worker:
         def __init__(self):
             self.started = False
@@ -55,6 +56,8 @@ def test_worker_factory_returns_a_lifecycle_owner(monkeypatch):
 
         def shutdown(self, *, timeout):
             self.stopped = timeout > 0
+            # Completion is an explicit port result, not an inferred side effect.
+            return confirmation
 
     worker = Worker()
     providers = SimpleNamespace(worker=worker, health_checks={})
@@ -84,7 +87,7 @@ def test_worker_factory_returns_a_lifecycle_owner(monkeypatch):
     assert runtime.start() is True
     assert runtime.health_check() is True
     assert runtime.run_forever() is None
-    assert runtime.shutdown(timeout=1) is True
+    assert runtime.shutdown(timeout=1) is (confirmation is True)
     assert worker.started is True
     assert worker.stopped is True
 

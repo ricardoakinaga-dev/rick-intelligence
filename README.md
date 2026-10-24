@@ -25,10 +25,21 @@ externally blocked. No production,
 that is `NOT_RUN`, `BLOCKED_EXTERNAL` or failed keeps the candidate below
 promotion.
 
-The current construction backlog is
-[`backlog-auditoria-2026-10-07.md`](docs/backlog-auditoria-2026-10-07.md), with
-execution tracked in
+The current audit baseline is
+[`relatorio-auditoria-2026-10-24.md`](docs/reports/relatorio-auditoria-2026-10-24.md),
+with the proposed [`executive plan`](docs/plans/execplan-aud24-2026-10-24.md),
+[`roadmap`](docs/roadmap-auditoria-2026-10-24.md) and
+[`backlog`](docs/backlog-auditoria-2026-10-24.md) for the AUD24 remediation wave.
+The prior construction plan remains at
 [`execplan-retomada-2026-10-09.md`](docs/plans/execplan-retomada-2026-10-09.md).
+The proposed production program is described in
+[`roadmap-producao-2026-10-12.md`](docs/roadmap-producao-2026-10-12.md) and
+[`backlog-producao-2026-10-12.md`](docs/backlog-producao-2026-10-12.md), with
+its observed baseline in
+[`baseline-producao-2026-10-12.md`](docs/reports/baseline-producao-2026-10-12.md).
+These planning artifacts add current defects and map pending runtime obligations;
+they do not adopt execution tasks, supersede prior acceptance, authorize deployment,
+or change the NO-GO decision.
 The preserved runtime-closure audit is
 [`triple-aaa-runtime-closure-current-audit.md`](docs/reports/triple-aaa-runtime-closure-current-audit.md);
 the predecessor audit remains

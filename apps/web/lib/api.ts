@@ -48,6 +48,8 @@ import type {
 const API_BASE = (process.env.NEXT_PUBLIC_API_BASE_URL || "").replace(/\/$/, "");
 
 import { ApiError } from "./api-error";
+import { validResponse } from "./response-contract";
+import { privateRequestLease } from "./client-authority";
 import { parseChatResult, parseChatResponse, type ChatStreamEvent } from "./chat-response";
 export { ApiError } from "./api-error";
 export { parseChatResponse, parseChatMetadata } from "./chat-response";
@@ -61,6 +63,8 @@ export type { ChatStreamEvent } from "./chat-response";
  */
 export function errorMessage(cause: unknown, fallback: string): string {
   if (cause instanceof ApiError) return cause.message;
+  // DOMException is not instanceof Error in every browser/test realm.
+  if (cause && typeof cause === "object" && "name" in cause && cause.name === "AbortError" && "message" in cause && typeof cause.message === "string" && cause.message) return cause.message;
   if (cause instanceof Error && cause.message) return cause.message;
   return fallback;
 }
@@ -92,15 +96,19 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     if (nonce) headers.set(CSRF_HEADER_NAME, nonce);
   }
 
+  const lease = path.startsWith("/api/") && !path.startsWith("/api/v1/auth/") ? privateRequestLease(init.signal ?? undefined) : null;
   let response: Response;
   try {
-    response = await fetch(`${API_BASE}${path}`, { ...init, headers, credentials: "include" });
-  } catch {
+    response = await fetch(`${API_BASE}${path}`, { ...init, signal: lease?.signal ?? init.signal, headers, credentials: "include" });
+    lease?.assert();
+  } catch (cause) {
+    if (cause && typeof cause === "object" && "name" in cause && cause.name === "AbortError") throw cause;
     throw new ApiError("A API não está disponível neste momento.", 0, "network_unavailable");
   }
 
   const requestId = response.headers.get("x-request-id") ?? undefined;
   const text = await response.text();
+  lease?.assert();
   let payload: unknown = null;
   if (text) {
     try {
@@ -110,6 +118,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     }
   }
   if (!response.ok) {
+    if (response.status === 401 && typeof window !== "undefined" && !path.startsWith("/api/v1/auth/")) window.dispatchEvent(new Event("rick-session-invalid"));
     const error = payload && typeof payload === "object" && "error" in payload
       ? (payload as { error?: { message?: string; code?: string; request_id?: string } }).error
       : undefined;
@@ -120,12 +129,13 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
       error?.request_id || requestId,
     );
   }
-  if (!text) return undefined as T;
+  if (!text && response.status === 204 && path === "/api/v1/auth/logout") return undefined as T;
+  if (!validResponse(path, payload, method)) throw new ApiError("A API retornou uma resposta incompatível. Tente novamente.", response.status, "invalid_response", requestId);
   return payload as T;
 }
 
 export const api = {
-  login: (body: { email: string; password: string; tenant_id: string }) =>
+  login: (body: { email: string; password: string; tenant_id: string; workspace_id?: string }) =>
     request<Session>("/api/v1/auth/login", { method: "POST", body: JSON.stringify(body) }),
   me: () => request<Session>("/api/v1/auth/me"),
   logout: () => request<{ status: string }>("/api/v1/auth/logout", { method: "POST" }),
@@ -176,11 +186,11 @@ export const api = {
       method: "POST",
       body: JSON.stringify(body),
     }),
-  listConversations: (limit = 50, signal?: AbortSignal) =>
-    request<ConversationListResponse>(`/api/v1/conversations?limit=${encodeURIComponent(String(limit))}`, { signal }),
-  getConversation: (conversationId: string, limit = 100, signal?: AbortSignal) =>
+  listConversations: (limit = 50, signal?: AbortSignal, cursor?: string) =>
+    request<ConversationListResponse>(`/api/v1/conversations?limit=${encodeURIComponent(String(limit))}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`, { signal }),
+  getConversation: (conversationId: string, limit = 100, signal?: AbortSignal, cursor?: string) =>
     request<ConversationDetailResponse>(
-      `/api/v1/conversations/${encodeURIComponent(conversationId)}?limit=${encodeURIComponent(String(limit))}`,
+      `/api/v1/conversations/${encodeURIComponent(conversationId)}?limit=${encodeURIComponent(String(limit))}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`,
       { signal },
     ).then((detail) => ({
       ...detail,
@@ -221,7 +231,7 @@ export const api = {
     form.set("collection_id", collectionId);
     return request<JobEnvelope>("/api/v1/documents/upload", { method: "POST", body: form });
   },
-  job: (jobId: string) => request<JobEnvelope>(`/api/v1/ingestion/jobs/${encodeURIComponent(jobId)}`),
+  job: (jobId: string, signal?: AbortSignal) => request<JobEnvelope>(`/api/v1/ingestion/jobs/${encodeURIComponent(jobId)}`, { signal }),
   cancelJob: (jobId: string) =>
     request<JobEnvelope>(`/api/v1/ingestion/jobs/${encodeURIComponent(jobId)}/cancel`, { method: "POST" }),
   retryJob: (jobId: string, file: File) => {
@@ -253,6 +263,7 @@ async function readChatStream(
   signal?: AbortSignal,
   onEvent?: (event: ChatStreamEvent) => void,
 ): Promise<ChatResponse> {
+  const lease = privateRequestLease(signal);
   const headers = new Headers({ Accept: "application/json, text/event-stream", "Content-Type": "application/json" });
   let response: Response;
   try {
@@ -260,14 +271,16 @@ async function readChatStream(
       method: "POST",
       headers,
       credentials: "include",
-      signal,
+      signal: lease.signal,
       body: JSON.stringify({ ...body, stream: true }),
     });
   } catch (cause) {
-    if (cause instanceof Error && cause.name === "AbortError") throw cause;
+    if (cause && typeof cause === "object" && "name" in cause && cause.name === "AbortError") throw cause;
     throw new ApiError("A API não está disponível neste momento.", 0, "network_unavailable");
   }
+  lease.assert();
   if (!response.ok) {
+    if (response.status === 401 && typeof window !== "undefined") window.dispatchEvent(new Event("rick-session-invalid"));
     const text = await response.text();
     let payload: unknown = null;
     try { payload = text ? JSON.parse(text) as unknown : null; } catch { payload = null; }
@@ -282,5 +295,8 @@ async function readChatStream(
     );
   }
 
-  return parseChatResponse(response, onEvent, signal);
+  lease.assert();
+  const result = await parseChatResponse(response, event => { if (lease.current()) onEvent?.(event); }, lease.signal);
+  lease.assert();
+  return result;
 }

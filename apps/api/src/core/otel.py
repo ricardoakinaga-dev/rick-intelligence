@@ -9,10 +9,49 @@ exports bounded HTTP spans over OTLP, and closes the exporter with the app.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from contextlib import contextmanager
+from contextlib import AbstractContextManager, contextmanager
+from importlib import import_module
 import os
 import re
-from typing import Any, Iterator, Mapping
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Iterator, Mapping, Protocol, cast
+
+if TYPE_CHECKING:
+    from starlette.types import ASGIApp, Message, Receive, Scope, Send
+    from opentelemetry.context import Context
+    from opentelemetry.sdk.trace.export import SpanExporter
+
+
+class SpanPort(Protocol):
+    def set_attribute(self, key: str, value: str | bool | int | float) -> None: ...
+
+
+class TracerPort(Protocol):
+    def start_as_current_span(
+        self, name: str, *, context: Context | None = None,
+        record_exception: bool = True, set_status_on_exception: bool = True,
+    ) -> AbstractContextManager[SpanPort]: ...
+
+
+class _HTTPExporterFactory(Protocol):
+    def __call__(self, *, endpoint: str) -> SpanExporter: ...
+
+
+class _GRPCExporterFactory(Protocol):
+    def __call__(self, *, endpoint: str, insecure: bool) -> SpanExporter: ...
+
+
+def _otlp_exporter(*, endpoint: str, use_http: bool) -> SpanExporter:
+    # Optional plugin modules are loaded only when configured. The two casts
+    # describe their pinned constructor contracts, not an unchecked SDK import.
+    # Missing plugins still raise ImportError and produce NOT_CONFIGURED.
+    if use_http:
+        module = import_module("opentelemetry.exporter.otlp.proto.http.trace_exporter")
+        http_factory = cast(_HTTPExporterFactory, module.OTLPSpanExporter)
+        return http_factory(endpoint=endpoint)
+    module = import_module("opentelemetry.exporter.otlp.proto.grpc.trace_exporter")
+    grpc_factory = cast(_GRPCExporterFactory, module.OTLPSpanExporter)
+    return grpc_factory(endpoint=endpoint, insecure=endpoint.startswith("http://"))
 
 
 _SAFE_SPAN_NAME = re.compile(r"^[A-Za-z][A-Za-z0-9_.:/-]{0,127}$")
@@ -22,7 +61,7 @@ _MAX_PROPAGATION_VALUE = 4096
 # The API and Worker each have one process-owned tracer.  Keeping the tracer
 # here gives downstream service seams a dependency-light span port while the
 # exporter remains optional in hermetic tests.
-_PROCESS_TRACER: object | None = None
+_PROCESS_TRACER: TracerPort | None = None
 _PROCESS_PROVIDER: object | None = None
 
 
@@ -31,7 +70,7 @@ class OpenTelemetryRuntime:
     status: str
     destination: str | None
     provider: object | None = None
-    tracer: object | None = None
+    tracer: TracerPort | None = None
 
     def close(self) -> None:
         global _PROCESS_TRACER, _PROCESS_PROVIDER
@@ -92,7 +131,7 @@ def current_trace_context() -> dict[str, str]:
         return {}
 
 
-def extract_trace_context(value: Mapping[str, object] | None) -> object | None:
+def extract_trace_context(value: Mapping[str, object] | None) -> Context | None:
     """Extract only the bounded W3C carrier received from another process."""
 
     carrier = _bounded_carrier(value)
@@ -118,39 +157,41 @@ def attach_trace_context(value: Mapping[str, object] | None) -> Iterator[None]:
         from opentelemetry import context as otel_context
 
         token = otel_context.attach(parent)
-        try:
-            yield
-        finally:
-            otel_context.detach(token)
     except Exception:
-        # A malformed/unsupported carrier must not stop durable work. The
-        # worker still emits a local root span when tracing is configured.
+        # Only attachment failures may fall back to a local root context.
+        # Never catch an exception thrown by the application at the yield.
         yield
+        return
+    try:
+        yield
+    finally:
+        try:
+            otel_context.detach(token)
+        except Exception:
+            # Telemetry cleanup must neither replace the body's exception nor
+            # turn successful durable work into a business failure.
+            pass
 
 
 @contextmanager
 def stage_span(
     name: str,
     *,
-    parent_context: object | None = None,
+    parent_context: Context | None = None,
     attributes: Mapping[str, object] | None = None,
-) -> Iterator[object | None]:
+) -> Iterator[SpanPort | None]:
     """Emit one bounded stage span without making tracing a hard dependency."""
 
     tracer = _PROCESS_TRACER
     if tracer is None:
         yield None
         return
-    kwargs: dict[str, object] = {
-        # Exceptions are recorded explicitly below with type/code only. The
-        # SDK default would serialize exception messages and stack traces.
-        "record_exception": False,
-        "set_status_on_exception": False,
-    }
-    if parent_context is not None:
-        kwargs["context"] = parent_context
     try:
-        span_manager = tracer.start_as_current_span(_safe_span_name(name), **kwargs)
+        # Keep exception messages/stack traces out of automatic SDK recording.
+        span_manager = tracer.start_as_current_span(
+            _safe_span_name(name), context=parent_context,
+            record_exception=False, set_status_on_exception=False,
+        )
         span = span_manager.__enter__()
     except Exception:
         # Instrumentation must never change application behavior. A broken
@@ -181,7 +222,7 @@ def stage_span(
             pass
 
 
-def record_safe_exception(span: object | None, error: object) -> None:
+def record_safe_exception(span: SpanPort | None, error: object) -> None:
     """Attach only non-sensitive exception identity to an active span."""
 
     if span is None:
@@ -198,13 +239,14 @@ def record_safe_exception(span: object | None, error: object) -> None:
 class _HTTPSpanMiddleware:
     """Small ASGI middleware that emits one bounded span per HTTP request."""
 
-    def __init__(self, app: object, *, tracer: object, extract_context: object | None = None) -> None:
+    def __init__(self, app: ASGIApp, *, tracer: TracerPort,
+                 extract_context: Callable[[Mapping[str, str]], Context | None] | None = None) -> None:
         self.app = app
         self.tracer = tracer
         self.extract_context = extract_context
 
     @staticmethod
-    def _carrier(scope: dict[str, Any]) -> dict[str, str]:
+    def _carrier(scope: Scope) -> dict[str, str]:
         """Project only W3C propagation headers into a bounded carrier."""
 
         raw_headers = scope.get("headers")
@@ -227,14 +269,15 @@ class _HTTPSpanMiddleware:
             carrier[name] = value
         return carrier
 
-    async def __call__(self, scope: dict[str, Any], receive: object, send: object) -> None:
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope.get("type") != "http":
             await self.app(scope, receive, send)
             return
-        method = scope.get("method") if isinstance(scope.get("method"), str) else "OTHER"
+        raw_method = scope.get("method")
+        method = raw_method if isinstance(raw_method, str) else "OTHER"
         status_code: int | None = None
 
-        async def observed_send(message: dict[str, Any]) -> None:
+        async def observed_send(message: Message) -> None:
             nonlocal status_code
             if message.get("type") == "http.response.start":
                 raw_status = message.get("status")
@@ -242,7 +285,7 @@ class _HTTPSpanMiddleware:
                     status_code = raw_status
             await send(message)
 
-        parent_context = None
+        parent_context: Context | None = None
         extractor = self.extract_context
         if callable(extractor):
             try:
@@ -251,12 +294,13 @@ class _HTTPSpanMiddleware:
                 # A malformed propagation header must not break the request;
                 # the span remains a new root with bounded attributes.
                 parent_context = None
-        span_kwargs = {} if parent_context is None else {"context": parent_context}
         # The middleware deliberately disables automatic exception recording;
         # otherwise SDK exporters may include request errors, headers or
         # stack text in the trace payload.  Only a bounded type/code is added.
-        span_kwargs.update(record_exception=False, set_status_on_exception=False)
-        with self.tracer.start_as_current_span("HTTP " + method[:16], **span_kwargs) as span:
+        with self.tracer.start_as_current_span(
+            "HTTP " + method[:16], context=parent_context,
+            record_exception=False, set_status_on_exception=False,
+        ) as span:
             span.set_attribute("http.request.method", method[:16])
             try:
                 await self.app(scope, receive, observed_send)
@@ -287,19 +331,16 @@ def install_otel(app: object, telemetry: object) -> OpenTelemetryRuntime:
         from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
         protocol = os.getenv("OTEL_EXPORTER_OTLP_PROTOCOL", "grpc").strip().lower()
-        if exporter_name == "otlp_proto_http" or protocol in {"http/protobuf", "http"}:
-            from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
-
-            exporter = OTLPSpanExporter(endpoint=endpoint)
-        else:
-            from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
-
-            exporter = OTLPSpanExporter(endpoint=endpoint, insecure=endpoint.startswith("http://"))
+        exporter = _otlp_exporter(
+            endpoint=endpoint,
+            use_http=exporter_name == "otlp_proto_http" or protocol in {"http/protobuf", "http"},
+        )
         service_name = os.getenv("OTEL_SERVICE_NAME", "rick-api").strip()[:128] or "rick-api"
         provider = TracerProvider(resource=Resource.create({"service.name": service_name}))
         provider.add_span_processor(BatchSpanProcessor(exporter))
         # The SDK permits one provider per process. Reuse an existing provider
         # when a test or an app factory constructs more than one application.
+        active_provider: trace.TracerProvider
         try:
             trace.set_tracer_provider(provider)
             active_provider = provider
@@ -346,16 +387,13 @@ def configure_process_otel(*, service_name: str) -> OpenTelemetryRuntime:
         from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
         protocol = os.getenv("OTEL_EXPORTER_OTLP_PROTOCOL", "grpc").strip().lower()
-        if exporter_name == "otlp_proto_http" or protocol in {"http/protobuf", "http"}:
-            from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
-
-            exporter = OTLPSpanExporter(endpoint=endpoint)
-        else:
-            from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
-
-            exporter = OTLPSpanExporter(endpoint=endpoint, insecure=endpoint.startswith("http://"))
+        exporter = _otlp_exporter(
+            endpoint=endpoint,
+            use_http=exporter_name == "otlp_proto_http" or protocol in {"http/protobuf", "http"},
+        )
         provider = TracerProvider(resource=Resource.create({"service.name": service_name[:128]}))
         provider.add_span_processor(BatchSpanProcessor(exporter))
+        active_provider: trace.TracerProvider
         try:
             trace.set_tracer_provider(provider)
             active_provider = provider

@@ -11,6 +11,13 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 import math
 import time
+from typing import TYPE_CHECKING, Protocol, cast
+
+if TYPE_CHECKING:
+    from jwt import PyJWK
+    from jwt.algorithms import AllowedPublicKeys
+    from jwt.types import Options
+    from rick_contracts.security import SessionSnapshot
 
 from rick_authorization import (
     AUTHORIZATION_SNAPSHOT_VERSION,
@@ -29,7 +36,7 @@ class OIDCError(Exception):
     _CODES = frozenset({
         "invalid_configuration", "invalid_token", "key_not_found",
         "issuer_mismatch", "audience_mismatch", "expired_token",
-        "membership_denied",
+        "membership_denied", "provider_unavailable", "logout_unsupported",
     })
 
     def __init__(self, code: str = "invalid_token") -> None:
@@ -107,6 +114,14 @@ def _claim_list(claims: Mapping[str, object], name: str) -> tuple[str, ...]:
     ))
 
 
+class TokenDecoder(Protocol):
+    def __call__(
+        self, token: str, *, key: object, algorithms: list[str],
+        audience: str | tuple[str, ...], issuer: str, options: Options,
+        leeway: int,
+    ) -> Mapping[str, object]: ...
+
+
 class OIDCVerifier:
     """Verify a signed OIDC JWT using an injected key resolver."""
 
@@ -115,7 +130,7 @@ class OIDCVerifier:
         settings: OIDCSettings,
         *,
         key_resolver: Callable[[str], object | None],
-        decoder: Callable[..., Mapping[str, object]] | None = None,
+        decoder: TokenDecoder | None = None,
         clock: Callable[[], float] = time.time,
     ) -> None:
         if not isinstance(settings, OIDCSettings) or not callable(key_resolver) or not callable(clock):
@@ -128,10 +143,24 @@ class OIDCVerifier:
                 import jwt
             except ImportError as exc:  # pragma: no cover - deployment dependency boundary
                 raise OIDCConfigurationError() from exc
-            decoder = jwt.decode
+            def decode_jwt(
+                token: str, *, key: object, algorithms: list[str],
+                audience: str | tuple[str, ...], issuer: str, options: Options,
+                leeway: int,
+            ) -> Mapping[str, object]:
+                # Resolver objects remain opaque for custom decoders. At the
+                # default decoder boundary PyJWT validates/coerces its own key
+                # formats; this cast must not add a different JWT policy.
+                return jwt.decode(
+                    token, key=cast("AllowedPublicKeys | PyJWK | str | bytes", key),
+                    algorithms=algorithms, audience=audience, issuer=issuer,
+                    options=options, leeway=leeway,
+                )
+
+            decoder = decode_jwt
         if not callable(decoder):
             raise OIDCConfigurationError()
-        self._decoder = decoder
+        self._decoder: TokenDecoder = decoder
 
     def verify(self, token: str) -> dict[str, object]:
         if (
@@ -153,7 +182,10 @@ class OIDCVerifier:
                 raise OIDCError()
             if not isinstance(kid, str) or not kid.strip() or len(kid) > 256:
                 raise OIDCError("key_not_found")
-            key = self._key_resolver(kid)
+            try:
+                key = self._key_resolver(kid)
+            except Exception:
+                raise OIDCError("provider_unavailable") from None
             if key is None:
                 raise OIDCError("key_not_found")
             claims = self._decoder(
@@ -201,6 +233,8 @@ class OIDCIdentityProvider:
     """Bearer-token identity facade for an externally managed OIDC session."""
 
     production_safe = True
+    # Verification alone cannot revoke a JWT or broker session (ADR-024/D3).
+    logout_capable = False
 
     def __init__(
         self,
@@ -235,7 +269,7 @@ class OIDCIdentityProvider:
         except Exception:
             return False
 
-    def validate_token(self, token: str | None):
+    def validate_token(self, token: str | None) -> SessionSnapshot:
         from rick_contracts.security import SessionSnapshot
 
         if not token:
@@ -246,7 +280,11 @@ class OIDCIdentityProvider:
             tenant = _safe_claim_text(claims, self._tenant_claim, maximum=128)
             if subject is None or tenant is None:
                 raise OIDCError("membership_denied")
-            membership = self._membership_resolver(subject, claims, tenant)
+            try:
+                membership = self._membership_resolver(subject, claims, tenant)
+            except Exception:
+                # An authority outage is not a negative membership decision.
+                raise OIDCError("provider_unavailable") from None
             if not isinstance(membership, Mapping):
                 raise OIDCError("membership_denied")
             if (membership.get("subject") != subject or membership.get("tenant_id") != tenant
@@ -255,7 +293,8 @@ class OIDCIdentityProvider:
                 raise OIDCError("membership_denied")
             workspace = _safe_claim_text(membership, "workspace_id", maximum=128)
             user_id = _safe_claim_text(membership, "user_id", maximum=256)
-            if workspace is None or user_id is None or not known_role(membership.get("role")):
+            membership_role = membership.get("role")
+            if workspace is None or user_id is None or not known_role(membership_role):
                 raise OIDCError("membership_denied")
             if not text_list(membership.get("authorized_collection_ids"), 128, 256):
                 raise OIDCError("membership_denied")
@@ -264,7 +303,7 @@ class OIDCIdentityProvider:
                 not text_list(overrides[name], 256, 128) for name in ("add", "remove") if name in overrides
             ):
                 raise OIDCError("membership_denied")
-            role = canonical_role(membership["role"])
+            role = canonical_role(membership_role)
             permissions = permissions_for_role(
                 role, normalize_permission_overrides(overrides)
             )
@@ -288,11 +327,20 @@ class OIDCIdentityProvider:
                 session_id=f"oidc:{subject}",
                 allowed_collection_ids=allowed,
             )
-        except Exception:
+        except OIDCError as exc:
+            if exc.code == "provider_unavailable":
+                raise
             return SessionSnapshot(authenticated=False, session_state="anonymous")
+        except Exception:
+            raise OIDCError("provider_unavailable") from None
 
     def logout(self, _token: str | None) -> None:
-        """OIDC logout is owned by the provider callback/session broker."""
+        """Verification alone cannot revoke a JWT or its broker session.
+
+        No broker/revocation port is part of this adapter's approved contract.
+        Refuse confirmation rather than inventing a process-local denylist.
+        """
+        raise OIDCError("logout_unsupported")
 
     def login(self, **_kwargs: object) -> dict[str, object]:
         raise OIDCError("invalid_configuration")

@@ -106,6 +106,40 @@ def test_a_baseline_above_the_measured_error_count_is_reported_for_lowering(
     assert "AVISO" in out and "rebaixe a linha do baseline" in out
 
 
+def test_an_explicit_source_file_is_checked_without_adopting_its_whole_package(tmp_path: Path, capsys) -> None:
+    package = _write_package(tmp_path, "typed_file_fixture", "")
+    source = package / "boundary.py"
+    source.write_text("VALUE: int = 1\n", encoding="utf-8")
+    baseline = _write_baseline(tmp_path, source, 0)
+    assert main([str(baseline)]) == 0
+    assert "PASS" in capsys.readouterr().out
+    source.write_text('VALUE: int = "regression"\n', encoding="utf-8")
+    assert main([str(baseline)]) == 1
+    assert "baseline aceita 0" in capsys.readouterr().out
+
+
+def test_canonical_roots_keep_original_packages_and_adopt_all_eight_zero_error_frontiers() -> None:
+    from configparser import ConfigParser
+
+    root = Path(__file__).resolve().parents[2]
+    expected = {
+        "packages/contracts/src", "packages/authorization/src",
+        "apps/api/src/routes/auth.py", "apps/api/src/core/rate_limit.py",
+        "apps/api/src/dependencies/identity.py", "apps/api/src/services/identity_offload.py",
+        "packages/identity/src/rick_identity/snapshots.py",
+        "packages/identity/src/rick_identity/postgres.py",
+        "packages/identity/src/rick_identity/oidc.py", "apps/api/src/core/otel.py",
+    }
+    entries, errors = parse_baseline((root / "docs/baselines/mypy-baseline.txt").read_text(), "canonical")
+    assert not errors
+    assert dict(entries) == {source: 0 for source in expected}
+    config = ConfigParser()
+    config.read(root / "mypy.ini")
+    assert {source.strip() for source in config["mypy"]["files"].split(",")} == expected
+    assert config["mypy"].getboolean("check_untyped_defs")
+    assert not config["mypy"].getboolean("ignore_missing_imports", fallback=False)
+
+
 def test_a_covered_directory_that_no_longer_exists_fails(tmp_path: Path, capsys) -> None:
     baseline = tmp_path / "baseline.txt"
     baseline.write_text("docs/does-not-exist-for-aud07-17 = 0\n", encoding="utf-8")

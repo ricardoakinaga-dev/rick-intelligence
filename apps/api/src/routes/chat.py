@@ -12,7 +12,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 from core.errors import ApiError, envelope
-from core.rate_limit import InMemoryRateLimiter, check_rate_limit_async, ensure_rate_limiter
+from core.rate_limit import InMemoryRateLimiter, check_rate_limit_async, ensure_rate_limiter_async, server_rate_request_id, rate_limit_key
 from core.streaming import ClosingStreamingRoute, closing_stream
 from dependencies.identity import require_authenticated
 from dependencies.services import get_providers
@@ -35,22 +35,20 @@ router = APIRouter(tags=["Clinical"], route_class=ClosingStreamingRoute)
 InMemoryChatRateLimiter = InMemoryRateLimiter
 
 
-def _chat_rate_limiter(providers):
-    return ensure_rate_limiter(providers)
+async def _chat_rate_limiter(providers):
+    if providers.settings.environment == "production" and getattr(providers, "rate_limiter", None) is None:
+        raise ApiError("provider_unavailable")
+    return await ensure_rate_limiter_async(providers)
 
 
 def _chat_rate_key(session) -> str:
-    identity = ":".join(
-        str(value or "")
-        for value in (getattr(session, "tenant_id", None), getattr(session, "user_id", None))
-    )
-    if not identity.strip(":"):
-        identity = str(getattr(session, "session_id", None) or "authenticated")
-    return hashlib.sha256(identity.encode("utf-8")).hexdigest()
+    return rate_limit_key("chat:actor", getattr(session, "tenant_id", None),
+                          getattr(session, "user_id", None),
+                          getattr(session, "session_id", None) if not getattr(session, "user_id", None) else None)
 
 
 async def _rate_allowed(providers, key: str, *, request_id: str | None = None) -> bool:
-    limiter = _chat_rate_limiter(providers)
+    limiter = await _chat_rate_limiter(providers)
     try:
         return await check_rate_limit_async(
             limiter,
@@ -58,8 +56,8 @@ async def _rate_allowed(providers, key: str, *, request_id: str | None = None) -
             limit_per_min=providers.settings.chat_rate_limit_per_min,
             request_id=request_id,
         )
-    except TypeError as exc:
-        raise ApiError("internal_error") from exc
+    except Exception:
+        raise ApiError("provider_unavailable") from None
 
 
 async def _chat_rate_allowed(providers, session, *, request_id: str | None = None) -> bool:
@@ -146,7 +144,7 @@ async def chat(payload: ChatRequest, request: Request, session=Depends(require_a
     if not await _chat_rate_allowed(
         providers,
         session,
-        request_id=getattr(request.state, "request_id", None),
+        request_id=server_rate_request_id(request),
     ):
         request_id = getattr(request.state, "request_id", "unknown")
         return JSONResponse(

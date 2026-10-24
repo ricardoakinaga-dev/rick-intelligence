@@ -25,6 +25,7 @@ ERROR_CODES = (
     "unsupported_media_type",
     "provider_timeout",
     "provider_unavailable",
+    "result_indeterminate",
     "provider_rate_limit",
     "vector_store_unavailable",
     "storage_unavailable",
@@ -47,6 +48,7 @@ _STATUS_BY_CODE = {
     "unsupported_media_type": 415,
     "provider_timeout": 504,
     "provider_unavailable": 503,
+    "result_indeterminate": 503,
     "provider_rate_limit": 429,
     "vector_store_unavailable": 503,
     "storage_unavailable": 503,
@@ -69,6 +71,7 @@ _SAFE_MESSAGES = {
     "unsupported_media_type": "Unsupported media type.",
     "provider_timeout": "Provider timed out.",
     "provider_unavailable": "Provider is unavailable.",
+    "result_indeterminate": "The operation may have been applied; confirmation is pending.",
     "provider_rate_limit": "Provider rate limit exceeded.",
     "vector_store_unavailable": "Vector store is unavailable.",
     "storage_unavailable": "Storage is unavailable.",
@@ -181,7 +184,8 @@ def _legacy_detail_to_code(detail: Any, status: int) -> tuple[str, Any]:
 
 async def api_error_handler(request: Request, exc: ApiError) -> JSONResponse:
     rid = _request_id(request)
-    return JSONResponse(status_code=exc.status_code, content=envelope(exc.code, exc.message, rid, exc.details))
+    headers = {"Retry-After": "60"} if exc.code == "rate_limited" else None
+    return JSONResponse(status_code=exc.status_code, content=envelope(exc.code, exc.message, rid, exc.details), headers=headers)
 
 
 async def http_exception_handler(request: Request, exc: HTTPException | StarletteHTTPException) -> JSONResponse:

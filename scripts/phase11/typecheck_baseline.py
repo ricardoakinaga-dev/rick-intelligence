@@ -110,7 +110,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 1
 
     roots = [path for path, _ in entries]
-    missing = [path for path in roots if not (ROOT / path).is_dir()]
+    missing = [path for path in roots if not ((ROOT / path).is_dir() or (ROOT / path).is_file())]
     if missing:
         for path in missing:
             print(f"FAIL: {source}: diretório inexistente: {path}")

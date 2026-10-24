@@ -21,10 +21,10 @@ export type ChatStreamInput = {
 type ChatEventHandler = (event: ChatStreamEvent) => void;
 
 export const chatAdapter = {
-  listConversations: (signal?: AbortSignal) => api.listConversations(50, signal),
+  listConversations: (signal?: AbortSignal, cursor?: string) => api.listConversations(50, signal, cursor),
 
-  getConversation: (conversationId: string, signal?: AbortSignal) =>
-    api.getConversation(conversationId, 100, signal),
+  getConversation: (conversationId: string, signal?: AbortSignal, cursor?: string) =>
+    api.getConversation(conversationId, 100, signal, cursor),
 
   sendChat: (input: ChatStreamInput, signal?: AbortSignal, onEvent?: ChatEventHandler) =>
     api.chatStream({

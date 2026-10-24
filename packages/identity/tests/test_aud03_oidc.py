@@ -3,7 +3,7 @@ import time
 import jwt
 import pytest
 
-from rick_identity import OIDCIdentityProvider, OIDCSettings, OIDCVerifier, PostgresUserStore
+from rick_identity import OIDCError, OIDCIdentityProvider, OIDCSettings, OIDCVerifier, PostgresUserStore
 
 
 def membership():
@@ -73,4 +73,7 @@ def test_resolver_failure_cannot_produce_authenticated_session():
                             decoder=lambda *args, **kwargs: {"iss": "https://issuer.example", "sub": "subject",
                                                             "exp": time.time() + 600, "tenant_id": "t"})
     token = jwt.encode({}, "synthetic-aud03-oidc-secret-32-bytes", algorithm="HS256", headers={"kid": "test"})
-    assert not OIDCIdentityProvider(verifier, membership_resolver=unavailable).validate_token(token).authenticated
+    # AUD15: fail closed without relabelling an outage as confirmed absence.
+    with pytest.raises(OIDCError) as error:
+        OIDCIdentityProvider(verifier, membership_resolver=unavailable).validate_token(token)
+    assert error.value.code == "provider_unavailable"

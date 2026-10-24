@@ -51,6 +51,21 @@ it("keeps loading and validation failure private, exposes retry and redirects lo
   value = { ...value, error: null, errorKind: null }; await render(); expect(router.replace).toHaveBeenCalledWith("/login?next=%2Fapp%2Fcases");
   pathname = "/login"; await render(); expect(container.querySelector("input")).not.toBeNull();
 });
+it("traps mobile navigation keyboard, restores opener focus and releases body scroll",async()=>{
+ vi.stubGlobal("requestAnimationFrame",vi.fn((callback:FrameRequestCallback)=>{callback(0);return 1;}));vi.stubGlobal("cancelAnimationFrame",vi.fn());
+ vi.stubGlobal("matchMedia",vi.fn(()=>({matches:true,addEventListener:vi.fn(),removeEventListener:vi.fn()})));
+ await render();const opener=container.querySelector('[aria-label="Abrir navegação"]') as HTMLButtonElement;const close=container.querySelector('[aria-label="Fechar navegação"]') as HTMLButtonElement;const last=container.querySelector('.profile-button') as HTMLButtonElement;
+ opener.focus();await act(async()=>opener.click());expect(document.activeElement).toBe(close);expect(document.body.style.overflow).toBe("hidden");
+ const backward=new KeyboardEvent("keydown",{key:"Tab",shiftKey:true,bubbles:true,cancelable:true});await act(async()=>close.dispatchEvent(backward));expect(backward.defaultPrevented).toBe(true);expect(document.activeElement).toBe(last);
+ const forward=new KeyboardEvent("keydown",{key:"Tab",bubbles:true,cancelable:true});await act(async()=>last.dispatchEvent(forward));expect(forward.defaultPrevented).toBe(true);expect(document.activeElement).toBe(close);
+ await act(async()=>close.dispatchEvent(new KeyboardEvent("keydown",{key:"Escape",bubbles:true,cancelable:true})));expect(document.activeElement).toBe(opener);expect(document.body.style.overflow).toBe("");
+});
+it("deduplicates logout and keeps failure safely recoverable after private teardown",async()=>{
+ let reject!:(reason:unknown)=>void;value.signOut.mockImplementationOnce(()=>new Promise<void>((_resolve,fail)=>{reject=fail;}));await render();
+ const profile=container.querySelector('.profile-button') as HTMLButtonElement;await act(async()=>{profile.click();profile.click();});expect(value.signOut).toHaveBeenCalledOnce();
+ value={...value,session:null};await render();await act(async()=>reject(new Error("SECRET INTERNAL ERROR")));expect(container.querySelector('input')).toBeNull();expect(container.textContent).toContain("não foi possível confirmar a saída");expect(container.textContent).not.toContain("SECRET INTERNAL ERROR");
+ await act(async()=>Array.from(container.querySelectorAll('button')).find(b=>b.textContent==="Tentar sair novamente")!.click());expect(value.signOut).toHaveBeenCalledTimes(2);expect(container.textContent).not.toContain("não foi possível confirmar a saída");
+});
 it("shows permitted navigation and executes profile logout", async () => {
   value = { ...value, session: { ...identity, permissions: ["cases.read", "documents.read", "audit.read"] } }; await render();
   expect(container.querySelector('a[href="/app/cases"]')).not.toBeNull(); expect(container.querySelector('a[href="/admin"]')).not.toBeNull();

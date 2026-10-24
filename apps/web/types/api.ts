@@ -14,13 +14,13 @@ export type Session = {
 
 export type HealthResponse = {
   status: string;
-  checks?: Array<{ name?: string; status?: string; ok?: boolean; required?: boolean; detail?: string }> | Record<string, { status?: string; ok?: boolean; required?: boolean; detail?: string }>;
+  checks?: Array<{ name?: string; status?: string; ok?: boolean; required?: boolean; detail?: string | null }> | Record<string, { status?: string; ok?: boolean; required?: boolean; detail?: string | null }>;
   [key: string]: unknown;
 };
 
 export type AdminHealthResponse = {
   status: string;
-  checks: Array<{ name: string; ok: boolean; required: boolean; detail?: string }>;
+  checks: Array<{ name: string; ok: boolean; required: boolean; detail?: string | null }>;
 };
 
 export type AdminUser = {

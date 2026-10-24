@@ -1,0 +1,48 @@
+{
+  "schema": "rick.production-audit-baseline/v1",
+  "candidate_sha": "48e383c25ca4af32aa7ffe7e2367360ca9742c58",
+  "origin": "Audit report delivered to the human in the same session; source /tmp/relatorio-auditoria-rick-intelligence-2026-10-12.md re-read before local implementation. This is a transcription of observed results, not reconstructed raw process output.",
+  "audit_observed_at": "2026-10-12T03:45:17Z",
+  "python_suite": {
+    "status": "FAIL",
+    "exit_code": 1,
+    "passed": 7713,
+    "failed": 6,
+    "skipped": 221,
+    "warnings": 75,
+    "subtests_passed": 88,
+    "duration_seconds": 522.02,
+    "command": "PYTHONDONTWRITEBYTECODE=1 .runtime/venvs/cvg/bin/python -m pytest apps/api/tests packages apps/worker/tests infrastructure scripts -q -p no:cacheprovider --junitxml=/tmp/rick-audit-pytest.xml",
+    "raw_xml_availability": "NOT_RECOVERED: original command-private temporary file; do not fabricate or substitute historical raw output",
+    "failures": [
+      "infrastructure/vps/tests/test_rework2.py::test_sticky_tmp_parent_and_private_child_are_supported",
+      "test_cli_public_metadata_key_never_reaches_operation_effects: private-config parameter",
+      "test_cli_public_metadata_key_never_reaches_operation_effects: symlink parameter",
+      "infrastructure/vps/tests/test_vps_production_rework9.py: gid parameter, first failure",
+      "infrastructure/vps/tests/test_vps_production_rework9.py: gid parameter, second failure",
+      "scripts/state_of_art/tests/test_frontend_supply_runtime.py::test_node_inventory_matches_tracked_canonical_manifests"
+    ]
+  },
+  "validate": {
+    "status": "FAIL",
+    "exit_code": 2,
+    "message": "state repository root does not match resolved repository",
+    "old_root": "/home/ricardo/rick-intelligence",
+    "current_root": "/mnt/dados/projetos/repositorios-containers/rick-intelligence"
+  },
+  "confirmed_hermetic_probes": {
+    "AUD12-A01": "Revocation fake raises PostgresIdentityError: logout HTTP 200 signed_out; copied synthetic token still accepted HTTP 200",
+    "AUD12-A02": "First shutdown drained=False/timed_out=True/active=1; second drained=True/timed_out=False/active=1",
+    "AUD12-A03": "Claim paused; shutdown drained=True/active=0; releasing claim starts handler afterwards. ACK/publication not observed",
+    "AUD12-A04": "Always-reject limiter: two search requests HTTP 200, limiter calls zero",
+    "AUD12-A05": "In-memory limiter accepts and retains 1000 synthetic distinct keys"
+  },
+  "static_web_findings": ["AUD12-A07", "AUD12-A08", "AUD12-A09", "AUD12-A10"],
+  "promotion": "NO-GO",
+  "limitations": [
+    "Historical summary is not a new test run and not original raw logs",
+    "Five environment-related Python failures remain failures; no host permissions were changed",
+    "No real stores/provider/browser/load/restore/production authority was verified in this audit",
+    "Current implementation must generate its own preserved red/green logs in workspace paths"
+  ]
+}

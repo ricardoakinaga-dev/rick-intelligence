@@ -51,7 +51,7 @@ test("login explains organization access in Portuguese and preserves the tenant 
 
 test("canonical role labels and administration status are presentation-only", async ({ page }) => {
   await mockIdentity(page, manager);
-  await page.route("**/api/v1/admin/health", route => route.fulfill({ json: { status: "ready", checks: [{ name: "kernel", ok: true, detail: "Verificação concluída" }] } }));
+  await page.route("**/api/v1/admin/health", route => route.fulfill({ json: { status: "ready", checks: [{ name: "kernel", ok: true, required: true, detail: "Verificação concluída" }] } }));
   await page.route("**/api/v1/admin/audit", route => route.fulfill({ json: { total: 0, items: [] } }));
   await page.goto("/admin");
   await expect(page.locator(".breadcrumb")).toContainText("Administração");
@@ -116,6 +116,9 @@ test("chat failure keeps the question and offers contextual retry", async ({ pag
   page.on("pageerror", error => errors.push(error.message));
   let chatRequests = 0;
   await mockIdentity(page, manager);
+  // This synthetic identity has chat.query but not history.read. Do not race a
+  // real unauthenticated 401 against the mocked authenticated session.
+  await page.route("**/api/v1/conversations?**", route => route.fulfill({ status: 403, json: { error: { code: "forbidden", message: "Histórico não autorizado.", request_id: "copy-history-denied", details: null } } }));
   await page.route("**/api/v1/chat", route => {
     chatRequests += 1;
     return chatRequests === 1

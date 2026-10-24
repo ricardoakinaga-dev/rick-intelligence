@@ -16,6 +16,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 from core.errors import ApiError, envelope
+from core.rate_limit import server_rate_request_id
 from core.security import constant_time_compare
 from dependencies.services import get_providers
 from models import SessionSnapshot
@@ -93,7 +94,7 @@ async def chat_completions(payload: CompatRequest, request: Request):
     if not await _compat_rate_allowed(
         providers,
         presented_key,
-        request_id=getattr(request.state, "request_id", None),
+        request_id=server_rate_request_id(request),
     ):
         request_id = getattr(request.state, "request_id", "unknown")
         return JSONResponse(

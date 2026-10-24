@@ -30,8 +30,11 @@ def _client(**overrides) -> TestClient:
 class _ProductionIdentity:
     production_safe = True
 
+    def __init__(self):
+        self._tokens = {"cookie-token", "bearer-token"}
+
     def validate_token(self, token):
-        if token not in {"cookie-token", "bearer-token"}:
+        if token not in self._tokens:
             return SessionSnapshot(authenticated=False, session_state="anonymous")
         return SessionSnapshot(
             authenticated=True,
@@ -48,7 +51,8 @@ class _ProductionIdentity:
         )
 
     def logout(self, token):
-        return None
+        # The security fixture must model a revoking authority, not no-op logout.
+        self._tokens.discard(token)
 
 
 class _ProductionDependency:
@@ -346,7 +350,12 @@ def test_authenticated_snapshot_without_explicit_tenant_fails_closed():
 
     response = client.get("/api/v1/auth/me")
 
-    assert response.status_code == 401, response.text
+    # A malformed server-owned authenticated scope is unknown/provider fault,
+    # not confirmed unauthenticated state (which could trigger logout cleanup).
+    assert response.status_code == 503, response.text
+    assert response.json()["error"]["code"] == "provider_unavailable"
+    assert "set-cookie" not in response.headers
+    assert client.cookies.get(settings.session_cookie_name) == "malformed-token"
 
 
 def test_knowledge_service_rejects_a_legacy_unscoped_store_without_retrying() -> None:

@@ -6022,6 +6022,19 @@
             "maxLength": 128,
             "minLength": 1,
             "title": "Tenant Id"
+          },
+          "workspace_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workspace Id"
           }
         },
         "type": "object",

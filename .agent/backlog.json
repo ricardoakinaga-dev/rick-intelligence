@@ -1863,6 +1863,2621 @@
         "target": "apps/web/lib/api.ts",
         "completion_signal": "Malformed inputs and prior-client rollout pass independently reviewed actual-boundary checks"
       }
+    },
+    {
+      "id": "PROD12-001",
+      "title": "Preservar baseline e mapa de obrigações",
+      "stage": "BUILD",
+      "priority": "P0",
+      "status": "TODO",
+      "origin": "docs/backlog-producao-2026-10-12.md: baseline AUD12",
+      "dependencies": [],
+      "owner": "Proposed role / not assigned: Lead/QA",
+      "acceptance_summary": "toda origem tem tarefa/critério/owner e evidência; A01–A05 reproduzidos em harness isolado, A07–A10 tratados como estáticos até browser; resultado 7.713/6/221 preservado sem promoção. Nenhum encerramento automático de tarefa histórica. Hash do mapa/reproduções registrado.",
+      "evidence_refs": [],
+      "milestone": "M0",
+      "size": "M",
+      "mandatory": true,
+      "delivery_summary": "preservar relatório/probes/saídas da auditoria, hashes e os primeiros resultados falhos; materializar fixtures sintéticas e testes discriminantes em local aprovado. O [sumário da baseline](<reports/baseline-producao-2026-10-12.md>) não substitui logs/provas originais. Mapear achados, 26 dimensões e obrigações AUD07 à fila.",
+      "accepted": false,
+      "specification_ref": "docs/backlog-producao-2026-10-12.md",
+      "next_action": {
+        "id": "PROD12-001:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect the contracted boundary and prerequisite evidence; preparation is not acceptance",
+        "target": "docs/backlog-producao-2026-10-12.md",
+        "completion_signal": "Owner, authority and applicable dependencies are evidenced before task selection"
+      }
+    },
+    {
+      "id": "PROD12-002",
+      "title": "Recuperar plano de controle e adotar ownership único",
+      "stage": "BUILD",
+      "priority": "P0",
+      "status": "TODO",
+      "origin": "docs/backlog-producao-2026-10-12.md: A06; continuidade AUD07-43",
+      "dependencies": [
+        "PROD12-001"
+      ],
+      "owner": "Proposed role / not assigned: Lead/control plane",
+      "acceptance_summary": "caminho alternativo/clone limpo e retomada validam run/refs; candidato errado/run divergente continua rejeitado. `make control-inputs-check` e `make validate` passam quando os demais inputs aplicáveis estiverem íntegros. Histórico/assinaturas não reescritos; um owner de status. Não resolver A06 por simples busca/substituição de caminhos em ledgers.",
+      "evidence_refs": [],
+      "milestone": "M0",
+      "size": "M",
+      "mandatory": true,
+      "delivery_summary": "revisar [restaurador](<ci/restore_control_inputs.py>) e estado existente, recuperar/revincular run ao checkout por procedimento explícito, com backup e decisão; reconciliar convenções obsoletas de [planos do controlador](<../.agent/PLANS.md>) com a retirada dos legados. Adotar IDs/escopo/dependências propostos sem alterar o passado.",
+      "accepted": false,
+      "specification_ref": "docs/backlog-producao-2026-10-12.md",
+      "next_action": {
+        "id": "PROD12-002:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect the contracted boundary and prerequisite evidence; preparation is not acceptance",
+        "target": "docs/backlog-producao-2026-10-12.md",
+        "completion_signal": "Owner, authority and applicable dependencies are evidenced before task selection"
+      }
+    },
+    {
+      "id": "PROD12-003",
+      "title": "Obter executor compatível e diagnosticar cinco falhas ambientais",
+      "stage": "BUILD",
+      "priority": "P1",
+      "status": "TODO",
+      "origin": "docs/backlog-producao-2026-10-12.md: cinco falhas ambientais",
+      "dependencies": [
+        "PROD12-001"
+      ],
+      "owner": "Proposed role / not assigned: QA/plataforma",
+      "acceptance_summary": "reexecutar os cinco node IDs falhos da baseline em ambiente compatível e comprovar cenários positivos/negativos. Unsupported continua BLOCKED/NOT_RUN para esse gate, não PASS. Não chmod/chown de áreas do host ou privilégio extra sem autorização. Testes de segurança Linux têm evidência real, não só fixture simulada.",
+      "evidence_refs": [],
+      "milestone": "M0",
+      "size": "M",
+      "mandatory": true,
+      "delivery_summary": "declarar UID/GID, namespace, filesystem, sticky bit e capabilities exigidos pelos testes VPS; fornecer executor descartável compatível. Melhorar diagnóstico de precondições e de EINVAL quando necessário, sem relaxar guards de ownership/symlink/hardlink.",
+      "accepted": false,
+      "specification_ref": "docs/backlog-producao-2026-10-12.md",
+      "next_action": {
+        "id": "PROD12-003:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect the contracted boundary and prerequisite evidence; preparation is not acceptance",
+        "target": "docs/backlog-producao-2026-10-12.md",
+        "completion_signal": "Owner, authority and applicable dependencies are evidenced before task selection"
+      }
+    },
+    {
+      "id": "PROD12-004",
+      "title": "Ratificar perfil do lançamento e autoridades",
+      "stage": "BUILD",
+      "priority": "P0",
+      "status": "TODO",
+      "origin": "docs/backlog-producao-2026-10-12.md: decisões atuais e autoridade",
+      "dependencies": [
+        "PROD12-001"
+      ],
+      "owner": "Proposed role / not assigned: Produto/segurança/release",
+      "acceptance_summary": "identidade, provider/modelo de chat, embeddings/dimensão, cases, política clínica, topologia, corpus/direitos e D07 têm owner e limites atuais. OIDC não é obrigatório só porque AUD07-30 usou esse título: executar o contrato da identidade aprovada; se IdP escolhido, implementar/revisar composição real separadamente. Não habilitar OIDC apenas por URLs, diagnóstico/prescrição autônomos ou módulo pessoal sem aprovação. Perfil limitado não dispensa gates atuais.",
+      "evidence_refs": [],
+      "milestone": "M0",
+      "size": "M",
+      "mandatory": true,
+      "delivery_summary": "documento datado com produto, tenants/capacidade, funcionalidades obrigatórias, owners/authority, regiões/dados/retention e limites. Confirmar escolhas existentes: [contas internas postgres-local-v1 e providers](<operations/vps-github-images.md#L337-L342>), [D04 intake amplo com revisão humana](<architecture/domain-decision-policy-2026-09-24.md#L3-L29>). A escolha não prova runtime ou segurança clínica.",
+      "accepted": false,
+      "specification_ref": "docs/backlog-producao-2026-10-12.md",
+      "next_action": {
+        "id": "PROD12-004:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect the contracted boundary and prerequisite evidence; preparation is not acceptance",
+        "target": "docs/backlog-producao-2026-10-12.md",
+        "completion_signal": "Owner, authority and applicable dependencies are evidenced before task selection"
+      }
+    },
+    {
+      "id": "PROD12-005",
+      "title": "Congelar budgets, carga, avaliação e aborto",
+      "stage": "BUILD",
+      "priority": "P1",
+      "status": "TODO",
+      "origin": "docs/backlog-producao-2026-10-12.md: SLO, RPO/RTO, corpus, custos",
+      "dependencies": [
+        "PROD12-004"
+      ],
+      "owner": "Proposed role / not assigned: SRE/domínio/provider",
+      "acceptance_summary": "valores, owners, workload, janelas/amostras, incerteza, abort conditions e coleta definidos **antes** dos ensaios. Pontos iniciais ratificados ou proposta de alteração formalmente aprovada e rastreável. RPO/RTO/custo não definidos continuam bloqueadores. Não ajustar target após resultado ruim para obter aceite.",
+      "evidence_refs": [],
+      "milestone": "M0",
+      "size": "M",
+      "mandatory": true,
+      "delivery_summary": "aprovar SLO/SLI, quotas de busca/login/recovery/provider, máximo de custo/tokens/contexto, limites parser, retenção/memória, dataset/splits/adjudicação, capacidade, duração soak e RPO/RTO. Reusar [pontos iniciais de SLO](<operations/slo.md#L48-L56>) e [canary/rollback](<../infrastructure/docker/rollout-policy.json>); não inventar resultados ou baixar targets.",
+      "accepted": false,
+      "specification_ref": "docs/backlog-producao-2026-10-12.md",
+      "next_action": {
+        "id": "PROD12-005:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect the contracted boundary and prerequisite evidence; preparation is not acceptance",
+        "target": "docs/backlog-producao-2026-10-12.md",
+        "completion_signal": "Owner, authority and applicable dependencies are evidenced before task selection"
+      }
+    },
+    {
+      "id": "PROD12-006",
+      "title": "Autorizar e provisionar inputs externos",
+      "stage": "BUILD",
+      "priority": "P1",
+      "status": "TODO",
+      "origin": "docs/backlog-producao-2026-10-12.md: recursos/autorização externa",
+      "dependencies": [
+        "PROD12-004",
+        "PROD12-005"
+      ],
+      "owner": "Proposed role / not assigned: Operações/segurança",
+      "acceptance_summary": "recursos exclusivos identificados, operador nomeado, acesso mínimo, teardown/backup/aborto aprovados; segredos por referência ao secret manager, não no documento. Detectar ausência como BLOCKED_EXTERNAL. Não adotar um serviço existente do host como laboratório por conveniência.",
+      "evidence_refs": [],
+      "milestone": "M0",
+      "size": "M",
+      "mandatory": true,
+      "delivery_summary": "inventário seguro de daemon/projeto, namespaces/buckets/volumes, DNS/TLS, endpoints/roles, corpus sintético/autorizado, provider/account, registry/signer, reviewers e alert receiver; estimar custo/recursos. Separar autorizações lab, DDL, fault/restore, publication e produção.",
+      "accepted": false,
+      "specification_ref": "docs/backlog-producao-2026-10-12.md",
+      "next_action": {
+        "id": "PROD12-006:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect the contracted boundary and prerequisite evidence; preparation is not acceptance",
+        "target": "docs/backlog-producao-2026-10-12.md",
+        "completion_signal": "Owner, authority and applicable dependencies are evidenced before task selection"
+      }
+    },
+    {
+      "id": "PROD12-007",
+      "title": "Tornar logout honesto e revogação recuperável",
+      "stage": "BUILD",
+      "priority": "P0",
+      "status": "TODO",
+      "origin": "docs/backlog-producao-2026-10-12.md: AUD12-A01",
+      "dependencies": [
+        "PROD12-001"
+      ],
+      "owner": "Proposed role / not assigned: Identidade/API",
+      "acceptance_summary": "storage indisponível não produz sucesso falso nem detalhe sensível; sucesso invalida token, falha preserva estado não confirmado e permite retry seguro. Regressão HTTP com falha injetada rejeita baseline; depois verificar PG/revogação real em 035. Não confundir apagar cookie com invalidar bearer copiado.",
+      "evidence_refs": [],
+      "milestone": "M1",
+      "size": "M",
+      "mandatory": true,
+      "delivery_summary": "propagar erro tipado da revogação ao contrato HTTP, sem responder `signed_out` quando ela não foi confirmada; política de cookie/retry e auditoria de tentativa versus conclusão explícitas.",
+      "accepted": false,
+      "specification_ref": "docs/backlog-producao-2026-10-12.md",
+      "next_action": {
+        "id": "PROD12-007:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect the contracted boundary and prerequisite evidence; preparation is not acceptance",
+        "target": "docs/backlog-producao-2026-10-12.md",
+        "completion_signal": "Owner, authority and applicable dependencies are evidenced before task selection"
+      }
+    },
+    {
+      "id": "PROD12-008",
+      "title": "Corrigir drain no shutdown repetido",
+      "stage": "BUILD",
+      "priority": "P0",
+      "status": "TODO",
+      "origin": "docs/backlog-producao-2026-10-12.md: AUD12-A02",
+      "dependencies": [
+        "PROD12-001"
+      ],
+      "owner": "Proposed role / not assigned: Worker",
+      "acceptance_summary": "handler retido por Event: primeira e segunda chamadas com timeout mantêm indicação de trabalho não drenado; após término, relatório correto/idempotente. Timeout/deadline/cancel/logical_done e wait_for_idle exercitados sem sleeps frágeis. Regressão A02 falha antes/passa depois.",
+      "evidence_refs": [],
+      "milestone": "M1",
+      "size": "M",
+      "mandatory": true,
+      "delivery_summary": "separar admissão fechada de parada concluída e recalcular relatório para ativos ainda executando. Não declarar `drained=True` com `active>0`.",
+      "accepted": false,
+      "specification_ref": "docs/backlog-producao-2026-10-12.md",
+      "next_action": {
+        "id": "PROD12-008:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect the contracted boundary and prerequisite evidence; preparation is not acceptance",
+        "target": "docs/backlog-producao-2026-10-12.md",
+        "completion_signal": "Owner, authority and applicable dependencies are evidenced before task selection"
+      }
+    },
+    {
+      "id": "PROD12-009",
+      "title": "Coordenar shutdown com claims em voo",
+      "stage": "BUILD",
+      "priority": "P0",
+      "status": "TODO",
+      "origin": "docs/backlog-producao-2026-10-12.md: AUD12-A03",
+      "dependencies": [
+        "PROD12-008"
+      ],
+      "owner": "Proposed role / not assigned: Worker",
+      "acceptance_summary": "claim suspenso por Event e shutdown concorrente não iniciam handler depois do fechamento; não há lease órfã/ACK indevido, deadlock ou excedente de concorrência. Regressão A03 rejeita baseline; perda de lease, cancel e erro de claim incluídos. Mesmo owner de 008, não dois writers de runtime.",
+      "evidence_refs": [],
+      "milestone": "M1",
+      "size": "M",
+      "mandatory": true,
+      "delivery_summary": "contabilizar/invalidar claims pendentes e tornar admissão de handler atômica com fechamento; definir devolução/reconciliação de lease adquirida depois do stop.",
+      "accepted": false,
+      "specification_ref": "docs/backlog-producao-2026-10-12.md",
+      "next_action": {
+        "id": "PROD12-009:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect the contracted boundary and prerequisite evidence; preparation is not acceptance",
+        "target": "docs/backlog-producao-2026-10-12.md",
+        "completion_signal": "Owner, authority and applicable dependencies are evidenced before task selection"
+      }
+    },
+    {
+      "id": "PROD12-010",
+      "title": "Impedir teardown de dependências ainda em uso",
+      "stage": "BUILD",
+      "priority": "P0",
+      "status": "TODO",
+      "origin": "docs/backlog-producao-2026-10-12.md: A02/A03; teardown",
+      "dependencies": [
+        "PROD12-008",
+        "PROD12-009"
+      ],
+      "owner": "Proposed role / not assigned: Worker/plataforma",
+      "acceptance_summary": "recursos spies permanecem abertos durante ativo/claim/timeout; fechamento único após drain, shutdown repetido/cancel/SIGTERM simulado e closers com falha. Timeout é visível, nunca sucesso falso. SIGTERM/crash reais em 036.",
+      "evidence_refs": [],
+      "milestone": "M1",
+      "size": "M",
+      "mandatory": true,
+      "delivery_summary": "composição só fecha stores/provider quando parada realmente concluída; reports inconsistentes são rejeitados e closers falhos podem ser tentados novamente sem double-close.",
+      "accepted": false,
+      "specification_ref": "docs/backlog-producao-2026-10-12.md",
+      "next_action": {
+        "id": "PROD12-010:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect the contracted boundary and prerequisite evidence; preparation is not acceptance",
+        "target": "docs/backlog-producao-2026-10-12.md",
+        "completion_signal": "Owner, authority and applicable dependencies are evidenced before task selection"
+      }
+    },
+    {
+      "id": "PROD12-011",
+      "title": "Limitar busca e concorrência antes do retrieval",
+      "stage": "BUILD",
+      "priority": "P0",
+      "status": "TODO",
+      "origin": "docs/backlog-producao-2026-10-12.md: AUD12-A04",
+      "dependencies": [
+        "PROD12-001",
+        "PROD12-005"
+      ],
+      "owner": "Proposed role / not assigned: API/segurança",
+      "acceptance_summary": "limiter negativo → 429 e zero chamadas retrieval/provider; backend do limiter indisponível → falha segura definida, sem fallback local em produção. Positivos, Retry-After, escopo e limites em body/top_k preservados; concorrência/cancel/timeout testados. Política compartilhada comprovada em 031/035/046.",
+      "evidence_refs": [],
+      "milestone": "M1",
+      "size": "M",
+      "mandatory": true,
+      "delivery_summary": "aplicar quota/rate limit por ator/tenant e política de concorrência/custo ratificada em 005; requests caros não iniciam embedding/store após negação. Preservar autorização, erros e compatibilidade HTTP.",
+      "accepted": false,
+      "specification_ref": "docs/backlog-producao-2026-10-12.md",
+      "next_action": {
+        "id": "PROD12-011:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect the contracted boundary and prerequisite evidence; preparation is not acceptance",
+        "target": "docs/backlog-producao-2026-10-12.md",
+        "completion_signal": "Owner, authority and applicable dependencies are evidenced before task selection"
+      }
+    },
+    {
+      "id": "PROD12-012",
+      "title": "Bloquear spray com buckets independentes",
+      "stage": "BUILD",
+      "priority": "P1",
+      "status": "TODO",
+      "origin": "docs/backlog-producao-2026-10-12.md: AUD12-A05: spray",
+      "dependencies": [
+        "PROD12-007",
+        "PROD12-011"
+      ],
+      "owner": "Proposed role / not assigned: Identidade/segurança",
+      "acceptance_summary": "alternar emails no mesmo IP não contorna teto global aprovado; contas/tenants diferentes não compartilham bucket acidental; forwarded spoof ignorado sem proxy autorizado; paralelo/TTL/Redis unavailable fail-closed. Fake/distribuído separados; não afirmar proteção multi-replica pelo teste local.",
+      "evidence_refs": [],
+      "milestone": "M1",
+      "size": "M",
+      "mandatory": true,
+      "delivery_summary": "IP/rede confiável, conta e tenant têm proteções independentes conforme threat model, sem armazenar PII crua em labels/chaves; preservar neutralidade de recuperação e minimizar risco de lockout induzido.",
+      "accepted": false,
+      "specification_ref": "docs/backlog-producao-2026-10-12.md",
+      "next_action": {
+        "id": "PROD12-012:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect the contracted boundary and prerequisite evidence; preparation is not acceptance",
+        "target": "docs/backlog-producao-2026-10-12.md",
+        "completion_signal": "Owner, authority and applicable dependencies are evidenced before task selection"
+      }
+    },
+    {
+      "id": "PROD12-013",
+      "title": "Limitar cardinalidade do limiter local",
+      "stage": "BUILD",
+      "priority": "P1",
+      "status": "TODO",
+      "origin": "docs/backlog-producao-2026-10-12.md: AUD12-A05: memória",
+      "dependencies": [
+        "PROD12-012"
+      ],
+      "owner": "Proposed role / not assigned: API/segurança",
+      "acceptance_summary": "carga de chaves arbitrárias não supera orçamento de memória/cardinalidade de 005; chaves expiradas removidas mesmo sem revisita; threads e capacidade/overflow testados. Nenhum bypass ao atingir limite; produção continua recusando limiter local.",
+      "evidence_refs": [],
+      "milestone": "M1",
+      "size": "P",
+      "mandatory": true,
+      "delivery_summary": "bound de chaves/eventos, expiry global e comportamento de capacidade definido, com relógio injetável e contenção segura.",
+      "accepted": false,
+      "specification_ref": "docs/backlog-producao-2026-10-12.md",
+      "next_action": {
+        "id": "PROD12-013:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect the contracted boundary and prerequisite evidence; preparation is not acceptance",
+        "target": "docs/backlog-producao-2026-10-12.md",
+        "completion_signal": "Owner, authority and applicable dependencies are evidenced before task selection"
+      }
+    },
+    {
+      "id": "PROD12-014",
+      "title": "Verificar e endurecer contrato CSRF/origin",
+      "stage": "BUILD",
+      "priority": "P1",
+      "status": "TODO",
+      "origin": "docs/backlog-producao-2026-10-12.md: CSRF condicional/A12",
+      "dependencies": [
+        "PROD12-004",
+        "PROD12-007"
+      ],
+      "owner": "Proposed role / not assigned: Segurança/browser",
+      "acceptance_summary": "cookie/bearer precedence, origem autorizada/negada, nonce inválido/expirado/injetado, login/logout/reset e proxy cobertos. Se hipótese não reproduzida, registrar limites e parecer independente, não alegar exploit nem fake fix. Double-submit/configured token/origin condizem com documentação; sem reduzir restrições existentes.",
+      "evidence_refs": [],
+      "milestone": "M1",
+      "size": "M",
+      "mandatory": true,
+      "delivery_summary": "reproduzir condições de cookie injection/subdomínio/CORS de forma isolada; documentar ameaça e política real. Se risco confirmado/aplicável, implementar defesa revisada (por exemplo vínculo verificável do nonce/origin), não presumir arquitetura sem teste.",
+      "accepted": false,
+      "specification_ref": "docs/backlog-producao-2026-10-12.md",
+      "next_action": {
+        "id": "PROD12-014:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect the contracted boundary and prerequisite evidence; preparation is not acceptance",
+        "target": "docs/backlog-producao-2026-10-12.md",
+        "completion_signal": "Owner, authority and applicable dependencies are evidenced before task selection"
+      }
+    },
+    {
+      "id": "PROD12-015",
+      "title": "Classificar snapshots e limpar inventário ativo",
+      "stage": "BUILD",
+      "priority": "P0",
+      "status": "TODO",
+      "origin": "docs/backlog-producao-2026-10-12.md: AUD12-A13",
+      "dependencies": [
+        "PROD12-001",
+        "PROD12-004"
+      ],
+      "owner": "Proposed role / not assigned: Evidência/supply chain",
+      "acceptance_summary": "[teste de inventário](<../scripts/state_of_art/tests/test_frontend_supply_runtime.py#L208-L214>) passa em clone e checkout atual; snapshot recuperável por manifest/hash; componente novo não classificado, manifesto/lock ausente e segredo real continuam falhando. Zero apagamento de evidência/dados sem aprovação. A13 isolado e suíte global reexecutados.",
+      "evidence_refs": [],
+      "milestone": "M2",
+      "size": "M",
+      "mandatory": true,
+      "delivery_summary": "aprovar destino/provenance dos 36 arquivos do snapshot runtime; preservar hashes/recuperabilidade fora do inventário de componentes ativos. Alinhar scanner/locks/SBOM/licenses por política explícita, não ampliar inventário para fingir que cópia histórica é app ativo.",
+      "accepted": false,
+      "specification_ref": "docs/backlog-producao-2026-10-12.md",
+      "next_action": {
+        "id": "PROD12-015:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect the contracted boundary and prerequisite evidence; preparation is not acceptance",
+        "target": "docs/backlog-producao-2026-10-12.md",
+        "completion_signal": "Owner, authority and applicable dependencies are evidenced before task selection"
+      }
+    },
+    {
+      "id": "PROD12-016",
+      "title": "Bootstrap/toolchain e CI locais reproduzíveis",
+      "stage": "BUILD",
+      "priority": "P1",
+      "status": "TODO",
+      "origin": "docs/backlog-producao-2026-10-12.md: A12; bootstrap",
+      "dependencies": [
+        "PROD12-002",
+        "PROD12-003",
+        "PROD12-015"
+      ],
+      "owner": "Proposed role / not assigned: Plataforma/CI",
+      "acceptance_summary": "clone limpo em caminho diferente instala e roda gates sem dependências do host/PYTHONPATH manual; versão errada falha com diagnóstico. CI local não cresce lixo versionável. [Toolchain](<../toolchain.json>) preservada até decisão formal de alteração. Não reabrir automaticamente retirada legada/namespace/fixtures AUD07 concluídas.",
+      "evidence_refs": [],
+      "milestone": "M2",
+      "size": "M",
+      "mandatory": true,
+      "delivery_summary": "instalação exclusiva de locks/hashes na toolchain declarada; detectar runtime efetivo Python/Node/npm e drift. Preservar pinagem de Actions e separação local/runtime/release; corrigir somente defeitos atuais demonstrados.",
+      "accepted": false,
+      "specification_ref": "docs/backlog-producao-2026-10-12.md",
+      "next_action": {
+        "id": "PROD12-016:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect the contracted boundary and prerequisite evidence; preparation is not acceptance",
+        "target": "docs/backlog-producao-2026-10-12.md",
+        "completion_signal": "Owner, authority and applicable dependencies are evidenced before task selection"
+      }
+    },
+    {
+      "id": "PROD12-017",
+      "title": "Expandir tipos nos caminhos de maior risco",
+      "stage": "BUILD",
+      "priority": "P1",
+      "status": "TODO",
+      "origin": "docs/backlog-producao-2026-10-12.md: AUD12-A11: tipos",
+      "dependencies": [
+        "PROD12-007",
+        "PROD12-008",
+        "PROD12-009",
+        "PROD12-010",
+        "PROD12-011",
+        "PROD12-012",
+        "PROD12-013",
+        "PROD12-014",
+        "PROD12-016"
+      ],
+      "owner": "Proposed role / not assigned: API/worker/qualidade",
+      "acceptance_summary": "13 arquivos atuais continuam zero erros; novos caminhos críticos têm gate executável e teste negativo que insere erro conhecido. Novos erros bloqueiam; erros herdados inventariados por responsável/risco, sem excluir silenciosamente módulos. TypeScript continua aprovado. Cada expansão é uma subtarefa revisável, não migração massiva.",
+      "evidence_refs": [],
+      "milestone": "M2",
+      "size": "G",
+      "mandatory": true,
+      "delivery_summary": "ampliar mypy de contratos/autorização para seams de auth/identity/rate limit, worker/composição, jobs e adapters críticos; inventário de escopo e baseline explícitos. Tipar inputs/erros/relatórios novos sem blanket Any/ignore.",
+      "accepted": false,
+      "specification_ref": "docs/backlog-producao-2026-10-12.md",
+      "next_action": {
+        "id": "PROD12-017:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect the contracted boundary and prerequisite evidence; preparation is not acceptance",
+        "target": "docs/backlog-producao-2026-10-12.md",
+        "completion_signal": "Owner, authority and applicable dependencies are evidenced before task selection"
+      }
+    },
+    {
+      "id": "PROD12-018",
+      "title": "Ampliar cobertura e regressões discriminantes",
+      "stage": "BUILD",
+      "priority": "P1",
+      "status": "TODO",
+      "origin": "docs/backlog-producao-2026-10-12.md: AUD12-A11: cobertura",
+      "dependencies": [
+        "PROD12-017",
+        "PROD12-021",
+        "PROD12-022",
+        "PROD12-023",
+        "PROD12-024",
+        "PROD12-025"
+      ],
+      "owner": "Proposed role / not assigned: QA/API/web",
+      "acceptance_summary": "preservar floors atuais API 75%, worker 74%, web 85% e testes existentes; expansão do denominador tem plano/floor explícito antes da medição, sem baixar gate antigo. A01–A10 têm regressões pertinentes e bugs de estado/concorrência são detectados; testes não só toast/resultado positivo. Pacotes compartilhados recebem coverage própria, não entram magicamente no denominador API. Branches críticos não testados geram tarefa/risco visível.",
+      "evidence_refs": [],
+      "milestone": "M2",
+      "size": "G",
+      "mandatory": true,
+      "delivery_summary": "cobrir wrapper HTTP, chat/paginação, documentos/retry, search/admin/collections/casos e ramos Python de falha/concorrência; registrar total elegível, incluído, excluído e branches. Reusar [sumário existente](<reports/coverage-2026-10-09.md>) sem anunciar subset como todo app.",
+      "accepted": false,
+      "specification_ref": "docs/backlog-producao-2026-10-12.md",
+      "next_action": {
+        "id": "PROD12-018:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect the contracted boundary and prerequisite evidence; preparation is not acceptance",
+        "target": "docs/backlog-producao-2026-10-12.md",
+        "completion_signal": "Owner, authority and applicable dependencies are evidenced before task selection"
+      }
+    },
+    {
+      "id": "PROD12-019",
+      "title": "Reduzir concentração de módulos por seams (advisory)",
+      "stage": "BUILD",
+      "priority": "P2",
+      "status": "TODO",
+      "origin": "docs/backlog-producao-2026-10-12.md: A11: concentração de módulos",
+      "dependencies": [
+        "PROD12-017",
+        "PROD12-018"
+      ],
+      "owner": "Proposed role / not assigned: Arquitetura/domínios",
+      "acceptance_summary": "contrato/diferencial/regressões preservados, ownership claro, redução de acoplamento demonstrada e nenhuma nova política duplicada. Não exigir número mágico de linhas. Pode continuar após primeira produção: se uma extração for necessária à correção/segurança, sua parte passa ao item obrigatório correspondente com decisão explícita, não como waiver de risco.",
+      "evidence_refs": [],
+      "milestone": "M2",
+      "size": "G",
+      "mandatory": false,
+      "delivery_summary": "após fixes/contratos, refatorações pequenas de ingestion_service/runtime/postgres_jobs/provider/Qdrant por fronteira testável, sem alterar comportamento para reduzir linhas.",
+      "accepted": false,
+      "specification_ref": "docs/backlog-producao-2026-10-12.md",
+      "next_action": {
+        "id": "PROD12-019:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect the contracted boundary and prerequisite evidence; preparation is not acceptance",
+        "target": "docs/backlog-producao-2026-10-12.md",
+        "completion_signal": "Owner, authority and applicable dependencies are evidenced before task selection"
+      }
+    },
+    {
+      "id": "PROD12-020",
+      "title": "Atualizar documentação e contratos observáveis",
+      "stage": "BUILD",
+      "priority": "P2",
+      "status": "TODO",
+      "origin": "docs/backlog-producao-2026-10-12.md: AUD12-A12",
+      "dependencies": [
+        "PROD12-014",
+        "PROD12-016",
+        "PROD12-021",
+        "PROD12-022",
+        "PROD12-023",
+        "PROD12-024",
+        "PROD12-025"
+      ],
+      "owner": "Proposed role / not assigned: Documentação/Lead",
+      "acceptance_summary": "checker de links sem erros; exemplos confrontados com código/contratos; README não promete produção/AAA; nenhum plano antigo vira autoridade concorrente. Revisão de conteúdo, não apenas links. Backlog/roadmap/controlador apontam para owners e aceites corretos.",
+      "evidence_refs": [],
+      "milestone": "M2",
+      "size": "M",
+      "mandatory": true,
+      "delivery_summary": "corrigir CSRF, histórico/streaming já entregues, provider/identidade/D04 e localidades dos testes; garantir índice, comandos, autoria de estados e limites de runtime coerentes. Atualizar docs por decisão, preservar snapshots históricos.",
+      "accepted": false,
+      "specification_ref": "docs/backlog-producao-2026-10-12.md",
+      "next_action": {
+        "id": "PROD12-020:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect the contracted boundary and prerequisite evidence; preparation is not acceptance",
+        "target": "docs/backlog-producao-2026-10-12.md",
+        "completion_signal": "Owner, authority and applicable dependencies are evidenced before task selection"
+      }
+    },
+    {
+      "id": "PROD12-021",
+      "title": "Vincular rascunhos ao caso correto",
+      "stage": "BUILD",
+      "priority": "P1",
+      "status": "TODO",
+      "origin": "docs/backlog-producao-2026-10-12.md: AUD12-A07",
+      "dependencies": [
+        "PROD12-001",
+        "PROD12-004"
+      ],
+      "owner": "Proposed role / not assigned: Web/casos",
+      "acceptance_summary": "nota/decisão/feedback de A nunca enviados em B; troca/reload/unmount/resposta tardia/tenant/permissão testados em unit e browser com feature habilitada. Feature desativada não escreve dados. Backend continua autoritativo; não gerar recomendação clínica autônoma.",
+      "evidence_refs": [],
+      "milestone": "M2",
+      "size": "M",
+      "mandatory": true,
+      "delivery_summary": "reproduzir A→B e decidir UX: rascunho por case_id ou limpar/confirmar ao trocar; cancelar/invalidar respostas antigas e estado de outra sessão.",
+      "accepted": false,
+      "specification_ref": "docs/backlog-producao-2026-10-12.md",
+      "next_action": {
+        "id": "PROD12-021:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect the contracted boundary and prerequisite evidence; preparation is not acceptance",
+        "target": "docs/backlog-producao-2026-10-12.md",
+        "completion_signal": "Owner, authority and applicable dependencies are evidenced before task selection"
+      }
+    },
+    {
+      "id": "PROD12-022",
+      "title": "Paginar conversas e turnos ponta a ponta",
+      "stage": "BUILD",
+      "priority": "P1",
+      "status": "TODO",
+      "origin": "docs/backlog-producao-2026-10-12.md: AUD12-A08",
+      "dependencies": [
+        "PROD12-001"
+      ],
+      "owner": "Proposed role / not assigned: Web/chat/API",
+      "acceptance_summary": "≥51 conversas e ≥101 turnos acessíveis após reload/load-more; cursor inválido, página vazia, filtros, deep-link, falha intermediária, troca de escopo e respostas fora de ordem cobertos. Sem duplicação/inversão/perda visual silenciosa; servidor não amplia escopo pelo cursor.",
+      "evidence_refs": [],
+      "milestone": "M2",
+      "size": "M",
+      "mandatory": true,
+      "delivery_summary": "expor cursor no [cliente HTTP](<../apps/web/lib/api.ts>) e [adapter](<../apps/web/components/chat/chat-adapter.ts>), consumir páginas no workspace com ordenação/dedup/abort e indicação de carregamento/truncamento.",
+      "accepted": false,
+      "specification_ref": "docs/backlog-producao-2026-10-12.md",
+      "next_action": {
+        "id": "PROD12-022:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect the contracted boundary and prerequisite evidence; preparation is not acceptance",
+        "target": "docs/backlog-producao-2026-10-12.md",
+        "completion_signal": "Owner, authority and applicable dependencies are evidenced before task selection"
+      }
+    },
+    {
+      "id": "PROD12-023",
+      "title": "Exibir autorização e confiança verdadeiras",
+      "stage": "BUILD",
+      "priority": "P1",
+      "status": "TODO",
+      "origin": "docs/backlog-producao-2026-10-12.md: AUD12-A09",
+      "dependencies": [
+        "PROD12-022"
+      ],
+      "owner": "Proposed role / not assigned: Web/chat",
+      "acceptance_summary": "acesso direto sem chat.query, 403 da API, falha/offline e mudança de grant mostram estado neutro/negado correto; nenhuma afirmação falsa de corpus autorizado. Positivo mantém legibilidade/foco; UI não substitui ACL backend.",
+      "evidence_refs": [],
+      "milestone": "M2",
+      "size": "P",
+      "mandatory": true,
+      "delivery_summary": "selo/sugestões/composer dependem de confirmação de escopo/permissão, não apenas existência de sessão; 403/revogação eliminam sucesso e conteúdo pendente.",
+      "accepted": false,
+      "specification_ref": "docs/backlog-producao-2026-10-12.md",
+      "next_action": {
+        "id": "PROD12-023:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect the contracted boundary and prerequisite evidence; preparation is not acceptance",
+        "target": "docs/backlog-producao-2026-10-12.md",
+        "completion_signal": "Owner, authority and applicable dependencies are evidenced before task selection"
+      }
+    },
+    {
+      "id": "PROD12-024",
+      "title": "Atualizar catálogo depois de retry publicado",
+      "stage": "BUILD",
+      "priority": "P1",
+      "status": "TODO",
+      "origin": "docs/backlog-producao-2026-10-12.md: AUD12-A10",
+      "dependencies": [
+        "PROD12-001"
+      ],
+      "owner": "Proposed role / not assigned: Web/documentos",
+      "acceptance_summary": "retry publicado mostra documento real no catálogo, não só mensagem; pending/failed/cancelled não mostram publicação; mudança de sessão, unmount e requests antigos não sobrescrevem catálogo atual. Teste browser confirma estado e requisições.",
+      "evidence_refs": [],
+      "milestone": "M2",
+      "size": "P",
+      "mandatory": true,
+      "delivery_summary": "tratar publicação de upload/reindex/retry pelo mesmo contrato de refresh sem misturar collection/workspace de operações antigas.",
+      "accepted": false,
+      "specification_ref": "docs/backlog-producao-2026-10-12.md",
+      "next_action": {
+        "id": "PROD12-024:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect the contracted boundary and prerequisite evidence; preparation is not acceptance",
+        "target": "docs/backlog-producao-2026-10-12.md",
+        "completion_signal": "Owner, authority and applicable dependencies are evidenced before task selection"
+      }
+    },
+    {
+      "id": "PROD12-025",
+      "title": "Resolver focos e validar acessibilidade local",
+      "stage": "BUILD",
+      "priority": "P1",
+      "status": "TODO",
+      "origin": "docs/backlog-producao-2026-10-12.md: foco/resize e matriz visual",
+      "dependencies": [
+        "PROD12-021",
+        "PROD12-022",
+        "PROD12-023",
+        "PROD12-024"
+      ],
+      "owner": "Proposed role / not assigned: Web/acessibilidade",
+      "acceptance_summary": "375/768/1440 px, largura estreita/zoom e navegação completa de teclado sem foco preso/oculto; resize/open/close/focus return testados. Axe sem violações relevantes nas superfícies obrigatórias e smoke manual com tecnologia assistiva. Hipótese não confirmada documentada; evidência visual nativa preservada. Prova contra API real em 041.",
+      "evidence_refs": [],
+      "milestone": "M2",
+      "size": "M",
+      "mandatory": true,
+      "delivery_summary": "reproduzir drawer mobile→desktop e fechar/inativar trap conforme viewport; revisar foco/modal/teclado/leitores/labels/contraste/reduced-motion nas rotas corrigidas.",
+      "accepted": false,
+      "specification_ref": "docs/backlog-producao-2026-10-12.md",
+      "next_action": {
+        "id": "PROD12-025:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect the contracted boundary and prerequisite evidence; preparation is not acceptance",
+        "target": "docs/backlog-producao-2026-10-12.md",
+        "completion_signal": "Owner, authority and applicable dependencies are evidenced before task selection"
+      }
+    },
+    {
+      "id": "PROD12-026",
+      "title": "Integrar e congelar candidato local",
+      "stage": "BUILD",
+      "priority": "P0",
+      "status": "TODO",
+      "origin": "docs/backlog-producao-2026-10-12.md: AUD07-27; candidato local",
+      "dependencies": [
+        "PROD12-002",
+        "PROD12-003",
+        "PROD12-007",
+        "PROD12-008",
+        "PROD12-009",
+        "PROD12-010",
+        "PROD12-011",
+        "PROD12-012",
+        "PROD12-013",
+        "PROD12-014",
+        "PROD12-015",
+        "PROD12-016",
+        "PROD12-017",
+        "PROD12-018",
+        "PROD12-020",
+        "PROD12-021",
+        "PROD12-022",
+        "PROD12-023",
+        "PROD12-024",
+        "PROD12-025"
+      ],
+      "owner": "Proposed role / not assigned: Integrador/QA/reviewer",
+      "acceptance_summary": "`make ci`, `make api-test api-contract api-security api14-acl api16-full`, `make compose-static ops-static eval-retrieval-pack security-adversarial storage-test web-validate` e suíte ampliada passam para o escopo local obrigatório na toolchain/FS compatíveis. As seis falhas originais têm resultados novos/causas, não somem; 221 skips reclassificados por gate, não contados como runtime. Nenhum P0/local obrigatório aberto. AUD07-27 continua com transição explícita, não aprovação por este documento. Review crítica P0/segurança/dados/web e fonte/diff/hash archivados.",
+      "evidence_refs": [],
+      "milestone": "M2",
+      "size": "G",
+      "mandatory": true,
+      "delivery_summary": "incorporar itens obrigatórios locais, executar matriz completa num SHA limpo com revisão separada; mapear todos os skips externos e warnings com owner/next gate.",
+      "accepted": false,
+      "specification_ref": "docs/backlog-producao-2026-10-12.md",
+      "next_action": {
+        "id": "PROD12-026:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect the contracted boundary and prerequisite evidence; preparation is not acceptance",
+        "target": "docs/backlog-producao-2026-10-12.md",
+        "completion_signal": "Owner, authority and applicable dependencies are evidenced before task selection"
+      }
+    },
+    {
+      "id": "PROD12-027",
+      "title": "Preparar topologia e hardening de staging/produção",
+      "stage": "BUILD",
+      "priority": "P1",
+      "status": "TODO",
+      "origin": "docs/backlog-producao-2026-10-12.md: topologia production-shaped",
+      "dependencies": [
+        "PROD12-004",
+        "PROD12-005",
+        "PROD12-006",
+        "PROD12-026"
+      ],
+      "owner": "Proposed role / not assigned: SRE/segurança/DBA",
+      "acceptance_summary": "stores/console não públicos, TLS verificado sem bypass, aplicações não-root, credenciais bootstrap/DDL não no runtime, canais e backups segregados. Install/validate/preflight oficiais revisados com ownership. Same-origin e destino API do build web corretos. Single VPS não declarado HA; risco/capacidade avaliados e aceitos quando permitido pelos gates.",
+      "evidence_refs": [],
+      "milestone": "M3",
+      "size": "G",
+      "mandatory": true,
+      "delivery_summary": "ratificar VPS/topologia/HA conforme perfil, DNS/TLS, firewall/network/egress, least privilege, volumes persistentes/quotas, secret manager/rotation, cookies/origins/proxies. Separar roles bootstrap, aplicação, readonly e migration; source/installer protegidos quando privilégio obrigatório.",
+      "accepted": false,
+      "specification_ref": "docs/backlog-producao-2026-10-12.md",
+      "next_action": {
+        "id": "PROD12-027:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect the contracted boundary and prerequisite evidence; preparation is not acceptance",
+        "target": "docs/backlog-producao-2026-10-12.md",
+        "completion_signal": "Owner, authority and applicable dependencies are evidenced before task selection"
+      }
+    },
+    {
+      "id": "PROD12-028",
+      "title": "Construir e verificar imagens imutáveis",
+      "stage": "BUILD",
+      "priority": "P0",
+      "status": "TODO",
+      "origin": "docs/backlog-producao-2026-10-12.md: AUD07-39",
+      "dependencies": [
+        "PROD12-016",
+        "PROD12-026",
+        "PROD12-027"
+      ],
+      "owner": "Proposed role / not assigned: Release/supply chain",
+      "acceptance_summary": "código/testes/build/scans correspondem aos digests usados no staging; **zero HIGH/CRITICAL inclusive unfixed**, conforme rollout vigente; imagem não-root e conteúdo/labels comprovados. Assinaturas e origem verificadas, não só tag. Aplicar scanners atuais; PASS antigo de dependência não vale para novo candidato. Reconstruir exige revalidar digests/provas afetadas.",
+      "evidence_refs": [],
+      "milestone": "M3",
+      "size": "G",
+      "mandatory": true,
+      "delivery_summary": "CI clean-SHA produz API/worker/web, digests, SBOM, provenance, scans/licenças/segredos e assinaturas verificáveis; registry retenção e trust chain revisados. Publicar somente com autorização.",
+      "accepted": false,
+      "specification_ref": "docs/backlog-producao-2026-10-12.md",
+      "next_action": {
+        "id": "PROD12-028:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect the contracted boundary and prerequisite evidence; preparation is not acceptance",
+        "target": "docs/backlog-producao-2026-10-12.md",
+        "completion_signal": "Owner, authority and applicable dependencies are evidenced before task selection"
+      }
+    },
+    {
+      "id": "PROD12-029",
+      "title": "Subir lab production-shaped e atestar readiness",
+      "stage": "BUILD",
+      "priority": "P0",
+      "status": "TODO",
+      "origin": "docs/backlog-producao-2026-10-12.md: lab/readiness/autorização",
+      "dependencies": [
+        "PROD12-006",
+        "PROD12-027",
+        "PROD12-028"
+      ],
+      "owner": "Proposed role / not assigned: SRE/runtime",
+      "acceptance_summary": "11 serviços canônicos saudáveis, API/Web probes reais; run/commit/tree/fingerprint/config hash/ownership/expiry vinculados. Ausência/queda/stale preflight recusados. Teardown prova zero recursos descartáveis órfãos e preserva volumes não pertencentes ao lab. Lab loopback prova integração, não substitui autoridade production-runtime de ambiente production-shaped aprovado.",
+      "evidence_refs": [],
+      "milestone": "M3",
+      "size": "G",
+      "mandatory": true,
+      "delivery_summary": "inicializar projeto isolado aprovado, bootstrap/migrations e API/web/worker A/B/stores/OTel com probes e shutdown bounded. Gerar preflight por produtor autorizado, não pelo próprio gate consumidor.",
+      "accepted": false,
+      "specification_ref": "docs/backlog-producao-2026-10-12.md",
+      "next_action": {
+        "id": "PROD12-029:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect the contracted boundary and prerequisite evidence; preparation is not acceptance",
+        "target": "docs/backlog-producao-2026-10-12.md",
+        "completion_signal": "Owner, authority and applicable dependencies are evidenced before task selection"
+      }
+    },
+    {
+      "id": "PROD12-030",
+      "title": "Aplicar migrations e provar integridade PostgreSQL",
+      "stage": "BUILD",
+      "priority": "P0",
+      "status": "TODO",
+      "origin": "docs/backlog-producao-2026-10-12.md: migrations/PostgreSQL",
+      "dependencies": [
+        "PROD12-029"
+      ],
+      "owner": "Proposed role / not assigned: DBA/worker",
+      "acceptance_summary": "migrations/preflight reais, constraints cross-tenant/workspace/collection negativas, rollback transacional/ownership/queue/outbox/history e reapply idempotente. Não presumir seis migrations de documento histórico. `make ops-scope-preflight`, `make phase3-postgres-runtime` com inputs válidos e relatório; nenhuma reparação automática de dados incompatíveis.",
+      "evidence_refs": [],
+      "milestone": "M3",
+      "size": "G",
+      "mandatory": true,
+      "delivery_summary": "inventariar migrations atuais, scope preflight, locks/checksums/history, empty/prior/current data e política roll-forward. Aplicar DDL só no banco aprovado; reconciliar conflitos explicitamente.",
+      "accepted": false,
+      "specification_ref": "docs/backlog-producao-2026-10-12.md",
+      "next_action": {
+        "id": "PROD12-030:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect the contracted boundary and prerequisite evidence; preparation is not acceptance",
+        "target": "docs/backlog-producao-2026-10-12.md",
+        "completion_signal": "Owner, authority and applicable dependencies are evidenced before task selection"
+      }
+    },
+    {
+      "id": "PROD12-031",
+      "title": "Provar Redis e buckets entre réplicas",
+      "stage": "BUILD",
+      "priority": "P1",
+      "status": "TODO",
+      "origin": "docs/backlog-producao-2026-10-12.md: Redis e API A/B",
+      "dependencies": [
+        "PROD12-012",
+        "PROD12-029"
+      ],
+      "owner": "Proposed role / not assigned: SRE/segurança",
+      "acceptance_summary": "`make phase3-redis-runtime phase3-redis-multi-replica-runtime` com observações reais; troca de API não reinicia quota de search/login/recovery; outages/timeouts/expiração/renovação/stale owner não abrem acesso. Sem leak de chaves/PII e memória bounded. Requisitos de replicação equivalentes ao perfil, sem alegar HA não provada.",
+      "evidence_refs": [],
+      "milestone": "M3",
+      "size": "G",
+      "mandatory": true,
+      "delivery_summary": "Redis auth/TLS/TTL/namespace, leases/reconnect/failover e duas APIs no mesmo backend de limites; zero process-local fallback.",
+      "accepted": false,
+      "specification_ref": "docs/backlog-producao-2026-10-12.md",
+      "next_action": {
+        "id": "PROD12-031:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect the contracted boundary and prerequisite evidence; preparation is not acceptance",
+        "target": "docs/backlog-producao-2026-10-12.md",
+        "completion_signal": "Owner, authority and applicable dependencies are evidenced before task selection"
+      }
+    },
+    {
+      "id": "PROD12-032",
+      "title": "Provar lifecycle S3/Qdrant",
+      "stage": "BUILD",
+      "priority": "P1",
+      "status": "TODO",
+      "origin": "docs/backlog-producao-2026-10-12.md: S3/Qdrant reais",
+      "dependencies": [
+        "PROD12-029",
+        "PROD12-030"
+      ],
+      "owner": "Proposed role / not assigned: Storage/retrieval",
+      "acceptance_summary": "`make phase3-object-qdrant-runtime`, wrong scope/checksum/version/object negativos, partial failure/restart/reconcile sem leak/órfão consultável. Retenção/delete/restore coerentes com dados autorizados e metadados, checksum e proveniência. Embedding dimension aprovada compatível com coleção.",
+      "evidence_refs": [],
+      "milestone": "M3",
+      "size": "G",
+      "mandatory": true,
+      "delivery_summary": "PUT/HEAD/GET/DELETE/checksum/length/version/retention scoped no object store; schema/dimensão/filtros/coleção/alias/rebuild/delete/restore no Qdrant. Autoridade continua em fonte durável, não no vetor.",
+      "accepted": false,
+      "specification_ref": "docs/backlog-producao-2026-10-12.md",
+      "next_action": {
+        "id": "PROD12-032:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect the contracted boundary and prerequisite evidence; preparation is not acceptance",
+        "target": "docs/backlog-producao-2026-10-12.md",
+        "completion_signal": "Owner, authority and applicable dependencies are evidenced before task selection"
+      }
+    },
+    {
+      "id": "PROD12-033",
+      "title": "Validar provider e embeddings reais com orçamento",
+      "stage": "BUILD",
+      "priority": "P1",
+      "status": "TODO",
+      "origin": "docs/backlog-producao-2026-10-12.md: provider/embeddings",
+      "dependencies": [
+        "PROD12-004",
+        "PROD12-005",
+        "PROD12-006",
+        "PROD12-029"
+      ],
+      "owner": "Proposed role / not assigned: Provider/RAG",
+      "acceptance_summary": "`make phase3-provider-runtime` contra serviço autorizado, modelos/dimensão/capabilities compatíveis; 429/500/timeout/truncamento/refusal/cancel não produzem conclusão aprovada falsa; limites de tokens/tempo/saída/custo observados. Nenhum dado fora do corpus permitido enviado, nenhuma cobrança fora do teto. Stub não prova provider real.",
+      "evidence_refs": [],
+      "milestone": "M4",
+      "size": "G",
+      "mandatory": true,
+      "delivery_summary": "fechar lacunas do adapter selecionado e exercitar chat nativo OpenAI ou Anthropic, embeddings OpenAI independentes, SSE/cancel/tool/JSON/errors/circuit/deadline/retry e quotas aprovadas. Outro endpoint exige composição revisada.",
+      "accepted": false,
+      "specification_ref": "docs/backlog-producao-2026-10-12.md",
+      "next_action": {
+        "id": "PROD12-033:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect the contracted boundary and prerequisite evidence; preparation is not acceptance",
+        "target": "docs/backlog-producao-2026-10-12.md",
+        "completion_signal": "Owner, authority and applicable dependencies are evidenced before task selection"
+      }
+    },
+    {
+      "id": "PROD12-034",
+      "title": "Golden path durável com recuperação",
+      "stage": "BUILD",
+      "priority": "P0",
+      "status": "TODO",
+      "origin": "docs/backlog-producao-2026-10-12.md: AUD07-28",
+      "dependencies": [
+        "PROD12-030",
+        "PROD12-031",
+        "PROD12-032",
+        "PROD12-033"
+      ],
+      "owner": "Proposed role / not assigned: Ingestão/QA",
+      "acceptance_summary": "`make phase3-golden-runtime` / `make phase3-provider-rag-runtime` com stores/provider reais; uma publicação lógica por operação, source/chunk/checksum/version corretos, falha parcial não aparece como publicado; replays/outbox/objetos reconciliados. Audit e dados após restart consistentes; artefatos vinculados ao candidato e fixtures autorizadas.",
+      "evidence_refs": [],
+      "milestone": "M4",
+      "size": "G",
+      "mandatory": true,
+      "delivery_summary": "upload→objeto→fila→worker→parse/chunk/embed→vetor→verify/publish→retrieval→evidence→decision→resposta→histórico, incluindo delete/reindex/retry/cancel/restart e lineage.",
+      "accepted": false,
+      "specification_ref": "docs/backlog-producao-2026-10-12.md",
+      "next_action": {
+        "id": "PROD12-034:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect the contracted boundary and prerequisite evidence; preparation is not acceptance",
+        "target": "docs/backlog-producao-2026-10-12.md",
+        "completion_signal": "Owner, authority and applicable dependencies are evidenced before task selection"
+      }
+    },
+    {
+      "id": "PROD12-035",
+      "title": "Identidade e isolamento reais entre réplicas",
+      "stage": "BUILD",
+      "priority": "P0",
+      "status": "TODO",
+      "origin": "docs/backlog-producao-2026-10-12.md: AUD07-29/30",
+      "dependencies": [
+        "PROD12-007",
+        "PROD12-014",
+        "PROD12-030",
+        "PROD12-031",
+        "PROD12-034"
+      ],
+      "owner": "Proposed role / not assigned: Identidade/segurança",
+      "acceptance_summary": "tenant A/B, token copiado depois de logout, falha do PG durante revogação e recuperação, grant retirado durante provider pendente e troca de API não vazam conteúdo/IDs/metadados; casos de timing com carga/metodologia aprovada. `make phase3-tenant-evidence-runtime` e harness identidade real. OIDC somente se escolhido e implementado: issuer/audience/JWKS rotation/membership/caches concretos, não configurados por aparência.",
+      "evidence_refs": [],
+      "milestone": "M4",
+      "size": "G",
+      "mandatory": true,
+      "delivery_summary": "provar política de identidade escolhida: login/logout/TTL/disable/reset/role-grant-workspace revocation, cookies/CSRF/CORS, buckets compartilhados e escopo em objetos/jobs/vetores/evidência/histórico/audit/browser.",
+      "accepted": false,
+      "specification_ref": "docs/backlog-producao-2026-10-12.md",
+      "next_action": {
+        "id": "PROD12-035:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect the contracted boundary and prerequisite evidence; preparation is not acceptance",
+        "target": "docs/backlog-producao-2026-10-12.md",
+        "completion_signal": "Owner, authority and applicable dependencies are evidenced before task selection"
+      }
+    },
+    {
+      "id": "PROD12-036",
+      "title": "Workers A/B, fencing e sinais reais",
+      "stage": "BUILD",
+      "priority": "P0",
+      "status": "TODO",
+      "origin": "docs/backlog-producao-2026-10-12.md: AUD07-32",
+      "dependencies": [
+        "PROD12-010",
+        "PROD12-030",
+        "PROD12-034"
+      ],
+      "owner": "Proposed role / not assigned: Worker/DBA",
+      "acceptance_summary": "`make phase3-multi-worker-runtime`, nenhuma dupla publicação/ACK stale, nenhum handler após fechamento confirmado, drain/deadline honesto, claims em voo reconciliados e dependências fechadas somente após parada. Work recuperado/terminal após restart e dados/auditoria íntegros. Somente fault injection no lab aprovado.",
+      "evidence_refs": [],
+      "milestone": "M4",
+      "size": "G",
+      "mandatory": true,
+      "delivery_summary": "dois processos concorrentes com PG/Redis reais, heartbeat/lease loss/stale version/duplicate delivery/DLQ/retry/replay; SIGTERM/kill/restart e shutdown corrigido em serviço.",
+      "accepted": false,
+      "specification_ref": "docs/backlog-producao-2026-10-12.md",
+      "next_action": {
+        "id": "PROD12-036:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect the contracted boundary and prerequisite evidence; preparation is not acceptance",
+        "target": "docs/backlog-producao-2026-10-12.md",
+        "completion_signal": "Owner, authority and applicable dependencies are evidenced before task selection"
+      }
+    },
+    {
+      "id": "PROD12-037",
+      "title": "Arquivos hostis em isolamento efetivo",
+      "stage": "BUILD",
+      "priority": "P1",
+      "status": "TODO",
+      "origin": "docs/backlog-producao-2026-10-12.md: AUD07-33",
+      "dependencies": [
+        "PROD12-005",
+        "PROD12-034",
+        "PROD12-036"
+      ],
+      "owner": "Proposed role / not assigned: Ingestão/segurança",
+      "acceptance_summary": "`make phase3-file-security-runtime`; casos do gate vigente contidos e erros redigidos, nenhum processo/arquivo órfão, escape, deserialização insegura ou conteúdo malicioso publicado. Timeouts/cancel/kill reais demonstrados. Acrescentar riscos de formato autorizado sem reduzir corpus/thresholds existentes.",
+      "evidence_refs": [],
+      "milestone": "M4",
+      "size": "G",
+      "mandatory": true,
+      "delivery_summary": "corpus aprovado malformado/path traversal/archive/decompression/resource exhaustion no parser process runner e pipeline real; CPU/RAM/tempo/output/IPC/cleanup/egress bounded.",
+      "accepted": false,
+      "specification_ref": "docs/backlog-producao-2026-10-12.md",
+      "next_action": {
+        "id": "PROD12-037:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect the contracted boundary and prerequisite evidence; preparation is not acceptance",
+        "target": "docs/backlog-producao-2026-10-12.md",
+        "completion_signal": "Owner, authority and applicable dependencies are evidenced before task selection"
+      }
+    },
+    {
+      "id": "PROD12-038",
+      "title": "Campanha RAG representativa e adjudicada",
+      "stage": "BUILD",
+      "priority": "P1",
+      "status": "TODO",
+      "origin": "docs/backlog-producao-2026-10-12.md: AUD07-31",
+      "dependencies": [
+        "PROD12-005",
+        "PROD12-033",
+        "PROD12-034",
+        "PROD12-035"
+      ],
+      "owner": "Proposed role / not assigned: RAG/domínio/dados",
+      "acceptance_summary": "ranking, ACL leakage, citation support/completeness/precision/recall, unsupported claims/faithfulness e abstain/escalate avaliados com incerteza e adjudicação; holdout não usado para otimizar o próprio teste. Policy clínica mantém revisão humana; métricas sintéticas 1,0 de cinco casos não aprovam segurança/qualidade clínica. Corpus insuficiente → BLOCKED_EXTERNAL. Artefato de avaliação real reviewado e hash-bound.",
+      "evidence_refs": [],
+      "milestone": "M4",
+      "size": "G",
+      "mandatory": true,
+      "delivery_summary": "corpus licenciado/revisado, estratos de dificuldade/ambiguidade/risco/idioma, splits e reserva, amostra e métricas ratificadas em 005; registrar versões de modelo/corpus/query/index.",
+      "accepted": false,
+      "specification_ref": "docs/backlog-producao-2026-10-12.md",
+      "next_action": {
+        "id": "PROD12-038:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect the contracted boundary and prerequisite evidence; preparation is not acceptance",
+        "target": "docs/backlog-producao-2026-10-12.md",
+        "completion_signal": "Owner, authority and applicable dependencies are evidenced before task selection"
+      }
+    },
+    {
+      "id": "PROD12-039",
+      "title": "Evidência forjada e ataques RAG/tool",
+      "stage": "BUILD",
+      "priority": "P0",
+      "status": "TODO",
+      "origin": "docs/backlog-producao-2026-10-12.md: negativos tenant/evidence/RAG",
+      "dependencies": [
+        "PROD12-034",
+        "PROD12-035",
+        "PROD12-036",
+        "PROD12-037",
+        "PROD12-038"
+      ],
+      "owner": "Proposed role / not assigned: Segurança/evidência",
+      "acceptance_summary": "tenant/evidence/adversarial corpus + integração real rejeitam entradas inválidas antes de publicação; apenas ANSWER com evidência válida pode gerar, ESCALATE/ABSTAIN não viram resposta clínica; JSON/SSE/fallback/history mantêm decisão/versão/provenance e provisional não parece final. Nenhuma instrução de documento substitui policy. Testar revogação entre retrieval, geração e persistência final.",
+      "evidence_refs": [],
+      "milestone": "M4",
+      "size": "G",
+      "mandatory": true,
+      "delivery_summary": "forged/stale/wrong checksum/unknown chunk/revoked source, prompt/document/retrieval/tool injection, incomplete generation e contradiction entre decisão/citação, nos boundaries reais.",
+      "accepted": false,
+      "specification_ref": "docs/backlog-producao-2026-10-12.md",
+      "next_action": {
+        "id": "PROD12-039:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect the contracted boundary and prerequisite evidence; preparation is not acceptance",
+        "target": "docs/backlog-producao-2026-10-12.md",
+        "completion_signal": "Owner, authority and applicable dependencies are evidenced before task selection"
+      }
+    },
+    {
+      "id": "PROD12-040",
+      "title": "Persistência e aceite do módulo clínico/casos",
+      "stage": "BUILD",
+      "priority": "P1",
+      "status": "TODO",
+      "origin": "docs/backlog-producao-2026-10-12.md: D04/persistência clínica",
+      "dependencies": [
+        "PROD12-004",
+        "PROD12-021",
+        "PROD12-030",
+        "PROD12-035",
+        "PROD12-039"
+      ],
+      "owner": "Proposed role / not assigned: Casos/DBA/domínio",
+      "acceptance_summary": "registros e notas corretos após restart/restore, isolamento A/B, grants e idempotência, revisão humana obrigatória e ESCALATE antes de provider para requests clínicos. Owner de domínio/privacidade aprova dados/workflow/limites; não há diagnóstico/prescrição autônomos. Se módulo fora do perfil por decisão explícita, provar flags fechadas e impossibilidade de gravação/execução; registrar aceite **do perfil desativado**, não PASS de persistência inexistente nem dispensa de policy clínica mandatória.",
+      "evidence_refs": [],
+      "milestone": "M4",
+      "size": "G",
+      "mandatory": true,
+      "delivery_summary": "confirmar escopo D04 e feature flags do lançamento. Se cases habilitado, verificar/fechar adapter durável de produção para casos/reviews/feedback, tenant ACL, audit/idempotency, recovery e política de PII. SQLite/process-local de teste não basta. Modelo já escolhido de intake/revisão não concede aprovação clínica.",
+      "accepted": false,
+      "specification_ref": "docs/backlog-producao-2026-10-12.md",
+      "next_action": {
+        "id": "PROD12-040:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect the contracted boundary and prerequisite evidence; preparation is not acceptance",
+        "target": "docs/backlog-producao-2026-10-12.md",
+        "completion_signal": "Owner, authority and applicable dependencies are evidenced before task selection"
+      }
+    },
+    {
+      "id": "PROD12-041",
+      "title": "Browser API-backed e acessibilidade independentes",
+      "stage": "BUILD",
+      "priority": "P1",
+      "status": "TODO",
+      "origin": "docs/backlog-producao-2026-10-12.md: frontend real",
+      "dependencies": [
+        "PROD12-021",
+        "PROD12-022",
+        "PROD12-023",
+        "PROD12-024",
+        "PROD12-025",
+        "PROD12-034",
+        "PROD12-035",
+        "PROD12-038",
+        "PROD12-039",
+        "PROD12-040"
+      ],
+      "owner": "Proposed role / not assigned: QA/web/acessibilidade",
+      "acceptance_summary": "375/768/1440, zoom/teclado/leitor de tela/contraste/reduced-motion/touch; axe e foco sem violação relevante, screenshots nativas + console/network + reviewer independente. A07–A10 reproduzidos/testados, paginação completa e rascunhos corretos. `make phase3-frontend-supply-runtime` para a prova exigida; `make web-validate`/fixtures locais não são substituto. Destino same-origin do build válido.",
+      "evidence_refs": [],
+      "milestone": "M4",
+      "size": "G",
+      "mandatory": true,
+      "delivery_summary": "browser no runtime aprovado, sem interceptar a fronteira que precisa de prova; login/casos/chat/history/search/fontes/upload/jobs/collections/admin/offline/403/worker/provider failures, conteúdo longo e estados vazios/loading/error.",
+      "accepted": false,
+      "specification_ref": "docs/backlog-producao-2026-10-12.md",
+      "next_action": {
+        "id": "PROD12-041:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect the contracted boundary and prerequisite evidence; preparation is not acceptance",
+        "target": "docs/backlog-producao-2026-10-12.md",
+        "completion_signal": "Owner, authority and applicable dependencies are evidenced before task selection"
+      }
+    },
+    {
+      "id": "PROD12-042",
+      "title": "Revisão de segurança externa escopada",
+      "stage": "BUILD",
+      "priority": "P1",
+      "status": "TODO",
+      "origin": "docs/backlog-producao-2026-10-12.md: revisão/ataques autorizados",
+      "dependencies": [
+        "PROD12-035",
+        "PROD12-036",
+        "PROD12-037",
+        "PROD12-038",
+        "PROD12-039",
+        "PROD12-040",
+        "PROD12-041"
+      ],
+      "owner": "Proposed role / not assigned: Segurança independente",
+      "acceptance_summary": "findings classificados com reproduções/evidências/disposição; zero Critical/High antes do release, Medium somente com owner/mitigação/expiração e aceite permitido. Testar APIs públicas e deployment, não só scanner. Nenhum ataque ao host/terceiros/produção fora da autorização; parecer independente vinculado ao candidato.",
+      "evidence_refs": [],
+      "milestone": "M4",
+      "size": "G",
+      "mandatory": true,
+      "delivery_summary": "revisão/ataques autorizados de sessão/autorização, proxy/TLS/SSRF/origin, quotas/resource exhaustion, parser/upload, dados/telemetria/segredos, provider e ambiente/imagens; escopo e abortos definidos.",
+      "accepted": false,
+      "specification_ref": "docs/backlog-producao-2026-10-12.md",
+      "next_action": {
+        "id": "PROD12-042:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect the contracted boundary and prerequisite evidence; preparation is not acceptance",
+        "target": "docs/backlog-producao-2026-10-12.md",
+        "completion_signal": "Owner, authority and applicable dependencies are evidenced before task selection"
+      }
+    },
+    {
+      "id": "PROD12-043",
+      "title": "Traces, métricas, SLO e alertas distribuídos",
+      "stage": "BUILD",
+      "priority": "P1",
+      "status": "TODO",
+      "origin": "docs/backlog-producao-2026-10-12.md: AUD07-34",
+      "dependencies": [
+        "PROD12-029",
+        "PROD12-034",
+        "PROD12-035",
+        "PROD12-036",
+        "PROD12-039"
+      ],
+      "owner": "Proposed role / not assigned: Observabilidade/SRE",
+      "acceptance_summary": "`make phase3-observability-runtime`; traces reais correlacionados, nenhum segredo/conteúdo/PII em labels, collector indisponível não bloqueia transação, ausência é no_data; alarmes de latência/erro/lease/DLQ/readiness/backup chegam e recebem acknowledgement. Environment/window/amostra/release do SLI preservados; local/staging nunca copiados como produção.",
+      "evidence_refs": [],
+      "milestone": "M5",
+      "size": "G",
+      "mandatory": true,
+      "delivery_summary": "exercitar collector/backend/dashboard/alert receiver com correlação Web/API/queue/worker/stores/provider/evidence/decision, cardinalidade/redaction/sampling/retention e owner on-call.",
+      "accepted": false,
+      "specification_ref": "docs/backlog-producao-2026-10-12.md",
+      "next_action": {
+        "id": "PROD12-043:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect the contracted boundary and prerequisite evidence; preparation is not acceptance",
+        "target": "docs/backlog-producao-2026-10-12.md",
+        "completion_signal": "Owner, authority and applicable dependencies are evidenced before task selection"
+      }
+    },
+    {
+      "id": "PROD12-044",
+      "title": "Auditoria durável e entrega/reconciliação",
+      "stage": "BUILD",
+      "priority": "P1",
+      "status": "TODO",
+      "origin": "docs/backlog-producao-2026-10-12.md: audit/outbox/DLQ",
+      "dependencies": [
+        "PROD12-030",
+        "PROD12-035",
+        "PROD12-043"
+      ],
+      "owner": "Proposed role / not assigned: Auditoria/DBA/SRE",
+      "acceptance_summary": "operação não é silenciosamente confirmada sem auditoria obrigatória; tentativas versus conclusão claras, reabertura/replay não perdem nem duplicam efeito lógico. Sink lento/falho não expõe payload nem trava indefinidamente; alertas de backlog/gaps executados. Audit persiste após crash e é consultável só no escopo autorizado. Prova em store/sink reais, não ring buffer.",
+      "evidence_refs": [],
+      "milestone": "M5",
+      "size": "G",
+      "mandatory": true,
+      "delivery_summary": "verificar append/outbox/required audit de operações sensíveis, retries/DLQ/consumer dedup, retention/redaction/ACL e reconciliação sob indisponibilidade do sink.",
+      "accepted": false,
+      "specification_ref": "docs/backlog-producao-2026-10-12.md",
+      "next_action": {
+        "id": "PROD12-044:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect the contracted boundary and prerequisite evidence; preparation is not acceptance",
+        "target": "docs/backlog-producao-2026-10-12.md",
+        "completion_signal": "Owner, authority and applicable dependencies are evidenced before task selection"
+      }
+    },
+    {
+      "id": "PROD12-045",
+      "title": "Restore integrado e ensaio de rollback/roll-forward",
+      "stage": "BUILD",
+      "priority": "P0",
+      "status": "TODO",
+      "origin": "docs/backlog-producao-2026-10-12.md: AUD07-35; rollback",
+      "dependencies": [
+        "PROD12-032",
+        "PROD12-036",
+        "PROD12-040",
+        "PROD12-043",
+        "PROD12-044"
+      ],
+      "owner": "Proposed role / not assigned: Recovery/DBA/SRE",
+      "acceptance_summary": "`make phase3-restore-runtime`: counts/checksums/ACL/lineage/jobs/conversas/casos preservados, golden smoke funciona; RPO/RTO medidos contra 005, falhas/corrupção de backup detectadas. Rollback de imagem ≤300 s segundo policy existente ou roll-forward aprovado quando schema incompatível; não apagar volumes reais. Backups têm criptografia/acesso/retention e restore com operador/target/release/tempo.",
+      "evidence_refs": [],
+      "milestone": "M5",
+      "size": "G",
+      "mandatory": true,
+      "delivery_summary": "backup consistente Postgres/objetos/vetores/Redis conforme necessidade, dados de casos/history/audit/outbox incluídos, restore isolado, reidratação/reconcile, imagens anteriores e compatibilidade migrations. Ensaiar rollback sob erro em staging antes do Go.",
+      "accepted": false,
+      "specification_ref": "docs/backlog-producao-2026-10-12.md",
+      "next_action": {
+        "id": "PROD12-045:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect the contracted boundary and prerequisite evidence; preparation is not acceptance",
+        "target": "docs/backlog-producao-2026-10-12.md",
+        "completion_signal": "Owner, authority and applicable dependencies are evidenced before task selection"
+      }
+    },
+    {
+      "id": "PROD12-046",
+      "title": "Capacidade, latência e custo representativos",
+      "stage": "BUILD",
+      "priority": "P1",
+      "status": "TODO",
+      "origin": "docs/backlog-producao-2026-10-12.md: AUD07-36",
+      "dependencies": [
+        "PROD12-005",
+        "PROD12-034",
+        "PROD12-038",
+        "PROD12-041",
+        "PROD12-043",
+        "PROD12-044"
+      ],
+      "owner": "Proposed role / not assigned: Performance/SRE",
+      "acceptance_summary": "`make phase3-performance`, budgets pré-aprovados atendidos; nenhuma medição de fixture usada como SLO. Identificar teto de admissão/quotas e headroom, comportamento em overload e degradado sem bypass, latência por família de rota/provider sem esconder tails/erros. Capacity/cost do perfil ratificados; se falhar, corrigir/retestar, não recortar workload conveniente.",
+      "evidence_refs": [],
+      "milestone": "M5",
+      "size": "G",
+      "mandatory": true,
+      "delivery_summary": "workloads de perfil real, incluindo distribuição payload/query/file/model, cold/warm e concorrência 1/10/50/100 conforme matriz vigente; registrar p50/p95/p99/throughput/error/CPU/RAM/disco/queues/custo e tamanho de amostra.",
+      "accepted": false,
+      "specification_ref": "docs/backlog-producao-2026-10-12.md",
+      "next_action": {
+        "id": "PROD12-046:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect the contracted boundary and prerequisite evidence; preparation is not acceptance",
+        "target": "docs/backlog-producao-2026-10-12.md",
+        "completion_signal": "Owner, authority and applicable dependencies are evidenced before task selection"
+      }
+    },
+    {
+      "id": "PROD12-047",
+      "title": "Chaos e recuperação controlados",
+      "stage": "BUILD",
+      "priority": "P1",
+      "status": "TODO",
+      "origin": "docs/backlog-producao-2026-10-12.md: AUD07-37",
+      "dependencies": [
+        "PROD12-006",
+        "PROD12-036",
+        "PROD12-042",
+        "PROD12-045",
+        "PROD12-046"
+      ],
+      "owner": "Proposed role / not assigned: Resiliência/SRE",
+      "acceptance_summary": "`make phase3-chaos`; nenhuma corrupção silenciosa/duplicate publication/cross-scope, recovery/deadline/retry/DLQ bounded, alertas e diagnósticos úteis; restore/roll-forward utilizado quando necessário. Safeguards preservam dados de outros projetos. Cada falha tem trigger, impacto, convergência e teste de reconciliação.",
+      "evidence_refs": [],
+      "milestone": "M5",
+      "size": "G",
+      "mandatory": true,
+      "delivery_summary": "matriz de stop/kill/partition/slow/disk/dependency failures envolvendo worker/PG/Redis/Qdrant/S3/provider/collector no projeto autorizado, com limites e abortos.",
+      "accepted": false,
+      "specification_ref": "docs/backlog-producao-2026-10-12.md",
+      "next_action": {
+        "id": "PROD12-047:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect the contracted boundary and prerequisite evidence; preparation is not acceptance",
+        "target": "docs/backlog-producao-2026-10-12.md",
+        "completion_signal": "Owner, authority and applicable dependencies are evidenced before task selection"
+      }
+    },
+    {
+      "id": "PROD12-048",
+      "title": "Soak curto/estendido e limites de recursos",
+      "stage": "BUILD",
+      "priority": "P1",
+      "status": "TODO",
+      "origin": "docs/backlog-producao-2026-10-12.md: AUD07-38",
+      "dependencies": [
+        "PROD12-046",
+        "PROD12-047"
+      ],
+      "owner": "Proposed role / not assigned: SRE/performance",
+      "acceptance_summary": "`make phase3-soak`; sem crescimento ilimitado/retry storm/órfãos, budgets de disponibilidade/recursos/latência atendidos para a janela testada; critérios de início/fim/amostra/frescor preservados. Não mudar duração após ver leak, não truncar logs problemáticos; nenhum claim de 30 dias de produção pelo soak de staging.",
+      "evidence_refs": [],
+      "milestone": "M5",
+      "size": "G",
+      "mandatory": true,
+      "delivery_summary": "executar duração/carga aprovadas em 005 após desempenho/chaos, observando growth de memória/FDs/processos/objetos/queues/telemetria, flaps e custo.",
+      "accepted": false,
+      "specification_ref": "docs/backlog-producao-2026-10-12.md",
+      "next_action": {
+        "id": "PROD12-048:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect the contracted boundary and prerequisite evidence; preparation is not acceptance",
+        "target": "docs/backlog-producao-2026-10-12.md",
+        "completion_signal": "Owner, authority and applicable dependencies are evidenced before task selection"
+      }
+    },
+    {
+      "id": "PROD12-049",
+      "title": "Runbooks, on-call e governança de dados",
+      "stage": "BUILD",
+      "priority": "P1",
+      "status": "TODO",
+      "origin": "docs/backlog-producao-2026-10-12.md: on-call, privacidade, runbooks",
+      "dependencies": [
+        "PROD12-004",
+        "PROD12-040",
+        "PROD12-043",
+        "PROD12-044",
+        "PROD12-045",
+        "PROD12-046",
+        "PROD12-047",
+        "PROD12-048"
+      ],
+      "owner": "Proposed role / not assigned: Operações/segurança/produto",
+      "acceptance_summary": "destinatário de alertas responde e executa recovery; permissões/contatos, prioridades e procedimento de comunicação confirmados. Retenção/exclusão cobre fonte, jobs/history/cases/vetores/audit/backups e obrigações legais aplicáveis com decisão competente; informação clínica não vira aprovação regulatória por esse plano. Documentos executáveis e vinculados ao candidato, sem credenciais embutidas.",
+      "evidence_refs": [],
+      "milestone": "M5",
+      "size": "M",
+      "mandatory": true,
+      "delivery_summary": "runbooks de incidentes/restores/replays/rotations/migrations/deploy/rollback/indisponibilidade, escala de plantão e contato de incidente, retenção/export/delete/consentimento/acesso com privacidade/domínio. Realizar tabletop e teste de operador distinto do autor.",
+      "accepted": false,
+      "specification_ref": "docs/backlog-producao-2026-10-12.md",
+      "next_action": {
+        "id": "PROD12-049:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect the contracted boundary and prerequisite evidence; preparation is not acceptance",
+        "target": "docs/backlog-producao-2026-10-12.md",
+        "completion_signal": "Owner, authority and applicable dependencies are evidenced before task selection"
+      }
+    },
+    {
+      "id": "PROD12-050",
+      "title": "CI remoto e pacote fresco no candidato exato",
+      "stage": "BUILD",
+      "priority": "P0",
+      "status": "TODO",
+      "origin": "docs/backlog-producao-2026-10-12.md: AUD07-40/43; frescor",
+      "dependencies": [
+        "PROD12-026",
+        "PROD12-028",
+        "PROD12-034",
+        "PROD12-035",
+        "PROD12-036",
+        "PROD12-037",
+        "PROD12-038",
+        "PROD12-039",
+        "PROD12-040",
+        "PROD12-041",
+        "PROD12-042",
+        "PROD12-043",
+        "PROD12-044",
+        "PROD12-045",
+        "PROD12-046",
+        "PROD12-047",
+        "PROD12-048",
+        "PROD12-049"
+      ],
+      "owner": "Proposed role / not assigned: CI/release/Lead",
+      "acceptance_summary": "`make triple-aaa-capability-matrix`, `make phase3-evidence` e validadores vigentes geram/verificam registros sem transformar failure em PASS. **Todos os gates técnicos deste estágio** passam e CI remoto é confirmado, não inferido do local. As lanes de autoridade `independent-reviews`, `sealed-packet` e `final-go-no-go` continuam legitimamente pendentes e bloqueiam promoção até 051–053; não exigir `--require-promotable` para encerrar 050. Dados errados/manifest missing/wrong-SHA/dirty/tampered recusados; objetos rehashed/retidos. Closure integral AUD07-43 fica condicionada a 053, não é concedida pelo aceite técnico de 050.",
+      "evidence_refs": [],
+      "milestone": "M6",
+      "size": "G",
+      "mandatory": true,
+      "delivery_summary": "reexecutar lanes técnicas locais/remotas/runtime e verificações de integridade pré-review/pré-selo/pré-Go; reunir refs imutáveis para SHA/tree/fingerprint/config/digests únicos. Aplicar freshness policy e retestar o que venceu após testes longos. Não editar observation time para reciclar prova.",
+      "accepted": false,
+      "specification_ref": "docs/backlog-producao-2026-10-12.md",
+      "next_action": {
+        "id": "PROD12-050:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect the contracted boundary and prerequisite evidence; preparation is not acceptance",
+        "target": "docs/backlog-producao-2026-10-12.md",
+        "completion_signal": "Owner, authority and applicable dependencies are evidenced before task selection"
+      }
+    },
+    {
+      "id": "PROD12-051",
+      "title": "Reviews independentes e scorecard tipado",
+      "stage": "BUILD",
+      "priority": "P0",
+      "status": "TODO",
+      "origin": "docs/backlog-producao-2026-10-12.md: AUD07-41; 12 escopos",
+      "dependencies": [
+        "PROD12-050"
+      ],
+      "owner": "Proposed role / not assigned: Reviewers independentes",
+      "acceptance_summary": "fontes e [constantes do motor](<../scripts/state_of_art/promotion_engine.py#L64-L124>) governam inventário; zero Critical/High, Medium com owner/aceite/mitigação/review/expiração; scorecard **26 dimensões tipadas**, overall derivado **≥96/100** conforme gate atual. Não converter as notas opinativas da auditoria para alcançar esse target. Reauditar A01–A13, obrigações antigas e riscos novos no artefato exato. Reviewer de outra árvore ou auto-review não aprova.",
+      "evidence_refs": [],
+      "milestone": "M6",
+      "size": "G",
+      "mandatory": true,
+      "delivery_summary": "obter os 12 scopes vigentes: Architecture, Security, Runtime, Database, Distributed Systems, RAG, Observability, Recovery, Frontend, Accessibility, Supply Chain e Operations. Reviews frescos com tentativa de rejeição e independência reconhecida pela autoridade; checklist de 18 riscos.",
+      "accepted": false,
+      "specification_ref": "docs/backlog-producao-2026-10-12.md",
+      "next_action": {
+        "id": "PROD12-051:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect the contracted boundary and prerequisite evidence; preparation is not acceptance",
+        "target": "docs/backlog-producao-2026-10-12.md",
+        "completion_signal": "Owner, authority and applicable dependencies are evidenced before task selection"
+      }
+    },
+    {
+      "id": "PROD12-052",
+      "title": "Preparar packet e cadeia de confiança para selagem final",
+      "stage": "BUILD",
+      "priority": "P0",
+      "status": "TODO",
+      "origin": "docs/backlog-producao-2026-10-12.md: packet/seal/trust",
+      "dependencies": [
+        "PROD12-050",
+        "PROD12-051"
+      ],
+      "owner": "Proposed role / not assigned: Signer/release independente",
+      "acceptance_summary": "inventário/references/candidato/fingerprint/run/expiry corretos e testes de tampered/missing/wrong trust/key/signature/SHA discriminantes; ausência de decisão/selo reais continua não-promotable. **Não exigir `--require-promotable` para encerrar 052**. O body e seus hashes estão prontos para decisão humana; não preencher GO nem assinar como autoridade por conta do verificador. `command=None` não recebe executor que fabrica aceite. Selagem de promoção efetiva e validação total pertencem à transação de 053.",
+      "evidence_refs": [],
+      "milestone": "M6",
+      "size": "M",
+      "mandatory": true,
+      "delivery_summary": "release/signer prepara body imutável de CI/runtime/performance/chaos/soak/DR/frontend/supply chain, reviews e scorecard completos; valida schema/hash/frescor/trust store/key_id/retention e ensaia procedimento de selagem sem aprovar promoção. Chave privada permanece com autoridade independente.",
+      "accepted": false,
+      "specification_ref": "docs/backlog-producao-2026-10-12.md",
+      "next_action": {
+        "id": "PROD12-052:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect the contracted boundary and prerequisite evidence; preparation is not acceptance",
+        "target": "docs/backlog-producao-2026-10-12.md",
+        "completion_signal": "Owner, authority and applicable dependencies are evidenced before task selection"
+      }
+    },
+    {
+      "id": "PROD12-053",
+      "title": "Decisão humana, selagem e ratificação do release",
+      "stage": "BUILD",
+      "priority": "P0",
+      "status": "TODO",
+      "origin": "docs/backlog-producao-2026-10-12.md: AUD07-42; Go/No-Go e selo",
+      "dependencies": [
+        "PROD12-004",
+        "PROD12-049",
+        "PROD12-052"
+      ],
+      "owner": "Proposed role / not assigned: D07/signer independente/release",
+      "acceptance_summary": "`make phase3-evidence-verify`/`make triple-aaa-verify` ou invocações documentadas com sealed-packet/trust-store/inputs reais aprovam todos os gates, inclusive reviews/selo/final-go-no-go e requisito promotable; zero Critical/High, scorecard vigente e frescor preservados. GO é autorização externa registrada, **não inferida do exit code**. Selo/signatário/decision-authority atendem vínculos do motor; D07 ratifica packet/digests e autoriza escopo de instalação/canary/expansão explicitamente. Promoção continua NO-GO até conclusão desse evento; 054 nunca roda só porque o draft técnico passou.",
+      "evidence_refs": [],
+      "milestone": "M6",
+      "size": "M",
+      "mandatory": true,
+      "delivery_summary": "D07 e signer independente reconhecido pelo contrato realizam a transação final: (1) decisão humana datada sobre body/hash/candidato/escopo/riscos; (2) se GO, assinatura Ed25519 e retenção desse body com metadados/cadeia válidos; (3) validação integral do packet e ratificação humana dos bytes/digest exatos antes de instalação. Se NO-GO ou falha, devolver ao marco pertinente. Papéis podem coincidir somente quando o contrato de independência/autoridade permitir; builders/verificadores não obtêm poder de signer.",
+      "accepted": false,
+      "specification_ref": "docs/backlog-producao-2026-10-12.md",
+      "next_action": {
+        "id": "PROD12-053:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect the contracted boundary and prerequisite evidence; preparation is not acceptance",
+        "target": "docs/backlog-producao-2026-10-12.md",
+        "completion_signal": "Owner, authority and applicable dependencies are evidenced before task selection"
+      }
+    },
+    {
+      "id": "PROD12-054",
+      "title": "Implantar canary autorizado sem mudar o candidato",
+      "stage": "BUILD",
+      "priority": "P0",
+      "status": "TODO",
+      "origin": "docs/backlog-producao-2026-10-12.md: canary autorizado",
+      "dependencies": [
+        "PROD12-027",
+        "PROD12-045",
+        "PROD12-049",
+        "PROD12-053"
+      ],
+      "owner": "Proposed role / not assigned: Operador/release",
+      "acceptance_summary": "política REC-33 vigente: ≥900 s e ≥100 requests, 5xx ≤1%, p95 ≤1500 ms, DLQ growth zero e readiness true; rollback ≤300 s ensaiado e trigger operável. Métricas/traces/alert receiver reais, smoke sintético/login/revoke/upload/consulta/casos quando habilitados; aborto automático/operacional se violar policy. Nenhum provider/scope extra ou evidência de staging copiada como PASS de SLO produção.",
+      "evidence_refs": [],
+      "milestone": "M7",
+      "size": "G",
+      "mandatory": true,
+      "delivery_summary": "operador instala somente digests aprovados, preserva anterior/volumes e aplica migration/preflight/config aprovados; começa com tenants/corpus/custo limitados ao perfil.",
+      "accepted": false,
+      "specification_ref": "docs/backlog-producao-2026-10-12.md",
+      "next_action": {
+        "id": "PROD12-054:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect the contracted boundary and prerequisite evidence; preparation is not acceptance",
+        "target": "docs/backlog-producao-2026-10-12.md",
+        "completion_signal": "Owner, authority and applicable dependencies are evidenced before task selection"
+      }
+    },
+    {
+      "id": "PROD12-055",
+      "title": "Expandir tráfego e transferir operação",
+      "stage": "BUILD",
+      "priority": "P1",
+      "status": "TODO",
+      "origin": "docs/backlog-producao-2026-10-12.md: expansão controlada/handoff",
+      "dependencies": [
+        "PROD12-054"
+      ],
+      "owner": "Proposed role / not assigned: Operador/on-call/produto",
+      "acceptance_summary": "stages documentados com decisão e observação; falha interrompe expansão/reverte conforme compatibilidade sem destruir dados. Acesso de usuários só no scope aprovado, on-call/backup/dead-letter/rotations ativos. Ambiente corresponde a digests/config aprovados. Maturidade limitada/single VPS descrita honestamente; escalar topologia exige nova prova/autoridade, não patch em produção sem release.",
+      "evidence_refs": [],
+      "milestone": "M7",
+      "size": "G",
+      "mandatory": true,
+      "delivery_summary": "após canary, expansão por estágios/amostra/janela aprovados (sem percentuais inventados), com limites de capacidade/gastos e responsáveis. Revisar health/quotas/privacy e rollback a cada estágio; handoff para plantão.",
+      "accepted": false,
+      "specification_ref": "docs/backlog-producao-2026-10-12.md",
+      "next_action": {
+        "id": "PROD12-055:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect the contracted boundary and prerequisite evidence; preparation is not acceptance",
+        "target": "docs/backlog-producao-2026-10-12.md",
+        "completion_signal": "Owner, authority and applicable dependencies are evidenced before task selection"
+      }
+    },
+    {
+      "id": "PROD12-056",
+      "title": "Observar produção e revisar o primeiro ciclo operacional",
+      "stage": "BUILD",
+      "priority": "P1",
+      "status": "TODO",
+      "origin": "docs/backlog-producao-2026-10-12.md: acompanhamento real/SLO",
+      "dependencies": [
+        "PROD12-055"
+      ],
+      "owner": "Proposed role / not assigned: SRE/produto/segurança",
+      "acceptance_summary": "registros environment/release/candidate/window/amostra/hash completos e honestos, no_data até evidência suficiente; SLO breach abre ação/risco, não dashboard saudável por default. Review de 30 dias com owners, incidents/recovery, despesas reais, status de riscos, backlog de correção e decisão sobre escala. Esse acompanhamento não é prerequisite circular para autorizar canary: é obrigação pós-Go, nunca SLO de 30 dias afirmado antes de operar.",
+      "evidence_refs": [],
+      "milestone": "M7",
+      "size": "G",
+      "mandatory": true,
+      "delivery_summary": "acompanhar SLIs de produção nas janelas vigentes (30 dias onde requerido, 24 h/10 min/per drill onde aplicável), incidentes, custos/capacidade/backup/restore/revogação e experiência de usuários; manutenção contínua e próximos ciclos.",
+      "accepted": false,
+      "specification_ref": "docs/backlog-producao-2026-10-12.md",
+      "next_action": {
+        "id": "PROD12-056:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect the contracted boundary and prerequisite evidence; preparation is not acceptance",
+        "target": "docs/backlog-producao-2026-10-12.md",
+        "completion_signal": "Owner, authority and applicable dependencies are evidenced before task selection"
+      }
+    },
+    {
+      "id": "PROD12-LOCAL-CONTROL",
+      "title": "Prepare and verify reversible PROD12 local control scope without global task acceptance",
+      "stage": "BUILD",
+      "priority": "P0",
+      "status": "IN_PROGRESS",
+      "origin": "Explicit delegated local controller ownership and later human implementation authorization",
+      "dependencies": [],
+      "owner": "Delegated sole controller writer",
+      "acceptance_summary": "Authenticated backup/guarded relocation, original prefixes, 56 TODO contracts, explicit local gate and original derived/archive checks pass; independent review and alternate checkout remain separate obligations",
+      "evidence_refs": [
+        ".agent/plans/producao-2026-10-12.md",
+        ".runtime/prod12-control/relocation-result.json"
+      ],
+      "next_action": {
+        "id": "PROD12-LOCAL-CONTROL:VERIFY-LOCAL-SCOPE",
+        "kind": "VERIFY",
+        "summary": "Verify exact local control scope and protected history, then integrate fresh isolated red probes without global dependency acceptance",
+        "target": ".agent/plans/producao-2026-10-12.md",
+        "completion_signal": "Control/archive/view/gate tests pass with protected hashes unchanged; missing original audit and external authority remain explicit"
+      }
+    },
+    {
+      "id": "AUD15-T001",
+      "title": "Preservar e reconciliar baseline",
+      "stage": "BUILD",
+      "priority": "P1",
+      "status": "TODO",
+      "origin": "docs/backlog-auditoria-2026-10-15.md#L59: Preservar e reconciliar baseline; current human request implementa todo o conteudo dos planos authorizes reversible local implementation only",
+      "origin_refs": [
+        "docs/backlog-auditoria-2026-10-15.md#L59",
+        "docs/reports/evidence/aud15-implementation-20261015/quality-bar.md",
+        ".agent/plans/producao-2026-10-12.md"
+      ],
+      "dependencies": [],
+      "dependency_semantics": "AND",
+      "owner": "Proposed role / not assigned: Lead/QA",
+      "acceptance_summary": "inventário com hashes/disponibilidade, alterações de candidato explícitas e cada um dos 13 achados mapeado. Ausências de logs originais de outras datas continuam registradas. Proposta de adoção/vínculo revisada, sem duas tarefas reivindicando o mesmo aceite, sem editar controlador neste pedido.",
+      "delivery_summary": "preservar o relatório/logs/probes disponíveis e seu vínculo à árvore auditada; comparar com o candidato de execução e mapear itens novos, extensões de PROD12 e revalidações de patches já existentes. Não sobrescrever provas históricas.",
+      "evidence_refs": [],
+      "milestone": "M0",
+      "size": "M",
+      "mandatory": true,
+      "accepted": false,
+      "specification_ref": "docs/backlog-auditoria-2026-10-15.md",
+      "planning_delivery_title": "Candidato, evidências e reconciliação com PROD12",
+      "common_dod_ref": "docs/backlog-auditoria-2026-10-15.md#L19-L26",
+      "next_action": {
+        "id": "AUD15-T001:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect exact contract, dependency evidence and authority before selection; independent preparation is not acceptance",
+        "target": "docs/backlog-auditoria-2026-10-15.md",
+        "completion_signal": "Owner, AND dependencies, authority and evidence procedure established without proxy acceptance"
+      }
+    },
+    {
+      "id": "AUD15-T002",
+      "title": "Fixar ambiente de verificação",
+      "stage": "BUILD",
+      "priority": "P1",
+      "status": "TODO",
+      "origin": "docs/backlog-auditoria-2026-10-15.md#L65: Fixar ambiente de verificação; current human request implementa todo o conteudo dos planos authorizes reversible local implementation only",
+      "origin_refs": [
+        "docs/backlog-auditoria-2026-10-15.md#L65",
+        "docs/reports/evidence/aud15-implementation-20261015/quality-bar.md",
+        ".agent/plans/producao-2026-10-12.md"
+      ],
+      "dependencies": [
+        "AUD15-T001"
+      ],
+      "dependency_semantics": "AND",
+      "owner": "Proposed role / not assigned: Plataforma/CI",
+      "acceptance_summary": "bootstrap reproduzível em checkout controlado, dependências consistentes, lint/typecheck/build aprovados nesse ambiente. Qualquer mudança de versão passa por decisão técnica explícita, não alteração silenciosa do contrato para coincidir com o host.",
+      "delivery_summary": "executar em Python/Node/npm compatíveis com o [contrato de toolchain](<../toolchain.json>), usando locks e runner existentes; registrar versões efetivas, não apenas pins declarados.",
+      "evidence_refs": [],
+      "milestone": "M0",
+      "size": "M",
+      "mandatory": true,
+      "accepted": false,
+      "specification_ref": "docs/backlog-auditoria-2026-10-15.md",
+      "planning_delivery_title": "Toolchain reproduzível",
+      "common_dod_ref": "docs/backlog-auditoria-2026-10-15.md#L19-L26",
+      "next_action": {
+        "id": "AUD15-T002:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect exact contract, dependency evidence and authority before selection; independent preparation is not acceptance",
+        "target": "docs/backlog-auditoria-2026-10-15.md",
+        "completion_signal": "Owner, AND dependencies, authority and evidence procedure established without proxy acceptance"
+      }
+    },
+    {
+      "id": "AUD15-T003",
+      "title": "Diagnosticar e reexecutar lane VPS",
+      "stage": "BUILD",
+      "priority": "P1",
+      "status": "TODO",
+      "origin": "docs/backlog-auditoria-2026-10-15.md#L71: Diagnosticar e reexecutar lane VPS; current human request implementa todo o conteudo dos planos authorizes reversible local implementation only",
+      "origin_refs": [
+        "docs/backlog-auditoria-2026-10-15.md#L71",
+        "docs/reports/evidence/aud15-implementation-20261015/quality-bar.md",
+        ".agent/plans/producao-2026-10-12.md"
+      ],
+      "dependencies": [
+        "AUD15-T001"
+      ],
+      "dependency_semantics": "AND",
+      "owner": "Proposed role / not assigned: Plataforma/segurança",
+      "acceptance_summary": "reexecutar a lane inteira e os negativos em Linux representativo; cada falha tem causa e resolução ou bloqueio concreto. A barreira ambiental diagnosticada não encerra todas as falhas por inferência. Sem chmod/chown do host, remoção de guards, mocking de DAC apresentado como prova real, ou skip convertido em verde.",
+      "delivery_summary": "listar os 277 node IDs falhos, agrupar causas e pré-condições UID/GID, sticky bit, namespaces e capabilities; disponibilizar executor descartável compatível por autorização própria. Reutilizar PROD12-003, ampliando a baseline de falhas a reconciliar.",
+      "evidence_refs": [],
+      "milestone": "M0",
+      "size": "G",
+      "mandatory": true,
+      "accepted": false,
+      "specification_ref": "docs/backlog-auditoria-2026-10-15.md",
+      "planning_delivery_title": "Executor VPS compatível e diagnóstico das 277 falhas",
+      "common_dod_ref": "docs/backlog-auditoria-2026-10-15.md#L19-L26",
+      "next_action": {
+        "id": "AUD15-T003:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect exact contract, dependency evidence and authority before selection; independent preparation is not acceptance",
+        "target": "docs/backlog-auditoria-2026-10-15.md",
+        "completion_signal": "Owner, AND dependencies, authority and evidence procedure established without proxy acceptance"
+      }
+    },
+    {
+      "id": "AUD15-T004",
+      "title": "Dar destino verificável aos skips",
+      "stage": "BUILD",
+      "priority": "P1",
+      "status": "TODO",
+      "origin": "docs/backlog-auditoria-2026-10-15.md#L77: Dar destino verificável aos skips; current human request implementa todo o conteudo dos planos authorizes reversible local implementation only",
+      "origin_refs": [
+        "docs/backlog-auditoria-2026-10-15.md#L77",
+        "docs/reports/evidence/aud15-implementation-20261015/quality-bar.md",
+        ".agent/plans/producao-2026-10-12.md"
+      ],
+      "dependencies": [
+        "AUD15-T001"
+      ],
+      "dependency_semantics": "AND",
+      "owner": "Proposed role / not assigned: QA/runtime",
+      "acceptance_summary": "todo skip obrigatório de runtime vinculado a PROD12 e reexecutado no ambiente adequado antes de seu gate; inaplicabilidade somente com perfil ratificado e prova de feature fechada. Não exigir artificialmente zero skips de testes genuinamente não aplicáveis, nem ocultar obrigação externa.",
+      "delivery_summary": "matriz dos 221 skips observados, por node ID, motivo, pré-condição, ambiente/owner e gate obrigatório; atualizar a coleta no candidato novo.",
+      "evidence_refs": [],
+      "milestone": "M0",
+      "size": "M",
+      "mandatory": true,
+      "accepted": false,
+      "specification_ref": "docs/backlog-auditoria-2026-10-15.md",
+      "planning_delivery_title": "Classificação dos 221 skips",
+      "common_dod_ref": "docs/backlog-auditoria-2026-10-15.md#L19-L26",
+      "next_action": {
+        "id": "AUD15-T004:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect exact contract, dependency evidence and authority before selection; independent preparation is not acceptance",
+        "target": "docs/backlog-auditoria-2026-10-15.md",
+        "completion_signal": "Owner, AND dependencies, authority and evidence procedure established without proxy acceptance"
+      }
+    },
+    {
+      "id": "AUD15-T005",
+      "title": "Corrigir inventário Node — AUD15-08",
+      "stage": "BUILD",
+      "priority": "P1",
+      "status": "TODO",
+      "origin": "docs/backlog-auditoria-2026-10-15.md#L83: Corrigir inventário Node — AUD15-08; current human request implementa todo o conteudo dos planos authorizes reversible local implementation only",
+      "origin_refs": [
+        "docs/backlog-auditoria-2026-10-15.md#L83",
+        "docs/reports/evidence/aud15-implementation-20261015/quality-bar.md",
+        ".agent/plans/producao-2026-10-12.md"
+      ],
+      "dependencies": [
+        "AUD15-T001"
+      ],
+      "dependency_semantics": "AND",
+      "owner": "Proposed role / not assigned: Supply chain/CI",
+      "acceptance_summary": "teste de inventário isolado e suíte relevante aprovados; negativos detectam manifesto extra legítimo não catalogado e componente canônico ausente. Não resolver removendo assertion ou ignorando indiscriminadamente diretórios executáveis. Vínculo: PROD12-015.",
+      "delivery_summary": "decidir política explícita de snapshots versionados e inventário de componentes; corrigir a origem da discrepância, preservando evidência histórica e componentes executáveis legítimos.",
+      "evidence_refs": [],
+      "milestone": "M0",
+      "size": "M",
+      "mandatory": true,
+      "accepted": false,
+      "specification_ref": "docs/backlog-auditoria-2026-10-15.md",
+      "planning_delivery_title": "Inventário Node coerente",
+      "common_dod_ref": "docs/backlog-auditoria-2026-10-15.md#L19-L26",
+      "next_action": {
+        "id": "AUD15-T005:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect exact contract, dependency evidence and authority before selection; independent preparation is not acceptance",
+        "target": "docs/backlog-auditoria-2026-10-15.md",
+        "completion_signal": "Owner, AND dependencies, authority and evidence procedure established without proxy acceptance"
+      }
+    },
+    {
+      "id": "AUD15-T006",
+      "title": "Logout federado honesto — AUD15-01",
+      "stage": "BUILD",
+      "priority": "P1",
+      "status": "TODO",
+      "origin": "docs/backlog-auditoria-2026-10-15.md#L89: Logout federado honesto — AUD15-01; current human request implementa todo o conteudo dos planos authorizes reversible local implementation only",
+      "origin_refs": [
+        "docs/backlog-auditoria-2026-10-15.md#L89",
+        "docs/reports/evidence/aud15-implementation-20261015/quality-bar.md",
+        ".agent/plans/producao-2026-10-12.md"
+      ],
+      "dependencies": [
+        "AUD15-T001"
+      ],
+      "dependency_semantics": "AND",
+      "owner": "Proposed role / not assigned: Identidade/API",
+      "acceptance_summary": "saída confirmada invalida a autoridade relevante sob o contrato aprovado; sem suporte/timeout/falha não há falso `signed_out` nem `completed`. Regressão JWT local rejeita a baseline; testes protegem o logout nativo já corrigido. Persistir decisão sobre alcance do access token versus sessão do broker, sem prometer revogar JWT stateless sem mecanismo.",
+      "delivery_summary": "definir a autoridade da sessão local/federada e a capacidade do adapter/broker; implementar revogação suportada ou recusa explícita de confirmação não suportada. Não trocar o perfil postgres-local-v1 por OIDC sem decisão: tratar também o adapter disponível/injetável.",
+      "evidence_refs": [],
+      "milestone": "M1",
+      "size": "M",
+      "mandatory": true,
+      "accepted": false,
+      "specification_ref": "docs/backlog-auditoria-2026-10-15.md",
+      "planning_delivery_title": "Logout OIDC com efeito/resultado honestos",
+      "common_dod_ref": "docs/backlog-auditoria-2026-10-15.md#L19-L26",
+      "next_action": {
+        "id": "AUD15-T006:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect exact contract, dependency evidence and authority before selection; independent preparation is not acceptance",
+        "target": "docs/backlog-auditoria-2026-10-15.md",
+        "completion_signal": "Owner, AND dependencies, authority and evidence procedure established without proxy acceptance"
+      }
+    },
+    {
+      "id": "AUD15-T007",
+      "title": "Indisponibilidade não é ausência — AUD15-06",
+      "stage": "BUILD",
+      "priority": "P1",
+      "status": "TODO",
+      "origin": "docs/backlog-auditoria-2026-10-15.md#L95: Indisponibilidade não é ausência — AUD15-06; current human request implementa todo o conteudo dos planos authorizes reversible local implementation only",
+      "origin_refs": [
+        "docs/backlog-auditoria-2026-10-15.md#L95",
+        "docs/reports/evidence/aud15-implementation-20261015/quality-bar.md",
+        ".agent/plans/producao-2026-10-12.md"
+      ],
+      "dependencies": [
+        "AUD15-T006"
+      ],
+      "dependency_semantics": "AND",
+      "owner": "Proposed role / not assigned: Identidade/API",
+      "acceptance_summary": "outage de resolver retorna erro de disponibilidade, não 200 de logout/401 por ausência inventada; token inválido continua negado. Recuperar resolver não pode desmentir uma saída anteriormente confirmada. Sem vazamento de detalhe ou redução de fail-closed. Mesmo owner de T006.",
+      "delivery_summary": "distinguir credencial inválida/expirada, membership negada e falha de consulta à autoridade; propagar indisponibilidade em envelope seguro.",
+      "evidence_refs": [],
+      "milestone": "M1",
+      "size": "M",
+      "mandatory": true,
+      "accepted": false,
+      "specification_ref": "docs/backlog-auditoria-2026-10-15.md",
+      "planning_delivery_title": "Distinguir indisponibilidade de ausência OIDC",
+      "common_dod_ref": "docs/backlog-auditoria-2026-10-15.md#L19-L26",
+      "next_action": {
+        "id": "AUD15-T007:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect exact contract, dependency evidence and authority before selection; independent preparation is not acceptance",
+        "target": "docs/backlog-auditoria-2026-10-15.md",
+        "completion_signal": "Owner, AND dependencies, authority and evidence procedure established without proxy acceptance"
+      }
+    },
+    {
+      "id": "AUD15-T008",
+      "title": "Limitar confirmação de reset — AUD15-02",
+      "stage": "BUILD",
+      "priority": "P1",
+      "status": "TODO",
+      "origin": "docs/backlog-auditoria-2026-10-15.md#L101: Limitar confirmação de reset — AUD15-02; current human request implementa todo o conteudo dos planos authorizes reversible local implementation only",
+      "origin_refs": [
+        "docs/backlog-auditoria-2026-10-15.md#L101",
+        "docs/reports/evidence/aud15-implementation-20261015/quality-bar.md",
+        ".agent/plans/producao-2026-10-12.md"
+      ],
+      "dependencies": [
+        "AUD15-T001"
+      ],
+      "dependency_semantics": "AND",
+      "owner": "Proposed role / not assigned: API/segurança",
+      "acceptance_summary": "limiter negativo exige **zero hash e zero consume**, falha do limiter é segura, requests permitidos usam quotas corretas e tokens não vazam nas chaves/logs; sucesso, expiração, replay e corrida single-use exercitados. Números de quota exigem política aprovada, não defaults inventados para obter PASS.",
+      "delivery_summary": "quota antes de KDF e transação de consumo; definir chaves/budgets e reduzir custo de token inválido sem enumeração nem quebra da transação single-use.",
+      "evidence_refs": [],
+      "milestone": "M1",
+      "size": "M",
+      "mandatory": true,
+      "accepted": false,
+      "specification_ref": "docs/backlog-auditoria-2026-10-15.md",
+      "planning_delivery_title": "Quota antes de trabalho caro no reset",
+      "common_dod_ref": "docs/backlog-auditoria-2026-10-15.md#L19-L26",
+      "next_action": {
+        "id": "AUD15-T008:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect exact contract, dependency evidence and authority before selection; independent preparation is not acceptance",
+        "target": "docs/backlog-auditoria-2026-10-15.md",
+        "completion_signal": "Owner, AND dependencies, authority and evidence procedure established without proxy acceptance"
+      }
+    },
+    {
+      "id": "AUD15-T009",
+      "title": "Não bloquear o loop — AUD15-07",
+      "stage": "BUILD",
+      "priority": "P1",
+      "status": "TODO",
+      "origin": "docs/backlog-auditoria-2026-10-15.md#L107: Não bloquear o loop — AUD15-07; current human request implementa todo o conteudo dos planos authorizes reversible local implementation only",
+      "origin_refs": [
+        "docs/backlog-auditoria-2026-10-15.md#L107",
+        "docs/reports/evidence/aud15-implementation-20261015/quality-bar.md",
+        ".agent/plans/producao-2026-10-12.md"
+      ],
+      "dependencies": [
+        "AUD15-T006",
+        "AUD15-T007",
+        "AUD15-T008"
+      ],
+      "dependency_semantics": "AND",
+      "owner": "Proposed role / not assigned: API/plataforma",
+      "acceptance_summary": "dependência artificialmente lenta não bloqueia request independente no mesmo processo; orçamento de espera/concorrência e saturação verificados. Login/lookup/erro não perdem escopo, tracing ou consistência da sessão. Benchmark deve registrar workload, não extrapolar uma chamada para capacidade real.",
+      "delivery_summary": "adapter async ou offload bounded para identidade/KDF/DB, com deadline, admissão, cancelamento e encerramento definidos; evitar apenas deslocar fila ilimitada para threads.",
+      "evidence_refs": [],
+      "milestone": "M2",
+      "size": "M",
+      "mandatory": true,
+      "accepted": false,
+      "specification_ref": "docs/backlog-auditoria-2026-10-15.md",
+      "planning_delivery_title": "Identidade sem bloqueio síncrono do event loop",
+      "common_dod_ref": "docs/backlog-auditoria-2026-10-15.md#L19-L26",
+      "next_action": {
+        "id": "AUD15-T009:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect exact contract, dependency evidence and authority before selection; independent preparation is not acceptance",
+        "target": "docs/backlog-auditoria-2026-10-15.md",
+        "completion_signal": "Owner, AND dependencies, authority and evidence procedure established without proxy acceptance"
+      }
+    },
+    {
+      "id": "AUD15-T010",
+      "title": "Autoridade de sessão entre abas — AUD15-05",
+      "stage": "BUILD",
+      "priority": "P1",
+      "status": "TODO",
+      "origin": "docs/backlog-auditoria-2026-10-15.md#L113: Autoridade de sessão entre abas — AUD15-05; current human request implementa todo o conteudo dos planos authorizes reversible local implementation only",
+      "origin_refs": [
+        "docs/backlog-auditoria-2026-10-15.md#L113",
+        "docs/reports/evidence/aud15-implementation-20261015/quality-bar.md",
+        ".agent/plans/producao-2026-10-12.md"
+      ],
+      "dependencies": [
+        "AUD15-T001"
+      ],
+      "dependency_semantics": "AND",
+      "owner": "Proposed role / not assigned: Web/identidade",
+      "acceptance_summary": "aba antiga não continua apresentando contexto A e submetendo ação como B; testes cobrem revogação, foco/visibility, API 401, indisponibilidade, logout falho e respostas antigas. Prova browser multi-page direcionada nesta tarefa e revalidação integrada em T022; não declarar bypass ACL que a auditoria não comprovou.",
+      "delivery_summary": "primeiro reproduzir multiaba A→logout/login B; sincronizar invalidação/troca e revalidar autoridade ao retomar antes de mostrar privado ou admitir mutações. Não persistir credenciais em broadcasts/storage.",
+      "evidence_refs": [],
+      "milestone": "M1",
+      "size": "M",
+      "mandatory": true,
+      "accepted": false,
+      "specification_ref": "docs/backlog-auditoria-2026-10-15.md",
+      "planning_delivery_title": "Revalidação de sessão entre abas",
+      "common_dod_ref": "docs/backlog-auditoria-2026-10-15.md#L19-L26",
+      "next_action": {
+        "id": "AUD15-T010:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect exact contract, dependency evidence and authority before selection; independent preparation is not acceptance",
+        "target": "docs/backlog-auditoria-2026-10-15.md",
+        "completion_signal": "Owner, AND dependencies, authority and evidence procedure established without proxy acceptance"
+      }
+    },
+    {
+      "id": "AUD15-T011",
+      "title": "Pergunta recuperável offline — AUD15-03",
+      "stage": "BUILD",
+      "priority": "P1",
+      "status": "TODO",
+      "origin": "docs/backlog-auditoria-2026-10-15.md#L119: Pergunta recuperável offline — AUD15-03; current human request implementa todo o conteudo dos planos authorizes reversible local implementation only",
+      "origin_refs": [
+        "docs/backlog-auditoria-2026-10-15.md#L119",
+        "docs/reports/evidence/aud15-implementation-20261015/quality-bar.md",
+        ".agent/plans/producao-2026-10-12.md"
+      ],
+      "dependencies": [
+        "AUD15-T001"
+      ],
+      "dependency_semantics": "AND",
+      "owner": "Proposed role / not assigned: Web/chat",
+      "acceptance_summary": "deferred send → offline → online mantém pergunta recuperável e retry idempotente; no backend pode haver resultado desconhecido, então reconciliação não duplica turno. Callback tardio não publica resposta, conteúdo não atravessa identidade e offline não se confunde com permissão revogada.",
+      "delivery_summary": "preservar texto e identidade/chave de retry ao abortar por perda de rede, mantendo descarte de resposta tardia e separação de sessão.",
+      "evidence_refs": [],
+      "milestone": "M1",
+      "size": "M",
+      "mandatory": true,
+      "accepted": false,
+      "specification_ref": "docs/backlog-auditoria-2026-10-15.md",
+      "planning_delivery_title": "Preservar pergunta e idempotência offline",
+      "common_dod_ref": "docs/backlog-auditoria-2026-10-15.md#L19-L26",
+      "next_action": {
+        "id": "AUD15-T011:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect exact contract, dependency evidence and authority before selection; independent preparation is not acceptance",
+        "target": "docs/backlog-auditoria-2026-10-15.md",
+        "completion_signal": "Owner, AND dependencies, authority and evidence procedure established without proxy acceptance"
+      }
+    },
+    {
+      "id": "AUD15-T012",
+      "title": "Preservar criação de caso — AUD15-04",
+      "stage": "BUILD",
+      "priority": "P1",
+      "status": "TODO",
+      "origin": "docs/backlog-auditoria-2026-10-15.md#L125: Preservar criação de caso — AUD15-04; current human request implementa todo o conteudo dos planos authorizes reversible local implementation only",
+      "origin_refs": [
+        "docs/backlog-auditoria-2026-10-15.md#L125",
+        "docs/reports/evidence/aud15-implementation-20261015/quality-bar.md",
+        ".agent/plans/producao-2026-10-12.md"
+      ],
+      "dependencies": [
+        "AUD15-T001"
+      ],
+      "dependency_semantics": "AND",
+      "owner": "Proposed role / not assigned: Web/casos",
+      "acceptance_summary": "enviar A e editar B enquanto pendente não apaga B silenciosamente; submit duplicado é excluído, erro permite recuperação e troca de sessão descarta callbacks. Manter requisitos de revisão/feedback que já possuem regressões.",
+      "delivery_summary": "bloquear edição explicitamente durante POST ou usar revisão de draft para limpar somente os dados efetivamente enviados.",
+      "evidence_refs": [],
+      "milestone": "M1",
+      "size": "P",
+      "mandatory": true,
+      "accepted": false,
+      "specification_ref": "docs/backlog-auditoria-2026-10-15.md",
+      "planning_delivery_title": "Preservar draft de caso após submit",
+      "common_dod_ref": "docs/backlog-auditoria-2026-10-15.md#L19-L26",
+      "next_action": {
+        "id": "AUD15-T012:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect exact contract, dependency evidence and authority before selection; independent preparation is not acceptance",
+        "target": "docs/backlog-auditoria-2026-10-15.md",
+        "completion_signal": "Owner, AND dependencies, authority and evidence procedure established without proxy acceptance"
+      }
+    },
+    {
+      "id": "AUD15-T013",
+      "title": "Paginação completa de casos — AUD15-09",
+      "stage": "BUILD",
+      "priority": "P2",
+      "status": "TODO",
+      "origin": "docs/backlog-auditoria-2026-10-15.md#L131: Paginação completa de casos — AUD15-09; current human request implementa todo o conteudo dos planos authorizes reversible local implementation only",
+      "origin_refs": [
+        "docs/backlog-auditoria-2026-10-15.md#L131",
+        "docs/reports/evidence/aud15-implementation-20261015/quality-bar.md",
+        ".agent/plans/producao-2026-10-12.md"
+      ],
+      "dependencies": [
+        "AUD15-T012"
+      ],
+      "dependency_semantics": "AND",
+      "owner": "Proposed role / not assigned: Web/casos",
+      "acceptance_summary": "51º caso acessível, sem duplicação; falha da próxima página preserva os itens anteriores; respostas tardias não alargam tenant/workspace/owner. Criar caso e atualizar lista não quebra cursor/offset.",
+      "delivery_summary": "reproduzir cenário com 51 casos; consumir paginação/total e apresentar parcialidade verdadeira, sem multiplicar coleta sem limite.",
+      "evidence_refs": [],
+      "milestone": "M2",
+      "size": "P",
+      "mandatory": true,
+      "accepted": false,
+      "specification_ref": "docs/backlog-auditoria-2026-10-15.md",
+      "planning_delivery_title": "Paginar todos os casos",
+      "common_dod_ref": "docs/backlog-auditoria-2026-10-15.md#L19-L26",
+      "next_action": {
+        "id": "AUD15-T013:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect exact contract, dependency evidence and authority before selection; independent preparation is not acceptance",
+        "target": "docs/backlog-auditoria-2026-10-15.md",
+        "completion_signal": "Owner, AND dependencies, authority and evidence procedure established without proxy acceptance"
+      }
+    },
+    {
+      "id": "AUD15-T014",
+      "title": "Recuperar após 403 sem afrouxar autoridade — AUD15-10",
+      "stage": "BUILD",
+      "priority": "P2",
+      "status": "TODO",
+      "origin": "docs/backlog-auditoria-2026-10-15.md#L137: Recuperar após 403 sem afrouxar autoridade — AUD15-10; current human request implementa todo o conteudo dos planos authorizes reversible local implementation only",
+      "origin_refs": [
+        "docs/backlog-auditoria-2026-10-15.md#L137",
+        "docs/reports/evidence/aud15-implementation-20261015/quality-bar.md",
+        ".agent/plans/producao-2026-10-12.md"
+      ],
+      "dependencies": [
+        "AUD15-T010",
+        "AUD15-T011"
+      ],
+      "dependency_semantics": "AND",
+      "owner": "Proposed role / not assigned: Web/chat/identidade",
+      "acceptance_summary": "403 não libera envio por tentativa cega; após autoridade revalidada e permissão restaurada a ação volta a funcionar. Diferenciar history.read de chat.query conforme política backend; se negado, UI permanece honesta. Testes antigos não são simplesmente removidos para ocultar falha.",
+      "delivery_summary": "substituir retry inoperante por revalidação/autenticação explícita conforme contrato; alinhar specs de 403/offline ao comportamento aprovado.",
+      "evidence_refs": [],
+      "milestone": "M2",
+      "size": "M",
+      "mandatory": true,
+      "accepted": false,
+      "specification_ref": "docs/backlog-auditoria-2026-10-15.md",
+      "planning_delivery_title": "Recuperação verdadeira após 403",
+      "common_dod_ref": "docs/backlog-auditoria-2026-10-15.md#L19-L26",
+      "next_action": {
+        "id": "AUD15-T014:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect exact contract, dependency evidence and authority before selection; independent preparation is not acceptance",
+        "target": "docs/backlog-auditoria-2026-10-15.md",
+        "completion_signal": "Owner, AND dependencies, authority and evidence procedure established without proxy acceptance"
+      }
+    },
+    {
+      "id": "AUD15-T015",
+      "title": "Validar sucesso HTTP — AUD15-12",
+      "stage": "BUILD",
+      "priority": "P2",
+      "status": "TODO",
+      "origin": "docs/backlog-auditoria-2026-10-15.md#L143: Validar sucesso HTTP — AUD15-12; current human request implementa todo o conteudo dos planos authorizes reversible local implementation only",
+      "origin_refs": [
+        "docs/backlog-auditoria-2026-10-15.md#L143",
+        "docs/reports/evidence/aud15-implementation-20261015/quality-bar.md",
+        ".agent/plans/producao-2026-10-12.md"
+      ],
+      "dependencies": [
+        "AUD15-T010"
+      ],
+      "dependency_semantics": "AND",
+      "owner": "Proposed role / not assigned: Web/contratos",
+      "acceptance_summary": "200 malformado não vira catálogo vazio nem sessão válida; erro seguro preserva request-id e suporta retry. Schemas válidos continuam aceitos; SSE mantém parser próprio e contratos de abort/terminal.",
+      "delivery_summary": "schemas/guards runtime nos envelopes consumidos, começando por sessão e documentos; rejeitar HTML/JSON inválido/campos ausentes com erro de contrato recuperável. Diferenciar endpoints legitimamente sem corpo.",
+      "evidence_refs": [],
+      "milestone": "M2",
+      "size": "M",
+      "mandatory": true,
+      "accepted": false,
+      "specification_ref": "docs/backlog-auditoria-2026-10-15.md",
+      "planning_delivery_title": "Validar respostas HTTP de sucesso",
+      "common_dod_ref": "docs/backlog-auditoria-2026-10-15.md#L19-L26",
+      "next_action": {
+        "id": "AUD15-T015:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect exact contract, dependency evidence and authority before selection; independent preparation is not acceptance",
+        "target": "docs/backlog-auditoria-2026-10-15.md",
+        "completion_signal": "Owner, AND dependencies, authority and evidence procedure established without proxy acceptance"
+      }
+    },
+    {
+      "id": "AUD15-T016",
+      "title": "Retomar o mesmo job — AUD15-11",
+      "stage": "BUILD",
+      "priority": "P2",
+      "status": "TODO",
+      "origin": "docs/backlog-auditoria-2026-10-15.md#L149: Retomar o mesmo job — AUD15-11; current human request implementa todo o conteudo dos planos authorizes reversible local implementation only",
+      "origin_refs": [
+        "docs/backlog-auditoria-2026-10-15.md#L149",
+        "docs/reports/evidence/aud15-implementation-20261015/quality-bar.md",
+        ".agent/plans/producao-2026-10-12.md"
+      ],
+      "dependencies": [
+        "AUD15-T015"
+      ],
+      "dependency_semantics": "AND",
+      "owner": "Proposed role / not assigned: Web/documentos",
+      "acceptance_summary": "timeout→published e 503→published convergem; não duplica upload/retry, não anuncia sucesso antecipado, permite cancelar acompanhamento e invalida callbacks de outro escopo. Definir recuperação após remount sem reter dados sensíveis indevidamente.",
+      "delivery_summary": "ação controlada de consultar/retomar acompanhamento, com budget/backoff e identificação do job sem reenvio do arquivo; distinguir timeout do polling de falha do job.",
+      "evidence_refs": [],
+      "milestone": "M2",
+      "size": "M",
+      "mandatory": true,
+      "accepted": false,
+      "specification_ref": "docs/backlog-auditoria-2026-10-15.md",
+      "planning_delivery_title": "Retomar acompanhamento do mesmo job",
+      "common_dod_ref": "docs/backlog-auditoria-2026-10-15.md#L19-L26",
+      "next_action": {
+        "id": "AUD15-T016:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect exact contract, dependency evidence and authority before selection; independent preparation is not acceptance",
+        "target": "docs/backlog-auditoria-2026-10-15.md",
+        "completion_signal": "Owner, AND dependencies, authority and evidence procedure established without proxy acceptance"
+      }
+    },
+    {
+      "id": "AUD15-T017",
+      "title": "Exceção original no OTel — AUD15-13",
+      "stage": "BUILD",
+      "priority": "P2",
+      "status": "TODO",
+      "origin": "docs/backlog-auditoria-2026-10-15.md#L155: Exceção original no OTel — AUD15-13; current human request implementa todo o conteudo dos planos authorizes reversible local implementation only",
+      "origin_refs": [
+        "docs/backlog-auditoria-2026-10-15.md#L155",
+        "docs/reports/evidence/aud15-implementation-20261015/quality-bar.md",
+        ".agent/plans/producao-2026-10-12.md"
+      ],
+      "dependencies": [
+        "AUD15-T001"
+      ],
+      "dependency_semantics": "AND",
+      "owner": "Proposed role / not assigned: Observabilidade/worker",
+      "acceptance_summary": "mesma exceção original preservada; falhas de attach/detach e corpo sem erro cobertas, sem `generator didn't stop after throw()`. Proteger resultado do worker atual; não apresentar o bug do utilitário como perda de job demonstrada.",
+      "delivery_summary": "separar entrada/cleanup do contexto das exceções lançadas pelo corpo, sem segundo yield após throw.",
+      "evidence_refs": [],
+      "milestone": "M2",
+      "size": "P",
+      "mandatory": true,
+      "accepted": false,
+      "specification_ref": "docs/backlog-auditoria-2026-10-15.md",
+      "planning_delivery_title": "Preservar exceções no contexto OTel",
+      "common_dod_ref": "docs/backlog-auditoria-2026-10-15.md#L19-L26",
+      "next_action": {
+        "id": "AUD15-T017:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect exact contract, dependency evidence and authority before selection; independent preparation is not acceptance",
+        "target": "docs/backlog-auditoria-2026-10-15.md",
+        "completion_signal": "Owner, AND dependencies, authority and evidence procedure established without proxy acceptance"
+      }
+    },
+    {
+      "id": "AUD15-T018",
+      "title": "Semântica acessível e foco",
+      "stage": "BUILD",
+      "priority": "P2",
+      "status": "TODO",
+      "origin": "docs/backlog-auditoria-2026-10-15.md#L161: Semântica acessível e foco; current human request implementa todo o conteudo dos planos authorizes reversible local implementation only",
+      "origin_refs": [
+        "docs/backlog-auditoria-2026-10-15.md#L161",
+        "docs/reports/evidence/aud15-implementation-20261015/quality-bar.md",
+        ".agent/plans/producao-2026-10-12.md"
+      ],
+      "dependencies": [
+        "AUD15-T010",
+        "AUD15-T011",
+        "AUD15-T012",
+        "AUD15-T013",
+        "AUD15-T014",
+        "AUD15-T016"
+      ],
+      "dependency_semantics": "AND",
+      "owner": "Proposed role / not assigned: Web/acessibilidade",
+      "acceptance_summary": "árvore acessível e navegação de teclado coerentes em mobile/tablet/desktop, sem foco preso/invisível; testes automáticos mais avaliação assistiva proporcional com evidência em T022. Nenhum PASS WCAG global derivado só de axe ou labels.",
+      "delivery_summary": "definir modalidade do drawer, interação com o fundo e restauração de foco; rever teclado, live regions, erro/loading e transições afetadas pelos fixes.",
+      "evidence_refs": [],
+      "milestone": "M2",
+      "size": "M",
+      "mandatory": true,
+      "accepted": false,
+      "specification_ref": "docs/backlog-auditoria-2026-10-15.md",
+      "planning_delivery_title": "Acessibilidade e foco nas transições corrigidas",
+      "common_dod_ref": "docs/backlog-auditoria-2026-10-15.md#L19-L26",
+      "next_action": {
+        "id": "AUD15-T018:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect exact contract, dependency evidence and authority before selection; independent preparation is not acceptance",
+        "target": "docs/backlog-auditoria-2026-10-15.md",
+        "completion_signal": "Owner, AND dependencies, authority and evidence procedure established without proxy acceptance"
+      }
+    },
+    {
+      "id": "AUD15-T019",
+      "title": "Tipagem gradual por risco",
+      "stage": "BUILD",
+      "priority": "P2",
+      "status": "TODO",
+      "origin": "docs/backlog-auditoria-2026-10-15.md#L167: Tipagem gradual por risco; current human request implementa todo o conteudo dos planos authorizes reversible local implementation only",
+      "origin_refs": [
+        "docs/backlog-auditoria-2026-10-15.md#L167",
+        "docs/reports/evidence/aud15-implementation-20261015/quality-bar.md",
+        ".agent/plans/producao-2026-10-12.md"
+      ],
+      "dependencies": [
+        "AUD15-T009",
+        "AUD15-T015",
+        "AUD15-T017"
+      ],
+      "dependency_semantics": "AND",
+      "owner": "Proposed role / not assigned: API/worker/web",
+      "acceptance_summary": "typecheck passa, novas fronteiras não dependem de Any/cast indiscriminado para silenciar erro; documentar o denominador Python além dos 13 arquivos da auditoria. Não impor reescrita de todo monorepo como dependência artificial.",
+      "delivery_summary": "ampliar tipagem nas fronteiras alteradas de identidade, transporte, worker/telemetria e adapters, com lista explícita de arquivos e baseline de dívida; preservar contratos canônicos.",
+      "evidence_refs": [],
+      "milestone": "M2",
+      "size": "M",
+      "mandatory": true,
+      "accepted": false,
+      "specification_ref": "docs/backlog-auditoria-2026-10-15.md",
+      "planning_delivery_title": "Tipagem ampliada nas fronteiras de risco",
+      "common_dod_ref": "docs/backlog-auditoria-2026-10-15.md#L19-L26",
+      "next_action": {
+        "id": "AUD15-T019:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect exact contract, dependency evidence and authority before selection; independent preparation is not acceptance",
+        "target": "docs/backlog-auditoria-2026-10-15.md",
+        "completion_signal": "Owner, AND dependencies, authority and evidence procedure established without proxy acceptance"
+      }
+    },
+    {
+      "id": "AUD15-T020",
+      "title": "Cobertura e testes discriminantes",
+      "stage": "BUILD",
+      "priority": "P2",
+      "status": "TODO",
+      "origin": "docs/backlog-auditoria-2026-10-15.md#L173: Cobertura e testes discriminantes; current human request implementa todo o conteudo dos planos authorizes reversible local implementation only",
+      "origin_refs": [
+        "docs/backlog-auditoria-2026-10-15.md#L173",
+        "docs/reports/evidence/aud15-implementation-20261015/quality-bar.md",
+        ".agent/plans/producao-2026-10-12.md"
+      ],
+      "dependencies": [
+        "AUD15-T009",
+        "AUD15-T010",
+        "AUD15-T011",
+        "AUD15-T012",
+        "AUD15-T013",
+        "AUD15-T014",
+        "AUD15-T015",
+        "AUD15-T016",
+        "AUD15-T017",
+        "AUD15-T018",
+        "AUD15-T019"
+      ],
+      "dependency_semantics": "AND",
+      "owner": "Proposed role / not assigned: QA/API/web",
+      "acceptance_summary": "todos os invariantes corrigidos têm negativos que rejeitam baseline; relatório informa arquivos/linhas/branches e exclusões, sem anunciar 92,57% como cobertura global. Não baixar floors vigentes; ampliação incompatível exige melhoria de testes e decisão de escopo explícita, não exclusão para obter verde.",
+      "delivery_summary": "incluir chat workspace, transporte e documentos no denominador relevante, além das suites novas; medir API/worker alterados, identificar ramos críticos e inventariar cenários dos 13 achados.",
+      "evidence_refs": [],
+      "milestone": "M2",
+      "size": "M",
+      "mandatory": true,
+      "accepted": false,
+      "specification_ref": "docs/backlog-auditoria-2026-10-15.md",
+      "planning_delivery_title": "Cobertura com denominador explícito e cenários novos",
+      "common_dod_ref": "docs/backlog-auditoria-2026-10-15.md#L19-L26",
+      "next_action": {
+        "id": "AUD15-T020:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect exact contract, dependency evidence and authority before selection; independent preparation is not acceptance",
+        "target": "docs/backlog-auditoria-2026-10-15.md",
+        "completion_signal": "Owner, AND dependencies, authority and evidence procedure established without proxy acceptance"
+      }
+    },
+    {
+      "id": "AUD15-T021",
+      "title": "Docs sem drift",
+      "stage": "BUILD",
+      "priority": "P2",
+      "status": "TODO",
+      "origin": "docs/backlog-auditoria-2026-10-15.md#L179: Docs sem drift; current human request implementa todo o conteudo dos planos authorizes reversible local implementation only",
+      "origin_refs": [
+        "docs/backlog-auditoria-2026-10-15.md#L179",
+        "docs/reports/evidence/aud15-implementation-20261015/quality-bar.md",
+        ".agent/plans/producao-2026-10-12.md"
+      ],
+      "dependencies": [
+        "AUD15-T002",
+        "AUD15-T005",
+        "AUD15-T006",
+        "AUD15-T007",
+        "AUD15-T008",
+        "AUD15-T009",
+        "AUD15-T010",
+        "AUD15-T011",
+        "AUD15-T012",
+        "AUD15-T013",
+        "AUD15-T014",
+        "AUD15-T015",
+        "AUD15-T016",
+        "AUD15-T017",
+        "AUD15-T018",
+        "AUD15-T019",
+        "AUD15-T020"
+      ],
+      "dependency_semantics": "AND",
+      "owner": "Proposed role / not assigned: Documentação/Lead",
+      "acceptance_summary": "`make docs-check` e diff check aprovam; exemplos refletem implementação validada, NOT_RUN externo e limitações permanecem visíveis; não promover produto pela nota nem reescrever relatório AUD15.",
+      "delivery_summary": "alinhar CSRF, histórico/streaming, logout federado, toolchain, erros e procedimentos de recuperação; ligar provas novas sem atualizar timestamps históricos.",
+      "evidence_refs": [],
+      "milestone": "M2",
+      "size": "P",
+      "mandatory": true,
+      "accepted": false,
+      "specification_ref": "docs/backlog-auditoria-2026-10-15.md",
+      "planning_delivery_title": "Documentação alinhada ao comportamento",
+      "common_dod_ref": "docs/backlog-auditoria-2026-10-15.md#L19-L26",
+      "next_action": {
+        "id": "AUD15-T021:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect exact contract, dependency evidence and authority before selection; independent preparation is not acceptance",
+        "target": "docs/backlog-auditoria-2026-10-15.md",
+        "completion_signal": "Owner, AND dependencies, authority and evidence procedure established without proxy acceptance"
+      }
+    },
+    {
+      "id": "AUD15-T022",
+      "title": "E2E local atual",
+      "stage": "BUILD",
+      "priority": "P1",
+      "status": "TODO",
+      "origin": "docs/backlog-auditoria-2026-10-15.md#L185: E2E local atual; current human request implementa todo o conteudo dos planos authorizes reversible local implementation only",
+      "origin_refs": [
+        "docs/backlog-auditoria-2026-10-15.md#L185",
+        "docs/reports/evidence/aud15-implementation-20261015/quality-bar.md",
+        ".agent/plans/producao-2026-10-12.md"
+      ],
+      "dependencies": [
+        "AUD15-T002",
+        "AUD15-T006",
+        "AUD15-T007",
+        "AUD15-T008",
+        "AUD15-T009",
+        "AUD15-T010",
+        "AUD15-T011",
+        "AUD15-T012",
+        "AUD15-T013",
+        "AUD15-T014",
+        "AUD15-T015",
+        "AUD15-T016",
+        "AUD15-T018"
+      ],
+      "dependency_semantics": "AND",
+      "owner": "Proposed role / not assigned: QA/browser",
+      "acceptance_summary": "build servido e versão do browser identificados, cenários positivos/negativos passam com console/rede/artefatos revisados; nenhum teste depende de política antiga contraditória. Mocks, API real e autoridade externa são classes distintas. Iniciar servidor/portas só na rodada autorizada, sem substituir a GUI existente; E2E local não fecha PROD12-041 real.",
+      "delivery_summary": "ensaio browser aprovado para identidade multiaba, offline durante envio, 403/revalidação, criação/paginação de casos, resposta malformada e retomada de job; matriz mobile/tablet/desktop e acessibilidade. Fixtures sintéticas e backend controlado devem ser explicitados.",
+      "evidence_refs": [],
+      "milestone": "M3",
+      "size": "G",
+      "mandatory": true,
+      "accepted": false,
+      "specification_ref": "docs/backlog-auditoria-2026-10-15.md",
+      "planning_delivery_title": "E2E local atual com testes de isolamento e recuperação",
+      "common_dod_ref": "docs/backlog-auditoria-2026-10-15.md#L19-L26",
+      "next_action": {
+        "id": "AUD15-T022:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect exact contract, dependency evidence and authority before selection; independent preparation is not acceptance",
+        "target": "docs/backlog-auditoria-2026-10-15.md",
+        "completion_signal": "Owner, AND dependencies, authority and evidence procedure established without proxy acceptance"
+      }
+    },
+    {
+      "id": "AUD15-T023",
+      "title": "Gate local integrado",
+      "stage": "BUILD",
+      "priority": "P1",
+      "status": "TODO",
+      "origin": "docs/backlog-auditoria-2026-10-15.md#L191: Gate local integrado; current human request implementa todo o conteudo dos planos authorizes reversible local implementation only",
+      "origin_refs": [
+        "docs/backlog-auditoria-2026-10-15.md#L191",
+        "docs/reports/evidence/aud15-implementation-20261015/quality-bar.md",
+        ".agent/plans/producao-2026-10-12.md"
+      ],
+      "dependencies": [
+        "AUD15-T002",
+        "AUD15-T003",
+        "AUD15-T004",
+        "AUD15-T005",
+        "AUD15-T006",
+        "AUD15-T007",
+        "AUD15-T008",
+        "AUD15-T009",
+        "AUD15-T010",
+        "AUD15-T011",
+        "AUD15-T012",
+        "AUD15-T013",
+        "AUD15-T014",
+        "AUD15-T015",
+        "AUD15-T016",
+        "AUD15-T017",
+        "AUD15-T018",
+        "AUD15-T019",
+        "AUD15-T020",
+        "AUD15-T021",
+        "AUD15-T022"
+      ],
+      "dependency_semantics": "AND",
+      "owner": "Proposed role / not assigned: Integrador/QA",
+      "acceptance_summary": "validação, lint, tipos, build, regressões/API/worker/web e inventário aprovados; lane VPS aprovada no executor compatível; skips classificados sem obrigação obrigatória ausente. Counts/coleção e mudanças justificados. Reviewer verifica negativos de identidade/draft/isolamento. Candidato integrado e evidência suficiente para fechar gaps locais, mas **não** GO de produção; obrigações históricas de PROD12-026 continuam exigindo seu próprio aceite.",
+      "delivery_summary": "repetir gates canônicos e suite ampliada no candidato único, revalidar os patches já observados e obter crítica independente das fronteiras corrigidas.",
+      "evidence_refs": [],
+      "milestone": "M3",
+      "size": "G",
+      "mandatory": true,
+      "accepted": false,
+      "specification_ref": "docs/backlog-auditoria-2026-10-15.md",
+      "planning_delivery_title": "Candidato local integrado e revisão independente",
+      "common_dod_ref": "docs/backlog-auditoria-2026-10-15.md#L19-L26",
+      "next_action": {
+        "id": "AUD15-T023:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect exact contract, dependency evidence and authority before selection; independent preparation is not acceptance",
+        "target": "docs/backlog-auditoria-2026-10-15.md",
+        "completion_signal": "Owner, AND dependencies, authority and evidence procedure established without proxy acceptance"
+      }
+    },
+    {
+      "id": "AUD15-T024",
+      "title": "Recursos, perfil e mapa externo",
+      "stage": "BUILD",
+      "priority": "P1",
+      "status": "TODO",
+      "origin": "docs/backlog-auditoria-2026-10-15.md#L197: Recursos, perfil e mapa externo; current human request implementa todo o conteudo dos planos authorizes reversible local implementation only",
+      "origin_refs": [
+        "docs/backlog-auditoria-2026-10-15.md#L197",
+        "docs/reports/evidence/aud15-implementation-20261015/quality-bar.md",
+        ".agent/plans/producao-2026-10-12.md"
+      ],
+      "dependencies": [
+        "AUD15-T001"
+      ],
+      "dependency_semantics": "AND",
+      "owner": "Proposed role / not assigned: Lead/SRE/produto",
+      "acceptance_summary": "cada lacuna externa tem ID canônico, owner proposto, pré-condição, gate, evidência requerida e autoridade pendente; preparação pode acabar com bloqueios explícitos, mas nenhum gate externo é considerado cumprido. Proposta revisada de vínculo T023→PROD12-026/050 e novos gaps antes de canary; nenhuma edição de dependências do controlador neste pedido.",
+      "delivery_summary": "reconciliar PROD12-004/005/006 e 027–056 com a auditoria nova: perfil postgres-local-v1/D04 já registrado, uso ou exposição efetiva de OIDC, direitos do corpus, ambientes, namespaces, custos, SLO, RPO/RTO, janela de testes e pessoas com poder de aborto/promoção. Manter contratos existentes, sem inventar novas autorizações.",
+      "evidence_refs": [],
+      "milestone": "M0",
+      "size": "M",
+      "mandatory": true,
+      "accepted": false,
+      "specification_ref": "docs/backlog-auditoria-2026-10-15.md",
+      "planning_delivery_title": "Reconciliar contratos externos, recursos e autoridades",
+      "common_dod_ref": "docs/backlog-auditoria-2026-10-15.md#L19-L26",
+      "next_action": {
+        "id": "AUD15-T024:INSPECT",
+        "kind": "INSPECT",
+        "summary": "Inspect exact contract, dependency evidence and authority before selection; independent preparation is not acceptance",
+        "target": "docs/backlog-auditoria-2026-10-15.md",
+        "completion_signal": "Owner, AND dependencies, authority and evidence procedure established without proxy acceptance"
+      }
+    },
+    {
+      "id": "AUD15-LOCAL-PREPARATION",
+      "title": "Prepare and integrate authorized reversible AUD15 local work without accepting task dependencies",
+      "stage": "BUILD",
+      "priority": "P0",
+      "status": "IN_PROGRESS",
+      "origin": "Current human request implementa todo o conteudo dos planos and exclusive delegated controller ownership; safe local preparation only",
+      "dependencies": [],
+      "owner": "Exclusive delegated controller writer; Lead integrates functional evidence",
+      "accepted": false,
+      "acceptance_summary": "Preserve baseline, adopt exact AUD15 TODO contracts and verify controller/views/integrity; independent review, all task dependencies and product acceptance remain separate",
+      "evidence_refs": [
+        ".runtime/implementation-aud15-20261015/control/backup-before-adoption/manifest.json",
+        "docs/reports/evidence/aud15-implementation-20261015/quality-bar.md",
+        ".agent/plans/producao-2026-10-12.md",
+        ".runtime/implementation-aud15-20261015/lead/candidate-after-integrated-round5.json",
+        ".runtime/implementation-aud15-20261015/lead/python-final-cohort.json",
+        ".runtime/implementation-aud15-20261015/lead/final-critic.md"
+      ],
+      "next_action": {
+        "id": "AUD15-LOCAL-PREPARATION:DECIDE-B01-RESULT-CONTRACT",
+        "kind": "DECIDE",
+        "summary": "Obtain explicit human B01 logout/audit result-contract decision before further implementation; keep FAIL regression and frozen bar",
+        "target": ".agent/plans/producao-2026-10-12.md",
+        "completion_signal": "Human chooses and bounds transactional/fenced sink capability or explicit indeterminate-result semantics; no choice, task acceptance or external authority inferred"
+      }
     }
   ]
 }

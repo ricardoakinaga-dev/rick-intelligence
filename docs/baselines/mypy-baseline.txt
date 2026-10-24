@@ -11,3 +11,21 @@
 # Cobertura inicial: contratos e autorização, conforme o plano AUD07-17.
 packages/contracts/src = 0
 packages/authorization/src = 0
+# AUD15-T019 (2026-10-15): oito fronteiras explicitamente verificadas.
+# Não altera os limites antigos nem aceita dívida nova. Helper/auth exigem
+# annotations; imports não listados têm interfaces, não cobertura de corpo.
+# A segunda expansão corrige os 27 erros do probe identity/OTel; os quatro
+# arquivos são adotados SOMENTE com zero erros, não como dívida tolerada.
+apps/api/src/routes/auth.py = 0
+apps/api/src/core/rate_limit.py = 0
+apps/api/src/dependencies/identity.py = 0
+apps/api/src/services/identity_offload.py = 0
+packages/identity/src/rick_identity/snapshots.py = 0
+packages/identity/src/rick_identity/postgres.py = 0
+packages/identity/src/rick_identity/oidc.py = 0
+apps/api/src/core/otel.py = 0
+# AUD24-042 (2026-10-24): fronteiras de auditoria tipadas, adotadas com zero erros.
+apps/api/src/services/audit.py = 0
+apps/api/src/services/audit_event.py = 0
+apps/api/src/services/audit_operations_store.py = 0
+apps/api/src/services/postgres_audit.py = 0

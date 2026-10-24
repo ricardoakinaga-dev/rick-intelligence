@@ -203,7 +203,7 @@ test("admin refresh failures remove old readiness and audit totals independently
   let auditFails = false;
   await page.route("**/api/v1/admin/health", route => healthFails
     ? route.fulfill({ status: 503, json: { error: { message: "Serviço indisponível" } } })
-    : route.fulfill({ json: { status: "ready", checks: [{ name: "kernel", ok: true }] } }));
+    : route.fulfill({ json: { status: "ready", checks: [{ name: "kernel", ok: true, required: true }] } }));
   await page.route("**/api/v1/admin/audit", route => auditFails
     ? route.fulfill({ status: 500, json: { error: { message: "Auditoria indisponível" } } })
     : route.fulfill({ json: { total: 7, items: [{ action: "synthetic_action", actor_user_id: "synthetic-km" }] } }));

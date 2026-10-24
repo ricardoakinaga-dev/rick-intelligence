@@ -319,6 +319,7 @@ async def _shutdown_owned_resources(app: FastAPI) -> None:
         shutdown_resources: list[object] = []
         seen_shutdown: set[int] = set()
         for resource in (
+            getattr(app.state, "identity_offload", None),
             *getattr(app.state, "owned_shutdown_resources", ()),
             getattr(app.state, "owned_ingestion", None),
             *getattr(app.state, "owned_runtime_resources", ()),
@@ -356,7 +357,8 @@ async def _shutdown_owned_resources(app: FastAPI) -> None:
                     key=(id(resource), "shutdown"), **shutdown_kwargs,
                 )
                 if completed is False or getattr(completed, "timed_out", False) is True:
-                    errors.append("ingestion_shutdown_timeout")
+                    errors.append("identity_shutdown_timeout" if resource is getattr(app.state, "identity_offload", None)
+                                  else "ingestion_shutdown_timeout")
                 else:
                     stopped_resources.add(id(resource))
             except Exception as exc:  # pragma: no cover - defensive boundary
@@ -702,6 +704,8 @@ def create_app(settings: ApiSettings | None = None, providers: Providers | None 
     )
     app.router.route_class = ClosingStreamingRoute
     app.state.providers = providers
+    from services.identity_offload import IdentityOffload
+    app.state.identity_offload = IdentityOffload()
     app.state.settings = settings
     # A composition fact, not a health claim. Injected implementations cannot
     # be inferred from configured names, class reprs or secret-bearing URLs.

@@ -68,6 +68,16 @@ def _get_int(name: str, default: int) -> int:
         raise ValueError(f"Invalid integer for {name}") from None
 
 
+def _get_optional_int(name: str) -> int | None:
+    raw = os.getenv(name)
+    if raw is None or not raw.strip():
+        return None
+    try:
+        return int(raw.strip())
+    except ValueError:
+        raise ValueError(f"Invalid integer for {name}") from None
+
+
 _ENVIRONMENT_ALIASES = {
     "local": "local",
     "dev": "dev",
@@ -101,6 +111,8 @@ class ApiSettings:
     session_cookie_name: str = field(default_factory=lambda: _get("SESSION_COOKIE_NAME", "rick_session"))
     session_cookie_secure: bool = field(default_factory=lambda: _get_bool("SESSION_COOKIE_SECURE", False))
     session_cookie_samesite: str = field(default_factory=lambda: _get("SESSION_COOKIE_SAMESITE", "lax"))
+    session_ttl_seconds: int = field(default_factory=lambda: _get_int("SESSION_TTL_SECONDS", 8 * 3600))
+    session_absolute_ttl_seconds: int = field(default_factory=lambda: _get_int("SESSION_ABSOLUTE_TTL_SECONDS", 7 * 24 * 3600))
     csrf_token: str = field(default_factory=lambda: _get("CSRF_TOKEN", ""), repr=False)
     csrf_header_name: str = field(default_factory=lambda: _get("CSRF_HEADER_NAME", "X-CSRF-Token"))
     csrf_cookie_name: str = field(default_factory=lambda: _get("CSRF_COOKIE_NAME", "rick_csrf"))
@@ -151,6 +163,11 @@ class ApiSettings:
     login_rate_limit_per_min: int = field(default_factory=lambda: _get_int("LOGIN_RATE_LIMIT_PER_MIN", 10))
     chat_rate_limit_per_min: int = field(default_factory=lambda: _get_int("CHAT_RATE_LIMIT_PER_MIN", 30))
     recovery_rate_limit_per_min: int = field(default_factory=lambda: _get_int("RECOVERY_RATE_LIMIT_PER_MIN", 5))
+    # Tenant-wide production ceilings need operational ratification; do not
+    # silently equate a per-account default with a whole-organization budget.
+    login_tenant_rate_limit_per_min: int | None = field(default_factory=lambda: _get_optional_int("LOGIN_TENANT_RATE_LIMIT_PER_MIN"))
+    recovery_tenant_rate_limit_per_min: int | None = field(default_factory=lambda: _get_optional_int("RECOVERY_TENANT_RATE_LIMIT_PER_MIN"))
+    search_tenant_rate_limit_per_min: int | None = field(default_factory=lambda: _get_optional_int("SEARCH_TENANT_RATE_LIMIT_PER_MIN"))
     knowledge_sqlite_path: str = field(default_factory=lambda: _get("RICK_KNOWLEDGE_SQLITE_PATH", "").strip())
     vector_sqlite_path: str = field(default_factory=lambda: _get("RICK_VECTOR_SQLITE_PATH", "").strip())
     chat_history_sqlite_path: str = field(default_factory=lambda: _get("RICK_CHAT_HISTORY_SQLITE_PATH", "").strip())
@@ -228,12 +245,15 @@ class ApiSettings:
             raise ValueError("CSRF_HEADER_NAME must be a visible token")
         if not self.csrf_cookie_name or any(ord(char) < 0x21 or ord(char) > 0x7E for char in self.csrf_cookie_name):
             raise ValueError("CSRF_COOKIE_NAME must be a visible token")
-        if self.login_rate_limit_per_min <= 0 or self.login_rate_limit_per_min > 100_000:
+        if type(self.login_rate_limit_per_min) is not int or not 1 <= self.login_rate_limit_per_min <= 100_000:
             raise ValueError("LOGIN_RATE_LIMIT_PER_MIN out of range")
-        if self.chat_rate_limit_per_min <= 0 or self.chat_rate_limit_per_min > 100_000:
+        if type(self.chat_rate_limit_per_min) is not int or not 1 <= self.chat_rate_limit_per_min <= 100_000:
             raise ValueError("CHAT_RATE_LIMIT_PER_MIN out of range")
-        if self.recovery_rate_limit_per_min <= 0 or self.recovery_rate_limit_per_min > 100_000:
+        if type(self.recovery_rate_limit_per_min) is not int or not 1 <= self.recovery_rate_limit_per_min <= 100_000:
             raise ValueError("RECOVERY_RATE_LIMIT_PER_MIN out of range")
+        for name, value in (("LOGIN_TENANT_RATE_LIMIT_PER_MIN", self.login_tenant_rate_limit_per_min), ("RECOVERY_TENANT_RATE_LIMIT_PER_MIN", self.recovery_tenant_rate_limit_per_min), ("SEARCH_TENANT_RATE_LIMIT_PER_MIN", self.search_tenant_rate_limit_per_min)):
+            if value is not None and (type(value) is not int or not 1 <= value <= 100_000):
+                raise ValueError(f"{name} out of range")
         if len(self.knowledge_sqlite_path) > 512 or "\x00" in self.knowledge_sqlite_path:
             raise ValueError("RICK_KNOWLEDGE_SQLITE_PATH is invalid")
         if len(self.vector_sqlite_path) > 512 or "\x00" in self.vector_sqlite_path:

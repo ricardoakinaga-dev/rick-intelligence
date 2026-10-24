@@ -21,7 +21,7 @@ async function mockSession(page: Page) {
 }
 
 function visualPath(screen: string, projectName: string) {
-  return resolve(process.cwd(), `../../artifacts/visual/state-of-art/${screen}-${projectName}.png`);
+  return resolve(process.env.RICK_VISUAL_EVIDENCE_DIR || "../../artifacts/visual/state-of-art", `${screen}-${projectName}.png`);
 }
 
 test("search uses the root response contract and preserves query params without live API", async ({ page }, testInfo) => {

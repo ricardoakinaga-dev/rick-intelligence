@@ -114,3 +114,22 @@ def test_persisted_metadata_json_is_bounded_and_finite():
         events = store.list(tenant_id="tenant-a")
 
         assert events == [{"action": "document.publish", "tenant_id": "tenant-a"}]
+
+
+def test_append_uses_stable_event_id_for_same_operation_and_status():
+    first = Connection([("INSERT INTO rick_audit_events", [])])
+    second = Connection([("INSERT INTO rick_audit_events", [])])
+    sink = PostgresAuditSink(factory_for(first, second))
+    event = {
+        "action": "auth.logout",
+        "tenant_id": "tenant-1",
+        "request_id": "request-1",
+        "status": "effect_applied",
+    }
+    assert sink.append(event) is True
+    assert sink.append(event) is True
+    first_id = first.cursor_instance.queries[0][1][0]
+    second_id = second.cursor_instance.queries[0][1][0]
+    assert first_id == second_id
+    assert first_id.startswith("audit-")
+    assert "ON CONFLICT (event_id) DO NOTHING" in first.cursor_instance.queries[0][0]

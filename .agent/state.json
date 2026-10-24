@@ -11,10 +11,10 @@
   "risk_level": "MEDIUM",
   "blast_radius": "CROSS_SYSTEM",
   "status": "IN_PROGRESS",
-  "active_execplan": ".agent/plans/phase-3-runtime-evidence-production-promotion.md",
-  "active_task": "Q17-01.A",
+  "active_execplan": ".agent/plans/producao-2026-10-12.md",
+  "active_task": "AUD15-LOCAL-PREPARATION",
   "verification_state": "PARTIAL",
-  "repository_state": "Recovered clean base 96efd7ca9e50adab517a52a507cc408e2bfdb263. October AUD07 local construction fixes completed; expanded matrix 7719 passed/221 external skips, prior CI/API/web gates passed including 339 Playwright. Exact changed code/configuration bound by docs/reports/retomada-final-2026-10-09.json. Independent review and remote/external runtime/release acceptance remain open; PH3-2 lab BLOCKED. Q17-01.A IN_PROGRESS/PARTIAL; deployed-inventory action unchanged.",
+  "repository_state": "AUD15760-file candidate6d0562090d560f2c6a68b9ac1765f2988134180ecb1d693c0414b6a95a08645e: localCI4/build4exit0/browser363PASS; rawPython7749PASS278FAIL221SKIP88sub plus disjoint15PASS11sub (cohort7764/278/221/99,not single stdout). Fresh independentREJECT:B01FAIL,B16unsatisfied,VPS277+221skips unresolved. B07/frontend fixes locally sustained.117items(92unchanged,24TODO/unaccepted,umbrellaIN_PROGRESS). Human B01 contract and legacy policies unresolved; PARTIAL/NO-GO, no acceptance.",
   "instruction_scope_refs": [
     ".agent/PLANS.md",
     "scripts/control_plane/vendor/engineering_framework/references/contracts.json",
@@ -22,27 +22,40 @@
     "docs/plans/plano-executivo-qualidade-2026-09-17.md",
     "docs/plans/backlog-qualidade-2026-09-17.md",
     "docs/backlog-auditoria-2026-10-07.md",
-    "docs/plans/execplan-retomada-2026-10-09.md"
+    "docs/plans/execplan-retomada-2026-10-09.md",
+    "docs/backlog-producao-2026-10-12.md",
+    "docs/roadmap-producao-2026-10-12.md",
+    "docs/architecture/domain-decision-policy-2026-09-24.md",
+    "docs/operations/vps-github-images.md",
+    "docs/backlog-auditoria-2026-10-15.md",
+    "docs/reports/evidence/aud15-implementation-20261015/quality-bar.md"
   ],
-  "last_gate_record": ".agent/gates/q24-local-integration-implementation-ready.json",
-  "last_event_id": "EVT-Q17-01A-FINAL-LOCAL-MATRIX-20261009",
-  "state_revision": 384,
-  "next_gate": "IMPLEMENTATION_READY",
-  "active_action_id": "Q17-01.A:VERIFY-Q17-19A-DEPLOYED-INVENTORY",
+  "last_gate_record": ".agent/gates/aud15-safe-local-preparation-ready.json",
+  "last_event_id": "EVT-AUD15-FINAL-CONTROL-SEALED-20261015",
+  "state_revision": 391,
+  "next_gate": "VERIFIED",
+  "active_action_id": "AUD15-LOCAL-PREPARATION:DECIDE-B01-RESULT-CONTRACT",
   "blocked_by": [
     "Q17-19.A local checksum-safe compatibility is live-tested; actual installed history/checksums and D02-authorized read-only database inventory remain unavailable",
     "Complete API/worker composition with approved external services, deployed identity/session behavior and distributed tenant isolation remain unproven",
-    "Approved provider/model/corpus, representative RAG evaluation and domain thresholds require D03/D04 decisions",
+    "Provider selection and D04 intake policy are documented; account-authorized models/dimensions/cost, representative corpus/rights and domain thresholds remain unproven",
     "Restore/RPO/RTO, capacity/chaos/soak, live telemetry, visual/accessibility and release/promotion require evidence and D05/D07 authority",
-    "PH3-2 lab entry is BLOCKED: overdue Docker-runtime and private-config obligations remain unresolved; administrative recheck cannot authorize runtime."
+    "PH3-2 lab entry is BLOCKED: overdue Docker-runtime and private-config obligations remain unresolved; administrative recheck cannot authorize runtime.",
+    "PROD12-001 original audit raw logs remain unrecuperated; transcript is not original execution proof; full fresh discriminating probes pending",
+    "PROD12-002 alternate-checkout recovery regression and independent review remain pending; local structural success is not artifact resume",
+    "AUD15 external B17 retains PROD12 authority/evidence obligations; local preparation is not product verification or GO",
+    "AUD15 B01 genuine FAIL: synchronous audit sink can persist completed after503; human result-contract decision required. B07 resetlookup/admission and frontend draft/guards have current bounded local proof, not external/product approval.",
+    "Legacy browserv1/v2 cutover/reload/coexistence and orphan-marker policy require human decision before release; no retroactive hard-fail or policy ratification inferred."
   ],
   "human_approval_required": [
     "D01: synthetic data, tenants, isolation and retention",
     "D02: disposable runtime, secrets, bootstrap identity, TLS/topology and trust store",
     "D03: provider, model, endpoints, cost and interruption limits",
-    "D04: corpus, licenses, domain risk, labels and thresholds",
+    "D04: broad clinical intake with mandatory human review already accepted; corpus rights/representativeness, labels, thresholds, clinical safety and release-profile ratification remain separate",
     "D05: SLO/DR, workloads, samples, windows and freshness",
-    "D07: separate promotion, signing and deployment authority"
+    "D07: separate promotion, signing and deployment authority",
+    "B01 human boundary: choose and bound transactional/fenced sink capability versus explicit indeterminate logout/audit result semantics; no decision made and no new D-number.",
+    "Before release: explicit legacy browserv1/v2 cutover/reload/coexistence and orphan-marker policy; no agent-invented hard-fail."
   ],
-  "updated_at": "2026-10-09T11:21:15.794412Z"
+  "updated_at": "2026-10-15T22:36:31.630352Z"
 }

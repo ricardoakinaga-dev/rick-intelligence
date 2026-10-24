@@ -7,20 +7,29 @@ choices stay in the application composition root.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
+from collections.abc import Buffer, Callable, Mapping, Sequence
 from contextlib import contextmanager
 from datetime import datetime
 import hashlib
 import json
 import secrets
 import time
-from typing import Iterator, Protocol
+from typing import Iterator, Protocol, SupportsFloat, SupportsIndex, SupportsInt, cast
 
 from rick_identity.snapshots import legacy_snapshot, snapshot_payload, valid_authorization_snapshot
 
 
+class DbCursor(Protocol):
+    @property
+    def rowcount(self) -> int: ...
+    def execute(self, query: str, params: tuple[object, ...] = ()) -> object: ...
+    def fetchone(self) -> object | None: ...
+    def fetchall(self) -> Sequence[object]: ...
+    def close(self) -> object: ...
+
+
 class DbConnection(Protocol):
-    def cursor(self) -> object: ...
+    def cursor(self) -> DbCursor: ...
     def commit(self) -> object: ...
     def rollback(self) -> object: ...
     def close(self) -> object: ...
@@ -51,7 +60,7 @@ def _reject_duplicate_json_keys(pairs: list[tuple[str, object]]) -> dict[str, ob
     return decoded
 
 
-def _row_dict(cursor: object, row: object) -> dict[str, object]:
+def _row_dict(cursor: DbCursor, row: object) -> dict[str, object]:
     if isinstance(row, Mapping):
         return {str(key): value for key, value in row.items()}
     description = getattr(cursor, "description", None) or ()
@@ -132,13 +141,28 @@ def _valid_authorization_snapshot(value: Mapping[str, object]) -> bool:
     return valid_authorization_snapshot(value)
 
 
+class _SupportsTrunc(Protocol):
+    def __trunc__(self) -> int: ...
+
+
+def _db_int(value: object) -> int:
+    # DB-API values are untrusted objects. int itself remains the runtime
+    # validator, including its existing coercions and TypeError/ValueError.
+    return int(cast(str | Buffer | SupportsInt | SupportsIndex | _SupportsTrunc, value))
+
+
+def _db_float(value: object) -> float:
+    # As above: describe the conversion boundary, do not replace its policy.
+    return float(cast(str | Buffer | SupportsFloat | SupportsIndex, value))
+
+
 def _epoch(value: object) -> float | None:
     if value is None:
         return None
     if isinstance(value, datetime):
         return value.timestamp()
     try:
-        return float(value)
+        return _db_float(value)
     except (TypeError, ValueError):
         return None
 
@@ -165,9 +189,9 @@ class _PostgresStoreBase:
         *,
         write: bool = False,
         connection: DbConnection | None = None,
-    ) -> Iterator[tuple[DbConnection, object]]:
+    ) -> Iterator[tuple[DbConnection, DbCursor]]:
         owns_connection = connection is None
-        cursor: object | None = None
+        cursor: DbCursor | None = None
         try:
             if owns_connection:
                 connection = self._connection_factory()
@@ -206,19 +230,19 @@ class _PostgresStoreBase:
                     pass
 
     @staticmethod
-    def _execute(cursor: object, query: str, params: tuple[object, ...] = ()) -> None:
+    def _execute(cursor: DbCursor, query: str, params: tuple[object, ...] = ()) -> None:
         execute = getattr(cursor, "execute", None)
         if not callable(execute):
             raise PostgresIdentityError()
         execute(query, params)
 
     @staticmethod
-    def _fetchone(cursor: object) -> dict[str, object] | None:
+    def _fetchone(cursor: DbCursor) -> dict[str, object] | None:
         row = getattr(cursor, "fetchone", lambda: None)()
         return None if row is None else _row_dict(cursor, row)
 
     @staticmethod
-    def _fetchall(cursor: object) -> list[dict[str, object]]:
+    def _fetchall(cursor: DbCursor) -> list[dict[str, object]]:
         return [_row_dict(cursor, row) for row in getattr(cursor, "fetchall", lambda: [])()]
 
     def health_check(self) -> bool:
@@ -254,8 +278,8 @@ class PostgresUserStore(_PostgresStoreBase):
             "external_subject": row.get("external_subject"),
             "email": row.get("email"),
             "status": row.get("status", "active"),
-            "password_version": int(row.get("password_version") or 1),
-            "role_version": int(row.get("role_version") or 1),
+            "password_version": _db_int(row.get("password_version") or 1),
+            "role_version": _db_int(row.get("role_version") or 1),
         }
         if row.get("password_hash"):
             record["password_hash"] = row["password_hash"]
@@ -281,24 +305,36 @@ class PostgresUserStore(_PostgresStoreBase):
         return self._record(row) if row else None
 
     def get_by_email_for_tenant(
-        self, email: str, tenant_id: str, *, connection: DbConnection | None = None
+        self, email: str, tenant_id: str, *, workspace_id: str | None = None,
+        connection: DbConnection | None = None,
     ) -> dict | None:
-        """Resolve one active membership for this email inside the tenant."""
+        """Resolve one active membership for this email inside the tenant.
+
+        Without ``workspace_id``, more than one active membership is an
+        actionable ambiguity (409), not an authentication failure.
+        """
         try:
             value = _required(email, maximum=256).casefold()
             tenant = _required(tenant_id, maximum=128)
+            workspace = _required(workspace_id, maximum=128) if workspace_id is not None else None
         except PostgresIdentityError:
             return None
+        query = (
+            self._SELECT
+            + " WHERE lower(u.email) = %s AND m.tenant_id = %s"
+            + " AND u.status = 'active' AND m.status = 'active'"
+        )
+        params: list[object] = [value, tenant]
+        if workspace is not None:
+            query += " AND m.workspace_id = %s"
+            params.append(workspace)
+        query += " LIMIT 2"
         with self._session(connection=connection) as (_connection, cursor):
-            self._execute(
-                cursor,
-                self._SELECT
-                + " WHERE lower(u.email) = %s AND m.tenant_id = %s"
-                + " AND u.status = 'active' AND m.status = 'active' LIMIT 2",
-                (value, tenant),
-            )
+            self._execute(cursor, query, tuple(params))
             rows = self._fetchall(cursor)
         if len(rows) != 1:
+            if len(rows) > 1 and workspace is None:
+                raise PostgresIdentityError("conflict")
             return None
         return self._record(rows[0])
 
@@ -469,7 +505,7 @@ class PostgresUserStore(_PostgresStoreBase):
             )
             row = self._fetchone(cursor)
         try:
-            return max(0, int((row or {}).get("count", 0) or 0))
+            return max(0, _db_int((row or {}).get("count", 0) or 0))
         except (TypeError, ValueError):
             raise PostgresIdentityError() from None
 
@@ -492,8 +528,9 @@ class PostgresUserStore(_PostgresStoreBase):
         result: dict[str, dict] = {}
         for row in rows:
             record = self._record(row)
-            if record is not None and isinstance(record.get("user_id"), str):
-                result.setdefault(record["user_id"], record)
+            user_id = record.get("user_id") if record is not None else None
+            if record is not None and isinstance(user_id, str):
+                result.setdefault(user_id, record)
         return list(result.values())
 
     def save(self, record: dict, *, connection: DbConnection | None = None) -> None:
@@ -630,7 +667,9 @@ class PostgresSessionStore(_PostgresStoreBase):
     def _record(row: Mapping[str, object]) -> dict[str, object] | None:
         snapshot = _json(row.get("authorization_snapshot"), _INVALID_JSON)
         if not isinstance(snapshot, Mapping) or not _valid_authorization_snapshot(snapshot):
-            return None
+            # A returned corrupt row is not a missing credential. Preserve the
+            # distinction for callers that may otherwise confirm logout cleanup.
+            raise PostgresIdentityError("identity_unavailable")
         result: dict[str, object] = {
             "session_id": row.get("session_id"),
             "user_id": row.get("user_id"),
@@ -641,8 +680,8 @@ class PostgresSessionStore(_PostgresStoreBase):
             "expires_at": _epoch(row.get("expires_at")) or 0.0,
             "revoked_at": _epoch(row.get("revoked_at")),
             "revoke_reason": row.get("revoke_reason"),
-            "password_version": int(row.get("password_version") or 1),
-            "role_version": int(row.get("role_version") or 1),
+            "password_version": _db_int(row.get("password_version") or 1),
+            "role_version": _db_int(row.get("role_version") or 1),
         }
         if isinstance(snapshot, Mapping):
             result.update({key: snapshot[key] for key in (
@@ -707,16 +746,16 @@ class PostgresSessionStore(_PostgresStoreBase):
                    expected.get("role_version", 1)))
             return cursor.rowcount == 1
 
-    def delete(self, token: str) -> None:
-        self.revoke(token, reason="manual_revoke")
+    def delete(self, token: str, *, connection: DbConnection | None = None) -> None:
+        self.revoke(token, reason="manual_revoke", connection=connection)
 
-    def revoke(self, token: str, *, reason: str = "manual_revoke") -> int:
+    def revoke(self, token: str, *, reason: str = "manual_revoke", connection: DbConnection | None = None) -> int:
         try:
             token = _required(token, maximum=4096)
             reason = _required(reason, maximum=128)
         except PostgresIdentityError:
             return 0
-        with self._session(write=True) as (_connection, cursor):
+        with self._session(write=True, connection=connection) as (_connection, cursor):
             self._execute(cursor, "UPDATE rick_sessions SET revoked_at = COALESCE(revoked_at, NOW()), revoke_reason = %s WHERE token_hash = %s AND revoked_at IS NULL", (reason, self._token_hash(token)))
             return max(0, int(getattr(cursor, "rowcount", 0) or 0))
 

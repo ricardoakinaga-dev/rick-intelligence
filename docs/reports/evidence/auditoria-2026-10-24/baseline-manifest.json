@@ -1,0 +1,37 @@
+{
+  "artifacts": {
+    "hashes-tracked.txt": "727d0e315b0ac0a6d76f96026e348ef76e60f771da9e5e762776137001ffbcb4",
+    "hashes-untracked.txt": "2ddec8eba149a36053ecb8a1eef5fa2238fbb981670c21cde82efbf2ab8bc690",
+    "status-before.txt": "926d305962ac873fef23910d21b76e7d94ad5e6964b61636af666a5386de7e22",
+    "tracked.patch": "cf43f15a6f8caeb065fc02a2d1f12887899cdd707aa7feccb044af39157ffa05",
+    "untracked.txt": "8a4bc80156da07e009eec411724f51f62aef7183ef3dff0da76591934c2ec032"
+  },
+  "branch": "archive/local-runtime-20261011",
+  "captured_at": "2026-10-24T09:17:27Z",
+  "counts": {
+    "patched_files": 71,
+    "tracked_files": 1525,
+    "untracked_files": 48
+  },
+  "head": "48e383c25ca4af32aa7ffe7e2367360ca9742c58",
+  "limitations": [
+    "Local worktree capture only; not an external backup or versioned commit.",
+    "Ignored files under .runtime/artifacts are not captured.",
+    "The manifest does not authorize commit, release or promotion."
+  ],
+  "restore": {
+    "method": "git worktree add --detach HEAD; git apply --binary tracked.patch; copy untracked files",
+    "restored_status_entries": 116,
+    "status_match": true,
+    "tracked_failures": 0,
+    "untracked_failures": 0
+  },
+  "schema": "rick.aud24.baseline.v1",
+  "worktree": {
+    "deleted": 0,
+    "modified": 71,
+    "other": 0,
+    "status_entries": 116,
+    "untracked": 45
+  }
+}

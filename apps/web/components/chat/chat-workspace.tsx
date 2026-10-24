@@ -34,8 +34,10 @@ import {
 } from "react";
 import { useSession } from "@/components/session-provider";
 import { Button, Spinner, StatusPill } from "@/components/ui";
-import { ApiError } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import { useOnlineStatus } from "@/lib/network";
+import { hasPermission } from "@/lib/permissions";
+import { sessionScopeKey } from "@/lib/session-scope";
 import {
   chatAdapter,
   type ChatCitation,
@@ -169,7 +171,7 @@ function normalizeError(cause: unknown): NormalizedError {
 }
 
 function isAbortError(cause: unknown) {
-  return cause instanceof Error && cause.name === "AbortError";
+  return Boolean(cause && typeof cause === "object" && "name" in cause && cause.name === "AbortError");
 }
 
 function citationKey(citation: ChatCitation) {
@@ -259,7 +261,7 @@ function CitationList({ citations, messageId, responseNumber }: { citations: Cha
                 <span className={styles.citationNumber} aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
                 <span className={styles.citationSummary}>
                   <strong>{citation.title || citation.document_id || "Documento sem título"}</strong>
-                  <small>{pageLabel(citation)} · fonte autorizada</small>
+                  <small>{pageLabel(citation)} · fonte retornada pela API</small>
                 </span>
                 <ChevronDown size={17} aria-hidden="true" />
               </summary>
@@ -311,7 +313,7 @@ function AnswerContent({ content }: { content: string }) {
   return <div className={styles.answerBlocks}>{renderedBlocks}</div>;
 }
 
-function MessageBubble({ message, onCopy, responseNumber }: { message: WorkspaceMessage; onCopy: (content: string) => void; responseNumber: number }) {
+function MessageBubble({ message, onCopy, responseNumber, scopeConfirmed }: { scopeConfirmed: boolean; message: WorkspaceMessage; onCopy: (content: string) => void; responseNumber: number }) {
   const assistant = message.role === "assistant";
   const sourcesId = sourceHeadingId(message.id);
   return (
@@ -343,7 +345,7 @@ function MessageBubble({ message, onCopy, responseNumber }: { message: Workspace
           </div>
           <CitationList citations={message.citations} messageId={message.id} responseNumber={responseNumber} />
           {(() => {
-            const trust = evidenceState(message);
+            const trust = scopeConfirmed ? evidenceState(message) : { tone: "warning", label: "Escopo não confirmado", description: "Confirme o acesso com a API antes de usar esta resposta." };
             return (
               <div className={`answer-confidence ${trust.tone === "success" ? "verified" : "unverified"}`} role="status">
                 <ShieldCheck size={16} aria-hidden="true" />
@@ -359,8 +361,27 @@ function MessageBubble({ message, onCopy, responseNumber }: { message: Workspace
 
 export function ChatWorkspace() {
   const { session } = useSession();
+  return <ScopedChatWorkspace key={sessionScopeKey(session)} />;
+}
+
+function ScopedChatWorkspace() {
+  const { session, ready } = useSession();
+  const authorityReady = ready !== false;
   const online = useOnlineStatus();
   const workspaceId = session?.workspace_id || "default";
+  const canQuery = Boolean(session?.authenticated) && hasPermission(session, "chat.query");
+  const [authorization, setAuthorization] = useState<"unconfirmed" | "confirmed" | "denied">("unconfirmed");
+  const queryAvailable = canQuery && online && authorityReady && authorization !== "denied";
+  const [revalidating, setRevalidating] = useState(false);
+  const revalidationBusy = useRef(false);
+  const [revalidationError, setRevalidationError] = useState<string | null>(null);
+  const [listCursor, setListCursor] = useState<string | null>(null);
+  const [turnCursor, setTurnCursor] = useState<string | null>(null);
+  const [listTotal, setListTotal] = useState(0);
+  const [turnTotal, setTurnTotal] = useState(0);
+  const [listMoreBusy, setListMoreBusy] = useState(false);
+  const [turnMoreBusy, setTurnMoreBusy] = useState(false);
+  const [pageError, setPageError] = useState<string | null>(null);
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [sidebarState, setSidebarState] = useState<SidebarState>("loading");
   const [sidebarError, setSidebarError] = useState<NormalizedError | null>(null);
@@ -416,8 +437,15 @@ export function ChatWorkspace() {
     if (requestRef.current.kind === "loading") return;
     conversationOperation.current += 1;
     detailAbortRef.current?.abort();
+    // The aborted controller belongs to the abandoned operation. Leaving it
+    // here would block send/load-more forever (AUD24-04).
+    detailAbortRef.current = null;
     setActiveId(null);
     activeIdRef.current = null;
+    setTurnCursor(null);
+    setTurnTotal(0);
+    setTurnMoreBusy(false);
+    setPageError(null);
     setActiveSummary(null);
     setMessages([]);
     setConversationState("ready");
@@ -447,6 +475,10 @@ export function ChatWorkspace() {
     activeIdRef.current = conversationId;
     setActiveSummary(summary);
     setMessages([]);
+    setTurnCursor(null);
+    setTurnTotal(0);
+    setTurnMoreBusy(false);
+    setPageError(null);
     setConversationState("loading");
     setConversationError(null);
     setPendingAssistant(null);
@@ -457,15 +489,29 @@ export function ChatWorkspace() {
 
     try {
       const detail = await chatAdapter.getConversation(conversationId, controller.signal);
-      if (operation !== conversationOperation.current) return;
+      if (operation !== conversationOperation.current || controller.signal.aborted) return;
       setActiveSummary(detail.conversation);
       setMessages(toMessages(detail.items || []));
+      setTurnCursor(detail.next_cursor || null);
+      setTurnTotal(detail.total);
       setConversationState("ready");
       setFocusIntent("conversation");
     } catch (cause) {
-      if (operation !== conversationOperation.current || isAbortError(cause)) return;
+      if (operation !== conversationOperation.current) return;
+      if (isAbortError(cause)) {
+        // An external authority suspension aborted this GET. Do not leave the
+        // panel stuck on "Abrindo conversa…": return a retryable state (AUD24-05).
+        setConversationError({ status: 0, code: "cancelled", message: "A abertura foi interrompida pela revalidação da sessão. Tente novamente." });
+        setConversationState("error");
+        setFocusIntent("conversation-error");
+        return;
+      }
       const error = normalizeError(cause);
       setConversationError(error);
+      // history.read is independent of chat.query; a history denial cannot
+      // establish or revoke query authorization.
+      setDraft("");
+      setPendingAssistant(null);
       setConversationState(error.status === 403 ? "forbidden" : "error");
       setFocusIntent("conversation-error");
     } finally {
@@ -473,21 +519,27 @@ export function ChatWorkspace() {
     }
   }, [workspaceId]);
 
-  const loadConversations = useCallback(async () => {
+  const loadConversations = useCallback(async (cursor?: string) => {
+    if (cursor && listAbortRef.current) return;
     listAbortRef.current?.abort();
     const controller = new AbortController();
     listAbortRef.current = controller;
-    setSidebarState("loading");
+    if (cursor) setListMoreBusy(true);
+    else setSidebarState("loading");
     setSidebarError(null);
+    setPageError(null);
     try {
-      const result = await chatAdapter.listConversations(controller.signal);
+      const result = await chatAdapter.listConversations(controller.signal, cursor);
       if (controller.signal.aborted) return;
       const items = Array.isArray(result.items) ? result.items : [];
-      setConversations(items);
+      setConversations(previous => Array.from(new Map((cursor ? [...previous, ...items] : items).map(item => [item.conversation_id, item])).values()).sort((a, b) => timestamp(b.updated_at) - timestamp(a.updated_at)));
+      setListTotal(result.total);
+      setListCursor(result.next_cursor && result.next_cursor !== cursor ? result.next_cursor : null);
+      if (cursor && result.next_cursor === cursor) setPageError("A API não avançou o cursor de conversas; o histórico permanece parcial.");
       setSidebarState("ready");
       const urlConversationId = readConversationIdFromUrl();
       const nextId = urlConversationId || (!activeIdRef.current ? items[0]?.conversation_id : null);
-      if (nextId && nextId !== activeIdRef.current) {
+      if (!cursor && nextId && nextId !== activeIdRef.current) {
         const nextSummary = items.find((conversation) => conversation.conversation_id === nextId) || nextId;
         void openConversation(nextSummary, false);
       }
@@ -495,11 +547,42 @@ export function ChatWorkspace() {
       if (controller.signal.aborted) return;
       const error = normalizeError(cause);
       setSidebarError(error);
-      setSidebarState(error.status === 403 ? "forbidden" : "error");
+      // history.read is independent of chat.query; a history denial cannot
+      // establish or revoke query authorization.
+      if (cursor) setPageError(error.message);
+      else setSidebarState(error.status === 403 ? "forbidden" : "error");
     } finally {
-      if (listAbortRef.current === controller) listAbortRef.current = null;
+      if (listAbortRef.current === controller) { listAbortRef.current = null; setListMoreBusy(false); }
     }
   }, [openConversation]);
+
+  const loadMoreTurns = async () => {
+    if (!activeId || !turnCursor || detailAbortRef.current || requestRef.current.kind === "loading") return;
+    const operation = conversationOperation.current;
+    const conversationId = activeId;
+    const cursor = turnCursor;
+    const controller = new AbortController();
+    detailAbortRef.current = controller;
+    setTurnMoreBusy(true);
+    setPageError(null);
+    try {
+      const detail = await chatAdapter.getConversation(conversationId, controller.signal, cursor);
+      if (controller.signal.aborted || operation !== conversationOperation.current || activeIdRef.current !== conversationId) return;
+      setMessages(previous => Array.from(new Map([...previous, ...toMessages(detail.items || [])].map(item => [item.id, item])).values()).sort((a, b) => timestamp(a.createdAt) - timestamp(b.createdAt)));
+      setTurnTotal(detail.total);
+      setTurnCursor(detail.next_cursor && detail.next_cursor !== cursor ? detail.next_cursor : null);
+      if (detail.next_cursor === cursor) setPageError("A API não avançou o cursor de mensagens; a conversa permanece parcial.");
+    } catch (cause) {
+      if (controller.signal.aborted || operation !== conversationOperation.current) return;
+      const error = normalizeError(cause);
+      setPageError(error.message);
+      // history.read is independent of chat.query; a history denial cannot
+      // establish or revoke query authorization.
+      if (error.status === 403) { setMessages([]); setDraft(""); setPendingAssistant(null); }
+    } finally {
+      if (detailAbortRef.current === controller) { detailAbortRef.current = null; setTurnMoreBusy(false); }
+    }
+  };
 
   useEffect(() => {
     if (!session) return;
@@ -512,6 +595,52 @@ export function ChatWorkspace() {
       sendOperation.current += 1;
     };
   }, [loadConversations, session, workspaceId]);
+
+  useLayoutEffect(() => () => {
+    listAbortRef.current?.abort();
+    detailAbortRef.current?.abort();
+    sendAbortRef.current?.abort();
+    conversationOperation.current += 1;
+    sendOperation.current += 1;
+  }, []);
+
+  useLayoutEffect(() => {
+    if (online && canQuery && authorityReady && authorization !== "denied") return;
+    if ((!online || !canQuery || !authorityReady) && authorization !== "denied") setAuthorization("unconfirmed");
+    setRevalidating(false);
+    revalidationBusy.current = false;
+    sendOperation.current += 1;
+    sendAbortRef.current?.abort();
+    setPendingAssistant(null);
+    if (requestRef.current.kind === "loading") {
+      const previous = requestRef.current;
+      if ((!online || !authorityReady) && canQuery && authorization !== "denied") {
+        const interrupted: RequestState = { ...previous, kind: "error", error: { status: 0, code: "network_unavailable", message: "A conexão foi perdida. A pergunta foi preservada; tente novamente com a mesma identidade de envio." } };
+        requestRef.current = interrupted;
+        setRequest(interrupted);
+        setDraft(previous.question);
+        setMessages(current => current.map(message => message.id === previous.userMessageId ? { ...message, status: "failed" } : message));
+      } else {
+        requestRef.current = EMPTY_REQUEST;
+        setRequest(EMPTY_REQUEST);
+        setMessages(current => current.filter(message => message.status !== "sending"));
+      }
+    }
+    if (!canQuery || authorization === "denied") setDraft("");
+  }, [online, canQuery, authorityReady, authorization]);
+
+  useEffect(() => {
+    const viewport = window.matchMedia("(max-width: 760px)");
+    const resize = () => {
+      if (!viewport.matches && mobileSidebarOpen) {
+        setMobileSidebarOpen(false);
+        setFocusIntent("conversation");
+      }
+    };
+    viewport.addEventListener("change", resize);
+    resize();
+    return () => viewport.removeEventListener("change", resize);
+  }, [mobileSidebarOpen]);
 
   useEffect(() => {
     const onPopState = () => {
@@ -527,8 +656,24 @@ export function ChatWorkspace() {
   useLayoutEffect(() => {
     const wasOpen = wasMobileSidebarOpen.current;
     if (mobileSidebarOpen) mobileCloseRef.current?.focus({ preventScroll: true });
-    else if (wasOpen) mobileToolbarRef.current?.focus({ preventScroll: true });
+    else if (wasOpen && window.matchMedia("(max-width: 760px)").matches) mobileToolbarRef.current?.focus({ preventScroll: true });
     wasMobileSidebarOpen.current = mobileSidebarOpen;
+  }, [mobileSidebarOpen]);
+
+  useLayoutEffect(() => {
+    if (!mobileSidebarOpen) return;
+    const drawer = document.getElementById("conversation-sidebar");
+    const previous: Array<[HTMLElement, boolean]> = [];
+    let child = drawer;
+    while (child?.parentElement && child.parentElement !== document.documentElement) {
+      for (const sibling of Array.from(child.parentElement.children)) {
+        if (sibling !== child && sibling instanceof HTMLElement && !sibling.classList.contains(styles.mobileBackdrop)) {
+          previous.push([sibling, sibling.inert]); sibling.inert = true;
+        }
+      }
+      child = child.parentElement;
+    }
+    return () => { for (const [element, inert] of previous) element.inert = inert; };
   }, [mobileSidebarOpen]);
 
   const handleMobileSidebarKeyDown = (event: KeyboardEvent<HTMLElement>) => {
@@ -562,6 +707,7 @@ export function ChatWorkspace() {
 
   useLayoutEffect(() => {
     if (!focusIntent) return;
+    if (mobileSidebarOpen) { setFocusIntent(null); return; }
     const target = focusIntent === "composer"
       ? composerRef.current
       : focusIntent === "conversation"
@@ -574,17 +720,18 @@ export function ChatWorkspace() {
       if (focusIntent !== "composer") target.scrollIntoView({ block: "nearest" });
       setFocusIntent(null);
     }
-  }, [conversationError, conversationState, focusIntent, messages.length, request.kind]);
+  }, [conversationError, conversationState, focusIntent, messages.length, mobileSidebarOpen, request.kind]);
 
   const sendMessage = useCallback(async (question: string, options?: { retry?: boolean }) => {
     const trimmed = question.trim();
-    if (!session || !trimmed || requestRef.current.kind === "loading") return;
+    // Ref exclusion also covers a submit queued before the page's busy render.
+    if (!session || !queryAvailable || !trimmed || detailAbortRef.current || requestRef.current.kind === "loading") return;
     if (!online) {
       setDraft(trimmed);
       setFocusIntent("composer");
       return;
     }
-    const previous = options?.retry && (requestRef.current.kind === "error" || requestRef.current.kind === "cancelled")
+    const previous = (options?.retry || (requestRef.current.kind !== "idle" && requestRef.current.question === trimmed)) && (requestRef.current.kind === "error" || requestRef.current.kind === "cancelled")
       ? requestRef.current
       : null;
     const userMessageId = previous?.userMessageId || makeClientId("user");
@@ -667,14 +814,33 @@ export function ChatWorkspace() {
         createdAt: Date.now(),
         status: "sent",
       };
-      setMessages((current) => [
-        ...current.map((message) => message.id === userMessageId ? { ...message, status: "sent" as const } : message),
-        assistantMessage,
-      ]);
+      setMessages((current) => {
+        const questionId = `${result.message_id}-question`;
+        const serverQuestion = current.find(message => message.id === questionId);
+        const optimisticQuestion = current.find(message => message.id === userMessageId);
+        const serverAnswer = current.find(message => message.id === result.message_id);
+        // Completed live turns use the same question/answer identity as history.
+        // Never dedup by question text: repeated questions are distinct turns.
+        const completedQuestion: WorkspaceMessage = {
+          id: questionId,
+          role: "user",
+          content: serverQuestion?.content ?? trimmed,
+          citations: [],
+          createdAt: serverQuestion?.createdAt ?? optimisticQuestion?.createdAt ?? assistantMessage.createdAt,
+          status: "sent",
+        };
+        return [
+          ...current.filter(message => message.id !== userMessageId && message.id !== questionId && message.id !== result.message_id),
+          completedQuestion,
+          { ...assistantMessage, createdAt: serverAnswer?.createdAt ?? completedQuestion.createdAt },
+        ].sort((a, b) => timestamp(a.createdAt) - timestamp(b.createdAt));
+      });
       setActiveId(result.conversation_id);
       activeIdRef.current = result.conversation_id;
       setActiveSummary(summary);
       setConversations((current) => [summary, ...current.filter((item) => item.conversation_id !== summary.conversation_id)]);
+      setAuthorization("confirmed");
+      setTurnTotal(previous => previous + 1);
       setConversationState("ready");
       setConversationError(null);
       setPendingAssistant(null);
@@ -694,25 +860,54 @@ export function ChatWorkspace() {
         setFocusIntent("composer");
       } else {
         const error = normalizeError(cause);
-        const hasPartialResponse = Boolean(streamedAnswer.trim() || streamedCitations.length);
+        const denied = error.status === 403;
+        setAuthorization(denied ? "denied" : "unconfirmed");
+        const hasPartialResponse = !denied && error.code !== "network_unavailable" && Boolean(streamedAnswer.trim() || streamedCitations.length);
         setPendingAssistant(hasPartialResponse ? { id: pendingAssistantId, answer: streamedAnswer, citations: streamedCitations, state: "interrupted" } : null);
         const failed: RequestState = { ...nextRequest, kind: "error", error };
         setMessages((current) => current.map((message) => message.id === userMessageId ? { ...message, status: "failed" as const } : message));
         requestRef.current = failed;
         setRequest(failed);
-        setDraft(trimmed);
+        setDraft(denied ? "" : trimmed);
         setFocusIntent("request-error");
       }
     } finally {
       if (operation === sendOperation.current) sendAbortRef.current = null;
     }
-  }, [activeSummary, online, session, workspaceId]);
+  }, [activeSummary, online, queryAvailable, session, workspaceId]);
 
   const cancelRequest = useCallback((event: ReactMouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
     event.stopPropagation();
     if (requestRef.current.kind === "loading") sendAbortRef.current?.abort();
   }, []);
+
+  const revalidateAuthorization = async () => {
+    if (!online || revalidationBusy.current) return;
+    revalidationBusy.current = true;
+    const operation = ++sendOperation.current;
+    setRevalidating(true);
+    setRevalidationError(null);
+    try {
+      const next = await api.me();
+      if (operation !== sendOperation.current) return;
+      if (sessionScopeKey(next) !== sessionScopeKey(session)) {
+        window.dispatchEvent(new Event("rick-session-invalid"));
+        setRevalidationError("A sessão mudou. Revalide a sessão antes de continuar.");
+        return;
+      }
+      if (!hasPermission(next, "chat.query")) { setRevalidationError("Sua sessão continua sem permissão de consulta."); return; }
+      setAuthorization("unconfirmed");
+      setFocusIntent("composer");
+    } catch (cause) {
+      if (operation === sendOperation.current) {
+        if (cause instanceof ApiError && cause.status === 401) window.dispatchEvent(new Event("rick-session-invalid"));
+        setRevalidationError(normalizeError(cause).message);
+      }
+    } finally {
+      if (operation === sendOperation.current) { revalidationBusy.current = false; setRevalidating(false); }
+    }
+  };
 
   const retryRequest = useCallback(() => {
     const current = requestRef.current;
@@ -741,11 +936,16 @@ export function ChatWorkspace() {
   };
 
   const choosePrompt = (prompt: string) => {
+    if (!queryAvailable) return;
     setDraft(prompt);
     setFocusIntent("composer");
   };
 
-  const inputDisabled = request.kind === "loading" || conversationState !== "ready" || activeSummary?.status === "archived";
+  // Drafting is local: keep the composer editable while offline, but the
+  // submit action remains gated by queryAvailable/online (AUD24-025).
+  const inputDisabled = !canQuery || !authorityReady || authorization === "denied"
+    || turnMoreBusy || request.kind === "loading" || conversationState !== "ready"
+    || activeSummary?.status === "archived";
   const hasHistory = conversations.length > 0;
   const requestError = request.kind === "error" ? request.error : null;
   const requestIsForbidden = Boolean(requestError?.status === 403);
@@ -763,8 +963,10 @@ export function ChatWorkspace() {
           <h1>Converse com o corpus.</h1>
           <p>Investigue casos com respostas rastreáveis, mantendo cada pergunta e fonte no seu espaço de trabalho.</p>
         </div>
-        <StatusPill tone="success"><ShieldCheck size={13} />Corpus autorizado</StatusPill>
+        <StatusPill tone={authorization === "confirmed" && queryAvailable ? "success" : "neutral"}><ShieldCheck size={13} />{!canQuery || authorization === "denied" ? "Consulta não autorizada" : authorization === "confirmed" && online ? "Consulta autorizada pela API" : "Autorização do corpus não confirmada"}</StatusPill>
       </div>
+
+      {authorization === "denied" && request.kind !== "error" ? <div role="status"><p>A consulta permanece bloqueada até revalidar a autorização.</p>{revalidationError ? <p>{revalidationError}</p> : null}<Button type="button" disabled={!online || revalidating} onClick={() => void revalidateAuthorization()}>{revalidating ? "Revalidando…" : "Revalidar autorização"}</Button></div> : null}
 
       <div className={styles.mobileToolbar}>
         <Button ref={mobileToolbarRef} type="button" variant="secondary" onClick={() => setMobileSidebarOpen(true)} aria-expanded={mobileSidebarOpen} aria-controls="conversation-sidebar">
@@ -774,7 +976,7 @@ export function ChatWorkspace() {
       </div>
 
       <div className={styles.shell}>
-        <aside id="conversation-sidebar" onKeyDown={handleMobileSidebarKeyDown} className={`${styles.sidebar} ${mobileSidebarOpen ? styles.sidebarOpen : ""}`} aria-label="Conversas" data-open={mobileSidebarOpen}>
+        <aside id="conversation-sidebar" role={mobileSidebarOpen ? "dialog" : undefined} aria-modal={mobileSidebarOpen ? true : undefined} aria-labelledby="conversation-sidebar-title" onKeyDown={handleMobileSidebarKeyDown} className={`${styles.sidebar} ${mobileSidebarOpen ? styles.sidebarOpen : ""}`} aria-label="Conversas" data-open={mobileSidebarOpen}>
           <div className={styles.sidebarHeader}>
             <div><span className="eyebrow">Navegar</span><h2 id="conversation-sidebar-title">Conversas</h2></div>
             <Button ref={mobileCloseRef} type="button" variant="ghost" className={styles.mobileClose} onClick={() => setMobileSidebarOpen(false)} aria-label="Fechar conversas"><X size={18} /></Button>
@@ -792,7 +994,7 @@ export function ChatWorkspace() {
               <div className={styles.sidebarState} role="status">
                 <CircleAlert size={18} />
                 <strong>Histórico indisponível</strong>
-                <p>Sua sessão pode consultar o corpus, mas não pode listar conversas.</p>
+                <p>Não foi possível confirmar acesso ao histórico. A API mantém a decisão de autorização.</p>
                 <Button type="button" variant="secondary" onClick={() => void loadConversations()}>Tentar novamente</Button>
               </div>
             ) : sidebarState === "error" ? (
@@ -831,9 +1033,11 @@ export function ChatWorkspace() {
               <div className={styles.emptyHistory}><History size={18} /><strong>Seu histórico começa aqui</strong><p>As consultas que você enviar aparecerão neste espaço.</p></div>
             )}
           </div>
+          {listTotal > conversations.length ? <p role="status">Histórico parcial · {conversations.length} de {listTotal} conversas{!listCursor ? ". A API não forneceu um cursor para continuar." : ". Carregue a próxima página para pesquisar o restante."}</p> : null}
+          {listCursor ? <Button type="button" variant="secondary" disabled={listMoreBusy || sidebarState === "loading"} onClick={() => void loadConversations(listCursor)}>{listMoreBusy ? "Carregando…" : "Carregar mais conversas"}</Button> : null}
           <div className={styles.sidebarFoot}><ShieldCheck size={15} /><span>Histórico privado do workspace<strong>{workspaceId}</strong></span></div>
         </aside>
-        {mobileSidebarOpen ? <button type="button" className={styles.mobileBackdrop} aria-label="Fechar conversas" onClick={() => setMobileSidebarOpen(false)} /> : null}
+        {mobileSidebarOpen ? <button type="button" className={styles.mobileBackdrop} tabIndex={-1} aria-hidden="true" onClick={() => setMobileSidebarOpen(false)} /> : null}
 
         <section className={`${styles.chatPanel} answer-panel`} aria-labelledby="chat-title">
           <header className={styles.chatHeader}>
@@ -867,7 +1071,7 @@ export function ChatWorkspace() {
               </div>
             ) : messages.length || pendingAssistant ? (
               <div className={styles.messageStack}>
-                {messages.map((message, index) => <MessageBubble key={message.id} message={message} responseNumber={index + 1} onCopy={(content) => void copyAnswer(content)} />)}
+                {messages.map((message, index) => <MessageBubble scopeConfirmed={queryAvailable && authorization === "confirmed" && sidebarState !== "error" && conversationState === "ready"} key={message.id} message={message} responseNumber={index + 1} onCopy={(content) => void copyAnswer(content)} />)}
                 {pendingAssistant ? (
                   <article className={`${styles.message} ${styles.assistantMessage} ${styles.streamingMessage} ${pendingIsInterrupted ? styles.interruptedMessage : ""}`} aria-label={pendingIsInterrupted ? "Resposta interrompida" : "Resposta provisória em andamento"}>
                     <div className={styles.messageHeader}><span className={styles.messageAuthor}><span className={`${styles.messageAvatar} ${styles.assistantAvatar}`} aria-hidden="true"><Bot size={15} /></span><strong>RICK</strong></span><span role="status" aria-live="polite" className={pendingIsInterrupted ? styles.interruptedLabel : styles.streamingLabel}>{pendingIsInterrupted ? "Resposta interrompida · não finalizada" : `Resposta provisória · ${pendingAssistant.answer ? "validando fontes…" : "consultando fontes…"}`}</span></div>
@@ -880,7 +1084,8 @@ export function ChatWorkspace() {
                   <div className={`${styles.requestNotice} ${requestIsForbidden ? styles.forbiddenNotice : ""}`} role="alert">
                     <div className={styles.requestNoticeIcon}>{requestIsForbidden ? <ShieldCheck size={18} /> : <CircleAlert size={18} />}</div>
                     <div><h3 ref={requestErrorRef} tabIndex={-1}>{requestIsForbidden ? "Acesso negado à consulta" : requestIsOffline ? "Sem conexão para concluir a consulta" : requestIsInterrupted ? "Resposta interrompida" : "Não foi possível concluir a consulta"}</h3><p>{requestError?.message || "Tente novamente mantendo a pergunta para o corpus."}</p></div>
-                    <div className={styles.requestActions}><Button type="button" variant="secondary" onClick={retryRequest}>Tentar novamente</Button><Button type="button" variant="ghost" onClick={startNewConversation}>Nova conversa</Button></div>
+                    {revalidationError ? <p role="status">{revalidationError}</p> : null}
+                    <div className={styles.requestActions}>{authorization === "denied" ? <Button type="button" variant="secondary" disabled={!online || revalidating} onClick={() => void revalidateAuthorization()}>{revalidating ? "Revalidando…" : "Revalidar autorização"}</Button> : <Button type="button" variant="secondary" disabled={!online} onClick={retryRequest}>Tentar novamente</Button>}<Button type="button" variant="ghost" onClick={startNewConversation}>Nova conversa</Button></div>
                   </div>
                 ) : request.kind === "cancelled" ? (
                   <div className={styles.requestNotice} role="status">
@@ -897,17 +1102,20 @@ export function ChatWorkspace() {
                 <h3>Qual caso você quer entender?</h3>
                 <p>Faça uma pergunta objetiva. A resposta e os identificadores das fontes ficam juntos para facilitar a revisão.</p>
                 <div className={styles.promptGrid} aria-label="Sugestões de consulta">
-                  <button type="button" onClick={() => choosePrompt("Quais fontes sustentam esta hipótese?")}><span>01</span>Quais fontes sustentam esta hipótese?</button>
-                  <button type="button" onClick={() => choosePrompt("Resuma o protocolo de vacinação deste caso.")}><span>02</span>Resuma o protocolo de vacinação deste caso.</button>
-                  <button type="button" onClick={() => choosePrompt("Compare os sinais clínicos descritos nas fontes autorizadas.")}><span>03</span>Compare os sinais clínicos descritos nas fontes autorizadas.</button>
+                  <button type="button" disabled={!queryAvailable} onClick={() => choosePrompt("Quais fontes sustentam esta hipótese?")}><span>01</span>Quais fontes sustentam esta hipótese?</button>
+                  <button type="button" disabled={!queryAvailable} onClick={() => choosePrompt("Resuma o protocolo de vacinação deste caso.")}><span>02</span>Resuma o protocolo de vacinação deste caso.</button>
+                  <button type="button" disabled={!queryAvailable} onClick={() => choosePrompt("Compare os sinais clínicos descritos nas fontes autorizadas.")}><span>03</span>Compare os sinais clínicos descritos nas fontes autorizadas.</button>
                 </div>
               </div>
             )}
           </div>
 
+          {conversationState === "ready" && turnTotal > messages.filter(message => message.role === "assistant").length ? <p role="status">Conversa parcial · {messages.filter(message => message.role === "assistant").length} de {turnTotal} turnos{!turnCursor ? ". A API não forneceu um cursor para continuar." : "."}</p> : null}
+          {turnCursor ? <Button type="button" variant="secondary" disabled={turnMoreBusy || conversationState !== "ready" || request.kind === "loading"} onClick={() => void loadMoreTurns()}>{turnMoreBusy ? "Carregando…" : "Carregar mais mensagens"}</Button> : null}
+          {pageError ? <p role="alert">{pageError}</p> : null}
           <div className={styles.composerArea}>
             {isArchived ? <div className={styles.archivedNotice} role="status"><Archive size={15} />Esta conversa está arquivada e não aceita novas perguntas.</div> : null}
-            {!online ? <div className={styles.composerOffline} role="alert" aria-live="assertive"><WifiOff size={15} aria-hidden="true" /><span><strong>Consulta pausada sem conexão.</strong> A pergunta continua editável; você poderá enviá-la quando a rede voltar.</span></div> : null}
+            {!online ? <div className={styles.composerOffline} role="alert" aria-live="assertive"><WifiOff size={15} aria-hidden="true" /><span><strong>Consulta pausada sem conexão.</strong> Você poderá consultar quando a rede voltar.</span></div> : null}
             <form className={styles.composer} onSubmit={submit} aria-label="Enviar consulta">
               <label htmlFor="chat-message">Pergunta</label>
               <div className={`${styles.composerBox} ${request.kind === "loading" ? styles.composerBusy : ""}`}>

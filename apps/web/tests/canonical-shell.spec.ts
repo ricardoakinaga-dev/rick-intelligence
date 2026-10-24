@@ -6,7 +6,7 @@ test("opens the evidence workbench at the target viewport", async ({ page }, tes
   await expect(page.getByRole("heading", { name: "Entre para continuar." })).toBeVisible();
 
   await page.screenshot({
-    path: resolve(process.cwd(), `../../artifacts/visual/state-of-art/login-${testInfo.project.name}.png`),
+    path: resolve(process.env.RICK_VISUAL_EVIDENCE_DIR || "../../artifacts/visual/state-of-art", `login-${testInfo.project.name}.png`),
     fullPage: true,
   });
 
@@ -27,7 +27,7 @@ test("opens the evidence workbench at the target viewport", async ({ page }, tes
   }
 
   await page.screenshot({
-    path: resolve(process.cwd(), `../../artifacts/visual/state-of-art/workbench-${testInfo.project.name}.png`),
+    path: resolve(process.env.RICK_VISUAL_EVIDENCE_DIR || "../../artifacts/visual/state-of-art", `workbench-${testInfo.project.name}.png`),
     fullPage: true,
   });
 });

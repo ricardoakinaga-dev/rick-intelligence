@@ -29,13 +29,14 @@ class InMemoryUserStore:
     def get_by_email(self, email: str) -> dict | None:
         return self._by_email.get((email or "").strip().lower())
 
-    def get_by_email_for_tenant(self, email: str, tenant_id: str) -> dict | None:
+    def get_by_email_for_tenant(self, email: str, tenant_id: str, *, workspace_id: str | None = None) -> dict | None:
         record = self.get_by_email(email)
         if (
             record is None
             or record.get("tenant_id") != tenant_id
             or record.get("status", "active") != "active"
             or record.get("membership_status", "active") != "active"
+            or (workspace_id is not None and record.get("workspace_id", "default") != workspace_id)
         ):
             return None
         return record

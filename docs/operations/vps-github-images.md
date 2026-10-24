@@ -905,6 +905,33 @@ Run it with effective UID 0 inside that disposable namespace. It changes only
 fresh test snapshot ownership; it creates no host accounts and uses no Docker.
 This command is documentation of missing evidence, not a statement of execution.
 
+### Executor compatibility diagnostic — AUD15
+
+Before repeating the VPS lane, run the non-privileged
+[executor preflight](<../../infrastructure/vps/preflight_executor.py>):
+
+```sh
+PYTHONDONTWRITEBYTECODE=1 python3 infrastructure/vps/preflight_executor.py
+```
+
+It creates only a disposable private synthetic input and calls the unchanged
+[descriptor-bound capture policy](<../../infrastructure/vps/contracts.py#L58-L123>).
+It does not read deployment config, start services, or change host ownership,
+permissions, capabilities or namespace mappings. Exit 0 means that this one
+synthetic capture succeeded; **the full VPS lane still remains NOT_RUN**. Exit 2
+reports BLOCKED_EXTERNAL with effective identity and parent metadata, not a
+product PASS or authorization to repair the host.
+
+The current AUD15 observation is `unprotected input parent`: effective UID/GID
+1000, root directory UID/GID 65534, and sticky writable `/tmp` owned by UID1000.
+The policy requires a root-owned sticky writable parent. This is evidence of an
+executor mismatch, not proof that all 277 failing tests will pass elsewhere.
+Provide an authorized disposable representative Linux executor and rerun all
+positive/negative boundaries, including actual multi-UID DAC, without weakening
+those guards. The [per-node skip inventory](<../reports/evidence/aud15-implementation-20261015/test-outcomes-first-run.json>)
+records missing fixtures/authority and proposed owner roles separately; none of
+those skipped test bodies was executed by the diagnostic.
+
 ### Formato nativo de BuildKit validado localmente
 
 O contrato compara o objeto completo de parâmetros com a política revisada.

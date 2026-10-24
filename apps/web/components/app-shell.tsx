@@ -22,9 +22,12 @@ const nav = [
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { session, ready, error: sessionError, errorKind: sessionErrorKind, refresh, signOut } = useSession();
+  const { session, ready, waitingForRemoteMutation, error: sessionError, errorKind: sessionErrorKind, refresh, signOut } = useSession();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [mobileViewport, setMobileViewport] = useState(() => typeof window !== "undefined" && window.matchMedia("(max-width: 900px)").matches);
+  const frameRef = useRef<HTMLDivElement>(null);
+  const validationRef = useRef<HTMLDivElement>(null);
+  const suspendedFocus = useRef<HTMLElement | null>(null);
   const railRef = useRef<HTMLElement>(null);
   const railCloseRef = useRef<HTMLButtonElement>(null);
   const mobileMenuRef = useRef<HTMLButtonElement>(null);
@@ -109,13 +112,25 @@ export function AppShell({ children }: { children: ReactNode }) {
     };
   }, [mobileOpen, mobileViewport]);
 
-  if (pathname === "/login") return <><NetworkStatus />{logoutNotice}{children}</>;
-  if (!ready || !session) {
-    if (sessionError && sessionErrorKind === "validation") {
-      return <>{logoutNotice}<div className="session-error-state" role="alert" aria-live="assertive"><div><AlertTriangle size={24} aria-hidden="true" /><h1>Sessão indisponível.</h1><p>Não foi possível confirmar sua identidade agora. Nenhum conteúdo privado foi exibido. Tente validar novamente ou volte ao login.</p><div className="session-error-actions"><Button variant="secondary" onClick={() => void refresh()}>Tentar novamente</Button><Link className="button ghost button-link" href="/login">Voltar ao login</Link></div></div></div></>;
+  useLayoutEffect(() => {
+    if (!ready && session) {
+      const active = document.activeElement;
+      if (active instanceof HTMLElement && frameRef.current?.contains(active)) suspendedFocus.current = active;
+      validationRef.current?.focus({ preventScroll: true });
+    } else if (ready) {
+      const previous = suspendedFocus.current;
+      suspendedFocus.current = null;
+      if (previous?.isConnected && frameRef.current?.contains(previous)) previous.focus({ preventScroll: true });
     }
-    return <>{logoutNotice}<div className="app-loading"><Spinner label="Validando sua sessão" /><p>Validando sua identidade e as permissões do espaço de trabalho.</p></div></>;
-  }
+  }, [ready, session]);
+
+  if (pathname === "/login") return <><NetworkStatus />{logoutNotice}{children}</>;
+  const validationNotice = waitingForRemoteMutation
+    ? <div ref={validationRef} tabIndex={-1} className="session-error-state" role="status"><h1>Sessão em alteração em outra aba.</h1><p>O conteúdo privado está oculto e as operações estão bloqueadas. Conclua a operação de sessão na outra aba para continuar. Se essa aba foi encerrada antes de concluir, mantenha este acesso bloqueado e solicite suporte para reconciliar a sessão.</p></div>
+    : sessionError && sessionErrorKind === "validation"
+    ? <div ref={validationRef} tabIndex={-1} className="session-error-state" role="alert" aria-live="assertive"><div><AlertTriangle size={24} aria-hidden="true" /><h1>Sessão indisponível.</h1><p>Não foi possível confirmar sua identidade agora. Nenhum conteúdo privado foi exibido. Tente validar novamente ou volte ao login.</p><div className="session-error-actions"><Button variant="secondary" onClick={() => void refresh()}>Tentar novamente</Button><Link className="button ghost button-link" href="/login">Voltar ao login</Link></div></div></div>
+    : <div ref={validationRef} tabIndex={-1} className="app-loading"><Spinner label="Validando sua sessão" /><p>Validando sua identidade e as permissões do espaço de trabalho.</p></div>;
+  if (!session) return <>{logoutNotice}{validationNotice}</>;
 
   const adminNav = { href: "/admin", label: "Administração", caption: "Controles operacionais", icon: ShieldCheck, permission: "audit.read" };
   const allNav = [...nav, adminNav];
@@ -145,7 +160,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   const openMobileNavigation = () => setMobileOpen(true);
 
   return (
-    <div className="app-frame">
+    <>
+    {!ready ? validationNotice : null}
+    <div ref={frameRef} className="app-frame" hidden={!ready} style={!ready ? { display: "none" } : undefined} inert={!ready ? true : undefined} aria-hidden={!ready ? true : undefined}>
       <a className="skip-link" href="#main-content">Pular para o conteúdo</a>
       <aside id="product-navigation" ref={railRef} onKeyDown={handleRailKeyDown} className={`rail ${mobileOpen ? "open" : ""}`} aria-label="Navegação do produto" aria-hidden={mobileRailHidden || undefined} inert={mobileRailHidden ? true : undefined}>
         <div className="rail-topline"><span className="brand-mark">R</span><span className="brand-lockup"><strong>RICK</strong><small>intelligence</small></span><button ref={railCloseRef} className="icon-button rail-close" onClick={() => setMobileOpen(false)} aria-label="Fechar navegação"><X size={18} /></button></div>
@@ -167,5 +184,6 @@ export function AppShell({ children }: { children: ReactNode }) {
         <main key={sessionScopeKey(session)} id="main-content" className="main-content" tabIndex={-1}>{logoutNotice}{children}</main>
       </div>
     </div>
+    </>
   );
 }

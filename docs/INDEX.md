@@ -1,7 +1,11 @@
 # Índice canônico de documentação
 
 **Status:** CURRENT para o checkout auditado.
-**Última consolidação:** retomada local de 09/10/2026. AUD07-01–26, 44–46 concluídas localmente; AUD07-27 parcial por revisão independente e vínculo de evidência ao candidato; AUD07-43 mantém gates externos abertos. O [relatório da retomada](reports/retomada-2026-10-09.md) registra os resultados atuais. A auditoria de 07/10 permanece baseline histórica de 64,2/100 em 26 áreas, sem recalcular a nota. Promoção `NO-GO`. O scorecard de 03/10 tem escopo diferente e não é diretamente comparável.
+**Atualização de planejamento — 24/10/2026:** a [auditoria AUD24](<reports/relatorio-auditoria-2026-10-24.md>) registra **74,7/100** e produção `NO-GO` no checkout `48e383c` com worktree sujo. A decisão AUD24-D1 foi ratificada no [ADR-024](<architecture/adr/ADR-024-audit-outcome-and-revocation-ordering.md>) (A+ em duas etapas; OIDC fora do perfil de produção). A primeira onda e as etapas 1–2 da identidade foram executadas localmente: G0 PASS, 6.040 testes Python, 263 web, 1.875 testes de API (79,22%) e CONTRACT verde; permanecem o gate live PostgreSQL/IdP, a tipagem AUD24-018, o candidato sujo e as ondas externas, portanto `NO-GO`. O [plano executivo AUD24](<plans/execplan-aud24-2026-10-24.md>), o [roadmap AUD24](<roadmap-auditoria-2026-10-24.md>) e o [backlog AUD24](<backlog-auditoria-2026-10-24.md>) propõem 29 contratos novos, herdam as obrigações PROD12 e mantêm oito marcos. Planejamento `PROPOSTO`: nenhum item foi adotado no [controlador](../.agent/backlog.json), nenhum aceite anterior foi alterado e nenhuma execução externa, DDL, deploy ou promoção foi autorizada.
+**Atualização de planejamento — 15/10/2026:** o [relatório AUD15](<reports/relatorio-auditoria-2026-10-15.md>) fundamenta o [backlog complementar](<backlog-auditoria-2026-10-15.md>) com 24 contratos novos e o [roadmap AUD15](<roadmap-auditoria-2026-10-15.md>) com oito marcos. As obrigações externas continuam nos IDs PROD12 existentes; novos IDs não foram adotados por este planejamento, nenhum aceite anterior foi alterado e produção permanece `NO-GO`. Resultados de testes citados são os da auditoria, não novas execuções nesta elaboração.
+**Atualização de planejamento — 12/10/2026:** [roadmap de produção](roadmap-producao-2026-10-12.md) e [backlog PROD12](backlog-producao-2026-10-12.md) propostos com 56 tarefas e oito marcos. A [baseline de 12/10](reports/baseline-producao-2026-10-12.md) registra achados/resultados do SHA `48e383c25ca4af32aa7ffe7e2367360ca9742c58`; a suíte ampliada falhou (7.713 passed, 6 failed, 221 skipped) e `make validate` ficou bloqueado por raiz do run. Nenhum código/gate/ledger/aceite anterior foi alterado pelo planejamento; implementação e produção não autorizadas por esses documentos. Promoção `NO-GO`.
+
+**Checkpoint de execução anterior:** retomada local de 09/10/2026. AUD07-01–26, 44–46 concluídas localmente; AUD07-27 parcial por revisão independente e vínculo de evidência ao candidato; AUD07-43 mantém gates externos abertos. O [relatório da retomada](reports/retomada-2026-10-09.md) registra os resultados atuais. A auditoria de 07/10 permanece baseline histórica de 64,2/100 em 26 áreas, sem recalcular a nota. Promoção `NO-GO`. O scorecard de 03/10 tem escopo diferente e não é diretamente comparável.
 **Regra:** documentos com status `HISTORICAL`, `REFERENCE / NOT_RUN` ou fase anterior não comprovam o estado executável atual.
 
 ## Autoridades atuais
@@ -14,7 +18,20 @@
 | Limites de dependência | [dependency-boundaries.json](architecture/dependency-boundaries.json) | CURRENT como regra automatizada |
 | Segurança e autorização | [authorization.md](architecture/authorization.md) e [production-runtime.md](architecture/production-runtime.md) | CURRENT, integração externa pendente; `security/` preserva decisões e evidências dos legados |
 | Operação e promoção | [release-readiness.md](operations/release-readiness.md) | REFERENCE / NOT_RUN |
-| Snapshot desta auditoria | [relatório de 07/10/2026](reports/relatorio-auditoria-2026-10-07.md) | CURRENT como baseline; escore técnico local; promoção NO-GO |
+| Baseline do planejamento de produção | [baseline-producao-2026-10-12.md](reports/baseline-producao-2026-10-12.md) | SNAPSHOT observado em 12/10; não é nova execução nem aprovação |
+| Roadmap para produção | [roadmap-producao-2026-10-12.md](roadmap-producao-2026-10-12.md) | PROPOSTO; sequência/gates, sem status de execução concorrente |
+| Backlog para produção | [backlog-producao-2026-10-12.md](backlog-producao-2026-10-12.md) | Especificação de 56 contratos; adoção anterior em TODO registrada no plano ativo; status/aceite somente no controlador, sem encerramento pelo planejamento AUD15 |
+| Snapshot mais recente de auditoria | [relatório AUD24](<reports/relatorio-auditoria-2026-10-24.md>) | SNAPSHOT observado em 24/10; 74,7/100; NO-GO, sem reexecução externa |
+| Decisão de auditoria/revogação | [ADR-024](<architecture/adr/ADR-024-audit-outcome-and-revocation-ordering.md>) | RATIFICADA em 24/10; A+ em duas etapas; produção não autorizada |
+| Pacote externo AUD24 | [M5–M7](<operations/aud24-m5-m7-external-package.md>) | PREPARADO; authority matrix, comandos, aborto e bloqueios D01–D07 |
+| Primeira onda AUD24 | [escopo executável](<plans/aud24-first-wave-2026-10-24.md>) | PREPARADO; AUD24-001/003, gate G0, sem executar |
+| Plano executivo AUD24 | [plano de 24/10](<plans/execplan-aud24-2026-10-24.md>) | PROPOSTO; workstreams, decisões humanas, gates e primeiros 10 dias |
+| Roadmap AUD24 | [roadmap de 24/10](<roadmap-auditoria-2026-10-24.md>) | PROPOSTO; oito marcos M0–M7, dependências e gates locais/externos/decisão |
+| Backlog AUD24 | [backlog de 24/10](<backlog-auditoria-2026-10-24.md>) | PROPOSTO; 29 contratos novos e herança PROD12, sem ledger de execução |
+| Snapshot AUD15 preservado | [relatório AUD15](<reports/relatorio-auditoria-2026-10-15.md>) | Observação histórica de 14/10 local–15/10 UTC; 74,6/100; NO-GO, sem reexecução neste planejamento |
+| Backlog complementar AUD15 | [backlog de 15/10](<backlog-auditoria-2026-10-15.md>) | PROPOSTO; 24 contratos novos, vínculos PROD12 e aceites, sem novo ledger de execução |
+| Roadmap complementar AUD15 | [roadmap de 15/10](<roadmap-auditoria-2026-10-15.md>) | PROPOSTO; oito marcos, dependências e gates locais/externos/promoção |
+| Snapshot AUD07 preservado | [relatório de 07/10/2026](reports/relatorio-auditoria-2026-10-07.md) | HISTORICAL como baseline de 07/10; não substitui a observação AUD24 |
 | Roadmap desta auditoria | [roadmap-auditoria-2026-10-07.md](roadmap-auditoria-2026-10-07.md) | CURRENT como planejamento de referência |
 | Backlog desta auditoria | [backlog-auditoria-2026-10-07.md](backlog-auditoria-2026-10-07.md) | CURRENT como contrato de escopo e aceite; 46 tarefas AUD07, **AUD07-01–26 e 44–46 concluídas localmente; 27 parcial; 28–43 dependem de evidência externa** |
 | Snapshot anterior (AUD03) | [scorecard de 03/10/2026](reports/evidence/auditoria-2026-10-03/scorecard.json) | HISTORICAL como baseline anterior; escopo de 29 áreas, não comparável |
@@ -29,6 +46,11 @@
 
 ## Evidências e relatórios
 
+- [Relatório AUD24](<reports/relatorio-auditoria-2026-10-24.md>): 74,7/100, comandos/exit codes, 26 dimensões, achados AUD24-01…12 e limites; leitura read-only do checkout sujo.
+- [Plano executivo AUD24](<plans/execplan-aud24-2026-10-24.md>): objetivo, workstreams, marcos, riscos, governança e decisões humanas.
+- [Roadmap AUD24](<roadmap-auditoria-2026-10-24.md>): oito marcos, caminho crítico, portões externos e critérios de parada.
+- [Backlog AUD24](<backlog-auditoria-2026-10-24.md>): 29 contratos com prioridade, tamanho, dependências, aceite e evidência; herança PROD12 sem duplicação.
+- [Relatório da auditoria de 15/10](<reports/relatorio-auditoria-2026-10-15.md>): baseline histórica de 74,6/100 e achados AUD15-01…13.
 - [Relatório da auditoria atual](reports/relatorio-auditoria-2026-10-07.md): notas das 26 áreas, achados A01–A20, comandos, exit codes e limites.
 - [Roadmap atual](roadmap-auditoria-2026-10-07.md): oito marcos M0–M7, sequência, gates de passagem e dependências externas.
 - [Backlog atual](backlog-auditoria-2026-10-07.md): 46 tarefas AUD07 com prioridades, dependências, tamanhos relativos e critérios de aceite.

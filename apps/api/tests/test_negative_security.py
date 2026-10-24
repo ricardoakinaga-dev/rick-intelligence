@@ -1,5 +1,7 @@
 """Negative security matrix (§51): roles × routes."""
 
+import logging
+
 from apps.api.tests.support import login_as
 
 
@@ -49,3 +51,16 @@ def test_chat_cannot_widen_collection(client):
     resp = client.post("/api/v1/chat", json={"message": "hello", "collection_id": "secret-collection"})
     assert resp.status_code == 403
     assert resp.json()["error"]["code"] == "forbidden"
+
+
+def test_access_denied_audit_failure_is_logged(client, providers, monkeypatch, caplog):
+    login_as(client, "vet@example.com")
+
+    def unavailable(_event):
+        raise RuntimeError("synthetic audit outage")
+
+    monkeypatch.setattr(providers.audit_sink, "emit", unavailable)
+    caplog.set_level(logging.WARNING, logger="dependencies.identity")
+    assert client.get("/api/v1/admin/users").status_code == 403
+    assert "access_denied audit failed" in caplog.text
+    assert "synthetic audit outage" not in caplog.text

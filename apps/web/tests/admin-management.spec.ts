@@ -131,7 +131,7 @@ test("supports user and session lifecycle with tenant-bound create and confirmat
 
   await page.route("**/api/v1/admin/users/**", async (route) => {
     const path = new URL(route.request().url()).pathname;
-    const userId = path.split("/").at(-1) || "";
+    const userId = path.split("/").at(path.endsWith("/reset-password") || path.endsWith("/deactivate") ? -2 : -1) || "";
     const user = users.find((item) => item.user_id === userId);
     if (route.request().method() === "PATCH") {
       const body = route.request().postDataJSON() as Record<string, unknown>;

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 import re
+import inspect
 from threading import RLock
 from urllib.parse import urlsplit, urlunsplit
 
@@ -11,11 +12,12 @@ from core.errors import ApiError
 
 
 DEFAULT_RETENTION = 10_000
-_ALLOWED_FIELDS = frozenset({
+AUDIT_EVENT_FIELDS = frozenset({
     "action", "actor_user_id", "target_id", "target_type", "tenant_id",
     "workspace_id", "request_id", "correlation_id", "reason", "status",
     "error_code", "user_id", "session_id", "collection_id",
 })
+_ALLOWED_FIELDS = AUDIT_EVENT_FIELDS
 _SAFE_STRING = re.compile(r"^[A-Za-z0-9_.:@/%+~\-]+$")
 _SENSITIVE_VALUE_MARKERS = (
     "authorization", "bearer ", "api key", "apikey", "cookie", "credential",
@@ -24,7 +26,22 @@ _SENSITIVE_VALUE_MARKERS = (
 )
 
 
-def emit_required(sink: object, event: dict) -> None:
+def _reject_async_result(value: object) -> None:
+    """Required audit is a synchronous completed-write port, not fire-and-forget."""
+    if not inspect.isawaitable(value):
+        return
+    # Close unstarted coroutine objects so rejection itself does not leak them.
+    # Other awaitables are unsupported too; cancellation is only best effort.
+    cleanup = getattr(value, "close", None) or getattr(value, "cancel", None)
+    if callable(cleanup):
+        try:
+            cleanup()
+        except Exception:
+            pass
+    raise ApiError("provider_unavailable")
+
+
+def emit_required(sink: object, event: Mapping[str, object]) -> None:
     """Persist an audit event or fail the mutation request closed."""
 
     if sink is None:
@@ -35,6 +52,7 @@ def emit_required(sink: object, event: dict) -> None:
             healthy = health()
         except Exception:
             raise ApiError("provider_unavailable") from None
+        _reject_async_result(healthy)
         if healthy is not True:
             raise ApiError("provider_unavailable")
     emitter = getattr(sink, "emit", None)
@@ -44,7 +62,10 @@ def emit_required(sink: object, event: dict) -> None:
         result = emitter(event)
     except Exception:
         raise ApiError("provider_unavailable") from None
-    if result is False:
+    _reject_async_result(result)
+    # Legacy synchronous void emitters remain supported; unknown truthy
+    # objects/values must not manufacture an acknowledgement.
+    if result is not None and result is not True:
         raise ApiError("provider_unavailable")
 
 
@@ -78,7 +99,7 @@ def _strip_url_credentials(value: str) -> str | None:
 try:
     from rick_observability import redact as _redact
 except ImportError:  # Keep a packaged API fallback independent of the monorepo wheel.
-    def _redact(value: object, *, _depth: int = 0) -> object:
+    def _redact(value: object, *, _depth: int = 0) -> object:  # type: ignore[misc]
         if _depth > 4:
             return "[truncated]"
         if isinstance(value, Mapping):

@@ -1,7 +1,13 @@
-"""Canonical poison confirmations and delayed daemon error thresholds."""
+"""Canonical poison confirmations and delayed daemon error thresholds.
+
+Candidate3: generic cancellation errors / RUNNING responses retain ownership;
+legacy cancelled / lease_lost counters did not prove durable queue settlement.
+"""
 from dataclasses import replace
 from threading import Event
+from types import SimpleNamespace
 import pytest
+from deployment_composition import DeploymentRuntime
 from rick_jobs import JobState, JobResult, JobFailure
 from runtime import WorkerCancelled
 from test_runtime import FakeQueue, LeaseLost, ManualClock, job, make_runtime, success
@@ -57,16 +63,16 @@ def expected_outcome(port, state, dimension=None, error=None):
     if error is LeaseLost:
         return 'lease_lost', 0
     if error:
-        return ('cancelled' if port == 'cancel' else 'queue_error'), 1
+        return (None if port == 'cancel' else 'queue_error'), 1
     if dimension:
-        return 'queue_error', 1
+        return (None if port == 'cancel' else 'queue_error'), 1
     if state is JobState.SUCCEEDED:
         return 'succeeded', 0
     if state is JobState.RUNNING:
-        return 'lease_lost', 0
+        return (None, 1) if port == 'cancel' else ('lease_lost', 0)
     if port == 'ack':
         return 'queue_error', 1
-    if port == 'cancel' or state is JobState.CANCELLED:
+    if state is JobState.CANCELLED:
         return 'cancelled', 0
     return 'failed', 0
 
@@ -106,6 +112,32 @@ def test_poison_confirmation_observation(trigger, dimension, state):
         worker.shutdown()
 
 
+def assert_pending_cancellation_blocks_close_and_retries(worker, queue, job_id):
+    class Store:
+        calls = 0
+        def close(self):
+            self.calls += 1
+    store = Store()
+    composition = DeploymentRuntime(SimpleNamespace(worker=worker, object_store=store))
+    original = queue._jobs[job_id]
+    assert original.state is JobState.RUNNING
+    report = worker.shutdown(timeout=0)
+    assert not report.drained and report.pending_claims == 1
+    assert worker.wait_for_idle(timeout=0) is False
+    assert composition.shutdown(timeout=0) is False and store.calls == 0
+    assert queue._jobs[job_id] == original
+    # A real version-fenced FakeQueue mutation now confirms release; do not
+    # equate the earlier synthetic confirmation/error with persisted state.
+    queue.cancel_lease = FakeQueue.cancel_lease.__get__(queue, type(queue))
+    assert composition.shutdown(timeout=1) is True and store.calls == 1
+    settled = queue._jobs[job_id]
+    assert settled.state is JobState.CANCELLED and settled.version > original.version
+    assert settled.attempt_count == original.attempt_count == 1
+    settled_calls = len(queue.cancel_lease_calls)
+    assert composition.shutdown(timeout=1) is True and store.calls == 1
+    assert len(queue.cancel_lease_calls) == settled_calls == 1
+
+
 @pytest.mark.parametrize('port', ['cancel', 'failure'])
 @pytest.mark.parametrize('max_runtime', [.001, .1])
 def test_daemon_counts_delayed_confirmation_errors(port, max_runtime):
@@ -129,6 +161,8 @@ def test_daemon_counts_delayed_confirmation_errors(port, max_runtime):
             execution = next(iter(worker._active.values()))
             released.set()
             assert execution.handler_done.wait(2)
+            execution.thread.join(1)
+            assert not execution.thread.is_alive()
         else:
             worker.request_stop()
     events = []
@@ -140,14 +174,18 @@ def test_daemon_counts_delayed_confirmation_errors(port, max_runtime):
         assert worker.metrics().queue_errors == 1
         assert totals.queue_errors == worker.metrics().queue_errors == 1
         assert worker._consecutive_queue_errors == 1 and worker.health().reason == 'queue_unavailable'
-        assert totals.cancelled == int(port == 'cancel') and totals.failed == 0
-        assert worker.metrics().cancelled == int(port == 'cancel')
+        assert totals.cancelled == totals.failed == worker.metrics().cancelled == 0
         assert worker.active_count == 0
+        if port == 'cancel':
+            assert len(worker._pending_recovery) == 1
+            assert queue._jobs['job-ingest-I1-late'].state is JobState.RUNNING
         assert len([e for e in events if e['event'] == 'worker.queue.error']) == 1
         assert MARKER not in str(events)
+        if port == 'cancel':
+            assert_pending_cancellation_blocks_close_and_retries(worker, queue, 'job-ingest-I1-late')
     finally:
         released.set()
-        worker.shutdown()
+        worker.shutdown(timeout=0)
 
 
 def test_daemon_counts_mixed_delayed_confirmations_once():
@@ -185,6 +223,9 @@ def test_daemon_counts_mixed_delayed_confirmations_once():
             assert len(executions) == 4
             released.set()
             assert all(e.handler_done.wait(2) for e in executions)
+            for execution in executions:
+                execution.thread.join(1)
+                assert not execution.thread.is_alive()
         else:
             worker.request_stop()
     events = []
@@ -194,8 +235,12 @@ def test_daemon_counts_mixed_delayed_confirmations_once():
         totals = worker.run_forever(max_runtime_seconds=.1)
         metrics = worker.metrics()
         assert totals.claimed == totals.started == 4
-        assert metrics.queue_errors == 2 and metrics.cancelled == metrics.succeeded == metrics.lease_lost == 1
-        assert totals.queue_errors == 2 and totals.cancelled == totals.succeeded == totals.lease_lost == 1
+        assert metrics.queue_errors == 2 and metrics.cancelled == 0
+        assert metrics.succeeded == metrics.lease_lost == 1
+        assert totals.queue_errors == 2 and totals.cancelled == 0
+        assert totals.succeeded == totals.lease_lost == 1
+        assert len(worker._pending_recovery) == 1
+        assert queue._jobs[str(originals[0].job_id)].state is JobState.RUNNING
         assert worker.health().reason == 'queue_unavailable' and worker._consecutive_queue_errors == 2
         assert len(calls) == len(set(calls)) == len(queue.calls) == 4
         assert worker.active_count == 0
@@ -203,6 +248,7 @@ def test_daemon_counts_mixed_delayed_confirmations_once():
         for key,(original,lease) in queue.snapshots.items():
             assert queue._jobs[key] == original and queue._leases[key] == lease
         assert MARKER not in str(events)
+        assert_pending_cancellation_blocks_close_and_retries(worker, queue, str(originals[0].job_id))
     finally:
         released.set()
-        worker.shutdown()
+        worker.shutdown(timeout=0)

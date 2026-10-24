@@ -1,0 +1,17 @@
+{
+  "checks": {
+    "deletions": 0,
+    "status_entries": "116/116 identical",
+    "tracked_hashes": "1525/1525 OK",
+    "untracked_hashes": "48/48 OK"
+  },
+  "head": "48e383c25ca4af32aa7ffe7e2367360ca9742c58",
+  "limitations": [
+    "Restoration used a local git worktree from HEAD plus the captured patch and untracked copy.",
+    "Does not prove recoverability of ignored artifacts or external stores."
+  ],
+  "manifest_sha256": "eef42268063441cbf85b1c67a51fae79b8386dc2dd6d579e49a5da8e4d3dea1b",
+  "method": "git worktree add --detach HEAD; git apply --binary tracked.patch; copy untracked files",
+  "result": "PASS",
+  "schema": "rick.aud24.restore-report.v1"
+}

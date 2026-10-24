@@ -7,7 +7,7 @@ const session = {
   user_id: "user-km",
   email: "km@example.com",
   role: "admin_rag",
-  canonical_role: "KNOWLEDGE_MANAGER", permissions: ["chat.query", "documents.read", "documents.upload", "documents.manage", "ingestion.run", "reindex.run", "collections.read", "observability.read", "audit.read"],
+  canonical_role: "KNOWLEDGE_MANAGER", permissions: ["chat.query", "history.read", "documents.read", "documents.upload", "documents.manage", "ingestion.run", "reindex.run", "collections.read", "observability.read", "audit.read"],
   tenant_id: "tenant-1",
   workspace_id: "workspace-1",
   session_id: "session-visual",
@@ -19,6 +19,7 @@ test("captures the grounded chat evidence state at the canonical viewports", asy
     contentType: "application/json",
     body: JSON.stringify(session),
   }));
+  await page.route("**/api/v1/conversations?**", route => route.fulfill({ json: { items: [], total: 0, next_cursor: null } }));
   await page.route("**/api/v1/chat", (route) => route.fulfill({
     status: 200,
     contentType: "application/json",
@@ -71,8 +72,10 @@ test("captures the grounded chat evidence state at the canonical viewports", asy
   await page.getByRole("button", { name: "Consultar" }).click();
   await expect(page.locator(".answer-panel").getByRole("alert").getByText("Consulta indisponível.", { exact: true })).toBeVisible();
   // The workspace keeps the previously persisted answer visible while the
-  // newer failed turn remains recoverable in the same conversation.
+  // newer failed turn remains recoverable in the same conversation. Retention
+  // does not pretend that this failed request reconfirmed server authority.
   await expect(page.locator(".answer-text")).toHaveCount(1);
   await expect(page.getByRole("button", { name: "Copiar", exact: true })).toHaveCount(1);
-  await expect(page.getByText("Com evidência", { exact: true })).toHaveCount(1);
+  await expect(page.getByText("Escopo não confirmado", { exact: true })).toBeVisible();
+  await expect(page.getByText("Com evidência", { exact: true })).toHaveCount(0);
 });

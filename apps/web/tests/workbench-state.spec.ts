@@ -27,7 +27,7 @@ test("document403 is not empty and cannot hide successful readiness", async ({ p
   await expect(primary).toBeVisible();
   expect(await primary.evaluate(node => node.getBoundingClientRect().bottom <= innerHeight)).toBe(true);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  await page.screenshot({ path: resolve(process.cwd(), `../../artifacts/visual/state-of-art/cycle1-permission-${testInfo.project.name}.png`), fullPage: true });
+  await page.screenshot({ path: resolve(process.env.RICK_VISUAL_EVIDENCE_DIR || "../../artifacts/visual/state-of-art", `cycle1-permission-${testInfo.project.name}.png`), fullPage: true });
 });
 
 test("only successful empty documents show zero and the empty state", async ({ page }) => {

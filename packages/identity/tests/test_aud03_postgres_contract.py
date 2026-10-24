@@ -142,5 +142,7 @@ def test_postgres_modern_snapshots_keep_exact_permission_and_collection_lists(st
 def test_postgres_legacy_marker_cannot_relabel_existing_permissions():
     db = Database()
     db.row["authorization_snapshot"]["permissions"] = []
-    assert not provider(db).validate_session("synthetic")["authenticated"]
+    with pytest.raises(PostgresIdentityError) as error:
+        provider(db).validate_session("synthetic")
+    assert error.value.code == "identity_unavailable"
     assert db.migration_writes == 0

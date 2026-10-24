@@ -211,7 +211,66 @@ def test_node_inventory_matches_tracked_canonical_manifests() -> None:
         for path in gate._git_files(ROOT)
         if path.name == "package.json"
     }
-    assert set(gate.NODE_COMPONENTS) == manifests == {"apps/web"}
+    result = gate.check_node_inventory(ROOT)
+    assert result["status"] == "PASS"
+    observed = result["observations"]
+    assert set(observed["canonical"]) == set(gate.NODE_COMPONENTS) == {"apps/web"}
+    assert observed["archived"] == [".runtime/production-local-20261004/source/apps/web"]
+    assert manifests == set(observed["canonical"]) | set(observed["archived"])
+    assert observed["unexpected"] == observed["invalid_archives"] == []
+
+
+@pytest.mark.parametrize("relative", ["apps/extra", ".runtime/new-snapshot/apps/web", ".runtime/production-local-20261004/source/apps/extra"])
+def test_inventory_rejects_every_unknown_node_manifest(tmp_path, monkeypatch, relative):
+    _write_node_component(tmp_path)
+    extra = tmp_path / relative / "package.json"
+    extra.parent.mkdir(parents=True)
+    extra.write_text('{"private":true}')
+    monkeypatch.setattr(gate, "_git_files", lambda _root: list(tmp_path.rglob("package.json")))
+    result = gate.check_node_inventory(tmp_path)
+    assert result["status"] == "FAIL"
+    assert result["observations"]["unexpected"] == [relative]
+    # Supply consumers cannot quietly audit only the canonical component.
+    assert gate.check_lockfiles(tmp_path, npm=None)["status"] == "FAIL"
+    assert gate.check_sbom(tmp_path, tmp_path / "evidence", npm=None)["status"] == "FAIL"
+    assert gate.check_licenses(tmp_path)["status"] == "FAIL"
+
+
+@pytest.mark.parametrize("damage", ["package", "lock", "provenance", "symlink"])
+def test_inventory_never_exempts_changed_or_unproven_archives(tmp_path, monkeypatch, damage):
+    _write_node_component(tmp_path)
+    import shutil
+    relative = ".runtime/production-local-20261004/source/apps/web"
+    archive = tmp_path / relative
+    archive.mkdir(parents=True)
+    for name in ("package.json", "package-lock.json"):
+        shutil.copyfile(ROOT / relative / name, archive / name)
+    provenance = tmp_path / "docs/local-runtime-archive-20261011.json"
+    provenance.parent.mkdir()
+    shutil.copyfile(ROOT / "docs/local-runtime-archive-20261011.json", provenance)
+    files = [tmp_path / "apps/web/package.json", archive / "package.json"]
+    monkeypatch.setattr(gate, "_git_files", lambda _root: files)
+    assert gate.check_node_inventory(tmp_path)["status"] == "PASS"
+    if damage == "package":
+        (archive / "package.json").write_text('{"new":"dependency"}')
+    elif damage == "lock":
+        (archive / "package-lock.json").write_text('{}')
+    elif damage == "provenance":
+        provenance.write_text('{}')
+    else:
+        target = archive / "package.json"
+        # The resolved absolute path is the synthetic archive created above.
+        assert target.resolve() == tmp_path.resolve() / relative / "package.json"
+        target.unlink()
+        target.symlink_to(ROOT / relative / "package.json")
+    result = gate.check_node_inventory(tmp_path)
+    assert result["status"] == "FAIL"
+    assert result["observations"]["invalid_archives"] == [relative]
+
+
+def test_inventory_keeps_missing_canonical_manifest_a_failure(tmp_path, monkeypatch):
+    monkeypatch.setattr(gate, "_git_files", lambda _root: [])
+    assert gate.check_node_inventory(tmp_path)["status"] == "FAIL"
 
 
 def test_sbom_parser_requires_non_empty_cyclonedx_components() -> None:

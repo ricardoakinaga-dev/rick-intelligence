@@ -10,6 +10,8 @@ from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, ConfigDict, Field, StrictInt, field_validator
 
 from core.errors import ApiError
+from core.rate_limit import check_rate_limit_async, ensure_rate_limiter_async, rate_limit_key, server_rate_request_id
+from starlette.concurrency import run_in_threadpool
 from dependencies.identity import require_authenticated
 from dependencies.services import get_providers
 from services.authorization_service import build_retrieval_context, has_permission
@@ -138,7 +140,7 @@ def _record_retrieval_failure(request: Request) -> None:
 
 
 @router.post("/api/v1/search")
-def search(payload: SearchRequest, request: Request, session=Depends(require_authenticated)):
+async def search(payload: SearchRequest, request: Request, session=Depends(require_authenticated)):
     if not has_permission(session, "sources.read"):
         raise ApiError("forbidden")
 
@@ -154,10 +156,28 @@ def search(payload: SearchRequest, request: Request, session=Depends(require_aut
         workspace_id=workspace_id,
         collection_id=payload.collection_id,
     )
+    providers = get_providers(request)
+    if settings.environment == "production" and getattr(providers, "rate_limiter", None) is None:
+        raise ApiError("provider_unavailable")
+    buckets = [(rate_limit_key("search:actor", session.tenant_id, session.user_id), settings.chat_rate_limit_per_min)]
+    if settings.search_tenant_rate_limit_per_min is not None:
+        buckets.append((rate_limit_key("search:tenant", session.tenant_id), settings.search_tenant_rate_limit_per_min))
+    try:
+        limiter = await ensure_rate_limiter_async(providers)
+        for key, ceiling in buckets:
+            if not await check_rate_limit_async(limiter, key, limit_per_min=ceiling,
+                                                request_id=server_rate_request_id(request)):
+                raise ApiError("rate_limited")
+    except ApiError:
+        raise
+    except Exception:
+        raise ApiError("provider_unavailable") from None
     retrieval = _retrieval_service(request)
     started = time.perf_counter()
     try:
-        result = retrieval.retrieve(query=payload.query, context=context, top_k=payload.top_k)
+        # Await distributed admission without running synchronous retrieval on
+        # the event loop. The existing ACL/evidence boundary remains intact.
+        result = await run_in_threadpool(retrieval.retrieve, query=payload.query, context=context, top_k=payload.top_k)
     except Exception:
         _record_retrieval_telemetry(request, started=started, outcome="error")
         _record_retrieval_failure(request)

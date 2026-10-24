@@ -41,9 +41,10 @@ Declaration model:
 - Workspace/collection widening: `build_retrieval_context` — request input narrows
   only; foreign workspace/collection → 403. Tested (VET secret-collection probe).
 - CORS: allowlist from config; wildcard+credentials rejected at startup; tested.
-- CSRF: cookie `SameSite=Lax`+`Secure` (configurable; `Secure=false` local/test only);
-  mutating browser requests rely on SameSite; explicit CSRF tokens deferred with
-  deployment-model note (see ADR). CORS ≠ CSRF documented.
+- CSRF: cookie `SameSite=Lax`+`Secure` (configurable; `Secure=false` local/test only)
+  plus a per-session double-submit nonce (`rick_csrf`, non-HttpOnly, SameSite=strict)
+  checked with `hmac.compare_digest`; Origin/Referer allowlist is enforced when present.
+  Local/test clients retain the explicit no-Origin fallback. CORS ≠ CSRF documented.
 - Error leaks: safe templates; legacy detail allowlisted keys only; tests assert
   no `redis://`/traceback/provider bodies.
 - Header spoofing/proxy: `X-Forwarded-For` is honored only when

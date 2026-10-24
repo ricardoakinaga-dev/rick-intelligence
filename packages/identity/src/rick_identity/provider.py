@@ -28,7 +28,7 @@ from rick_authorization import (
     normalize_permission_overrides,
     permissions_for_role,
 )
-from rick_identity.passwords import verify_password_hash
+from rick_identity.passwords import hash_password, verify_password_hash
 from rick_identity.snapshots import known_role, legacy_snapshot, valid_authorization_snapshot
 
 
@@ -39,9 +39,17 @@ class IdentityError(Exception):
 
 
 class Pbkdf2Verifier:
+    # A fixed-cost dummy hash keeps an unknown/disabled account on the same KDF
+    # path as a known one (AUD24-08). The value is never accepted as a login.
+    _DUMMY_HASH = hash_password("rick-timing-dummy")
+
     def verify(self, user_record: dict, password: str) -> bool:
         stored = user_record.get("password_hash") or ""
         return bool(stored) and verify_password_hash(stored, password)
+
+    def verify_dummy(self, password: str) -> bool:
+        verify_password_hash(self._DUMMY_HASH, password)
+        return False
 
 
 class PlainTestVerifier:
@@ -49,6 +57,9 @@ class PlainTestVerifier:
 
     def verify(self, user_record: dict, password: str) -> bool:
         return bool(password) and user_record.get("password_plain") == password
+
+    def verify_dummy(self, _password: str) -> bool:
+        return False
 
 
 def _required_tenant_id(value: object) -> str:
@@ -86,19 +97,34 @@ def _anonymous_snapshot() -> dict:
 
 
 class IdentityProviderImpl:
-    def __init__(self, *, users, sessions, verifier, tenant_policy=None) -> None:
+    def __init__(self, *, users, sessions, verifier, tenant_policy=None, absolute_ttl_seconds: int = 7 * 24 * 3600) -> None:
+        if isinstance(absolute_ttl_seconds, bool) or not isinstance(absolute_ttl_seconds, int) or not 300 <= absolute_ttl_seconds <= 30 * 24 * 3600:
+            raise IdentityError("invalid_configuration")
         self.users = users
         self.sessions = sessions
         self.verifier = verifier
         self.tenant_policy = tenant_policy or (lambda user, tenant_id: tenant_id == user.get("tenant_id"))
+        self.absolute_ttl_seconds = absolute_ttl_seconds
 
     # -- login -----------------------------------------------------------
-    def login(self, *, email, password, tenant_id, ip, user_agent) -> dict:
+    def login(self, *, email, password, tenant_id, workspace_id=None, ip, user_agent) -> dict:
         tenant_lookup = getattr(self.users, "get_by_email_for_tenant", None)
         if not callable(tenant_lookup):
             raise IdentityError("unauthorized")
-        user = tenant_lookup(email, tenant_id)
-        if user is None or not self.verifier.verify(user, password):
+        if workspace_id is not None:
+            if not isinstance(workspace_id, str) or not workspace_id.strip():
+                raise IdentityError("unauthorized")
+            user = tenant_lookup(email, tenant_id, workspace_id=workspace_id.strip())
+        else:
+            user = tenant_lookup(email, tenant_id)
+        if user is None:
+            # Unknown/disabled account: still pay the verifier cost so the
+            # response time does not disclose whether the account exists.
+            verify_dummy = getattr(self.verifier, "verify_dummy", None)
+            if callable(verify_dummy):
+                verify_dummy(password)
+            raise IdentityError("unauthorized")
+        if not self.verifier.verify(user, password):
             raise IdentityError("unauthorized")
         if (
             user.get("status", "active") != "active"
@@ -143,15 +169,23 @@ class IdentityProviderImpl:
             return _anonymous_snapshot()
         record = copy.deepcopy(record)
         if not valid_authorization_snapshot(record):
-            return _anonymous_snapshot()
+            raise IdentityError("provider_unavailable")
         now = time.time()
         if record.get("revoked_at") is not None or now >= record.get("expires_at", 0):
             return _anonymous_snapshot()
+        created_at = record.get("created_at")
+        if isinstance(created_at, (int, float)) and not isinstance(created_at, bool):
+            if now >= float(created_at) + self.absolute_ttl_seconds:
+                # Sliding activity cannot extend a session beyond the absolute
+                # lifetime derived from the immutable creation timestamp.
+                return _anonymous_snapshot()
         try:
             session_tenant = _required_tenant_id(record.get("tenant_id"))
             session_workspace = _required_workspace_id(record.get("workspace_id", "default"))
         except IdentityError:
-            return _anonymous_snapshot()
+            # A live stored credential with corrupt server-owned scope is not
+            # confirmed absent. Consumers must not turn this into logout success.
+            raise IdentityError("provider_unavailable") from None
         scoped_lookup = getattr(self.users, "get_by_id_for_tenant_workspace", None)
         if not callable(scoped_lookup):
             return _anonymous_snapshot()

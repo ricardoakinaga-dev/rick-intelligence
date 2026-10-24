@@ -15,6 +15,7 @@ class Providers:
     chat_backend: object = None  # ChatBackend protocol
     health_checks: dict = field(default_factory=dict)
     audit_sink: object = None
+    audit_operations: object = None
     chat_history: object = None
     case_store: object = None  # controlled local clinical-case record/review/feedback store
     job_journal: object = None

@@ -9,6 +9,10 @@ WEB_COVERAGE_SOURCES = frozenset({
     "lib/chat-response.ts", "lib/api-error.ts", "lib/session-scope.ts",
     "components/session-provider.tsx", "components/app-shell.tsx",
     "components/cases/case-workspace.tsx", "components/ui.tsx",
+    "lib/api.ts", "lib/network.ts", "lib/client-authority.ts",
+    "lib/response-contract.ts", "lib/job-tracking.ts", "lib/session-coordination.ts",
+    "components/chat/chat-adapter.ts", "components/chat/chat-workspace.tsx",
+    "app/app/documents/page.tsx",
 })
 
 

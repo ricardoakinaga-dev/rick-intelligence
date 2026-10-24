@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 from fastapi import Cookie, Depends, Header, Request
 
 from core.errors import ApiError
@@ -9,6 +11,10 @@ from core.otel import record_safe_exception, stage_span
 from core.security import resolve_auth_precedence, resolve_session_cookie
 from dependencies.services import get_providers
 from models import SessionSnapshot
+from services.identity_offload import identity_token_port, run_identity
+from services.audit_event import make_audit_event
+
+_logger = logging.getLogger(__name__)
 
 
 def _extract_bearer(authorization: str | None) -> str | None:
@@ -47,17 +53,19 @@ async def get_current_session(
     )
     bearer_token = _extract_bearer(authorization)
     token, _source = resolve_auth_precedence(cookie_token, bearer_token)
-    identity = providers.identity
+    identity = identity_token_port(providers.identity)
     with stage_span("auth.identity", attributes={"auth.operation": "validate_token"}) as span:
         try:
-            snapshot = identity.validate_token(token)  # type: ignore[union-attr]
+            snapshot = await run_identity(request, identity.validate_token, token)
         except Exception as exc:
             record_safe_exception(span, exc)
             raise
     if snapshot.authenticated and not _has_explicit_tenant(snapshot):
         # An authenticated identity without an explicit tenant is malformed;
         # never reinterpret it as the default tenant.
-        return SessionSnapshot(authenticated=False, session_state="anonymous", tenant_id=None)
+        # Invalid server-owned authenticated scope is a provider fault, not
+        # confirmed absence; callers must not report signed out on this basis.
+        raise ApiError("provider_unavailable")
     # Attach server-derived identity to request context for logs/audit.
     ctx = getattr(request.state, "request_context", None)
     if ctx is not None and snapshot.authenticated:
@@ -94,19 +102,27 @@ def require_permission(permission: str, *, target_type: str = "permission"):
             try:
                 audit = providers.audit_sink
                 if audit is not None:
-                    audit.emit(  # type: ignore[union-attr]
-                        {
-                            "action": "auth.access_denied",
-                            "actor_user_id": session.user_id,
-                            "target_type": target_type,
-                            "target_id": permission,
-                            "tenant_id": session.tenant_id,
-                            "workspace_id": session.workspace_id,
-                            "request_id": getattr(request.state, "request_id", None),
-                        }
-                    )
-            except Exception:
-                pass
+                    emitter = getattr(audit, "emit", None)
+                    if not callable(emitter):
+                        raise TypeError("audit sink has no emit port")
+                    await run_identity(request, emitter, make_audit_event(
+                        "auth.access_denied",
+                        actor_user_id=session.user_id,
+                        target_type=target_type,
+                        target_id=permission,
+                        tenant_id=session.tenant_id,
+                        workspace_id=session.workspace_id,
+                        request_id=getattr(request.state, "request_id", None),
+                    ))
+            except Exception as exc:
+                # A denied action must not become an unaudited action when the
+                # sink is degraded. Keep the request fail-closed and make the
+                # delivery failure observable without logging identity payloads.
+                _logger.warning(
+                    "auth access_denied audit failed request_id=%s error_type=%s",
+                    getattr(request.state, "request_id", None),
+                    type(exc).__name__,
+                )
             raise ApiError("forbidden")
         # Workspace scoping for admin routes is enforced in route via require_workspace helper.
         return session

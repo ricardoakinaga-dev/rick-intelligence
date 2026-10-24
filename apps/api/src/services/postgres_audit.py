@@ -10,6 +10,7 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from contextlib import contextmanager
 from datetime import datetime
+import hashlib
 import json
 from typing import Iterator, Protocol
 import uuid
@@ -158,6 +159,15 @@ class PostgresAuditSink:
             key: value for key, value in sanitized.items()
             if key in _ALLOWED_FIELDS and key not in {"tenant_id", "action", *columns}
         }
+        request_id = columns["request_id"]
+        status = _text(sanitized.get("status"), maximum=64)
+        if request_id:
+            # Stable idempotency key for one operation/status. Concurrent or
+            # replayed writes collide on the primary key instead of duplicating.
+            material = f"{action}\x1f{request_id}\x1f{status or ''}".encode("utf-8")
+            event_id = f"audit-{hashlib.sha256(material).hexdigest()[:32]}"
+        else:
+            event_id = f"audit-{uuid.uuid4().hex}"
         try:
             with self._session(write=True) as (_connection, cursor):
                 self._execute(cursor, """
@@ -165,13 +175,15 @@ class PostgresAuditSink:
                         (event_id, tenant_id, actor_user_id, action, target_type, target_id,
                          workspace_id, request_id, metadata, occurred_at)
                     VALUES (%s,%s,%s,%s,%s,%s,%s,%s,CAST(%s AS jsonb),NOW())
+                    ON CONFLICT (event_id) DO NOTHING
                 """, (
-                    f"audit-{uuid.uuid4().hex}", tenant_id, columns["actor_user_id"], action,
+                    event_id, tenant_id, columns["actor_user_id"], action,
                     columns["target_type"], columns["target_id"], columns["workspace_id"],
                     columns["request_id"], json.dumps(metadata, ensure_ascii=False, sort_keys=True),
                 ))
         except PostgresAuditError:
             return False
+        # A conflict means the same operation/status was already recorded.
         return True
 
     def emit(self, event: object) -> bool:

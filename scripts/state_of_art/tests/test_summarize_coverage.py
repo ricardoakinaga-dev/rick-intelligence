@@ -100,7 +100,7 @@ def test_api_coverage_rejects_files_outside_production_scope(tmp_path: Path, mon
 def _web_report() -> dict:
     files = {"/runner/repository/apps/web/" + path: {"lines": {"covered": 9, "total": 10}}
         for path in WEB_COVERAGE_SOURCES}
-    return {"total": {"lines": {"covered": 90, "total": 100}}, **files}
+    return {"total": {"lines": {"covered": 9 * len(files), "total": 10 * len(files)}}, **files}
 
 
 def _web_invoke(tmp_path: Path, monkeypatch, report: dict) -> dict:
@@ -111,9 +111,9 @@ def _web_invoke(tmp_path: Path, monkeypatch, report: dict) -> dict:
     return json.loads(destination.read_text())
 
 
-def test_web_coverage_includes_all_ten_declared_behavior_modules(tmp_path: Path, monkeypatch) -> None:
+def test_web_coverage_includes_all_nineteen_declared_risk_modules(tmp_path: Path, monkeypatch) -> None:
     summary = _web_invoke(tmp_path, monkeypatch, _web_report())
-    assert summary["source_file_count"] == 10
+    assert summary["source_file_count"] == 19
     assert summary["lines_percent"] == 90
     assert summary["minimum_lines_percent"] == 85
     assert "components/cases/case-workspace.tsx" in summary["scope"]
@@ -133,10 +133,19 @@ def test_web_coverage_rejects_incomplete_or_false_reports(tmp_path: Path, monkey
         report["total"]["lines"]["covered"] = 100
     elif mutation == "below-floor":
         for path, entry in report.items():
-            entry["lines"]["covered"] = 80 if path == "total" else 8
+            entry["lines"]["covered"] = 8 * len(WEB_COVERAGE_SOURCES) if path == "total" else 8
     else:
         report[key]["lines"]["covered"] = True
     with pytest.raises(SystemExit):
+        _web_invoke(tmp_path, monkeypatch, report)
+
+
+@pytest.mark.parametrize("source", ["lib/api.ts", "lib/response-contract.ts", "lib/client-authority.ts", "lib/session-coordination.ts", "lib/job-tracking.ts", "components/chat/chat-workspace.tsx", "app/app/documents/page.tsx"])
+def test_web_report_cannot_omit_a_new_risk_frontier(tmp_path: Path, monkeypatch, source: str) -> None:
+    report = _web_report()
+    assert source in WEB_COVERAGE_SOURCES
+    del report["/runner/repository/apps/web/" + source]
+    with pytest.raises(SystemExit, match="source list differs"):
         _web_invoke(tmp_path, monkeypatch, report)
 
 

@@ -8,7 +8,7 @@ from threading import Barrier
 import pytest
 
 from rick_authorization import AuthorizationError, build_retrieval_context, can_access_collection
-from rick_identity import IdentityProviderImpl, InMemorySessionStore, InMemoryUserStore, PlainTestVerifier, PostgresSessionStore
+from rick_identity import IdentityError, IdentityProviderImpl, InMemorySessionStore, InMemoryUserStore, PlainTestVerifier, PostgresIdentityError, PostgresSessionStore
 from services.authorization_service import refresh_context_from_user
 
 
@@ -156,7 +156,9 @@ def test_modern_snapshot_corruption_never_derives_role_defaults(sessions, state,
     else:
         record[key] = value
     mutate(sessions, token, record)
-    assert not provider.validate_session(token)["authenticated"]
+    with pytest.raises(IdentityError) as error:
+        provider.validate_session(token)
+    assert error.value.code == "provider_unavailable"
     persisted = sessions.get(token)
     assert persisted.get("authorization_state") == record.get("authorization_state")
     assert persisted.get("permissions") == record.get("permissions")
@@ -212,7 +214,9 @@ def test_postgres_decoding_rejects_corrupt_modern_snapshot(key, value):
         snapshot.pop(key, None)
     else:
         snapshot[key] = value
-    assert PostgresSessionStore._record({"authorization_snapshot": snapshot}) is None
+    with pytest.raises(PostgresIdentityError) as error:
+        PostgresSessionStore._record({"authorization_snapshot": snapshot})
+    assert error.value.code == "identity_unavailable"
 
 
 def test_detached_legacy_without_persistence_port_is_denied():

@@ -455,6 +455,10 @@ def build_external_providers(
     # without the API importing a provider-specific callback broker.
     if settings.environment == "production" and getattr(inputs.identity, "production_safe", False) is not True:
         raise ExternalCompositionError("production-safe identity provider")
+    if settings.environment == "production" and getattr(inputs.identity, "logout_capable", True) is not True:
+        # D3: an identity without a revocation port is not a production logout
+        # provider. Fail closed at composition instead of returning 503 later.
+        raise ExternalCompositionError("revocable production identity")
     if settings.environment == "production" and callable(getattr(inputs.identity, "issue_password_reset", None)) and (
         inputs.password_reset_delivery is None
     ):
@@ -497,6 +501,11 @@ def build_external_providers(
     )
     chat_history = PostgresChatHistoryStore(inputs.connection_factory)
     audit_sink = PostgresAuditStore(inputs.connection_factory)
+    from services.audit_operations_store import PostgresAuditOperationStore
+    audit_operations = PostgresAuditOperationStore(inputs.connection_factory)
+    bind_operations = getattr(inputs.identity, "bind_audit_operations", None)
+    if callable(bind_operations):
+        bind_operations(audit_operations)
     object_store = S3CompatibleObjectStore(
         settings.object_store_endpoint,
         settings.object_store_bucket,
@@ -719,6 +728,7 @@ def build_external_providers(
         chat_backend=professor,
         health_checks=health_checks,
         audit_sink=audit_sink,
+        audit_operations=audit_operations,
         chat_history=chat_history,
         job_journal=queue,
         knowledge=knowledge,

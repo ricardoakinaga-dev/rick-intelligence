@@ -17,9 +17,9 @@ Handlers follow the existing :class:`rick_jobs.JobExecutor` shape::
 runtime never forcefully interrupts a Python handler.  Timeouts, lease loss,
 and shutdown therefore request cooperative cancellation and prevent any late
 acknowledgement.  A queue that exposes ``cancel_lease`` can release a lease
-explicitly; the canonical queue currently recovers an abandoned lease by its
-durable expiry path, so the runtime leaves it untouched when that optional
-capability is absent.
+explicitly; the canonical queue also owns durable database expiry recovery.
+That native guarantee is not inferred for arbitrary adapters: unadmitted
+claims without confirmed settlement remain pending and prevent completed drain.
 """
 
 from __future__ import annotations
@@ -402,6 +402,7 @@ class ShutdownReport:
     timed_out: bool
     cancelled: int
     active: int
+    pending_claims: int = 0
 
     def as_dict(self) -> dict[str, object]:
         return {
@@ -409,6 +410,7 @@ class ShutdownReport:
             "timed_out": self.timed_out,
             "cancelled": self.cancelled,
             "active": self.active,
+            "pending_claims": self.pending_claims,
         }
 
 
@@ -447,7 +449,7 @@ class _MetricState:
 class _Execution:
     job: Job
     lease: JobLease
-    handler: Handler
+    handler: Handler | None
     token: CancellationToken
     started_at: float
     deadline: float
@@ -466,6 +468,7 @@ class _Execution:
     finalizing: bool = False
     timed_out: bool = False
     queue_error_detected: bool = False
+    admission_interrupted: bool = False
     thread: Thread | None = None
 
 
@@ -598,6 +601,12 @@ class RealWorkerRuntime:
         self._daemon_owner: Thread | None = None
         self._cycle_owner: Thread | None = None
         self._active: dict[str, _Execution] = {}
+        # Claim operations remain outstanding through admission/reconciliation,
+        # even when queue IO has not yet returned any handler-visible job.
+        self._pending_claims = 0
+        # Interrupted admission keeps ownership until a fenced queue mutation
+        # actually settles it; arbitrary queue ports need not guarantee expiry.
+        self._pending_recovery: dict[str, _Execution] = {}
         self._started = False
         self._closing = False
         self._closed = False
@@ -955,47 +964,23 @@ class RealWorkerRuntime:
             return True
 
     def _end_finalization(self, execution: _Execution, outcome: str, *, code: str | None = None) -> None:
-        with execution.lock:
-            self._record_outcome(execution, outcome, code=code)
-            execution.finalizing = False
-
-    def _release_cancelled_lease(self, execution: _Execution) -> str:
-        release = getattr(self.queue, "cancel_lease", None)
-        if not callable(release):
-            return "cancelled"
         try:
-            recovered = release(
-                execution.lease,
-                now=self._now(),
-                expected_version=execution.job.version,
-            )
-            if (
-                not isinstance(recovered, Job)
-                or recovered.job_id != execution.job.job_id
-                or recovered.scope != execution.job.scope
-                or recovered.state is JobState.PENDING
-            ):
-                self._metrics.increment("queue_errors")
-                return "queue_error"
-            if isinstance(recovered, Job) and recovered.state is JobState.SUCCEEDED:
-                return "succeeded"
-            if isinstance(recovered, Job) and recovered.state is JobState.RUNNING:
-                return "lease_lost"
-        except Exception as exc:
-            if self._is_lease_error(exc):
-                return "lease_lost"
+            # _record_outcome publishes outcome/logical_done under its own short
+            # lock. Keep the finalizer reservation, not the state lock, over emit.
+            self._record_outcome(execution, outcome, code=code)
+        finally:
             with execution.lock:
-                execution.queue_error_detected = True
-            self._metrics.increment("queue_errors")
-            self._emit("worker.queue.error", execution=execution, reason="mutation_failed")
-            return "cancelled"
-        return "cancelled"
+                execution.finalizing = False
 
     def _finalize_cancel(self, execution: _Execution) -> None:
-        if not self._begin_finalization(execution):
-            return
-        outcome = self._release_cancelled_lease(execution)
-        self._end_finalization(execution, outcome)
+        with execution.lock:
+            with self._lock:
+                execution.cancel_requested = True
+                execution.token._request()
+                execution.admission_interrupted = True
+        # Cooperative handler cancellation is not proof of durable lease
+        # release. Use the same fenced, retryable ownership as late claims.
+        self._finalize_interrupted_claim(execution)
 
     def _finalize_lease_lost(self, execution: _Execution) -> None:
         if not self._begin_finalization(execution):
@@ -1166,7 +1151,9 @@ class RealWorkerRuntime:
             handler_done = execution.handler_done.is_set()
             timed_out = now >= execution.deadline
             heartbeat_due = now >= execution.next_heartbeat_at
-        if lease_lost:
+        if execution.admission_interrupted:
+            self._finalize_interrupted_claim(execution)
+        elif lease_lost:
             self._finalize_lease_lost(execution)
         elif cancelled:
             self._finalize_cancel(execution)
@@ -1180,27 +1167,156 @@ class RealWorkerRuntime:
         elif heartbeat_due:
             self._heartbeat(execution, now)
 
-    def _monitor_active(self) -> None:
+    def _monitor_active(self, *, retry_pending: bool = True) -> None:
         now = self._now()
         with self._lock:
-            executions = tuple(self._active.values())
+            executions = tuple(execution for execution in self._active.values()
+                if retry_pending or not execution.admission_interrupted)
+            if retry_pending:
+                executions += tuple(self._pending_recovery.values())
         for execution in executions:
             self._monitor_one(execution, now)
         self._reap()
 
     def _reap(self) -> None:
         with self._lock:
-            finished = [
-                job_id
-                for job_id, execution in self._active.items()
-                if execution.handler_done.is_set() and execution.logical_done.is_set()
-                and (execution.thread is None or not execution.thread.is_alive())
-            ]
-            for job_id in finished:
-                execution = self._active.pop(job_id)
+            active = tuple(self._active.items())
+        for job_id, execution in active:
+            with execution.lock:
+                if not execution.handler_done.is_set() or execution.finalizing:
+                    continue
+                completed = execution.logical_done.is_set()
+                interrupted = execution.admission_interrupted
                 thread = execution.thread
-                if thread is not None and thread.ident is not None and thread is not current_thread():
-                    thread.join(timeout=0)
+            if not (completed or interrupted):
+                continue
+            # Thread lifecycle seams are outside both state locks, even for a
+            # nominally nonblocking query/join. Keep the owner until they return.
+            if thread is not None and thread.is_alive():
+                continue
+            if completed and thread is not None and thread.ident is not None and thread is not current_thread():
+                thread.join(timeout=0)
+            with execution.lock:
+                if (execution.thread is not thread or not execution.handler_done.is_set()
+                        or execution.finalizing):
+                    continue
+                with self._lock:
+                    if self._active.get(job_id) is not execution:
+                        continue
+                    if execution.logical_done.is_set():
+                        self._active.pop(job_id)
+                    elif execution.admission_interrupted:
+                        self._active.pop(job_id)
+                        self._pending_recovery[job_id] = execution
+        with self._lock:
+            pending = tuple(self._pending_recovery.items())
+        for job_id, execution in pending:
+            with execution.lock:
+                if not execution.logical_done.is_set() or execution.finalizing:
+                    continue
+                with self._lock:
+                    if self._pending_recovery.get(job_id) is execution:
+                        self._pending_recovery.pop(job_id)
+
+    def _finalize_interrupted_claim(self, execution: _Execution) -> None:
+        """Settle aborted admission without inventing a queue expiry guarantee."""
+        if not self._begin_finalization(execution):
+            return
+        try:
+            with self._lock:
+                closing = self._closing or self._stop_requested or self._closed
+            if closing or execution.cancel_requested:
+                cancel = getattr(self.queue, "cancel_lease", None)
+                if not callable(cancel):
+                    raise RuntimeConfigurationError("interrupted lease cancellation unavailable")
+                recovered = cancel(execution.lease, now=self._now(),
+                    expected_version=execution.job.version)
+            else:
+                failure = self._failure(execution.job, code="handler_failed",
+                    retryable=True, now=self._now())
+                recovered = self.queue.fail(execution.lease, failure, now=self._now(),
+                    expected_version=execution.job.version)
+            if (not isinstance(recovered, Job) or recovered.job_id != execution.job.job_id
+                    or recovered.scope != execution.job.scope
+                    or recovered.state not in {JobState.QUEUED, JobState.RETRYING,
+                        JobState.FAILED, JobState.DEAD_LETTER, JobState.CANCELLED, JobState.SUCCEEDED}):
+                raise RuntimeConfigurationError("interrupted lease settlement incomplete")
+        except BaseException as error:
+            if self._is_lease_error(error):
+                self._record_outcome(execution, "lease_lost")
+            else:
+                with execution.lock:
+                    execution.queue_error_detected = True
+                self._metrics.increment("queue_errors")
+                self._emit("worker.queue.error", execution=execution, reason="unconfirmed_settlement")
+                # No logical_done: retain a retryable owner and truthful pending
+                # accounting, including when cleanup itself is interrupted.
+                if not isinstance(error, Exception):
+                    raise
+        else:
+            outcome = ("succeeded" if recovered.state is JobState.SUCCEEDED else
+                "cancelled" if recovered.state is JobState.CANCELLED else "failed")
+            self._record_outcome(execution, outcome,
+                code="handler_failed" if outcome == "failed" else None)
+        finally:
+            with execution.lock:
+                execution.finalizing = False
+
+    def _recover_interrupted_batch(
+        self, claimed: tuple[tuple[Job, JobLease], ...], now: float, error: BaseException,
+        existing: set[str], reservations: dict[str, _Execution],
+    ) -> None:
+        """Publish every valid unstarted owner before invoking cleanup ports."""
+        seen = set(existing)
+        owners: list[_Execution] = []
+        for item in claimed:
+            observed = self._validate_claim(item, now)
+            if observed is None:
+                continue  # Never mutate a foreign/malformed/unowned claim.
+            job, lease = observed
+            identity = str(job.job_id)
+            if identity in seen:
+                continue
+            seen.add(identity)
+            with self._lock:
+                execution = reservations.get(identity) or self._active.get(identity)
+            if execution is not None:
+                with execution.lock:
+                    busy = execution.logical_done.is_set() or execution.finalizing or execution.launched
+                    thread = execution.thread
+                if busy or (thread is not None and (thread.ident is not None or thread.is_alive())):
+                    continue  # Existing native/finalization ownership is retained.
+            else:
+                execution = _Execution(job=job, lease=lease, handler=None,
+                    token=CancellationToken(), started_at=now,
+                    deadline=now + self.handler_timeout_seconds,
+                    next_heartbeat_at=now + self._lease_interval(lease))
+                thread = None
+            with execution.lock:
+                # Thread observation may have yielded to a concurrent finalizer
+                # or a replacement. Recheck state/identity, not IO, under locks.
+                if (execution.thread is not thread or execution.logical_done.is_set()
+                        or execution.finalizing or execution.launched):
+                    continue
+                with self._lock:
+                    current = self._active.get(identity)
+                    if current is not None and current is not execution:
+                        continue
+                    execution.error = error
+                    execution.admission_interrupted = True
+                    execution.handler_done.set()
+                    if current is execution:
+                        self._active.pop(identity)
+                    self._pending_recovery[identity] = execution
+            owners.append(execution)
+        for execution in owners:
+            try:
+                self._finalize_interrupted_claim(execution)
+            except BaseException:
+                # Preserve the original admission interrupt, not a later cleanup
+                # interrupt. All staged owners remain visible until settled.
+                error.add_note("worker interrupted settlement remains pending")
+        self._reap()
 
     def _confirm_launch(self, execution: _Execution) -> None:
         with execution.lock:
@@ -1210,12 +1326,16 @@ class RealWorkerRuntime:
             execution.launched = True
         self._emit("worker.job.started", execution=execution)
 
-    def _start_execution(self, job: Job, lease: JobLease) -> _Execution:
-        handler = self.registry.get(job.operation)
-        if handler is None:
-            raise RuntimeConfigurationError("handler is not registered")
-        callable_handler = self._handler_callable(handler)
+    def _start_execution(
+        self, job: Job, lease: JobLease, *, cancel_only: bool = False,
+        reservations: dict[str, _Execution] | None = None,
+    ) -> _Execution:
         now = self._now()
+        expired = not lease.active_at(now)
+        handler = self.registry.get(job.operation)
+        if handler is None and not (cancel_only or expired):
+            raise RuntimeConfigurationError("handler is not registered")
+        callable_handler = self._handler_callable(handler) if handler is not None else None
         execution = _Execution(
             job=job,
             lease=lease,
@@ -1245,9 +1365,23 @@ class RealWorkerRuntime:
                             handler_entered = True
                             execution.token.checkpoint()
                             self._inject_fault("during_handler", execution)
+                            execution.token.checkpoint()
+                            with execution.lock:
+                                entry_lease = execution.lease
+                            # Native scheduling, tracing and fault hooks may all
+                            # yield after admission. Sample eligibility here,
+                            # immediately before the actual callable, not at
+                            # Thread.start. Expiry is never ownership-loss proof.
+                            if not entry_lease.active_at(self._now()):
+                                with execution.lock:
+                                    with self._lock:
+                                        execution.admission_interrupted = True
+                                        execution.token._request()
+                                self._finalize_interrupted_claim(execution)
+                                return
                             execution.result = callable_handler(
                                 job,
-                                lease,
+                                entry_lease,
                                 cancelled=execution.token,
                             )
                         except BaseException as error:  # worker isolation boundary
@@ -1276,9 +1410,33 @@ class RealWorkerRuntime:
             daemon=True,
         )
         execution.thread = thread
+        if reservations is not None:
+            # Keep the batch's finalization owner even if a concurrent monitor
+            # settles/reaps it before the interrupted driver regains control.
+            reservations[str(job.job_id)] = execution
         with self._lock:
-            self._active[str(job.job_id)] = execution
-            self._max_active = max(self._max_active, len(self._active))
+            # Admission and closing share the same linearization point. Queue
+            # IO and thread launch stay outside this lock so shutdown can always
+            # observe a blocked claim/launcher without waiting for the driver.
+            cancellation = cancel_only or self._closing or self._closed or self._stop_requested
+            rejected = cancellation or expired or self._unsettled_ownership_locked()
+            if rejected:
+                # Expiry forbids execution but does not discharge ownership.
+                # Normal expired admission uses retryable failure, not terminal
+                # cancellation; closing retains its guarded cancellation policy.
+                execution.cancel_requested = cancellation
+                execution.admission_interrupted = True
+                execution.token._request()
+                execution.handler_done.set()
+            else:
+                self._active[str(job.job_id)] = execution
+                self._max_active = max(self._max_active, len(self._active))
+        if rejected:
+            self._finalize_interrupted_claim(execution)
+            with self._lock:
+                if not execution.logical_done.is_set():
+                    self._pending_recovery[str(job.job_id)] = execution
+            return execution
         try:
             thread.start()
         except BaseException as error:
@@ -1294,9 +1452,12 @@ class RealWorkerRuntime:
                     execution.error = error
                     execution.handler_done.set()
             else:
-                with self._lock:
-                    if self._active.get(str(job.job_id)) is execution:
-                        self._active.pop(str(job.job_id))
+                with execution.lock:
+                    execution.error = error
+                    execution.admission_interrupted = True
+                    execution.handler_done.set()
+                # The batch exception path transfers this unstarted reservation
+                # and remaining valid leases before releasing claim accounting.
                 raise
         else:
             if execution.launched or thread.ident is not None or thread.is_alive():
@@ -1361,8 +1522,10 @@ class RealWorkerRuntime:
             token=lease.token,
         ):
             return None
-        if job.state is not JobState.RUNNING or not lease.active_at(now):
+        if job.state is not JobState.RUNNING:
             return None
+        # Binding establishes a returned owner; local expiry only controls
+        # whether it may execute, never proves that the queue released it.
         return job, lease
 
     def _sleep(self, seconds: float) -> None:
@@ -1385,8 +1548,12 @@ class RealWorkerRuntime:
 
     def _wait_for(self, executions: tuple[_Execution, ...]) -> None:
         while True:
-            self._monitor_active()
-            if all(execution.logical_done.is_set() for execution in executions):
+            self._monitor_active(retry_pending=False)
+            if all(execution.logical_done.is_set() or (
+                    execution.admission_interrupted and execution.handler_done.is_set())
+                    for execution in executions):
+                # run_once may return an incomplete batch once the handler has
+                # yielded ownership to pending settlement. This is not idle.
                 return
             with self._lock:
                 if self._closed:
@@ -1430,6 +1597,12 @@ class RealWorkerRuntime:
                 with self._lock:
                     self._cycle_owner = None
 
+    def _unsettled_ownership_locked(self) -> bool:
+        # Caller owns the short runtime state lock; no thread/queue operations.
+        return bool(self._pending_recovery) or any(
+            execution.admission_interrupted and not execution.logical_done.is_set()
+            for execution in self._active.values())
+
     def _run_cycle(self, *, wait: bool) -> RunResult:
 
         if not isinstance(wait, bool):
@@ -1439,95 +1612,131 @@ class RealWorkerRuntime:
             if self._closing or self._closed or self._stop_requested:
                 return RunResult(active=len(self._active))
             capacity = self.max_concurrency - len(self._active)
-        self._monitor_active()
+        self._monitor_active(retry_pending=False)
         with self._lock:
+            if self._closing or self._closed or self._stop_requested:
+                return RunResult(active=len(self._active))
+            if self._unsettled_ownership_locked():
+                # A still-live handler may already own failed settlement even
+                # before reaping can move it to the recovery ledger.
+                return RunResult(backpressured=True, active=len(self._active))
             capacity = self.max_concurrency - len(self._active)
             existing = tuple(self._active.values())
         backpressured = capacity <= 0
         claimed_count = 0
         started: list[_Execution] = []
+        reservations: dict[str, _Execution] = {}
         admitted = {str(execution.job.job_id) for execution in existing}
         immediate_failed = immediate_poisoned = immediate_lease_lost = 0
         immediate_succeeded = immediate_cancelled = 0
         queue_errors = 0
         if capacity > 0:
-            claimed = self._claim(capacity)
-            if claimed is None:
-                queue_errors = 1
-                claimed = ()
-            claimed_count = len(claimed)
-            self._metrics.increment("claimed", claimed_count) if claimed_count else None
-            now = self._now()
-            for item in claimed:
-                observed = self._validate_claim(item, now)
-                if observed is None:
-                    self._metrics.increment("poisoned")
-                    immediate_poisoned += 1
-                    self._metrics.increment("queue_errors")
-                    self._emit("worker.queue.error", reason="invalid_claim")
-                    queue_errors += 1
-                    continue
-                job, lease = observed
-                identity = str(job.job_id)
-                if identity in admitted:
-                    immediate_poisoned += 1
-                    queue_errors += 1
-                    self._metrics.increment("poisoned")
-                    self._metrics.increment("queue_errors")
-                    self._emit("worker.queue.error", reason="invalid_claim")
-                    continue
-                admitted.add(identity)
-                try:
-                    payload_size = self._payload_size(job)
-                except (TypeError, ValueError, OverflowError):
-                    payload_size = self.max_payload_bytes + 1
-                if payload_size > self.max_payload_bytes:
-                    outcome, _ = self._poison_claim(job, lease, code="payload_too_large")
-                    if outcome == "failed":
-                        immediate_failed += 1
-                    elif outcome == "lease_lost":
-                        immediate_lease_lost += 1
-                    elif outcome == "succeeded":
-                        immediate_succeeded += 1
-                    elif outcome == "cancelled":
-                        immediate_cancelled += 1
-                    else:
-                        queue_errors += 1
-                    immediate_poisoned += 1
-                    continue
-                if self.registry.get(job.operation) is None:
-                    outcome, _ = self._poison_claim(job, lease, code="unknown_operation")
-                    if outcome == "failed":
-                        immediate_failed += 1
-                    elif outcome == "lease_lost":
-                        immediate_lease_lost += 1
-                    elif outcome == "succeeded":
-                        immediate_succeeded += 1
-                    elif outcome == "cancelled":
-                        immediate_cancelled += 1
-                    else:
-                        queue_errors += 1
-                    immediate_poisoned += 1
-                    continue
-                try:
-                    execution = self._start_execution(job, lease)
-                    started.append(execution)
-                    if execution.launch_failed:
+            with self._lock:
+                if self._closing or self._closed or self._stop_requested:
+                    return RunResult(active=len(self._active))
+                if self._unsettled_ownership_locked():
+                    return RunResult(backpressured=True, active=len(self._active))
+                self._pending_claims += 1
+                now = self._last_now
+            claimed: tuple[tuple[Job, JobLease], ...] = ()
+            claim_index = 0
+            try:
+                returned = self._claim(capacity)
+                if returned is None:
+                    queue_errors = 1
+                else:
+                    claimed = returned
+                claimed_count = len(claimed)
+                self._metrics.increment("claimed", claimed_count) if claimed_count else None
+                now = self._now()
+                for claim_index, item in enumerate(claimed):
+                    observed = self._validate_claim(item, now)
+                    if observed is None:
                         self._metrics.increment("poisoned")
-                        self._emit("worker.job.poisoned", code="invalid_job", reason="non_retryable")
-                except Exception:
-                    outcome, _ = self._poison_claim(job, lease, code="invalid_job")
-                    if outcome == "failed":
-                        immediate_failed += 1
-                    elif outcome == "lease_lost":
-                        immediate_lease_lost += 1
-                    elif outcome == "succeeded":
-                        immediate_succeeded += 1
-                    elif outcome == "cancelled":
-                        immediate_cancelled += 1
-                    else:
+                        immediate_poisoned += 1
+                        self._metrics.increment("queue_errors")
+                        self._emit("worker.queue.error", reason="invalid_claim")
                         queue_errors += 1
-                    immediate_poisoned += 1
+                        continue
+                    job, lease = observed
+                    identity = str(job.job_id)
+                    if identity in admitted:
+                        immediate_poisoned += 1
+                        queue_errors += 1
+                        self._metrics.increment("poisoned")
+                        self._metrics.increment("queue_errors")
+                        self._emit("worker.queue.error", reason="invalid_claim")
+                        continue
+                    admitted.add(identity)
+                    with self._lock:
+                        stopped = self._closing or self._closed or self._stop_requested
+                    if stopped or not lease.active_at(now):
+                        # Keep an owned expired tuple for fenced settlement,
+                        # never classify local time alone as lease-loss proof.
+                        started.append(self._start_execution(job, lease, cancel_only=stopped,
+                            reservations=reservations))
+                        continue
+                    try:
+                        payload_size = self._payload_size(job)
+                    except (TypeError, ValueError, OverflowError):
+                        payload_size = self.max_payload_bytes + 1
+                    if payload_size > self.max_payload_bytes:
+                        outcome, _ = self._poison_claim(job, lease, code="payload_too_large")
+                        if outcome == "failed":
+                            immediate_failed += 1
+                        elif outcome == "lease_lost":
+                            immediate_lease_lost += 1
+                        elif outcome == "succeeded":
+                            immediate_succeeded += 1
+                        elif outcome == "cancelled":
+                            immediate_cancelled += 1
+                        else:
+                            queue_errors += 1
+                        immediate_poisoned += 1
+                        continue
+                    if self.registry.get(job.operation) is None:
+                        outcome, _ = self._poison_claim(job, lease, code="unknown_operation")
+                        if outcome == "failed":
+                            immediate_failed += 1
+                        elif outcome == "lease_lost":
+                            immediate_lease_lost += 1
+                        elif outcome == "succeeded":
+                            immediate_succeeded += 1
+                        elif outcome == "cancelled":
+                            immediate_cancelled += 1
+                        else:
+                            queue_errors += 1
+                        immediate_poisoned += 1
+                        continue
+                    try:
+                        execution = self._start_execution(job, lease, reservations=reservations)
+                        started.append(execution)
+                        if execution.launch_failed:
+                            self._metrics.increment("poisoned")
+                            self._emit("worker.job.poisoned", code="invalid_job", reason="non_retryable")
+                    except Exception:
+                        outcome, _ = self._poison_claim(job, lease, code="invalid_job")
+                        if outcome == "failed":
+                            immediate_failed += 1
+                        elif outcome == "lease_lost":
+                            immediate_lease_lost += 1
+                        elif outcome == "succeeded":
+                            immediate_succeeded += 1
+                        elif outcome == "cancelled":
+                            immediate_cancelled += 1
+                        else:
+                            queue_errors += 1
+                        immediate_poisoned += 1
+            except BaseException as error:
+                try:
+                    self._recover_interrupted_batch(claimed[claim_index:], now, error,
+                        {str(execution.job.job_id) for execution in existing}, reservations)
+                except BaseException:
+                    error.add_note("worker interrupted batch reconciliation incomplete")
+                raise  # Never replace or swallow the original admission interrupt.
+            finally:
+                with self._lock:
+                    self._pending_claims -= 1
 
         targets = tuple(started)
         if wait:
@@ -1535,7 +1744,7 @@ class RealWorkerRuntime:
                 self._wait_for(targets)
             elif backpressured or existing:
                 self._wait_for(existing)
-        self._monitor_active()
+        self._monitor_active(retry_pending=False)
         outcomes = [execution.outcome for execution in started]
         succeeded = immediate_succeeded + outcomes.count("succeeded")
         failed = immediate_failed + outcomes.count("failed")
@@ -1637,7 +1846,7 @@ class RealWorkerRuntime:
             if remaining <= 0:
                 break
             self._sleep(remaining)
-        self._monitor_active()
+        self._monitor_active(retry_pending=False)
         consume(RunResult(active=self.active_count), final=True)
         return totals
 
@@ -1661,15 +1870,13 @@ class RealWorkerRuntime:
             maximum=_MAX_TIMEOUT_SECONDS,
         )
         with self._lock:
-            if self._closed:
-                return ShutdownReport(True, False, 0, len(self._active))
             self._closing = True
             self._stop_requested = True
-            executions = tuple(self._active.values())
+            executions = tuple(self._active.values()) + tuple(self._pending_recovery.values())
         cancelled = 0
         for execution in executions:
             with execution.lock:
-                if not execution.logical_done.is_set():
+                if not execution.logical_done.is_set() and not execution.cancel_requested:
                     execution.cancel_requested = True
                     execution.token._request()
                     cancelled += 1
@@ -1678,8 +1885,8 @@ class RealWorkerRuntime:
         while True:
             self._monitor_active()
             with self._lock:
-                active = tuple(self._active.values())
-            if not active:
+                idle = not self._active and self._pending_claims == 0 and not self._pending_recovery
+            if idle:
                 break
             if self._now() >= deadline:
                 break
@@ -1687,14 +1894,18 @@ class RealWorkerRuntime:
         self._monitor_active()
         with self._lock:
             remaining = len(self._active)
-            self._closed = True
-        timed_out = remaining > 0
+            pending_claims = self._pending_claims + len(self._pending_recovery)
+            timed_out = remaining > 0 or pending_claims > 0
+            # Closed admission is not completed shutdown. Later calls must
+            # continue monitoring live threads and late claim reconciliation.
+            self._closed = not timed_out
         self._emit("worker.runtime.stopped", reason="deadline" if timed_out else "drained")
         return ShutdownReport(
             drained=not timed_out,
             timed_out=timed_out,
             cancelled=cancelled,
             active=remaining,
+            pending_claims=pending_claims,
         )
 
     close = shutdown
@@ -1715,8 +1926,9 @@ class RealWorkerRuntime:
         deadline = None if bounded is None else self._now() + bounded
         while True:
             self._monitor_active()
-            if self.active_count == 0:
-                return True
+            with self._lock:
+                if not self._active and self._pending_claims == 0 and not self._pending_recovery:
+                    return True
             if deadline is not None and self._now() >= deadline:
                 return False
             remaining = self.poll_interval_seconds

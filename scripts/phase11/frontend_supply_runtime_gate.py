@@ -51,6 +51,17 @@ VIEWPORTS: tuple[dict[str, int], ...] = (
 # AUD07-02/04 retired the three legacy components. The canonical web app is
 # still mandatory: _missing_node_components rejects an absent package.json.
 NODE_COMPONENTS = ("apps/web",)
+# This branch intentionally preserved one historical source variant byte-for-byte
+# (docs/local-runtime-archive-20261011.md). It is not a deploy/build input for the
+# current product. Exempt only this exact, provenance-checked immutable pair;
+# never ignore arbitrary manifests merely because they live under .runtime.
+_ARCHIVED_NODE_PAIRS = {
+    ".runtime/production-local-20261004/source/apps/web": {
+        "package.json": "9ad775e480e3904fcc095cb057ea63e1df558a7c3ecc181c680bcb50c7227968",
+        "package-lock.json": "af69ee8861c32d6bdbb8d515c7cd934571ab2ce43f713aa0e3c83a3590fb1fd1",
+    }
+}
+_ARCHIVE_PROVENANCE = "docs/local-runtime-archive-20261011.json"
 EXIT_PASS = 0
 EXIT_FAIL = 1
 EXIT_BLOCKED = 2
@@ -1129,6 +1140,59 @@ def audit_frontend_sources(root: Path) -> dict[str, Any]:
     return _check("frontend-source-audit", "PASS", detail, evidence=[_relative(root, package_path), _relative(root, config_path), _relative(root, next_config_path), _relative(root, workflow_path)], observations=values)
 
 
+def check_node_inventory(root: Path) -> dict[str, Any]:
+    """Account for every tracked manifest, including immutable archived inputs."""
+    root = root.resolve()
+    manifests = {
+        path.parent.relative_to(root).as_posix()
+        for path in _git_files(root)
+        if path.name == "package.json"
+    }
+    canonical = sorted(set(NODE_COMPONENTS) & manifests)
+    missing = sorted(set(NODE_COMPONENTS) - manifests)
+    invalid_canonical = [
+        name for name in canonical
+        if not (root / name / "package.json").is_file()
+        or (root / name / "package.json").is_symlink()
+        or not (root / name / "package.json").resolve().is_relative_to(root)
+    ]
+    archived = sorted(set(_ARCHIVED_NODE_PAIRS) & manifests)
+    unexpected = sorted(manifests - set(NODE_COMPONENTS) - set(_ARCHIVED_NODE_PAIRS))
+    invalid_archives: list[str] = []
+    for name in archived:
+        try:
+            provenance_path = root / _ARCHIVE_PROVENANCE
+            if provenance_path.is_symlink() or not provenance_path.resolve().is_relative_to(root):
+                raise ValueError("archive provenance escapes the checkout")
+            provenance = load_json(provenance_path)
+            entries = provenance.get("snapshot_files", []) if isinstance(provenance, dict) else []
+            if not isinstance(entries, list):
+                raise ValueError("invalid archive provenance")
+            for filename, wanted in _ARCHIVED_NODE_PAIRS[name].items():
+                path = root / name / filename
+                if path.is_symlink() or not path.resolve().is_relative_to(root):
+                    raise ValueError("archive input escapes the checkout")
+                if hashlib.sha256(path.read_bytes()).hexdigest() != wanted:
+                    raise ValueError("archive bytes changed")
+                matching = [entry for entry in entries if isinstance(entry, dict) and entry.get("path") == f"apps/web/{filename}"]
+                if len(matching) != 1 or matching[0].get("sha256") != wanted or matching[0].get("status") != "unpublished_snapshot_candidate":
+                    raise ValueError("archive provenance does not identify these bytes")
+        except (OSError, UnicodeDecodeError, ValueError, TypeError):
+            invalid_archives.append(name)
+    observations = {
+        "canonical": canonical, "archived": archived, "unexpected": unexpected,
+        "missing": missing, "invalid_canonical": invalid_canonical,
+        "invalid_archives": invalid_archives,
+    }
+    failed = bool(missing or invalid_canonical or unexpected or invalid_archives)
+    return _check(
+        "node-inventory", "FAIL" if failed else "PASS",
+        "Node manifests are missing, unexpected or have invalid archive provenance" if failed else "all Node manifests are accounted for; the historical pair is immutable and not a current build input",
+        evidence=[f"{name}/package.json" for name in sorted(manifests)],
+        observations=observations,
+    )
+
+
 def _node_components(root: Path) -> list[tuple[str, Path, Path, dict[str, Any]]]:
     components: list[tuple[str, Path, Path, dict[str, Any]]] = []
     for relative in NODE_COMPONENTS:
@@ -1154,6 +1218,9 @@ def _missing_node_components(root: Path) -> list[str]:
 
 
 def check_lockfiles(root: Path, *, npm: str | None = None, timeout: float = 90.0) -> dict[str, Any]:
+    inventory = check_node_inventory(root)
+    if inventory["status"] != "PASS":
+        return _check("lockfiles", "FAIL", "Node inventory is incomplete or invalid", observations=inventory["observations"])
     components = _node_components(root)
     missing_packages = _missing_node_components(root)
     if not components:
@@ -1218,6 +1285,9 @@ def _parse_sbom(value: str) -> tuple[bool, int, str]:
 
 def check_sbom(root: Path, evidence_dir: Path, *, npm: str | None = None, syft: str | None = None, timeout: float = 120.0) -> dict[str, Any]:
     evidence_dir.mkdir(parents=True, exist_ok=True)
+    inventory = check_node_inventory(root)
+    if inventory["status"] != "PASS":
+        return _check("sbom", "FAIL", "Node inventory is incomplete or invalid", observations=inventory["observations"])
     components = _node_components(root)
     missing_packages = _missing_node_components(root)
     if not components:
@@ -1314,6 +1384,9 @@ def _license_ok(value: object) -> bool:
 
 
 def check_licenses(root: Path) -> dict[str, Any]:
+    inventory = check_node_inventory(root)
+    if inventory["status"] != "PASS":
+        return _check("licenses", "FAIL", "Node inventory is incomplete or invalid", observations=inventory["observations"])
     components = _node_components(root)
     missing_packages = _missing_node_components(root)
     if not components:
@@ -1509,6 +1582,7 @@ def run_gate(
         )
         checks.extend(checks_result)
         npm = _tool("npm")
+        checks.append(check_node_inventory(root))
         checks.append(check_lockfiles(root, npm=npm))
         checks.append(check_sbom(root, evidence_dir, npm=npm, syft=_tool("syft")))
         checks.append(check_secrets(root, evidence_dir, python=sys.executable, gitleaks=_tool("gitleaks")))

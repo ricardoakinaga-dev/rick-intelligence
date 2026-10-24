@@ -36,6 +36,7 @@ from rick_identity import (
 )
 from rick_authorization import CANONICAL_ROLES, LEGACY_ROLE_ALIASES, canonical_role
 from rick_identity.passwords import hash_password
+from services.identity_results import ResetEffect
 
 
 def _mode() -> str:
@@ -155,22 +156,29 @@ class InMemoryIdentityProvider:
         if data.get("authenticated") and (
             not isinstance(data.get("tenant_id"), str) or not data["tenant_id"].strip()
         ):
-            return SessionSnapshot(authenticated=False, session_state="anonymous", tenant_id=None)
+            from core.errors import ApiError
+            raise ApiError("provider_unavailable")
         return SessionSnapshot(**{k: v for k, v in data.items() if k in SessionSnapshot.model_fields})
 
     @_serialize_admin_mutation
-    def login(self, *, email, password, tenant_id, ip, user_agent) -> dict:
+    def login(self, *, email, password, tenant_id, workspace_id=None, ip, user_agent) -> dict:
         from core.errors import ApiError
 
         from rick_identity import IdentityError
 
         try:
-            return self._provider.login(email=email, password=password, tenant_id=tenant_id, ip=ip, user_agent=user_agent)
+            return self._provider.login(email=email, password=password, tenant_id=tenant_id,
+                                        workspace_id=workspace_id, ip=ip, user_agent=user_agent)
         except IdentityError as exc:
             raise ApiError(exc.code)
 
     def validate_token(self, token: str | None) -> SessionSnapshot:
-        return self._to_snapshot(self._provider.validate_session(token))
+        from core.errors import ApiError
+        from rick_identity import IdentityError
+        try:
+            return self._to_snapshot(self._provider.validate_session(token))
+        except IdentityError as exc:
+            raise ApiError(exc.code) from None
 
     def refresh_authorization_context(self, *, context: Mapping[str, object]) -> dict[str, object] | None:
         """Read current local grants for final publication and cache replay checks."""
@@ -440,7 +448,13 @@ class InMemoryIdentityProvider:
         self._set_password(user, new_password)
         user["password_version"] = int(user.get("password_version", 1)) + 1
         self._users.save(user)
-        return self._provider.revoke_user_sessions(user["user_id"], reason="password_recovery")
+        revoked = self._provider.revoke_user_sessions(user["user_id"], reason="password_recovery")
+        return ResetEffect(
+            revoked,
+            user_id=user["user_id"],
+            tenant_id=user.get("tenant_id"),
+            workspace_id=user.get("workspace_id", "default"),
+        )
 
     @_serialize_admin_mutation
     def revoke_session_by_id(self, *, actor, session_id: str) -> int:

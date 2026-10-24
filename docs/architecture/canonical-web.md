@@ -48,7 +48,7 @@ no build. Essa configuração não autoriza acesso a um serviço de produção.
 | `/app` | pergunta como ação principal; documentos e disponibilidade independentes; vazio/403/erro distintos | critérios externos e aceite do produto completo |
 | `/app/documents` | catálogo, filtros, upload, jobs, retry/reindex/delete confirmados pelo servidor; proteção contra resposta de coleção antiga | validação externa da persistência e recuperação |
 | `/app/search` | consulta, coleção, limite inteiro, histórico da URL, trechos e metadados; invalidação de resposta antiga | matriz visual, conteúdo longo e testes independentes |
-| `/app/chat` | pergunta, loading, resposta, citações, incerteza e clipboard | histórico persistido e streaming na interface |
+| `/app/chat` | pergunta, loading, resposta, citações, incerteza, clipboard, **histórico persistido e streaming SSE implementados** | aceite externo/AT e matriz visual final; recuperação de aborto coberta em AUD24 |
 | `/admin` | guarda por permissões efetivas, saúde e auditoria independentes; estados anteriores limpos na atualização | operações administrativas adicionais exigem contratos próprios |
 
 O papel é exibido somente depois de resolvido pelo servidor. O controle de

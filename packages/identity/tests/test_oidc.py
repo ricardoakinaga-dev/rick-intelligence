@@ -88,3 +88,8 @@ def test_identity_provider_requires_authoritative_membership_and_never_defaults_
 def test_default_oidc_algorithms_are_asymmetric() -> None:
     settings = OIDCSettings(issuer="https://issuer.example", audience="rick-client")
     assert settings.algorithms == ("RS256", "ES256")
+
+
+def test_oidc_provider_declares_it_cannot_revoke_sessions():
+    assert OIDCIdentityProvider.logout_capable is False
+    assert OIDCIdentityProvider.production_safe is True

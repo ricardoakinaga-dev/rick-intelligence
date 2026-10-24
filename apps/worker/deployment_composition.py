@@ -14,7 +14,7 @@ from dataclasses import replace
 import inspect
 import os
 from pathlib import Path
-from threading import Event, Thread
+from threading import Event, Lock, Thread
 from time import monotonic
 from typing import Any
 
@@ -172,6 +172,10 @@ class DeploymentRuntime:
         self._closed = False
         self._async_bridge: _AsyncLoopBridge | None = None
         self._shutdown_complete = False
+        # Reserve one lifecycle operation without waiting on arbitrary closer
+        # IO. Concurrent/reentrant callers truthfully report incomplete/busy.
+        self._shutdown_operation = Lock()
+        self._shutdown_in_progress = False
         self._worker_stopped = False
         self._closed_resources: set[int] = set()
         self._shutdown_errors: tuple[str, ...] = ()
@@ -267,7 +271,26 @@ class DeploymentRuntime:
 
     readiness_check = health_check
 
+    def _begin_shutdown_operation(self) -> bool:
+        with self._shutdown_operation:
+            if self._shutdown_in_progress:
+                return False
+            self._shutdown_in_progress = True
+            return True
+
+    def _end_shutdown_operation(self) -> None:
+        with self._shutdown_operation:
+            self._shutdown_in_progress = False
+
     def shutdown(self, *, timeout: float | None = None, wait: bool = True) -> object:
+        if not self._begin_shutdown_operation():
+            return False
+        try:
+            return self._shutdown_owned(timeout=timeout, wait=wait)
+        finally:
+            self._end_shutdown_operation()
+
+    def _shutdown_owned(self, *, timeout: float | None = None, wait: bool = True) -> object:
         if self._shutdown_complete:
             return True
         if self._disposed:
@@ -283,15 +306,29 @@ class DeploymentRuntime:
                 return False
             self._admin_audit_thread = None
         worker_shutdown = getattr(self.worker, "shutdown", None)
-        if not self._worker_stopped and callable(worker_shutdown):
+        if not self._worker_stopped:
+            if not callable(worker_shutdown):
+                self._shutdown_errors = ("worker_shutdown_failed",)
+                return False
             try:
                 worker_report = worker_shutdown(timeout=max(0.001, deadline - monotonic()))
             except Exception:
                 self._shutdown_errors = ("worker_shutdown_failed",)
                 return False
-            if worker_report is False or getattr(worker_report, "timed_out", False) is True:
-                self._shutdown_errors = ("worker_shutdown_timeout",)
-                return False
+            # Legacy lifecycle adapters explicitly return True. Structured
+            # reports must prove actual drain; neither truthiness nor the
+            # absence of a timeout proves that dependencies are unused.
+            if worker_report is not True:
+                active = getattr(worker_report, "active", None)
+                pending = getattr(worker_report, "pending_claims", 0)
+                if not (
+                    getattr(worker_report, "drained", None) is True
+                    and getattr(worker_report, "timed_out", None) is False
+                    and type(active) is int and active == 0
+                    and type(pending) is int and pending == 0
+                ):
+                    self._shutdown_errors = ("worker_shutdown_timeout",)
+                    return False
         self._worker_stopped = True
         # Successfully closed resources are never closed twice. Failed closers
         # remain eligible on a later call; closing admission is not completion.
@@ -360,7 +397,15 @@ class DeploymentRuntime:
         The host supplies a finite retry budget before this explicit terminal
         action. A failed disposal never makes future shutdown return success.
         """
-        complete = self.shutdown(timeout=timeout)
+        if not self._begin_shutdown_operation():
+            return False
+        try:
+            return self._dispose_owned(timeout=timeout)
+        finally:
+            self._end_shutdown_operation()
+
+    def _dispose_owned(self, *, timeout: float) -> bool:
+        complete = self._shutdown_owned(timeout=timeout)
         if not self._worker_stopped:
             # An active worker may still hold provider references.
             return False

@@ -30,22 +30,62 @@ npm run test:coverage
 npm run test:e2e
 ```
 
-`npm run test:coverage` runs Vitest with an 85% line minimum over the explicit
-ten-file denominator in `vitest.config.ts`: navigation, permissions,
-presentation, chat response parsing, API errors, session scope keys, the session
-provider, app shell, case workspace, and UI primitives. Parser tests run against native
-streams; React component tests use jsdom. Routes, the other
-workspaces, API request wrappers, and dependencies are outside this unit
-denominator. Playwright exercises complementary browser behavior. Reports
-default to `.runtime/qa/web/`; `RICK_WEB_COVERAGE_DIR` selects another destination.
-The repository's sanitized summary validator must declare the same source set
-when integrating this expanded denominator.
+`npm run test:coverage` keeps the **85% line minimum** over the explicit
+**19-file denominator** in [Vitest configuration](<vitest.config.ts>): all twelve
+current library modules (including real API transport, response guards, client
+authority, durable session coordination and job observation), session provider, app shell, UI primitives, case
+workspace, both chat modules and the documents page. This preserves the original
+ten modules and adds nine risk surfaces; it is **not whole-frontend coverage**.
+Other routes/workspaces and dependencies remain outside this unit denominator.
+Parser tests use native streams; React component tests use jsdom, including real
+provider + shell + workspace integration. Playwright supplies complementary
+browser evidence, not real IdP/store/provider acceptance. Reports default to
+`.runtime/qa/web/`; `RICK_WEB_COVERAGE_DIR` selects an isolated destination. The
+[sanitized summary validator](<../../scripts/state_of_art/summarize_coverage.py>)
+requires exactly the same nineteen sources and rejects missing files or false totals.
 
 Private component state is discarded when session identity, tenant, workspace,
 role or permissions change. Case callbacks from the discarded instance are
 invalidated, including list, detail, catalog and mutation success/error paths.
 This client behavior supplements server authorization; it cannot discover a
 server revocation until an authoritative session update arrives.
+
+Focus, visibility and same-origin session-change announcements revalidate that
+authority. During validation, the previous tree exists only in memory and is
+**hidden and inert**; private JSON/FormData/SSE admission is suspended, in-flight
+requests are aborted and their late bodies/events are fenced by epoch. The same
+session restores its drafts and focus without remounting; another identity or
+changed scope discards them. A remote pending login/logout cannot be bypassed by
+focus. An orphaned remote transaction stays fail-closed and needs resolution in
+the other tab/support, rather than a timer inventing authority. No credentials,
+session records or private drafts are broadcast or persisted for this mechanism.
+The v2 coordinator stores independent opaque pending-operation markers: settling
+B cannot erase pending C, and a fresh observer checks every marker before
+validation/commit/admission. Missing or unstable storage fails closed. Only the
+writer removes its own operation; no timer clears another writer's marker.
+
+This guarantee is for **cooperating v2 clients**. Observed legacy announcements
+are tracked conservatively, but the old single-value protocol cannot reconstruct
+a pending writer already overwritten before observer startup. Mixed-version
+rolling deployment is **not validated** and needs an explicitly authorized
+cutover/reload policy; this implementation does not invent that release decision.
+Do not clear unknown markers automatically to make a pending session appear ready.
+
+An aborted mutation is **not rollback**. Case creation/review/feedback retain
+newer drafts and display an indeterminate-result warning; use the explicit
+refresh to consult records before repeating. There is no automatic retry or
+invented server idempotency for case mutations/uploads. Chat alone retains the
+same idempotency key for its explicit recoverable retry. Case lists expose
+server totals and explicit next-page loading beyond the first fifty records.
+
+Job observation has a 9,600 ms wall-clock budget and bounded backoff; timeout,
+transport failure or pause do not imply cancellation, publication or failure of
+the server job. Resume observes the **same identifier**, without upload/retry.
+After a remount, an authorized user can enter the identifier manually; the
+browser does not persist it or the original source. A genuine new attempt is an
+explicit retry with a source file and can return a successor job identifier.
+Malformed 2xx envelopes, booleans and inconsistent identifiers are rejected before
+consumers announce success. These client guards supplement server ACLs.
 
 The SSE protocol requires one completion followed by `[DONE]`. Completion
 freezes the payload; another nonterminal frame before `[DONE]` is invalid.

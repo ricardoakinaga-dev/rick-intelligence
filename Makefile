@@ -368,12 +368,12 @@ api16-root: legacy-reference
 api-coverage:
 	mkdir -p "$(ROOT)/.runtime/qa"
 	PYTHONDONTWRITEBYTECODE=1 $(PYTEST) -m pytest -q -p no:cacheprovider "$(ROOT)/scripts/state_of_art/tests/test_summarize_coverage.py"
-	COVERAGE_FILE="$(ROOT)/.runtime/qa/.coverage-api" PYTEST_ADDOPTS="--cov=$(ROOT)/apps/api/src --cov-report=term --cov-report=json:$(ROOT)/.runtime/qa/api-coverage.json --cov-fail-under=75" $(MAKE) --no-print-directory api16-root PYTHON="$(PYTHON)"
+	COVERAGE_FILE="$(ROOT)/.runtime/qa/.coverage-api" PYTEST_ADDOPTS="--cov=$(ROOT)/apps/api/src --cov-branch --cov-report=term --cov-report=json:$(ROOT)/.runtime/qa/api-coverage.json --cov-fail-under=75" $(MAKE) --no-print-directory api16-root PYTHON="$(PYTHON)"
 	$(PYTEST) "$(ROOT)/scripts/state_of_art/summarize_coverage.py" api "$(ROOT)/.runtime/qa/api-coverage.json" "$(ROOT)/.runtime/qa/api-summary.json" 75
 
 worker-coverage:
 	mkdir -p "$(ROOT)/.runtime/qa"
-	COVERAGE_FILE="$(ROOT)/.runtime/qa/.coverage-worker" PYTEST_ADDOPTS="--cov=$(ROOT)/apps/worker --cov-config=$(ROOT)/apps/worker/coverage.ini --cov-report=term --cov-report=json:$(ROOT)/.runtime/qa/worker-coverage.json --cov-fail-under=74" $(MAKE) --no-print-directory api16-worker PYTHON="$(PYTHON)"
+	COVERAGE_FILE="$(ROOT)/.runtime/qa/.coverage-worker" PYTEST_ADDOPTS="--cov=$(ROOT)/apps/worker --cov-config=$(ROOT)/apps/worker/coverage.ini --cov-branch --cov-report=term --cov-report=json:$(ROOT)/.runtime/qa/worker-coverage.json --cov-fail-under=74" $(MAKE) --no-print-directory api16-worker PYTHON="$(PYTHON)"
 	$(PYTEST) "$(ROOT)/scripts/state_of_art/summarize_coverage.py" worker "$(ROOT)/.runtime/qa/worker-coverage.json" "$(ROOT)/.runtime/qa/worker-summary.json" 74
 
 api16-benchmark:
@@ -402,7 +402,8 @@ web-build:
 	cd "$(WEB_DIR)" && RICK_API_INTERNAL_URL="http://127.0.0.1:$${RICK_API_TEST_PORT:-8001}" npm run build
 
 web-e2e:
-	cd "$(WEB_DIR)" && RICK_WEB_E2E_PRODUCTION=1 RICK_VISUAL_EVIDENCE_DIR="$(WEB_CURRENT_EVIDENCE_DIR)/production-test-results" RICK_PERFORMANCE_EVIDENCE_DIR="$(WEB_CURRENT_EVIDENCE_DIR)/performance" npm run test:e2e
+	@mkdir -p "$(ROOT)/.runtime/tmp/playwright"
+	cd "$(WEB_DIR)" && TMPDIR="$(ROOT)/.runtime/tmp/playwright" RICK_WEB_E2E_PRODUCTION=1 RICK_VISUAL_EVIDENCE_DIR="$(WEB_CURRENT_EVIDENCE_DIR)/production-test-results" RICK_PERFORMANCE_EVIDENCE_DIR="$(WEB_CURRENT_EVIDENCE_DIR)/performance" npm run test:e2e
 	@printf '%s\n' 'viewport matrix: 375/768/1440; no planned or executable skips'
 	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) "$(ROOT)/scripts/state_of_art/summarize_web_performance.py" --input "$(WEB_CURRENT_EVIDENCE_DIR)/performance" --output "$(WEB_CURRENT_EVIDENCE_DIR)/performance-summary.json"
 

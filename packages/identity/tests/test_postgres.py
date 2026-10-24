@@ -127,18 +127,26 @@ def session_row(**overrides):
 def test_persisted_identity_json_fails_closed_for_oversized_and_nonfinite_snapshots() -> None:
     oversized = '{"permissions":["chat.query"]}' + (" " * (64 * 1024))
     oversized_connection = Connection([("token_hash", [session_row(authorization_snapshot=oversized)], 1)])
-    assert PostgresSessionStore(factory_for(oversized_connection), ttl_seconds=600).get("bearer") is None
+    with pytest.raises(PostgresIdentityError) as error:
+        PostgresSessionStore(factory_for(oversized_connection), ttl_seconds=600).get("bearer")
+    assert error.value.code == "identity_unavailable"
 
     nan_connection = Connection([("token_hash", [session_row(authorization_snapshot='{"permissions":[NaN]}')], 1)])
-    assert PostgresSessionStore(factory_for(nan_connection), ttl_seconds=600).get("bearer") is None
+    with pytest.raises(PostgresIdentityError) as error:
+        PostgresSessionStore(factory_for(nan_connection), ttl_seconds=600).get("bearer")
+    assert error.value.code == "identity_unavailable"
 
     duplicate_connection = Connection([
         ("token_hash", [session_row(authorization_snapshot='{"permissions":["chat.query"],"permissions":["chat.query"]}')], 1),
     ])
-    assert PostgresSessionStore(factory_for(duplicate_connection), ttl_seconds=600).get("bearer") is None
+    with pytest.raises(PostgresIdentityError) as error:
+        PostgresSessionStore(factory_for(duplicate_connection), ttl_seconds=600).get("bearer")
+    assert error.value.code == "identity_unavailable"
 
     malformed_connection = Connection([("token_hash", [session_row(authorization_snapshot='{"permissions":1}')], 1)])
-    assert PostgresSessionStore(factory_for(malformed_connection), ttl_seconds=600).get("bearer") is None
+    with pytest.raises(PostgresIdentityError) as error:
+        PostgresSessionStore(factory_for(malformed_connection), ttl_seconds=600).get("bearer")
+    assert error.value.code == "identity_unavailable"
 
 
 def test_persisted_user_acl_json_fails_closed_instead_of_widening_scope() -> None:
@@ -240,13 +248,13 @@ def test_login_rejects_multiple_active_memberships_without_creating_a_session() 
     sessions = InMemorySessionStore()
     provider = IdentityProviderImpl(users=users, sessions=sessions, verifier=Pbkdf2Verifier())
 
-    with pytest.raises(IdentityError) as error:
+    with pytest.raises(PostgresIdentityError) as error:
         provider.login(
             email="user-a@example.test", password="secret-password", tenant_id="tenant-a",
             ip=None, user_agent=None,
         )
 
-    assert error.value.code == "unauthorized"
+    assert error.value.code == "conflict"
     assert "workspace" not in str(error.value).casefold()
     query, params = connection.cursor_instance.queries[0]
     assert "m.tenant_id = %s" in query
@@ -498,3 +506,17 @@ def test_persistent_provider_uses_authoritative_session_snapshot_and_stays_opt_i
 def test_session_ttl_is_bounded() -> None:
     with pytest.raises(PostgresIdentityError):
         PostgresSessionStore(lambda: None, ttl_seconds=59)
+
+
+def test_ambiguous_tenant_membership_is_actionable_conflict() -> None:
+    active = user_row(
+        workspace_id="workspace-a", role="VETERINARIAN",
+        permission_overrides={"add": [], "remove": []}, authorized_collection_ids=[],
+    )
+    second = {**active, "workspace_id": "workspace-b", "session_id": "s2"}
+    connection = Connection([("lower(u.email)", [active, second], 2)])
+    with pytest.raises(PostgresIdentityError) as error:
+        PostgresUserStore(factory_for(connection)).get_by_email_for_tenant(
+            "user-a@example.test", "tenant-a",
+        )
+    assert error.value.code == "conflict"

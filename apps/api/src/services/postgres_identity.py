@@ -32,6 +32,7 @@ from rick_identity import (
     PostgresUserStore,
     hash_password,
 )
+from services.identity_results import ResetEffect
 
 
 def _role(value: str) -> str:
@@ -77,7 +78,9 @@ class PostgresIdentityProvider:
         *,
         session_ttl_seconds: int = 8 * 3600,
         recovery_ttl_seconds: int = 15 * 60,
+        session_absolute_ttl_seconds: int = 7 * 24 * 3600,
         production_safe: bool = False,
+        audit_operations: object | None = None,
     ) -> None:
         if not callable(connection_factory):
             raise ValueError("connection factory is required")
@@ -88,12 +91,18 @@ class PostgresIdentityProvider:
         self._users = PostgresUserStore(connection_factory)
         self._sessions = PostgresSessionStore(connection_factory, ttl_seconds=session_ttl_seconds)
         self._recovery = PostgresRecoveryStore(connection_factory, ttl_seconds=recovery_ttl_seconds)
+        self._audit_operations = audit_operations
         self._provider = IdentityProviderImpl(
             users=self._users,
             sessions=self._sessions,
             verifier=Pbkdf2Verifier(),
+            absolute_ttl_seconds=session_absolute_ttl_seconds,
         )
         self._login_attempts: dict[str, list[float]] = {}
+
+    def bind_audit_operations(self, store: object) -> None:
+        """Bind the durable operation store after the provider is constructed."""
+        self._audit_operations = store
 
     def health_check(self) -> bool:
         return self._users.health_check()
@@ -118,18 +127,22 @@ class PostgresIdentityProvider:
 
     @staticmethod
     def _to_snapshot(data: dict) -> SessionSnapshot:
-        if data.get("authenticated") and not isinstance(data.get("tenant_id"), str):
-            return SessionSnapshot(authenticated=False, session_state="anonymous", tenant_id=None)
+        tenant = data.get("tenant_id")
+        if data.get("authenticated") and (not isinstance(tenant, str) or not tenant.strip()):
+            from core.errors import ApiError
+            # Malformed authenticated scope is not evidence of no active token.
+            raise ApiError("provider_unavailable")
         return SessionSnapshot(
             **{key: value for key, value in data.items() if key in SessionSnapshot.model_fields}
         )
 
-    def login(self, *, email, password, tenant_id, ip, user_agent) -> dict:
+    def login(self, *, email, password, tenant_id, workspace_id=None, ip, user_agent) -> dict:
         try:
             return self._provider.login(
                 email=email,
                 password=password,
                 tenant_id=tenant_id,
+                workspace_id=workspace_id,
                 ip=ip,
                 user_agent=user_agent,
             )
@@ -143,10 +156,13 @@ class PostgresIdentityProvider:
     def validate_token(self, token: str | None) -> SessionSnapshot:
         try:
             return self._to_snapshot(self._provider.validate_session(token))
-        except PostgresIdentityError:
-            # Authentication fails closed while readiness reports storage
-            # outage; it never becomes an anonymous cross-tenant fallback.
-            return SessionSnapshot(authenticated=False, session_state="anonymous", tenant_id=None)
+        except IdentityError as exc:
+            from core.errors import ApiError
+            raise ApiError(exc.code) from None
+        except PostgresIdentityError as exc:
+            # Unavailable validation is not confirmed absence. In particular,
+            # logout cleanup must retain cookies while session state is unknown.
+            raise _api_error(exc) from None
 
     def refresh_authorization_context(self, *, context: Mapping[str, object]) -> dict[str, object] | None:
         """Read the exact current membership before replay or publication."""
@@ -179,11 +195,26 @@ class PostgresIdentityProvider:
 
         return refresh_context_from_user(context, user)
 
-    def logout(self, token: str | None) -> None:
+    def logout(self, token: str | None, *, operation_id: str | None = None) -> None:
+        if operation_id and self._audit_operations is not None:
+            from core.errors import ApiError
+
+            try:
+                with self._recovery_transaction() as connection:
+                    self._sessions.revoke(token, reason="manual_revoke", connection=connection)
+                    if not self._audit_operations.mark_effect(operation_id, connection=connection):
+                        raise ApiError("provider_unavailable")
+                return
+            except (ApiError, PostgresIdentityError):
+                raise
+            except Exception as exc:
+                raise _api_error(PostgresIdentityError()) from None
         try:
             self._provider.logout(token)
-        except PostgresIdentityError:
-            return
+        except PostgresIdentityError as exc:
+            # A cookie deletion is not a durable revocation. Preserve the
+            # typed failure so HTTP cannot announce an unconfirmed logout.
+            raise _api_error(exc) from None
 
     def _user_for_actor(self, actor, user_id: str, *, connection=None) -> dict:
         from core.errors import ApiError
@@ -872,14 +903,17 @@ class PostgresIdentityProvider:
                 workspace_id=workspace,
             )
         except PostgresIdentityError as exc:
+            # Reset must remain neutral for ambiguous/unknown accounts; the
+            # actionable workspace conflict belongs to interactive login.
+            if exc.code == "conflict":
+                return None
             raise _api_error(exc) from None
 
-    def consume_password_reset(self, *, token: str, new_password: str) -> int:
+    def consume_password_reset(self, *, token: str, new_password: str, operation_id: str | None = None) -> int:
         from core.errors import ApiError
 
         if not isinstance(new_password, str) or len(new_password) < 8:
             raise ApiError("validation_error")
-        password_hash = hash_password(new_password)
         try:
             with self._recovery_transaction() as connection:
                 claim = self._recovery.consume(token, connection=connection)
@@ -911,16 +945,35 @@ class PostgresIdentityProvider:
                     or user.get("membership_status", "active") != "active"
                 ):
                     raise ApiError("validation_error", "Invalid or expired reset token.")
+                # Invalid/expired/replayed tokens never pay for KDF. Keep the
+                # hash inside the same claim/update transaction: a failure rolls
+                # back the single-use claim rather than losing a valid token.
+                password_hash = hash_password(new_password)
                 if not self._users.update_password_credentials(
                     user_id=user_id, password_hash=password_hash, connection=connection,
                 ):
                     raise ApiError("validation_error", "Invalid or expired reset token.")
                 # Password credentials and password_version are global to the
                 # user, so invalidate every tenant/workspace session atomically.
-                return self._sessions.revoke_user(
+                revoked = self._sessions.revoke_user(
                     user_id,
                     reason="password_recovery",
                     connection=connection,
+                )
+                if operation_id and self._audit_operations is not None:
+                    if not self._audit_operations.mark_effect(
+                        operation_id,
+                        tenant_id=tenant_id,
+                        actor_user_id=user_id,
+                        workspace_id=workspace_id,
+                        connection=connection,
+                    ):
+                        raise ApiError("provider_unavailable")
+                return ResetEffect(
+                    revoked,
+                    user_id=user_id,
+                    tenant_id=tenant_id,
+                    workspace_id=workspace_id,
                 )
         except ApiError:
             raise

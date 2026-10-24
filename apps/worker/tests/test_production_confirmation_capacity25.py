@@ -163,6 +163,7 @@ def test_concurrent_drivers_preserve_capacity_and_remaining_jobs():
 
 @pytest.mark.parametrize('kind', ['shape', 'scope', 'lease_identity', 'worker_identity', 'expired'])
 def test_invalid_claim_poison_counters_match_batch_and_metrics(kind):
+    expired_fences, expired_handlers = [], []
     class InvalidClaimQueue(FakeQueue):
         def claim(self, **kwargs):
             items = super().claim(**kwargs)
@@ -175,11 +176,44 @@ def test_invalid_claim_poison_counters_match_batch_and_metrics(kind):
             if kind == 'worker_identity': lease = replace(lease, worker_id='foreign-independent')
             if kind == 'expired': lease = replace(lease, acquired_at=now-2, heartbeat_at=now-1, expires_at=now-.5)
             return ((current, lease),)
+        def fail(self, lease, failure, *, now, expected_version):
+            if kind == 'expired':
+                current = self._jobs[str(lease.job_id)]
+                assert expected_version == current.version
+                assert lease.job_id == current.job_id and lease.scope == current.scope
+                assert lease.worker_id == current.attempts[-1].worker_id
+                assert lease.token == self._leases[str(lease.job_id)].token
+                expired_fences.append((str(lease.job_id), expected_version))
+            return super().fail(lease, failure, now=now, expected_version=expected_version)
     queue = InvalidClaimQueue([job()])
-    worker = make_runtime(queue, ManualClock(), success)
+    if kind == 'expired':
+        def expired_handler(j, lease, *, cancelled):
+            expired_handlers.append(j.job_id)
+            return success(j, lease, cancelled=cancelled)
+        worker = make_runtime(queue, ManualClock(), expired_handler)
+    else:
+        worker = make_runtime(queue, ManualClock(), success)
     try:
         batch = worker.run_once()
         record('invalid-claim', kind=kind, batch=batch.as_dict(), metrics=worker.metrics().as_dict())
+        if kind == 'expired':
+            # Expiry controls execution eligibility, not owned-lease validity.
+            # The old ignored/poisoned measurement left the actual row RUNNING.
+            assert batch.started == worker.metrics().started == 0 and expired_handlers == []
+            assert batch.failed == batch.completed == worker.metrics().failed == 1
+            assert batch.poisoned == worker.metrics().poisoned == 0
+            assert batch.queue_errors == worker.metrics().queue_errors == 0
+            assert batch.cancelled == batch.lease_lost == 0
+            assert len(queue.failures) == len(expired_fences) == 1
+            identity, failure = queue.failures[0]
+            assert expired_fences[0][0] == identity and failure.retryable
+            assert queue._jobs[identity].state is JobState.FAILED
+            assert queue._jobs[identity].version > expired_fences[0][1]
+            assert queue.acknowledged == queue.cancel_lease_calls == []
+            report = worker.shutdown(timeout=0)
+            assert report.drained and report.active == report.pending_claims == 0
+            assert worker.wait_for_idle(timeout=0) and worker._pending_recovery == {}
+            return
         assert batch.started == batch.completed == 0
         assert batch.queue_errors == worker.metrics().queue_errors == 1
         assert queue.failures == queue.acknowledged == queue.cancel_lease_calls == []

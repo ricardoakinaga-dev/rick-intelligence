@@ -336,3 +336,57 @@ def test_legacy_session_without_workspace_uses_default_membership_scope():
 
     assert snapshot["authenticated"] is True
     assert snapshot["workspace_id"] == "default"
+
+
+def test_unknown_account_pays_the_dummy_verifier_cost():
+    class SpyVerifier:
+        def __init__(self):
+            self.verify_calls = 0
+            self.dummy_calls = 0
+
+        def verify(self, _user, _password):
+            self.verify_calls += 1
+            return True
+
+        def verify_dummy(self, _password):
+            self.dummy_calls += 1
+            return False
+
+    verifier = SpyVerifier()
+    provider = IdentityProviderImpl(
+        users=InMemoryUserStore(), sessions=InMemorySessionStore(), verifier=verifier,
+    )
+    with pytest.raises(IdentityError):
+        provider.login(
+            email="absent@example.com", password="guess", tenant_id="default",
+            ip=None, user_agent=None,
+        )
+    assert verifier.dummy_calls == 1
+    assert verifier.verify_calls == 0
+
+
+def test_sliding_activity_cannot_exceed_the_absolute_session_lifetime():
+    users = InMemoryUserStore()
+    users.seed({"user_id": "u1", "email": "u1@example.com", "role": "VETERINARIAN",
+                "tenant_id": "default", "workspace_id": "default", "status": "active",
+                "permission_overrides": {"add": [], "remove": []},
+                "authorized_collection_ids": [], "password_plain": "secret-pw",
+                "password_version": 1, "role_version": 1})
+    sessions = InMemorySessionStore()
+    provider = IdentityProviderImpl(
+        users=users, sessions=sessions, verifier=PlainTestVerifier(),
+        absolute_ttl_seconds=300,
+    )
+    issued = provider.login(email="u1@example.com", password="secret-pw", tenant_id="default", ip=None, user_agent=None)
+    token = issued["session_token"]
+    sessions._sessions[token]["created_at"] = time.time() - 301
+    assert provider.validate_session(token)["authenticated"] is False
+
+
+def test_login_resolves_an_explicit_workspace():
+    provider, _ = make_provider()
+    issued = provider.login(
+        email="u1@example.com", password="secret-pw", tenant_id="default",
+        workspace_id="default", ip=None, user_agent=None,
+    )
+    assert issued["session_token"]

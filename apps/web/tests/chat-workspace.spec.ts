@@ -107,7 +107,7 @@ test("resumes a conversation, keeps turns together, and expands citations", asyn
   const conversationDrawer = page.getByRole("button", { name: /Conversas/ }).first();
   if (await conversationDrawer.isVisible()) {
     await conversationDrawer.click();
-    const sidebar = page.getByRole("complementary", { name: "Conversas" });
+    const sidebar = page.getByRole("dialog", { name: "Conversas" });
     await expect(sidebar.getByRole("button", { name: "Fechar conversas", exact: true })).toBeFocused();
     await expect(sidebar.getByRole("button", { name: "Protocolo de biossegurança", exact: true })).toBeVisible();
     await page.keyboard.press("Shift+Tab");
@@ -139,7 +139,7 @@ test("resumes a conversation, keeps turns together, and expands citations", asyn
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 
-test("keeps the question recoverable across forbidden and retry states", async ({ page }) => {
+test("requires explicit revalidation after forbidden before retrying the same turn", async ({ page }) => {
   await mockSession(page);
   await mockConversations(page, { items: [] });
   let attempts = 0;
@@ -159,8 +159,12 @@ test("keeps the question recoverable across forbidden and retry states", async (
   await page.getByLabel("Pergunta", { exact: true }).fill("Quais fontes posso revisar?");
   await page.getByLabel("Pergunta", { exact: true }).press("Enter");
   await expect(page.locator('[role="alert"]').filter({ hasText: "Acesso negado à consulta" })).toBeVisible();
-  await expect(page.getByLabel("Pergunta", { exact: true })).toHaveValue("Quais fontes posso revisar?");
-  await expect(page.getByRole("button", { name: "Tentar novamente", exact: true })).toBeVisible();
+  await expect(page.getByLabel("Pergunta", { exact: true })).toHaveValue("");
+  await expect(page.getByLabel("Pergunta", { exact: true })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Tentar novamente", exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "Revalidar autorização", exact: true }).click();
+  await expect(page.getByLabel("Pergunta", { exact: true })).toBeEnabled();
+  expect(attempts).toBe(1);
 
   await page.getByRole("button", { name: "Tentar novamente", exact: true }).click();
   await expect(page.getByText("A consulta foi retomada com o mesmo escopo.", { exact: true })).toBeVisible();
@@ -191,7 +195,7 @@ test("offers a history permission state and a cancellable request at the target 
   await expect(page.getByText("Histórico indisponível", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Nova conversa", exact: true })).toBeVisible();
   if ((page.viewportSize()?.width || 1440) < 760) {
-    await page.getByRole("complementary", { name: "Conversas" }).getByRole("button", { name: "Fechar conversas", exact: true }).click();
+    await page.getByRole("dialog", { name: "Conversas" }).getByRole("button", { name: "Fechar conversas", exact: true }).click();
   }
   await page.getByLabel("Pergunta", { exact: true }).fill("Preciso cancelar esta consulta.");
   await page.getByRole("button", { name: "Consultar", exact: true }).click();
@@ -204,10 +208,7 @@ test("offers a history permission state and a cancellable request at the target 
   releasePending.current?.();
 });
 
-test("keeps the draft editable while offline and recovers when the connection returns", async ({ page }, testInfo) => {
-  await page.addInitScript(() => {
-    Object.defineProperty(navigator, "onLine", { configurable: true, get: () => false });
-  });
+test("preserves the draft with disabled offline admission and recovers online", async ({ page }, testInfo) => {
   await mockSession(page);
   await mockConversations(page, { items: [] });
   let chatRequests = 0;
@@ -223,14 +224,18 @@ test("keeps the draft editable while offline and recovers when the connection re
   });
 
   await page.goto("/app/chat");
-  await expect(page.locator('[data-network-state="offline"]')).toBeVisible();
   const composer = page.getByLabel("Pergunta", { exact: true });
   const submit = page.getByRole("button", { name: "Consultar", exact: true });
   await composer.fill("Quais fontes posso revisar offline?");
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, "onLine", { configurable: true, get: () => false });
+    window.dispatchEvent(new Event("offline"));
+  });
+  await expect(page.locator('[data-network-state="offline"]')).toBeVisible();
+  await expect(composer).toBeEnabled();
   await expect(page.getByText("Consulta pausada sem conexão.", { exact: false })).toBeVisible();
   await expect(submit).toBeDisabled();
   await page.screenshot({ path: testInfo.outputPath("offline-state.png"), fullPage: true, animations: "disabled" });
-  await composer.press("Enter");
   await expect(composer).toHaveValue("Quais fontes posso revisar offline?");
   expect(chatRequests).toBe(0);
 
@@ -243,6 +248,58 @@ test("keeps the draft editable while offline and recovers when the connection re
   await submit.click();
   await expect(page.getByText("A conexão voltou e a consulta foi concluída.", { exact: true })).toBeVisible();
   expect(chatRequests).toBe(1);
+});
+
+test("offline during an admitted send preserves retry identity and fences the late response", async ({ page }, testInfo) => {
+  await mockSession(page);
+  await mockConversations(page, { items: [] });
+  const requests: Array<Record<string, unknown>> = [];
+  let firstRoute: Route | undefined;
+  await page.route("**/api/v1/chat", async route => {
+    requests.push(route.request().postDataJSON() as Record<string, unknown>);
+    if (requests.length === 1) { firstRoute = route; return; }
+    await json(route, { conversation_id: "conv-offline-send", message_id: "msg-retry", answer: "Consulta recuperada com a mesma identidade.", citations: [], metadata: { evidence_status: "NO_EVIDENCE" } });
+  });
+  await page.goto("/app/chat");
+  const composer = page.getByLabel("Pergunta", { exact: true });
+  const question = "Preserve esta pergunta durante a consulta interrompida.";
+  await composer.fill(question);
+  await page.getByRole("button", { name: "Consultar", exact: true }).click();
+  await expect.poll(() => requests.length).toBe(1);
+  expect(firstRoute).toBeDefined();
+  const first = requests[0];
+  expect(first.idempotency_key).toEqual(expect.any(String));
+  expect(String(first.idempotency_key).length).toBeGreaterThan(0);
+
+  // Native browser network transitions, after POST admission, not a fabricated
+  // navigator property or a mocked React transport.
+  await page.context().setOffline(true);
+  await expect(page.locator('[data-network-state="offline"]')).toBeVisible();
+  await expect(composer).toHaveValue(question);
+  await expect(composer).toBeDisabled();
+  expect(requests).toHaveLength(1);
+  await page.screenshot({ path: testInfo.outputPath("offline-during-send.png"), fullPage: true, animations: "disabled" });
+  await page.context().setOffline(false);
+  const retry = page.locator(".answer-panel").getByRole("button", { name: "Tentar novamente", exact: true });
+  await expect(retry).toBeEnabled();
+  await expect(composer).toHaveValue(question);
+  expect(requests).toHaveLength(1); // Reconnection never submits automatically.
+  await retry.click();
+  await expect(page.getByText("Consulta recuperada com a mesma identidade.", { exact: true })).toBeVisible();
+  expect(requests).toHaveLength(2);
+  expect(requests[1]).toEqual(first); // Same question, scope and idempotency key.
+
+  // A server may finish the first operation despite native fetch cancellation.
+  // Complete that held HTTP response after recovery; it must never replace it.
+  try {
+    await json(firstRoute!, { conversation_id: "conv-offline-send", message_id: "msg-old", answer: "RESPOSTA ANTIGA NÃO PUBLICÁVEL", citations: [], metadata: { evidence_status: "NO_EVIDENCE" } });
+  } catch (cause) {
+    if (!firstRoute!.request().failure()) throw cause;
+  }
+  await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+  await expect(page.getByText("RESPOSTA ANTIGA NÃO PUBLICÁVEL", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Consulta recuperada com a mesma identidade.", { exact: true })).toBeVisible();
+  expect(requests).toHaveLength(2);
 });
 
 test("preserves a partial stream as explicitly non-final and retries the same question", async ({ page }, testInfo) => {

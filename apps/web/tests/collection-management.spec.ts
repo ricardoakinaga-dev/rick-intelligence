@@ -49,7 +49,7 @@ test("collection manager can create, edit, and archive a collection through the 
   await page.goto("/app/documents");
   await expect(page.getByRole("heading", { name: "Coleções autorizadas", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Nova coleção", exact: true }).click();
-  await page.getByLabel("Identificador").fill("protocols");
+  await page.getByRole("textbox", { name: "Identificador", exact: true }).fill("protocols");
   await page.getByLabel("Nome").fill("Protocolos operacionais");
   await page.getByLabel("Descrição").fill("Rotinas aprovadas");
   await page.getByRole("button", { name: "Criar coleção", exact: true }).click();
