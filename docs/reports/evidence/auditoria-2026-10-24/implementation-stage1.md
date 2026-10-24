@@ -154,7 +154,7 @@ O login ganhou o campo de workspace em um controle recolhível; o botão “Entr
 
 | Item | Disposição | Autoridade/limite |
 |---|---|---|
-| AUD24-033 VPS lane | `BLOCKED_EXTERNAL` | Executor com UID/GID/namespace representativos não disponível; a lane local falha por barreira de ownership, não por 277 defeitos independentes |
+| AUD24-033 VPS lane | `BLOCKED_EXTERNAL` | Amostra local: 3 falhas iniciais `Refusal: unprotected input parent` (parents 0o775), não 277 defeitos independentes. Um copy para árvore 0700 em container poderia mascarar a barreira de host; executor representativo segue ausente |
 | AUD24-034 CI remoto | `BLOCKED_EXTERNAL` | Sem push/credenciais de CI remoto nesta sessão; o candidato está apenas em commits locais |
 | Release integrity | `FAIL` esperado | `release_integrity --require-clean` rejeita envelopes runtime `NOT_RUN`; manifest gerado, sem GO |
 | AUD24-044 pack RAG | `BLOCKED_EXTERNAL` | D04: corpus, direitos, labels e thresholds não aprovados; nenhum pack sintético é apresentado como representativo |

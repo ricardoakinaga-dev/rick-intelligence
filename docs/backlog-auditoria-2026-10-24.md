@@ -243,7 +243,7 @@ Este documento é **especificação**, não ledger de execução. Os 29 contrato
 **Entrega:** executor Linux descartável com UID/GID/sticky/namespace representativos; execução da lane; classificação de cada falha; nenhuma mudança de DAC/ownership do host.
 **Aceite:** lane executada no executor; 277 falhas reconciliadas por causa e disposição; nenhuma suprimida; procedimento reproduzível.
 **Evidência:** relatório da lane + ambiente + negativos.
-**Status local (24/10):** `BLOCKED_EXTERNAL`; executor representativo não disponível. A falha local é de ownership/namespace, não prova de 277 defeitos. O lab Docker provou PostgreSQL/Redis/S3/Qdrant e multi-worker 8/8, mas o gate multi-réplica Redis **FAIL** (replay/idempotência local ao processo e bucket de login por IP) e não substitui a lane VPS.
+**Status local (24/10):** `BLOCKED_EXTERNAL`; amostra local falha em `unprotected input parent` (parents 0o775), não em 277 defeitos. O lab Docker provou PostgreSQL/Redis/S3/Qdrant e multi-worker 8/8, mas o gate multi-réplica Redis **FAIL** (replay/idempotência local ao processo e bucket de login por IP) e não substitui a lane VPS.
 **Achado:** AUD24-12; extensão de PROD12-003/AUD15-T003.
 
 #### AUD24-034 — CI remoto e evidência vinculada
