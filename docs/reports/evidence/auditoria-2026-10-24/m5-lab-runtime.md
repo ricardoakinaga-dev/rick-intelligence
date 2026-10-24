@@ -55,3 +55,14 @@ Comando: `make multi-worker-runtime` com o mesmo PostgreSQL descartável.
 Provas: dois processos com sessões independentes; exatamente um dono do claim; heartbeat fencing; uma única publicação durável; crash após claim/heartbeat/handler/transação; lease expirado recuperado; ack/publicação do worker obsoleto rejeitados; estado/lease/attempt/audit/outbox consistentes após recuperação; publicação duplicada rejeitada.
 
 Artefato: [multi-worker-runtime-gate.json](multi-worker-runtime-gate.json).
+
+## 7. Redis multi-replica — FAIL (achado real, não promovido)
+
+Comando: `make redis-multi-replica-runtime` com dois processos `apps/api` reais e o mesmo Redis.
+
+**PASS:** dois processos independentes; boundary HTTP canônico.
+**FAIL:** isolamento de tenant; bucket atômico compartilhado; replay cross-replica; bypass; TTL do bucket.
+
+Observações: `login` 0/4 permitidos, `recovery`/`chat`/`compatibility` 1/4; TTL do bucket vazio. A hipótese mais forte é que o **store de idempotência/replay é local ao processo**, enquanto o bucket é Redis: o replay cross-replica consome um segundo token em vez de devolver a decisão original; o login também parece usar chave por IP/tenant e foi consumido pelo bootstrap. Isso é um **defeito/gap de arquitetura multi-réplica**, não um artefato de container.
+
+**Não foi corrigido nesta rodada** e não foi convertido em PASS. Permanece como investigação M5/M6.
