@@ -101,3 +101,13 @@ Timeout real na criação de registry deixou órfão Created; corrigido marcador
 cleanup antes da tentativa e existência/label antes da remoção. Três regressões
 PASS; órfão removido e ausência verificada. TLS durante build: startup timeout;
 após build: PASS/cleanup PASS, ambos preservados. Nenhum SLO foi ratificado.
+
+### Fechamento da proposta de imagens
+
+398a6e0: sete gates de código PASS; workflow completo NO-GO.
+Propostas locais com OS corrigido e pip/ensurepip ausentes: scans 0/0/0
+(85/85/57 pacotes), SBOMs 86/86/58 e smokes readonly/UID10001 PASS.
+Remoção do instalador incorporada aos dois Dockerfiles; cadeia remota precisa
+de novo SHA e de base/política de construção revisadas. Bases locais em cache
+executam Python3.12.15/Node22.23.2, divergindo do CI3.12.3/22.19.0; não aprovar
+essa diferença pelo builder. Fontes/receitas e resultados anteriores preservados.

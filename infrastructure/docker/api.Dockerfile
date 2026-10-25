@@ -51,6 +51,8 @@ RUN python -m pip install --no-cache-dir --disable-pip-version-check \
     && python -m pip check \
     && python -m compileall -q /opt/rick/apps/api/src /opt/rick/apps/worker /opt/rick/packages \
     && find /opt/rick -type d -name __pycache__ -prune -exec rm -rf {} + \
+    && python -m pip uninstall --yes pip \
+    && python -c "import importlib.util, pathlib, shutil, sysconfig; assert importlib.util.find_spec('pip') is None; p = pathlib.Path(sysconfig.get_path('stdlib')) / 'ensurepip'; shutil.rmtree(p) if p.exists() else None; assert importlib.util.find_spec('ensurepip') is None" \
     && chown -R 10001:10001 /opt/rick
 
 USER 10001:10001

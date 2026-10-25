@@ -161,3 +161,31 @@ do label e verificação de ausência, sem tocar na pilha dev compartilhada.
 O relatório original da tentativa continua preservado; a verificação real de
 cleanup fica em `.runtime/phase-3/supply-local/patch-ca4b097f02bd/verified-cleanup.json`.
 Essa correção exige novo SHA e CI, mantendo o 39a468c como evidência anterior.
+
+## Propostas de runtime e instalador
+
+O [quality 398a6e0](https://github.com/ricardoakinaga-dev/rick-intelligence/actions/runs/40216392521)
+aprovou os sete gates de código; o workflow completo continua NO-GO.
+As propostas locais receberam patches assinados de musl/musl-utils/zlib. A
+primeira atualização de pip expôs dependências vendorizadas vulneráveis no
+rescan; seus achados foram preservados. A proposta final remove pip e ensurepip
+do runtime após conferir dependências, mantendo a instalação durante o build.
+Essa remoção foi incorporada aos Dockerfiles de API/worker para evitar
+reintroduzir ferramentas de instalação em builds futuros. Não há exclusão de
+advisory nem alteração de threshold: o scan continua com todas as severidades.
+
+As três propostas finais tiveram **zero achados** no Trivy com inventários
+85/85/57 e SBOMs CycloneDX com 86/86/58 componentes. Smokes reais passaram com
+UID 10001, rede desabilitada e filesystem readonly; API/worker conservaram os
+drivers e contexto SSL verificado, sem instalador pip/ensurepip. São propostas
+locais não assinadas, derivadas de imagens anteriores com receita adicional;
+não são imagens da cadeia remota confiável no SHA final. Arquivos e receitas:
+`.runtime/phase-3/unblock-5bbe0f6/image-remediation/`; consolidação dos scans/SBOMs
+em `.runtime/phase-3/unblock-398a6e0/final-images/`.
+
+O smoke observou Python **3.12.15** e Node **22.23.2** nas bases locais em cache,
+enquanto `toolchain.json` declara 3.12.3/22.19.0 para o CI. A divergência não foi
+aprovada nem escondida: a versão/digest do perfil de release precisa de decisão
+e rebuild confiável. O contexto de código da aplicação foi conferido, mas as
+receitas/proveniência e a compatibilidade da toolchain continuam sujeitas a
+revisão independente. Produção permanece **NO-GO**.
