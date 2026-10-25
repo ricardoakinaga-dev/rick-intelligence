@@ -256,10 +256,13 @@ def signed(source=SOURCE,digest=D):
                    'base_materials','build_config_sha256','source_mapping_sha256')}
     construction.update(policy_schema=c['schema'],policy_sha256=admission['construction']['api']['sha256'])
     tools = json.loads(admission['tool_policy']['json'])
+    scope = {'schema':'rick.sbom-runtime-scope/v1','native_sbom_sha256':D,
+             'runtime_packages':1,'scanner_packages':1,'supplementary':[]}
     ref=f'ghcr.io/{contracts.REPO}-api@sha256:{D}'
     statement={'_type':'https://in-toto.io/Statement/v1','predicateType':contracts.PREDICATE,'subject':[{'name':ref.split('@')[0],'digest':{'sha256':digest}}],
         'predicate':{'source_sha':source,'image_ref':ref,'scan_status':'PASS','promotion_authorized':False,
-            'sbom_sha256':D,'provenance_sha256':D,'scan_sha256':D,'oci_sha256':D,'construction':construction,
+            'sbom_sha256':D,'sbom_scope':scope,'sbom_scope_sha256':canonical_sha256(scope),
+            'provenance_sha256':D,'scan_sha256':D,'oci_sha256':D,'construction':construction,
             'tool_policy_sha256':admission['tool_policy']['sha256'],'quality':admission['quality'],
             'quality_sha256':canonical_sha256(admission['quality']),
             'configured_build_tools':{k:tools['images'][k] for k in

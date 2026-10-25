@@ -366,6 +366,11 @@ jobs:
 
   phase3-evidence:
     name: PHASE3 / capability evidence matrix
+    if: >-
+      !(github.event_name == 'workflow_dispatch' &&
+        inputs.candidate_image_evidence &&
+        github.repository == 'ricardoakinaga-dev/rick-intelligence' &&
+        github.ref == 'refs/heads/phase3/a8a83ca-candidate')
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
@@ -443,6 +448,10 @@ jobs:
     needs: [fast, unit, contract, security, rag-eval, frontend, supply-chain, phase3-evidence, runtime, frontend-runtime, performance, chaos, soak, nightly]
     if: >-
       always() &&
+      !(github.event_name == 'workflow_dispatch' &&
+        inputs.candidate_image_evidence &&
+        github.repository == 'ricardoakinaga-dev/rick-intelligence' &&
+        github.ref == 'refs/heads/phase3/a8a83ca-candidate') &&
       needs.fast.result == 'success' &&
       needs.unit.result == 'success' &&
       needs.contract.result == 'success' &&
@@ -597,7 +606,12 @@ jobs:
 
   runtime:
     name: RUNTIME / disposable State-of-Art packet
-    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    if: >-
+      (github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') &&
+      !(github.event_name == 'workflow_dispatch' &&
+        inputs.candidate_image_evidence &&
+        github.repository == 'ricardoakinaga-dev/rick-intelligence' &&
+        github.ref == 'refs/heads/phase3/a8a83ca-candidate')
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     permissions:
@@ -643,7 +657,12 @@ jobs:
 
   frontend-runtime:
     name: FRONTEND-RUNTIME / 375-768-1440 browser matrix
-    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    if: >-
+      (github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') &&
+      !(github.event_name == 'workflow_dispatch' &&
+        inputs.candidate_image_evidence &&
+        github.repository == 'ricardoakinaga-dev/rick-intelligence' &&
+        github.ref == 'refs/heads/phase3/a8a83ca-candidate')
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     permissions:
@@ -678,7 +697,12 @@ jobs:
 
   performance:
     name: PERFORMANCE / explicit fail-closed lane
-    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    if: >-
+      (github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') &&
+      !(github.event_name == 'workflow_dispatch' &&
+        inputs.candidate_image_evidence &&
+        github.repository == 'ricardoakinaga-dev/rick-intelligence' &&
+        github.ref == 'refs/heads/phase3/a8a83ca-candidate')
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
@@ -700,7 +724,12 @@ jobs:
 
   chaos:
     name: CHAOS / explicit fail-closed lane
-    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    if: >-
+      (github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') &&
+      !(github.event_name == 'workflow_dispatch' &&
+        inputs.candidate_image_evidence &&
+        github.repository == 'ricardoakinaga-dev/rick-intelligence' &&
+        github.ref == 'refs/heads/phase3/a8a83ca-candidate')
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
@@ -722,7 +751,12 @@ jobs:
 
   soak:
     name: SOAK / explicit fail-closed lane
-    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    if: >-
+      (github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') &&
+      !(github.event_name == 'workflow_dispatch' &&
+        inputs.candidate_image_evidence &&
+        github.repository == 'ricardoakinaga-dev/rick-intelligence' &&
+        github.ref == 'refs/heads/phase3/a8a83ca-candidate')
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:

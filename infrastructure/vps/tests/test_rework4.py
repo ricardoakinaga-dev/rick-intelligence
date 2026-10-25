@@ -177,7 +177,8 @@ def test_fresh_absence_is_explicit_authority_plus_current_readonly_inventory(tmp
 
 
 @pytest.mark.parametrize('attack',['none','subject_name','subject_extra','construction','quality','tool_policy',
-    'recipe','tool_identity','tool_image','quality_attempt','quality_source','quality_jobs','buildx','coverage','scan_policy','no_authority'])
+    'recipe','tool_identity','tool_image','quality_attempt','quality_source','quality_jobs','buildx','coverage','scan_policy',
+    'sbom_scope','sbom_scope_hash','sbom_scope_native','sbom_scope_count','sbom_scope_reason','no_authority'])
 def test_candidate_independent_identities_cannot_be_omitted_or_echoed(tmp_path,attack):
     policy=admission_fixture();envelope=signed();s=json.loads(base64.b64decode(envelope['payload']));p=s['predicate']
     if attack=='subject_name':s['subject'][0]['name']='ghcr.io/evil/other'
@@ -192,6 +193,14 @@ def test_candidate_independent_identities_cannot_be_omitted_or_echoed(tmp_path,a
     if attack=='buildx':p['buildx_binary']['sha256']='f'*64
     if attack=='coverage':p['scan_coverage']=[]
     if attack=='scan_policy':p['scan_requirements']['language_types']=[]
+    if attack=='sbom_scope':p.pop('sbom_scope')
+    if attack=='sbom_scope_hash':p['sbom_scope_sha256']='f'*64
+    if attack=='sbom_scope_native':p['sbom_scope']['native_sbom_sha256']='f'*64
+    if attack=='sbom_scope_count':p['sbom_scope']['runtime_packages']=2
+    if attack=='sbom_scope_reason':p['sbom_scope']['supplementary']=[{
+        'spdx_id':'SPDXRef-supplementary','name':'embedded','version':'1',
+        'purls':['pkg:pypi/embedded@1'],'source':'acquired package info from SBOM: /tmp/demo.cdx.json',
+        'reason':'arbitrary','classification':'unversioned'}]
     if attack=='no_authority':policy=None
     envelope['payload']=base64.b64encode(json.dumps(s).encode()).decode()
     invoke=lambda:deploy.attestations(json.dumps(envelope),SOURCE,manifest()['images'][0]['image_ref'],policy)

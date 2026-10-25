@@ -98,9 +98,19 @@ revisão independente, selo do release packet ou decisão humana. O instalador
 de produção não admite esse schema. A publicação de imagens e promoção
 continuam exigindo suas políticas, autoridade e validações originais.
 
-Limite do caminho atual: `publish-images.yml` ainda exige a matriz PHASE3 entre
-seus oito gates. Como a promoção também consome imagens assinadas, o novo job
-resolve a obtenção de evidências para revisão, mas não autoriza publicação nem
-altera esse contrato. A revisão do fluxo de publicação precisa separar o aceite
-de construção do aceite de promoção, preservando a matriz completa na promoção;
-essa política não é aprovada pelo inventário assinado de CI.
+## Construção e promoção são estágios distintos
+
+O dispatch de candidate com `candidate_image_evidence=true` executa somente os
+sete gates de código e as três lanes de construção. As seis lanes de
+produção/ambiente (`PHASE3`, `CHAOS`, `SOAK`, `PERFORMANCE`, `RUNTIME` e
+`FRONTEND-RUNTIME`) e o job `RELEASE` permanecem definidos, mas ficam
+`skipped` nesse dispatch porque exigem ambiente e autoridade que o candidate não
+possui. Isso permite que a execução de construção termine verde sem transformar
+um `skipped` em aprovação.
+
+Um dispatch normal em `main` continua executando as seis lanes e o `RELEASE`.
+`publish_guard.py` exige `PHASE3` e os demais gates com conclusão `success`;
+`skipped` nunca satisfaz a promoção. O candidato continua com
+`promotion_authorized=false` e o pacote de produção continua exigindo corpus e
+avaliador aprovados, perfil TLS/auth, budgets, CI confiável, revisão
+independente e decisão humana `GO`.

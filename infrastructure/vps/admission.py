@@ -130,6 +130,29 @@ def candidate_policy(predicate, service, policy):
         or not re.fullmatch('sha256:[0-9a-f]{64}',str(coverage[0].get('config_digest','')))
         or predicate.get('scan_requirements') != tools['scan'][service]):
         raise Refusal('signed substantive scanner coverage and policy binding required')
-    for key in ('scan_sha256','oci_sha256','sbom_sha256','provenance_sha256'):
+    for key in ('scan_sha256','oci_sha256','sbom_sha256','provenance_sha256','sbom_scope_sha256'):
         if not re.fullmatch('[0-9a-f]{64}',str(predicate.get(key,''))):
             raise Refusal('signed candidate evidence hash missing')
+    scope = predicate.get('sbom_scope')
+    if (not isinstance(scope,dict)
+        or set(scope) != {'schema','native_sbom_sha256','runtime_packages','scanner_packages','supplementary'}
+        or scope.get('schema') != 'rick.sbom-runtime-scope/v1'
+        or scope.get('native_sbom_sha256') != predicate.get('sbom_sha256')
+        or predicate.get('sbom_scope_sha256') != canonical_sha256(scope)
+        or not isinstance(scope.get('runtime_packages'),int)
+        or isinstance(scope.get('runtime_packages'),bool)
+        or scope['runtime_packages'] < 1
+        or scope.get('scanner_packages') != scope['runtime_packages']
+        or not isinstance(scope.get('supplementary'),list)):
+        raise Refusal('signed SBOM runtime scope required')
+    for item in scope['supplementary']:
+        if (not isinstance(item,dict)
+            or set(item) != {'spdx_id','name','version','purls','source','reason','classification'}
+            or not all(isinstance(item.get(key),str) and item[key]
+                       for key in ('spdx_id','name','version','source'))
+            or item.get('reason') not in {'embedded_sbom','compiled_node_bundle'}
+            or item.get('classification') not in {'unversioned','not_in_scanner'}
+            or not isinstance(item.get('purls'),list) or not item['purls']
+            or any(not isinstance(purl,str) or not purl.startswith('pkg:')
+                   for purl in item['purls'])):
+            raise Refusal('signed SBOM supplementary scope malformed')

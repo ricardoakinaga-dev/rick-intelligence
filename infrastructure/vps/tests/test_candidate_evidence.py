@@ -152,6 +152,12 @@ def test_workflow_evidence_does_not_publish_or_weaken_promotion():
     assert 'github.sha' in build['with']['context']
     assert build['with']['provenance'].startswith('mode=max,version=v0.2,builder-id=')
     assert 'oci-artifact=false' in build['with']['outputs']
+    # Construction evidence runs only the seven code gates and the three build
+    # lanes. The six production/environment lanes and the release gate stay in
+    # the full promotion path but are skipped for the candidate dispatch.
+    for name in ('phase3-evidence','runtime','frontend-runtime','performance','chaos','soak','release'):
+        assert 'candidate_image_evidence' in workflow['jobs'][name]['if']
+        assert 'phase3/a8a83ca-candidate' in workflow['jobs'][name]['if']
     from publish_guard import REQUIRED_JOBS
     assert 'PHASE3 / capability evidence matrix' in REQUIRED_JOBS
 

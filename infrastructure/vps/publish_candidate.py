@@ -301,14 +301,19 @@ def package_identity(kind, name, version):
         name = re.sub('[-_.]+','-',name).lower()
     return kind,name,version
 
-def purl_identity(value):
-    # Do not strip epochs/revisions, infer aliases or collapse ecosystems.
-    # Native extension subpaths are not independent installed distributions.
+def purl_parts(value):
     if not isinstance(value,str) or not value.startswith('pkg:') or re.search('%(?![0-9a-fA-F]{2})',value):
         raise Refusal('supported package URL identity required')
     body, _, subpath = value[4:].partition('#')
     body = body.partition('?')[0]
     path, sep, version = body.rpartition('@')
+    return path, sep, version, subpath
+
+
+def purl_identity(value):
+    # Do not strip epochs/revisions, infer aliases or collapse ecosystems.
+    # Native extension subpaths are not independent installed distributions.
+    path, sep, version, subpath = purl_parts(value)
     if not sep:
         raise Refusal('versioned package URL required for runtime coverage')
     kind, sep, name = path.partition('/')
@@ -327,35 +332,94 @@ def purl_identity(value):
         raise Refusal('unsupported runtime package URL ecosystem')
     return package_identity(kind,name,version), bool(subpath)
 
-def reconcile_sbom(report, statement):
-    """Every admitted runtime package needs a versioned SPDX distribution identity."""
-    packages = spdx_packages(statement.get('predicate',{}))
-    identities = set()
-    for package in packages:
-        refs = package.get('externalRefs',[])
-        if not isinstance(refs,list) or any(not isinstance(r,dict) for r in refs):
-            raise Refusal('SPDX external package references malformed')
-        for ref in refs:
-            if ref.get('referenceType') != 'purl':
-                continue
-            value = ref.get('referenceLocator')
-            # Supplementary generic/embedded packages remain valid SPDX, but
-            # cannot substitute for the runtime ecosystems admitted by Trivy.
-            if not isinstance(value,str):
-                raise Refusal('SPDX package URL malformed')
-            if value.split('/',1)[0] not in {'pkg:deb','pkg:apk','pkg:pypi','pkg:npm'}:
-                continue
+RUNTIME_PURL_ECOSYSTEMS = {'pkg:deb','pkg:apk','pkg:pypi','pkg:npm'}
+SUPPLEMENTARY_SBOM_SOURCES = (
+    ('embedded_sbom','acquired package info from SBOM: '),
+    ('compiled_node_bundle','acquired package info from installed node module manifest file: '),
+)
+
+
+def supplementary_source(package):
+    """Recognize native metadata that is not an installed runtime distribution.
+
+    Syft imports embedded wheel SBOMs and scans bundled package.json manifests
+    inside Next.js. Those entries can be versionless or name a library that is
+    vendored, not installed. They remain visible in the native SBOM but cannot
+    stand in for the runtime inventories admitted by Trivy.
+    """
+    source = package.get('sourceInfo')
+    if not isinstance(source,str):
+        return None
+    for reason,prefix in SUPPLEMENTARY_SBOM_SOURCES:
+        if not source.startswith(prefix):
+            continue
+        paths = [part.strip() for part in source[len(prefix):].split(',')]
+        if not paths or any(not path or '..' in path or '\0' in path for path in paths):
+            return None
+        if reason == 'embedded_sbom':
+            pattern = r'/.*\.dist-info/sboms/[^/]+\.json'
+        else:
+            pattern = r'/.*/node_modules/.+/dist/compiled/.+/package.json'
+        if not all(re.fullmatch(pattern,path) for path in paths):
+            return None
+        return {'reason':reason,'source':source}
+    return None
+
+
+def supplementary_runtime_package(package, scanned):
+    """Return exclusion evidence for a supplementary runtime-shaped package.
+
+    A package is excluded only when native provenance places it in an embedded
+    SBOM or a compiled node bundle, it has a runtime purl, and none of its
+    versioned distribution identities is admitted by the scanner. A matching
+    installed identity always stays in the strict runtime inventory.
+    """
+    provenance = supplementary_source(package)
+    if provenance is None:
+        return None
+    purls = []
+    refs = package.get('externalRefs',[])
+    if not isinstance(refs,list) or any(not isinstance(ref,dict) for ref in refs):
+        raise Refusal('SPDX external package references malformed')
+    for ref in refs:
+        if ref.get('referenceType') != 'purl':
+            continue
+        value = ref.get('referenceLocator')
+        if not isinstance(value,str):
+            raise Refusal('SPDX package URL malformed')
+        if value.split('/',1)[0] in RUNTIME_PURL_ECOSYSTEMS:
+            purls.append(value)
+    if not purls:
+        return None
+    unversioned, outside = [], []
+    for value in purls:
+        try:
+            _path, sep, _version, subpath = purl_parts(value)
+        except Refusal:
+            # Malformed runtime identities remain subject to the strict checks
+            # below instead of being excused as supplementary.
+            return None
+        if not sep:
+            unversioned.append(value)
+            continue
+        try:
             identity, subpath = purl_identity(value)
-            if subpath:
-                # A bundled component may have its own version while the purl
-                # names its parent distribution. It cannot cover that parent.
-                continue
-            if identity[2] != package['versionInfo']:
-                raise Refusal('SPDX package URL/version disagreement')
-            if not subpath:
-                if identity != package_identity(identity[0],package['name'],package['versionInfo']):
-                    raise Refusal('SPDX package URL/name disagreement')
-                identities.add(identity)
+        except Refusal:
+            return None
+        if subpath:
+            continue
+        if identity in scanned:
+            return None
+        outside.append(value)
+    if not unversioned and not outside:
+        return None
+    return {'spdx_id':package.get('SPDXID'),'name':package.get('name'),
+            'version':package.get('versionInfo'),'purls':unversioned+outside,
+            'source':provenance['source'],'reason':provenance['reason'],
+            'classification':'unversioned' if unversioned else 'not_in_scanner'}
+
+
+def scanned_identities(report):
     kinds = {'debian':'deb','alpine':'apk','python-pkg':'pypi','node-pkg':'npm'}
     scanned = set()
     for result in report['Results']:
@@ -370,11 +434,51 @@ def reconcile_sbom(report, statement):
                 explicit, subpath = purl_identity(locator)
                 if subpath or explicit != identity:
                     raise Refusal('scanner package URL/name/version disagreement')
-            if identity not in identities:
-                raise Refusal('SPDX omitted admitted runtime package identity/version')
             scanned.add(identity)
-    if identities != scanned:
+    return scanned
+
+
+def reconcile_sbom(report, statement):
+    """Every admitted runtime package needs a versioned SPDX distribution identity."""
+    packages = spdx_packages(statement.get('predicate',{}))
+    scanned = scanned_identities(report)
+    identities = set()
+    supplementary = []
+    for package in packages:
+        excluded = supplementary_runtime_package(package,scanned)
+        if excluded is not None:
+            supplementary.append(excluded)
+            continue
+        refs = package.get('externalRefs',[])
+        if not isinstance(refs,list) or any(not isinstance(r,dict) for r in refs):
+            raise Refusal('SPDX external package references malformed')
+        for ref in refs:
+            if ref.get('referenceType') != 'purl':
+                continue
+            value = ref.get('referenceLocator')
+            # Supplementary generic/embedded packages remain valid SPDX, but
+            # cannot substitute for the runtime ecosystems admitted by Trivy.
+            if not isinstance(value,str):
+                raise Refusal('SPDX package URL malformed')
+            if value.split('/',1)[0] not in RUNTIME_PURL_ECOSYSTEMS:
+                continue
+            identity, subpath = purl_identity(value)
+            if subpath:
+                # A bundled component may have its own version while the purl
+                # names its parent distribution. It cannot cover that parent.
+                continue
+            if identity[2] != package['versionInfo']:
+                raise Refusal('SPDX package URL/version disagreement')
+            if not subpath:
+                if identity != package_identity(identity[0],package['name'],package['versionInfo']):
+                    raise Refusal('SPDX package URL/name disagreement')
+                identities.add(identity)
+    if scanned - identities:
+        raise Refusal('SPDX omitted admitted runtime package identity/version')
+    if identities - scanned:
         raise Refusal('scanner omitted SPDX runtime distribution coverage')
+    return {'schema':'rick.sbom-runtime-scope/v1','runtime_packages':len(identities),
+            'scanner_packages':len(scanned),'supplementary':supplementary}
 
 def bounded_tar_headers(raw, size):
     """Reject extension/sparse headers before tarfile can allocate their body."""
@@ -803,7 +907,10 @@ def _publish(captured):
     captured.export('scan.json', OUT/'scan.json')
     report = parse(scan.read())
     scan_coverage(report,inventory,tools['scan'][service])
-    reconcile_sbom(report,parse(captured.retained['sbom.json'].read()))
+    sbom_scope = reconcile_sbom(report,parse(captured.retained['sbom.json'].read()))
+    sbom_scope['native_sbom_sha256'] = captured.retained['sbom.json'].sha256
+    evidence_writer('sbom-scope.json', (json.dumps(
+        sbom_scope,sort_keys=True,separators=(',',':'),ensure_ascii=False)+'\n').encode())
     captured.verify()
     with registry_auth() as auth:
         captured.verify()
@@ -821,6 +928,7 @@ def _publish(captured):
     predicate = {'source_sha':source,'image_ref':ref,'promotion_authorized':False,'scan_status':'PASS',
         'application_digest':application,'builder_id':builder,'buildx_binary':buildx,
         'scan_sha256':captured.retained['scan.json'].sha256,'sbom_sha256':captured.retained['sbom.json'].sha256,
+        'sbom_scope':sbom_scope,'sbom_scope_sha256':canonical_sha256(sbom_scope),
         'provenance_sha256':captured.retained['provenance.json'].sha256,'oci_sha256':captured.retained['image.tar'].sha256,
         'quality':quality,'quality_sha256':canonical_sha256(quality),
         'tool_policy_sha256':tool_identity,'scan_requirements':tools['scan'][service],

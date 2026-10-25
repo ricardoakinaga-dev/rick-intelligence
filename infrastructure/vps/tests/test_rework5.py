@@ -126,6 +126,66 @@ def test_unversioned_primary_purl_and_unknown_runtime_version_are_refused():
     with pytest.raises(contracts.Refusal):pub.reconcile_sbom(report,s)
 
 
+def supplementary_package(source,*,name='embedded',version='UNKNOWN',purl='pkg:pypi/embedded'):
+    s=statement();p=s['predicate']
+    p['packages'].append({'SPDXID':'SPDXRef-supplementary','name':name,'versionInfo':version,
+        'sourceInfo':source,'externalRefs':[
+            {'referenceCategory':'PACKAGE-MANAGER','referenceType':'purl','referenceLocator':purl}]})
+    p['relationships'].append({'spdxElementId':'SPDXRef-root',
+        'relatedSpdxElement':'SPDXRef-supplementary','relationshipType':'CONTAINS'})
+    return s
+
+
+@pytest.mark.parametrize('reason,source,purl',[
+    ('embedded_sbom','acquired package info from SBOM: /usr/local/lib/python3.12/site-packages/demo-1.0.dist-info/sboms/demo.cdx.json','pkg:pypi/embedded'),
+    ('compiled_node_bundle','acquired package info from installed node module manifest file: /opt/app/node_modules/next/dist/compiled/demo/package.json','pkg:npm/embedded')])
+def test_unversioned_native_supplementary_components_are_not_runtime(reason,source,purl):
+    report=clean_scan('sha256:'+D);s=supplementary_package(source,purl=purl)
+    scope=pub.reconcile_sbom(report,s)
+    assert scope['runtime_packages']==scope['scanner_packages']==2
+    assert scope['supplementary']==[{'spdx_id':'SPDXRef-supplementary','name':'embedded',
+        'version':'UNKNOWN','purls':[purl],'source':source,'reason':reason,
+        'classification':'unversioned'}]
+
+
+@pytest.mark.parametrize('reason,source,purl,name,version',[
+    ('embedded_sbom','acquired package info from SBOM: /usr/local/lib/python3.12/site-packages/demo-1.0.dist-info/sboms/auditwheel.cdx.json','pkg:apk/alpine/libdemo@1.2.3-r0','libdemo','1.2.3-r0'),
+    ('compiled_node_bundle','acquired package info from installed node module manifest file: /opt/app/node_modules/next/dist/compiled/demo/package.json','pkg:npm/embedded@2','embedded','2')])
+def test_versioned_native_supplementary_components_outside_scanner_are_not_runtime(reason,source,purl,name,version):
+    report=clean_scan('sha256:'+D);s=supplementary_package(source,name=name,version=version,purl=purl)
+    scope=pub.reconcile_sbom(report,s)
+    assert scope['supplementary'][0]['classification']=='not_in_scanner'
+    assert scope['supplementary'][0]['reason']==reason
+
+
+def test_native_supplementary_scope_cannot_hide_an_admitted_runtime_identity():
+    report=clean_scan('sha256:'+D);s=statement();p=s['predicate']
+    p['packages'].append({'SPDXID':'SPDXRef-embedded-duplicate','name':'rick-dependency',
+        'versionInfo':'1','sourceInfo':'acquired package info from SBOM: /usr/local/lib/python3.12/site-packages/demo-1.0.dist-info/sboms/demo.cdx.json',
+        'externalRefs':[{'referenceCategory':'PACKAGE-MANAGER','referenceType':'purl',
+                         'referenceLocator':'pkg:pypi/rick-dependency@1'}]})
+    p['relationships'].append({'spdxElementId':'SPDXRef-root',
+        'relatedSpdxElement':'SPDXRef-embedded-duplicate','relationshipType':'CONTAINS'})
+    scope=pub.reconcile_sbom(report,s)
+    assert scope['supplementary']==[]
+
+
+@pytest.mark.parametrize('source',[
+    'acquired package info from SBOM: /etc/passwd',
+    'acquired package info from SBOM: /usr/local/lib/python3.12/site-packages/demo-1.0.dist-info/sboms/../../etc/passwd',
+    'acquired package info from installed node module manifest file: /opt/app/node_modules/next/package.json'])
+def test_untrusted_source_path_cannot_excuse_unversioned_runtime_identity(source):
+    report=clean_scan('sha256:'+D);s=supplementary_package(source)
+    with pytest.raises(contracts.Refusal,match='versioned'):pub.reconcile_sbom(report,s)
+
+
+def test_malformed_supplementary_purl_is_still_refused():
+    report=clean_scan('sha256:'+D);s=supplementary_package(
+        'acquired package info from SBOM: /usr/local/lib/python3.12/site-packages/demo-1.0.dist-info/sboms/demo.cdx.json',
+        purl='pkg:pypi/bad%ZZ')
+    with pytest.raises(contracts.Refusal):pub.reconcile_sbom(report,s)
+
+
 @pytest.fixture
 def candidate(tmp_path,monkeypatch):
     from test_rework6 import modeled_root_ancestors

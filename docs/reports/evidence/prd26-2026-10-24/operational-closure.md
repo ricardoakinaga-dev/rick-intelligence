@@ -137,3 +137,7 @@ operacionais de produção, perfil TLS/auth e referências a secret/trust stores
 CI remoto no SHA exato, proveniência/assinaturas, revisão independente e decisão
 humana de release. A avaliação local não concede essas autoridades. Após fechar
 o código, é necessário regenerar as evidências no candidato limpo e revisado.
+
+A correção posterior da reconciliação dos três SBOMs nativos está registrada em
+[sbom-reconciliation-closure.md](sbom-reconciliation-closure.md); ela exige um
+novo rebuild remoto para vincular o escopo suplementar ao predicate assinado.
