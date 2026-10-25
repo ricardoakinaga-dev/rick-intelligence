@@ -87,9 +87,15 @@ PostgreSQL, Qdrant, queue, identity, chat, auditoria, histórico, job journal,
 object store, retrieval, ingestion, vector store, storage e provider
 responderam `true`.
 
+**API HTTP real:** o servidor Uvicorn foi iniciado em `127.0.0.1:18000` com
+`RICK_API_COMPOSITION=local_lab_composition:build` e os mesmos serviços. Resultados:
+`GET /health/live` **200**; `GET /api/v1/auth/me` com token real do Keycloak
+**200**, `VETERINARIAN`, tenant `tenant-a`, workspace `workspace-a`, 7 permissões;
+`GET /health/ready` **503** fail-closed (14 checks `true`, 3 `false`).
+
 **Limite:** a composição não foi admitida em `environment=production`; o 503
-é o comportamento correto para Redis local sem TLS. Não é prova de readiness
-de produção.
+é o comportamento correto para Redis local sem TLS e embedding fixture. Não é
+prova de readiness de produção.
 
 ## 6. Limitações e próximo passo
 
@@ -102,10 +108,12 @@ de produção.
   executar golden path e restore com composição autorizada e vincular os
   resultados ao pacote de release.
 
-## 7. Artefatos locais
+## 8. Artefatos locais
 
 `.runtime/phase-2/postgres-runtime-gate.json`,
 `.runtime/phase-3/multi-worker-runtime-gate.json`,
 `.runtime/phase-2/redis-runtime-gate.json`,
 `.runtime/phase-2/object-qdrant-runtime-gate.json`,
-`.runtime/phase-3/provider-runtime-gate.json`.
+`.runtime/phase-3/provider-runtime-gate.json`. Composição reproduzível:
+`scripts/phase11/local_lab_composition.py`; o servidor local usa
+`RICK_API_COMPOSITION=local_lab_composition:build`.
