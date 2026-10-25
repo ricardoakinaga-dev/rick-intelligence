@@ -76,3 +76,12 @@ Regressão canônica completa: 305 passed, incluindo sete ataques ao loader.
 O restorer confere a união dos inventários antes de escrever, falhando em
 conflitos; não fabrica recibos nem permite importar aprovação.
 Nova continuação de CI permanece necessária para o SHA desse reparo.
+
+### Agendamento determinístico de identidade
+
+Quality 4d0db8b aprovou FAST; CONTRACT falhou em 113,57 ms vs o antigo assert
+de 100 ms que incluía admissão. B07/T009 é prova de progresso, não ratificação
+de SLO. Substituição por barreira causal: worker bloqueado, saúde responde antes
+da liberação, thread ASGI distinta. 43 testes PASS; mutação inline foi rejeitada.
+Nenhum SLO foi aumentado nem código de produção alterado nessa etapa; nova
+publicação e CI são necessários para o SHA que inclui essa prova.

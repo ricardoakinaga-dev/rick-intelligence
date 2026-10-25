@@ -107,3 +107,21 @@ verificados **1.138 links, zero erros**. A suíte canônica de CI passou em
 `.runtime/phase-3/unblock-a8a83ca/fresh-full-validate.log` e
 `fresh-full-result.json`. Não foram alterados o checker de links, o controlador,
 a política de retenção ou a quality bar congelada.
+
+## Progresso do loop e medição de latência
+
+No [quality 4d0db8b](https://github.com/ricardoakinaga-dev/rick-intelligence/actions/runs/40214481141),
+FAST passou, confirmando a restauração autêntica no GitHub. CONTRACT preservou
+um FAIL em `test_slow_identity_lookup_does_not_occupy_asgi_loop[login]`: 113,57 ms
+para um assert de 100 ms que incluía admissão do runner antes da entrada no
+worker. O contrato B07/T009 exige não bloquear o loop, sem fixar esse orçamento
+de latência. O teste agora mantém o worker bloqueado por um evento, exige saúde
+concorrente antes de liberá-lo e verifica que a identidade roda fora da thread
+ASGI. Timeouts de cinco segundos apenas limitam fixture quebrado; não são novo
+SLO. A medição de 113,57 ms e o breach de SLO local continuam preservados.
+
+Os 43 testes de identidade passaram. Mutação isolada que executa a identidade
+sincronamente na thread ASGI foi rejeitada pelo teste (um FAIL esperado),
+confirmando que a prova causal detecta a regressão. Código de produção, limites
+de admissão/deadline e critérios da quality bar não foram alterados por isso.
+Essa alteração requer novo SHA/CI, sem reclassificar a falha de 4d0db8b.

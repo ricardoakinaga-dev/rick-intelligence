@@ -99,13 +99,18 @@ def test_reset_allowed_uses_independent_private_ip_and_token_buckets(client, pro
 @pytest.mark.parametrize("operation", ["validate_token", "login", "issue_password_reset", "consume_password_reset"])
 def test_slow_identity_lookup_does_not_occupy_asgi_loop(app, providers, monkeypatch, operation):
     original = getattr(providers.identity, operation)
-    entered = threading.Event()
-    def slow(*args, **kwargs):
-        entered.set()
-        time.sleep(0.15)
-        return original(*args, **kwargs)
-    monkeypatch.setattr(providers.identity, operation, slow)
+    release = threading.Event()
+    worker_threads = []
     async def exercise():
+        loop = asyncio.get_running_loop()
+        loop_thread = threading.get_ident()
+        entered = asyncio.Event()
+        def slow(*args, **kwargs):
+            worker_threads.append(threading.get_ident())
+            loop.call_soon_threadsafe(entered.set)
+            assert release.wait(5), "identity fixture was not released"
+            return original(*args, **kwargs)
+        monkeypatch.setattr(providers.identity, operation, slow)
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             if operation == "login":
                 request = client.post("/api/v1/auth/login", json={"email":"admin@example.com", "password":"password123", "tenant_id":"default"})
@@ -116,14 +121,19 @@ def test_slow_identity_lookup_does_not_occupy_asgi_loop(app, providers, monkeypa
             else:
                 request = client.get("/api/v1/auth/me")
             task = asyncio.create_task(request)
-            started = time.monotonic()
-            while not entered.is_set():
-                await asyncio.sleep(0)
-            independent = await client.get("/health/live")
-            elapsed = time.monotonic() - started
-            await task
-            assert independent.status_code == 200
-            assert elapsed < 0.10
+            try:
+                # Assert causal progress while the identity worker remains
+                # blocked. Runner admission time is not an event-loop SLO.
+                # Deadman timeouts bound broken fixtures; they are not latency
+                # acceptance thresholds or retries of a failed observation.
+                await asyncio.wait_for(entered.wait(), timeout=5)
+                independent = await asyncio.wait_for(client.get("/health/live"), timeout=5)
+                assert independent.status_code == 200
+                assert worker_threads and all(t != loop_thread for t in worker_threads)
+                assert not task.done() and not release.is_set()
+            finally:
+                release.set()
+                await asyncio.wait_for(task, timeout=5)
     asyncio.run(exercise())
 
 
