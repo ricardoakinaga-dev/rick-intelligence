@@ -48,11 +48,17 @@ explícito em Redis, objeto/vetor e provider.
 O Keycloak **26.7.3** foi instalado e iniciado em modo dev, com admin local
 descartável. `GET /realms/master` responde **200** em `127.0.0.1:18080`.
 Foram provisionados o realm **`rick`**, o client confidencial **`rick-api`**
-e o usuário **`reader@example.invalid`**. O discovery
+e o usuário **`reader@example.invalid`**, com mappers de `tenant_id`,
+`workspace_id` e audiência `rick-api`. O discovery
 `/realms/rick/.well-known/openid-configuration` responde e o **password grant**
-retorna access/refresh token. A aplicação ainda não foi apontada para este IdP,
-não há membership/roles A/B e não houve teste de revogação/logout; é prova de
-instalação e login local, não de isolamento multi-tenant.
+retorna access/refresh token. O `OIDCVerifier` validou a assinatura RS256, o
+issuer e a audiência reais; o `OIDCIdentityProvider` resolveu uma sessão
+autoritativa `VETERINARIAN` com tenant `tenant-a`, workspace `workspace-a`,
+7 permissões e coleção `col-a`.
+
+**Limite:** o membership resolver foi estático no probe; não há store de
+membership, usuários A/B, revogação/logout, multi-réplica ou integração da API
+com este IdP. É prova de verificação OIDC real, não de isolamento multi-tenant.
 
 **Achado de infraestrutura:** o `compose.integration.yml` usa `internal: true`,
 e o Docker 29 não publica portas de host nessa rede. Para acesso do host foi
