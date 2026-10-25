@@ -164,9 +164,15 @@ Foi executado um drill real, não o gate formal:
 **RPO/RTO:** o dump foi tirado no mesmo estado da origem (RPO observado 0 para
 este snapshot); o RTO de PostgreSQL foi 1,883 s. Não são RPO/RTO de produção.
 
-**Limite:** jobs/audit/evidence como componentes formais e o gate
-`make restore-runtime` não foram exercitados; o resultado é evidência parcial
-de PostgreSQL + objetos + Qdrant, não `PASS` do gate.
+**Gate formal:** `make restore-runtime` com
+`RICK_RESTORE_RUNTIME_PATH=scripts/phase11/local_restore_runtime.py` executou
+seed→backup→destroy→restore→rebuild→verify e retornou **PASS**;
+`runtime_claim=true`, `production_safe=false`, RPO **0,0 s** e RTO **3,823 s**
+(budgets 300/900 s). Componentes: PostgreSQL, object storage, jobs, audit,
+evidence lineage e Qdrant. O runtime é local/loopback; não é produção.
+
+**Limite:** jobs/audit/evidence são tabelas de probe do laboratório, não as
+tabelas de produção; o `production_safe=false` é explícito.
 
 ## 8. Limitações e próximo passo
 
