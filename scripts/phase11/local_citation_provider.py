@@ -27,7 +27,6 @@ class Handler(BaseHTTPRequestHandler):
             text=json.dumps(body)
             m=re.search(r"SOURCE\s+(ev[A-Za-z0-9_.:-]+)", text)
             marker=m.group(1) if m else "ev-missing"
-            open(".runtime/citation-provider-debug.log","a").write("MARKER="+marker+" COUNT="+str(text.count("SOURCE"))+"\nTAIL="+text[-1500:]+"\n")
             content=f"Segundo a fonte autorizada, o documento confirma o laboratório local. [cite:{marker}]"
             self._json({"model":body.get("model","chat-test"),"choices":[{"message":{"role":"assistant","content":content},"finish_reason":"stop"}],"usage":{"prompt_tokens":10,"completion_tokens":5,"total_tokens":15}}); return
         self.send_response(404); self.end_headers()

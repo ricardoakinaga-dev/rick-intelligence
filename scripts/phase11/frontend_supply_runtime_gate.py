@@ -1553,6 +1553,7 @@ def run_gate(
     root: Path = ROOT,
     *,
     output: str | Path = ".runtime/phase-3/frontend-supply-runtime-gate.json",
+    evidence_dir: str | Path | None = None,
     web_url: str | None = None,
     api_url: str | None = None,
     browser_executable: str | None = None,
@@ -1563,7 +1564,7 @@ def run_gate(
 ) -> dict[str, Any]:
     root = root.resolve()
     output_path = _safe_path(root, output)
-    evidence_dir = root / ".runtime/phase-3/frontend-supply"
+    evidence_dir = _safe_path(root, evidence_dir or ".runtime/phase-3/frontend-supply")
     started_at = time.time()
     checks: list[dict[str, Any]] = []
     browser_claim = False
@@ -1635,6 +1636,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=None)
     parser.add_argument("--output", default=".runtime/phase-3/frontend-supply-runtime-gate.json")
+    parser.add_argument("--evidence-dir", help="isolated browser, scan and screenshot artifact directory")
     parser.add_argument("--web-url", default=os.getenv("RICK_FRONTEND_WEB_URL"))
     parser.add_argument("--api-url", default=os.getenv("RICK_FRONTEND_API_URL"))
     parser.add_argument("--browser-executable", default=None)
@@ -1648,6 +1650,7 @@ def main(argv: list[str] | None = None) -> int:
         payload = run_gate(
             root,
             output=args.output,
+            evidence_dir=args.evidence_dir,
             web_url=args.web_url,
             api_url=args.api_url,
             browser_executable=args.browser_executable,

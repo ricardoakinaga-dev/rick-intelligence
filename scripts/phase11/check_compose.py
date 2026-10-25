@@ -127,6 +127,26 @@ def _validate_rendered_services(compose: str, payload: object) -> list[str]:
     return errors
 
 
+def _validate_embedding_dimensions(compose: str, payload: object) -> list[str]:
+    """The bootstrap, API and both workers must select the same vector space."""
+    services = payload.get("services", {}) if isinstance(payload, dict) else {}
+    dimensions = []
+    for name in ("qdrant-init", "api", "worker", "worker-b"):
+        service = services.get(name, {})
+        environment = service.get("environment", {}) if isinstance(service, dict) else {}
+        value = environment.get("EMBEDDING_DIMENSION") if isinstance(environment, dict) else None
+        try:
+            dimension = int(str(value))
+        except (TypeError, ValueError):
+            return [f"{compose}:{name}: explicit EMBEDDING_DIMENSION is required"]
+        if dimension < 1 or dimension > 65536:
+            return [f"{compose}:{name}: invalid EMBEDDING_DIMENSION"]
+        dimensions.append(dimension)
+    if len(set(dimensions)) != 1:
+        return [f"{compose}: API/worker/Qdrant embedding dimensions differ"]
+    return []
+
+
 def _validate_observability_topology(compose: str, payload: object) -> list[str]:
     """Check rendered wiring, mounts and isolation; no daemon access is needed."""
 
@@ -171,7 +191,13 @@ def _validate_observability_topology(compose: str, payload: object) -> list[str]
     collector = services["otel-collector"]
     require(collector.get("image") == "otel/opentelemetry-collector-contrib:0.123.0",
             "otel-collector: v0.123.0 is required")
-    require(not collector.get("healthcheck"), "otel-collector: scratch image cannot run a shell healthcheck")
+    collector_health = collector.get("healthcheck")
+    require(not collector_health or (
+        isinstance(collector_health, dict)
+        and collector_health.get("test") == [
+            "CMD", "/otelcol-contrib", "validate", "--config=/etc/otelcol-contrib/config.yaml",
+        ]
+    ), "otel-collector: scratch image requires a native validate probe, never a shell healthcheck")
     ready = services["collector-ready"]
     require(ready.get("image") == services["api"].get("image"),
             "collector-ready: must reuse the immutable API image")
@@ -279,6 +305,7 @@ def main() -> int:
             errors.append(f"{compose}: config --format json did not return JSON")
             continue
         errors.extend(_validate_rendered_services(compose, rendered))
+        errors.extend(_validate_embedding_dimensions(compose, rendered))
         errors.extend(_validate_observability_topology(compose, rendered))
         code, output = run(compose, env_file, "config", "--services")
         if code != 0:

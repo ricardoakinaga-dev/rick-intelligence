@@ -305,6 +305,7 @@ services:
       LLM_BASE_URL: ${LLM_BASE_URL:?set the reviewed provider endpoint}
       LLM_MODEL: ${LLM_MODEL:?set the reviewed chat model}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:?set the reviewed embedding model}
+      EMBEDDING_DIMENSION: ${EMBEDDING_DIMENSION:-1536}
       OTEL_SERVICE_NAME: rick-api
       OTEL_EXPORTER_OTLP_ENDPOINT: ${RICK_OTEL_ENDPOINT:?set the collector endpoint}
       OTEL_EXPORTER_OTLP_PROTOCOL: grpc

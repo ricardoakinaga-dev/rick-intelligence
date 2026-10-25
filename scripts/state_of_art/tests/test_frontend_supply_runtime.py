@@ -394,3 +394,26 @@ def test_wrapper_emits_blocked_commit_bound_envelope(tmp_path: Path, monkeypatch
     assert supply["gate_id"] == "P1-07"
     assert supply["lane"] == "P1-07"
     assert supply["raw_artifacts"] == envelope["raw_artifacts"]
+
+
+def test_auxiliary_artifacts_can_be_isolated_from_control_inputs(tmp_path, monkeypatch):
+    _write_node_component(tmp_path)
+    selected = []
+
+    def browser_probe(root, *, evidence_dir, **kwargs):
+        selected.append(evidence_dir)
+        evidence_dir.mkdir(parents=True, exist_ok=True)
+        (evidence_dir / "browser-evidence.json").write_text('{"status":"NOT_RUN"}')
+        return [], False, {"status": "NOT_RUN"}
+
+    monkeypatch.setattr(gate, "_run_browser_probe", browser_probe)
+    monkeypatch.setattr(gate, "_tool", lambda name: None)
+    gate.run_gate(tmp_path, output="isolated/result.json", evidence_dir="isolated/artifacts")
+    assert selected == [tmp_path / "isolated/artifacts"]
+    assert (selected[0] / "browser-evidence.json").is_file()
+    assert not (tmp_path / ".runtime/phase-3/frontend-supply/browser-evidence.json").exists()
+
+
+def test_auxiliary_evidence_directory_cannot_escape_repository(tmp_path):
+    with pytest.raises(ValueError):
+        gate.run_gate(tmp_path, evidence_dir="../outside")

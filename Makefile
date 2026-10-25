@@ -16,6 +16,13 @@ WEB_DIR := $(ROOT)/apps/web
 WEB_CURRENT_EVIDENCE_DIR ?= $(ROOT)/.runtime/qa/web-e2e
 
 .PHONY: ops-scope-preflight
+.PHONY: phase3-local-product-probe phase3-prepare-production
+
+phase3-local-product-probe:
+	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)" $(PYTEST) "$(ROOT)/scripts/phase11/local_product_probe.py" --from-dev-compose --provider-container "$${RICK_LOCAL_PROVIDER_CONTAINER:?set the disposable provider fixture container}" --managed-provider-fixture --allow-private-containers
+
+phase3-prepare-production:
+	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)" $(PYTHON) "$(ROOT)/scripts/state_of_art/prepare_phase3_handoff.py"
 
 .DEFAULT_GOAL := help
 
