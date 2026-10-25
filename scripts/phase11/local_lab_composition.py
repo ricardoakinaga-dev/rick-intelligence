@@ -59,7 +59,7 @@ def build(settings):
             settings.object_store_endpoint, require_https=False
         ),
         identity=_identity(),
-        created_by="prd26-local-lab",
+        created_by="user-reader",
         redis_client=client,
         rate_limiter=limiter,
         rate_limit_namespace=namespace,

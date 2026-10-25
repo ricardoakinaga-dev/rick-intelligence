@@ -115,8 +115,21 @@ chave retornou os 156 bytes; o objeto e o checksum estão corretos. O job
 permaneceu em retry/`QUEUED` e um job anterior virou `DEAD_LETTER`. A causa
 provável está na escrita/verificação Qdrant/Knowledge, não no objeto.
 
-**Estado:** golden path **FAIL parcial**; nenhum documento foi publicado. É um
-defeito local real a corrigir antes de declarar ingestão ponta a ponta.
+**Causa raiz encontrada e corrigida:** `created_by` da composição apontava para
+`prd26-local-lab`, sem linha em `rick_users`, violando a FK de
+`rick_documents.created_by` e virando `storage_unavailable`. A composição local
+passou a usar `user-reader`. Após a correção, o worker publicou o job:
+`published/SUCCEEDED`, documento `published`, 1 chunk no PostgreSQL e 1 ponto
+no Qdrant; `GET /api/v1/documents` retornou 200. A recuperação direta retornou
+1 evidência com score.
+
+**Chat com evidência:** a recuperação funciona, mas o provider fixture não emite
+marcadores de citação; o Professor retorna `citation_invalid` e a API responde
+`generation_failed` (500). Isso é limitação do fixture, não prova de resposta
+grounded. Próximo passo: fixture que ecoe `[cite:<evidence_id>]`.
+
+**Estado:** golden path de **upload → worker → publicação** `PASS` local; resposta
+grounded com citação ainda pendente de fixture compatível.
 
 ## 7. Limitações e próximo passo
 
