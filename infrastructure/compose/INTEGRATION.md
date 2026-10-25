@@ -30,6 +30,9 @@ remoto. Volumes recebem o namespace do projeto e são preservados ao parar.
 Não há comando de purge nem `down -v`. Não usar o mesmo namespace para dados
 reais. As portas são somente loopback: Postgres15432, S3 19000/console19001,
 Qdrant16333 e Keycloak18080. A rede interna não oferece egress para geração IA.
+**Docker 29:** uma rede `internal: true` não publica portas de host; se o host
+precisar acessar os serviços, use um override revisado com `internal: false` e
+assuma o tradeoff de egress. Não altere o arquivo canônico sem essa decisão.
 
 Postgres usa DB/usuário de bootstrap `rick_integration`; esse superuser de
 laboratório não pode ser a identidade de runtime da futura API. Keycloak usa
