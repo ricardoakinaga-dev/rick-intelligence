@@ -6,6 +6,13 @@
 ARG PYTHON_IMAGE
 FROM ${PYTHON_IMAGE} AS runtime
 
+# Pin the Alpine security fixes in the recipe, rather than patching an image
+# after construction. Debian bases do not use apk. Base/toolchain admission is
+# still a separate reviewed policy.
+RUN if [ -f /etc/alpine-release ]; then \
+      apk add --no-cache musl=1.2.6-r3 musl-utils=1.2.6-r3 zlib=1.3.2-r1; \
+    fi
+
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONPATH=/opt/rick/apps/api/src:/opt/rick/apps/worker:/opt/rick/packages/jobs/src:/opt/rick/packages/contracts/src:/opt/rick/packages/authorization/src:/opt/rick/packages/identity/src:/opt/rick/packages/observability/src:/opt/rick/packages/knowledge/src:/opt/rick/packages/ingestion/src:/opt/rick/packages/retrieval/src:/opt/rick/packages/providers/src:/opt/rick/packages/locking/src:/opt/rick/packages/professor/src:/opt/rick/packages/evidence/src:/opt/rick/packages/decision/src:/opt/rick/packages/storage/src

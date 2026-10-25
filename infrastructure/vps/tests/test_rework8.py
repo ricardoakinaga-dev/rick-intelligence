@@ -160,7 +160,10 @@ def test_changed_existing_authorization_refused_before_effects(monkeypatch, atta
 @pytest.mark.parametrize('noop',[False,True])
 def test_unchanged_existing_and_complete_noop_authorization(monkeypatch, noop):
     directory=ROOT/'infrastructure/migrations';rows=migrate.migration_files(directory)
-    history=[(v,h,migrate.APPLICATION) for v,_,h in rows[:10 if noop else 9]]
+    # A noop has the complete installed inventory, including future migrations.
+    # The pending case leaves exactly the last migration unapplied.
+    installed = rows if noop else rows[:-1]
+    history=[(v,h,migrate.APPLICATION) for v,_,h in installed]
     relations=[['public','rick_documents','r'],['public','rick_schema_migrations','r']]
     approved=plan_bytes(observation(rows,history,relations))
     db_guard.validate_migration_plan(json.loads(approved),allow_noop=noop)

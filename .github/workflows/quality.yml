@@ -6,6 +6,12 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      candidate_image_evidence:
+        description: Build signed OCI evidence on the candidate branch (no registry publication or promotion)
+        required: false
+        default: false
+        type: boolean
   schedule:
     - cron: "17 3 * * *"
 
@@ -20,6 +26,80 @@ env:
   NODE_VERSION: "22.19.0"
 
 jobs:
+  candidate-image-evidence:
+    name: CANDIDATE / signed build evidence (${{ matrix.service }})
+    needs: [fast, unit, contract, security, rag-eval, frontend, supply-chain]
+    if: github.event_name == 'workflow_dispatch' && inputs.candidate_image_evidence && github.repository == 'ricardoakinaga-dev/rick-intelligence' && github.ref == 'refs/heads/phase3/a8a83ca-candidate'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    # Construction artifacts only. No registry writes or deployment environment.
+    permissions:
+      contents: read
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [api, worker, web]
+    env:
+      SERVICE: ${{ matrix.service }}
+      NEEDS_JSON: ${{ toJSON(needs) }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Bind dispatch, seven same-run gates and proposed immutable toolchain
+        run: python3 infrastructure/vps/candidate_evidence.py prepare
+      - name: Create isolated builder from checksum-verified Buildx and immutable BuildKit
+        run: |
+          docker buildx create --name candidate-evidence --driver docker-container --driver-opt "image=$BUILDKIT_IMAGE" --use
+          docker buildx inspect --bootstrap
+      - name: Build exact Git SHA with native provenance and SBOM
+        id: build
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
+        with:
+          context: https://github.com/ricardoakinaga-dev/rick-intelligence.git#${{ github.sha }}
+          file: infrastructure/docker/${{ matrix.service }}.Dockerfile
+          platforms: linux/amd64
+          push: false
+          outputs: type=oci,dest=candidate-evidence/image.tar,name=ghcr.io/ricardoakinaga-dev/rick-intelligence-${{ matrix.service }},oci-artifact=false
+          provenance: mode=max,version=v0.2,builder-id=https://github.com/ricardoakinaga-dev/rick-intelligence/actions/runs/${{ github.run_id }}
+          sbom: generator=${{ env.SBOM_GENERATOR_IMAGE }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/ricardoakinaga-dev/rick-intelligence
+            org.opencontainers.image.revision=${{ github.sha }}
+          build-args: |
+            PYTHON_IMAGE=${{ env.PYTHON_IMAGE }}
+            NODE_BUILD_IMAGE=${{ env.NODE_IMAGE }}
+            NODE_RUNTIME_IMAGE=${{ env.NODE_IMAGE }}
+            RICK_API_INTERNAL_URL=http://api:8000
+      - name: Scan the exact archive and retain all severity findings
+        run: |
+          docker run --rm --volume "$PWD/candidate-evidence:/evidence" "$TRIVY_IMAGE" image \
+            --input /evidence/image.tar --scanners vuln --list-all-pkgs \
+            --format json --output /evidence/scan.json --exit-code 0
+      - name: Bind OCI blobs, source, native statements and scan to inventory
+        env:
+          BUILT_DIGEST: ${{ steps.build.outputs.digest }}
+        run: python3 infrastructure/vps/candidate_evidence.py inventory
+      - uses: sigstore/cosign-installer@d58896d6a1865668819e1d91763c7751a165e159 # v3.9.2
+        with:
+          cosign-release: v2.5.3
+      - name: Sign construction inventory using workflow OIDC and verify exact identity and SHA
+        run: |
+          cosign sign-blob --yes --bundle candidate-evidence/inventory.sigstore.json candidate-evidence/inventory.json
+          python3 infrastructure/vps/candidate_evidence.py verify-signature
+      - name: Preserve construction evidence and actual failure diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: candidate-build-${{ github.sha }}-${{ matrix.service }}-${{ github.run_attempt }}
+          path: candidate-evidence/
+          if-no-files-found: warn
+          retention-days: 30
+          compression-level: 0
+      - name: Require no vulnerability findings (signature is not release approval)
+        run: python3 infrastructure/vps/candidate_evidence.py require-clean-scan
+
   fast:
     name: FAST / control and static
     runs-on: ubuntu-24.04

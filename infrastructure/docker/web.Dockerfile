@@ -41,6 +41,10 @@ RUN npm ci --omit=dev --ignore-scripts --no-audit --no-fund
 
 FROM ${NODE_RUNTIME_IMAGE} AS runtime
 
+RUN if [ -f /etc/alpine-release ]; then \
+      apk add --no-cache musl=1.2.6-r3 musl-utils=1.2.6-r3 zlib=1.3.2-r1; \
+    fi
+
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
     HOSTNAME=0.0.0.0 \

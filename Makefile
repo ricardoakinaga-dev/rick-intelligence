@@ -213,7 +213,7 @@ ops-static: ops-migration-check
 	bash -n "$(ROOT)/infrastructure/scripts/validate-env.sh"
 	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) -m py_compile "$(ROOT)/infrastructure/scripts/backup-restore-check.py" "$(ROOT)/infrastructure/scripts/backup_restore.py"
 	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) "$(ROOT)/scripts/phase11/check_canonical_ci.py"
-	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) -m pytest -q -p no:cacheprovider "$(ROOT)/scripts/phase11/test_check_canonical_ci.py"
+	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) -m pytest -q -p no:cacheprovider "$(ROOT)/scripts/phase11/test_check_canonical_ci.py" "$(ROOT)/infrastructure/vps/tests/test_candidate_evidence.py"
 
 compose-static:
 	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) "$(ROOT)/scripts/phase11/check_compose.py"
