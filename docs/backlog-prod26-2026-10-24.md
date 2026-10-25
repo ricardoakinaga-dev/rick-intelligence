@@ -176,7 +176,7 @@ Este documento é **especificação**, não ledger de execução. Os 22 contrato
 **Entrega:** upload → fila → lease → indexação → retrieval → delete/reindex; crash boundaries; multi-worker A/B; nenhuma publicação duplicada.
 **Aceite:** E2E com crash/replay; recuperação de lease; ausência de duplicata; estado/attempt/audit consistentes.
 **Evidência:** relatório E2E + matriz de crash + artefatos.
-**Status local (24/10):** `VERIFY` — upload 202, worker `run_once` **succeeded=1**, job `published/SUCCEEDED`, documento `published`, 1 chunk e 1 ponto Qdrant; falha anterior `storage_unavailable` era FK de `created_by` e foi corrigida. Publicação do documento `PASS`; resposta grounded ainda falha na revalidação de publicação (`publication_sources_changed`). Ver [gates locais](<reports/evidence/prd26-2026-10-24/local-runtime-gates.md>).
+**Status local (24/10):** `VERIFY` — upload 202, worker `run_once` **succeeded=1**, job `published/SUCCEEDED`, documento `published`, 1 chunk e 1 ponto Qdrant; falha anterior `storage_unavailable` era FK de `created_by` e foi corrigida. Publicação do documento e resposta grounded com citação `PASS` local; fixture de provider não é modelo real. Ver [gates locais](<reports/evidence/prd26-2026-10-24/local-runtime-gates.md>).
 **Herda:** PROD12-034/037.
 
 #### PRD26-032 — Restore/DR integrado com RPO/RTO

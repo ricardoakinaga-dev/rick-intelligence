@@ -131,9 +131,17 @@ retornou `CITATION_INVALID`, `evidence_count=0`,
 O marcador de citação foi reconhecido; a falha está na revalidação de
 publicação, não no fixture.
 
-**Próximo passo:** comparar `document_checksum`, `title`, `evidence_id` e
-escopo entre `EvidenceDecisionGate.issue` e `validate_publication`; corrigir a
-revalidação antes de testar resposta grounded com citação.
+**Causa raiz e correção:** o OIDC local não tinha `refresh_authorization_context`,
+então o wrapper de revalidação retornava `None` e a publicação era rejeitada.
+A composição local passou a fornecer um revalidador que consulta
+`rick_memberships` no PostgreSQL e devolve permissões/coleções ativas.
+
+**Resultado final do golden path:** `POST /api/v1/chat` **200** com
+`evidence_status=APPROVED_EVIDENCE`, `publication_validation=verified`,
+`decision_action=ANSWER`, `evidence_count=1` e citação real de
+`local-lab-3.md`. O fixture de citação está em
+`scripts/phase11/local_citation_provider.py`; é fixture local, não modelo de
+qualidade.
 
 **Estado:** golden path de **upload → worker → publicação** `PASS` local; resposta
 grounded com citação ainda pendente de fixture compatível.
