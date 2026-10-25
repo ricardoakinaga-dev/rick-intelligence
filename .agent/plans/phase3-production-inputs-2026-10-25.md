@@ -85,3 +85,8 @@ de SLO. Substituição por barreira causal: worker bloqueado, saúde responde an
 da liberação, thread ASGI distinta. 43 testes PASS; mutação inline foi rejeitada.
 Nenhum SLO foi aumentado nem código de produção alterado nessa etapa; nova
 publicação e CI são necessários para o SHA que inclui essa prova.
+
+A segunda inferência equivalente (getter de reset, 104,11 ms) foi exposta no
+quality 5bbe0f6. Correção da família inteira por barreiras causais, conservando
+os deadlines 30/1000 ms, retenção de vaga, não consumo após deadline, quota e
+cancelamento resistente. 43 testes PASS e mutação inline do getter rejeitada.

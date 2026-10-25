@@ -125,3 +125,14 @@ sincronamente na thread ASGI foi rejeitada pelo teste (um FAIL esperado),
 confirmando que a prova causal detecta a regressão. Código de produção, limites
 de admissão/deadline e critérios da quality bar não foram alterados por isso.
 Essa alteração requer novo SHA/CI, sem reclassificar a falha de 4d0db8b.
+
+No [quality 5bbe0f6](https://github.com/ricardoakinaga-dev/rick-intelligence/actions/runs/40214940862),
+CONTRACT detectou a mesma inferência por tempo no getter de reset: 104,11 ms
+vs 100 ms. A família de scheduling foi corrigida de forma conjunta: getter e
+delegação mantidos bloqueados até a prova de saúde; reset expirado retorna 503
+antes da liberação, conserva a vaga e nunca consome; quota e cancelamento
+resistente precisam concluir o chamador enquanto o port continua retido.
+Os deadlines configurados de 30/1000 ms foram preservados. Foram eliminadas
+inferências de progresso baseadas no tempo de admissão do runner, sem afirmar
+um SLO novo. Os 43 testes passaram; execução inline do getter também foi
+rejeitada por mutação isolada. Falhas anteriores continuam arquivadas.

@@ -148,7 +148,7 @@ def test_delegated_identity_lookup_happens_in_admitted_worker(app, providers):
             if name == "validate_token":
                 lookup_threads.append(threading.get_ident())
                 entered.set()
-                assert release.wait(2)
+                assert release.wait(5)
             return getattr(native, name)
     app.state.providers.identity = DelegatedIdentity()
     async def exercise():
@@ -156,12 +156,10 @@ def test_delegated_identity_lookup_happens_in_admitted_worker(app, providers):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             task = asyncio.create_task(client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"}))
             try:
-                until = time.monotonic() + 1
-                while not entered.is_set() and not task.done() and time.monotonic() < until:
-                    await asyncio.sleep(0)
-                assert entered.is_set(), "supported __getattr__ delegation must not be rejected"
-                health = await asyncio.wait_for(client.get("/health/live"), timeout=0.10)
+                assert await asyncio.to_thread(entered.wait, 5), "supported delegation must not be rejected"
+                health = await asyncio.wait_for(client.get("/health/live"), timeout=5)
                 assert health.status_code == 200
+                assert not task.done() and not release.is_set()
             finally:
                 release.set()
                 response = await task
@@ -176,6 +174,7 @@ def test_delegated_identity_lookup_happens_in_admitted_worker(app, providers):
 def test_reset_hot_method_lookup_is_admitted_and_cannot_consume_after_deadline(app, lookup_kind, timeout_ms):
     from dataclasses import replace
     entered = threading.Event()
+    release = threading.Event()
     lookup_threads, lookup_active, consumed = [], [], []
     runner = app.state.identity_offload
     def consume(**kwargs):
@@ -185,7 +184,7 @@ def test_reset_hot_method_lookup_is_admitted_and_cannot_consume_after_deadline(a
         lookup_threads.append(threading.get_ident())
         lookup_active.append(runner._active)
         entered.set()
-        time.sleep(0.12)
+        assert release.wait(5), "hot getter was not released"
         return consume
     class DynamicIdentity:
         def __getattr__(self, name):
@@ -201,22 +200,23 @@ def test_reset_hot_method_lookup_is_admitted_and_cannot_consume_after_deadline(a
     async def exercise():
         loop_thread = threading.get_ident()
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-            started = time.monotonic()
             task = asyncio.create_task(client.post("/api/v1/auth/confirm-password-reset",
                 json={"token":"private-reset-token", "new_password":"new-password"}))
             try:
-                until = time.monotonic() + 1
-                while not entered.is_set() and not task.done() and time.monotonic() < until:
-                    await asyncio.sleep(0)
-                health = await client.get("/health/live")
-                health_elapsed = time.monotonic() - started
-                response = await task
+                assert await asyncio.to_thread(entered.wait, 5)
+                health = await asyncio.wait_for(client.get("/health/live"), timeout=5)
+                assert health.status_code == 200 and not release.is_set()
+                assert lookup_threads and all(thread != loop_thread for thread in lookup_threads)
+                if timeout_ms != 30:
+                    assert not task.done()
+                    release.set()
+                response = await asyncio.wait_for(task, timeout=5)
                 active_after_response = runner._active
             finally:
-                await task
+                release.set()
+                await asyncio.wait_for(task, timeout=5)
                 assert await asyncio.to_thread(runner.shutdown, timeout=2)
             assert entered.is_set()
-            assert health.status_code == 200 and health_elapsed < 0.10
             assert lookup_threads and all(thread != loop_thread for thread in lookup_threads)
             assert lookup_active == [1], "hot method resolution must hold an admission slot"
             if timeout_ms == 30:
@@ -468,13 +468,14 @@ def test_auth_quota_deadline_and_admission_do_not_starve_shared_pool(app, provid
             else:
                 path, payload = "/api/v1/auth/recovery", {"email":"admin@example.com", "tenant_id":"default"}
             tasks = [asyncio.create_task(client.post(path, json=payload)) for _ in range(42)]
-            await asyncio.sleep(0.06)
             health = asyncio.create_task(client.get("/health/live"))
             try:
-                await asyncio.wait([*tasks, health], timeout=0.10)
+                await asyncio.wait([*tasks, health], timeout=5)
                 timely = all(task.done() for task in tasks)
                 independent = health.done()
                 statuses = [task.result().status_code for task in tasks if task.done()]
+                assert not release.is_set()
+                assert independent and health.result().status_code == 200
             finally:
                 release.set()
                 if init_lock is not None:
@@ -503,11 +504,16 @@ def test_async_quota_resistant_cancellation_retains_admission_without_extending_
                 finally:
                     finished.set()
                 return True
-        started = time.monotonic()
+        task = asyncio.create_task(check_rate_limit_async(Limiter(), "scope", limit_per_min=1,
+                                        offload=runner, timeout_seconds=0.03))
+        done, _ = await asyncio.wait({task}, timeout=5)
+        if task not in done:
+            release.set()
+            await asyncio.gather(task, return_exceptions=True)
+            pytest.fail("caller waited for a port that suppressed cancellation")
         with pytest.raises(ApiError):
-            await check_rate_limit_async(Limiter(), "scope", limit_per_min=1,
-                                        offload=runner, timeout_seconds=0.03)
-        assert time.monotonic() - started < 0.15
+            task.result()
+        assert not release.is_set() and not finished.is_set()
         await asyncio.wait_for(cancelled.wait(), timeout=1)
         assert runner.shutdown(timeout=0) is False
         with pytest.raises(ApiError):
