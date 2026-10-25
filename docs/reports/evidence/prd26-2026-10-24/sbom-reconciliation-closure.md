@@ -101,6 +101,10 @@ separação é de estágio, não de critério: o candidate continua
 
 - O pacote de revisão original de `b116f6c` continua histórico e registra a
   falha anterior; ele não foi reescrito nem reassinado.
+- A classificação usa o campo `sourceInfo` do SBOM nativo e o inventário do
+  Trivy; não abre o arquivo referenciado na camada da imagem. A existência e a
+  semântica desse caminho continuam dependendo do gerador nativo e da revisão
+  independente.
 - O predicate assinado de `b116f6c` não contém `sbom_scope`, porque foi gerado
   antes desta correção. É necessário um novo rebuild remoto no SHA que contém
   esta mudança para produzir predicate, inventário e assinaturas com o escopo.
