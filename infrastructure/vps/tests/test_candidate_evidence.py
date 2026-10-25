@@ -63,6 +63,30 @@ def test_native_oci_construction_preserves_real_subject_bytes(tmp_path, layout):
     assert json.loads((tmp_path/'sbom.json').read_text())['predicate']['packages']
 
 
+def test_scanner_layout_selects_only_exact_application_and_rehashes_all_bytes(tmp_path):
+    path, expected = archive(tmp_path)
+    layout = tmp_path/'scan-layout'
+    result = ce.inspect_oci(path, expected, SOURCE, BUILDER, 'api', tmp_path, layout)
+    index = json.loads((layout/'index.json').read_text())
+    assert len(index['manifests']) == 1
+    assert index['manifests'][0]['digest'] == result['application_digest']
+    assert index['manifests'][0]['platform'] == {'os': 'linux', 'architecture': 'amd64'}
+    for p in (layout/'blobs/sha256').iterdir():
+        assert p.name == ce.sha256(p) and p.stat().st_mode & 0o222 == 0
+    config = layout/'blobs/sha256'/result['configuration_digest'].split(':')[1]
+    assert config.exists()
+    with pytest.raises(FileExistsError):
+        ce.inspect_oci(path, expected, SOURCE, BUILDER, 'api', None, layout)
+
+
+def test_wrong_native_source_cannot_export_scanner_layout(tmp_path):
+    path, expected = archive(tmp_path, bad='source')
+    layout = tmp_path/'scan-layout'
+    with pytest.raises(Refusal):
+        ce.inspect_oci(path, expected, SOURCE, BUILDER, 'api', tmp_path, layout)
+    assert not layout.exists()
+
+
 @pytest.mark.parametrize('attack', ['config_revision', 'platform', 'source', 'revision',
     'dockerfile', 'directory', 'builder', 'materials', 'packages', 'name', 'subject_digest', 'attachment', 'empty'])
 def test_reject_rehashed_oci_with_wrong_source_subject_or_missing_native_evidence(tmp_path, attack):
@@ -168,3 +192,34 @@ def test_signature_checks_exact_sha_ref_identity_issuer_and_file_bytes(tmp_path,
         assert argv[argv.index(flag)+1] == value
     assert not any('insecure' in word for word in argv)
     assert kwargs['check'] is True and checked == [True]
+
+
+def test_publication_scanner_uses_admitted_application_without_registry_effects(tmp_path):
+    import publish_candidate as pub
+    from test_safety import construction_review, IMAGE
+    path, expected = archive(tmp_path)
+    pub.oci_evidence(path, expected, image=IMAGE, source=SOURCE, builder=BUILDER,
+        review=construction_review(), writer=lambda name, data: (tmp_path/name).write_bytes(data))
+    inventory = json.loads((tmp_path/'oci-inventory.json').read_text())
+    descriptor = json.loads(pub.scanner_index(inventory))['manifests'][0]
+    assert descriptor['digest'] == inventory['runnable'][0]['digest']
+    assert descriptor['platform'] == {'os': 'linux', 'architecture': 'amd64'}
+    argv = pub.scanner_command(['-v', '/private/inputs:/input:ro', '-v', '/private/outputs:/output:rw'], 'scanner@sha256:'+'d'*64)
+    assert argv[argv.index('--entrypoint')+1] == '/bin/sh'
+    script = argv[argv.index('-c')+1]
+    assert 'mktemp -d' in script and 'tar -xf /input/image.tar' in script
+    assert '/input/scan-index.json' in script and 'trivy "$@" --input "$scan_dir"' in script
+    assert 'image' in argv and 'copy' not in argv and '--severity' not in argv
+
+
+@pytest.mark.parametrize('attack', ['extra', 'missing', 'platform', 'digest'])
+def test_publication_scanner_rejects_ambiguous_or_unbound_application(attack):
+    import publish_candidate as pub
+    digest = 'sha256:'+'d'*64
+    inventory = {'runnable': [{'digest': digest, 'platform': {'os': 'linux', 'architecture': 'amd64'}}],
+        'members': {'blobs/sha256/'+'d'*64: {'type': 'file', 'size': 123}}}
+    if attack == 'extra': inventory['runnable'].append(copy.deepcopy(inventory['runnable'][0]))
+    if attack == 'missing': inventory['members'] = {}
+    if attack == 'platform': inventory['runnable'][0]['platform']['architecture'] = 'arm64'
+    if attack == 'digest': inventory['runnable'][0]['digest'] = '../../outside'
+    with pytest.raises(Refusal): pub.scanner_index(inventory)

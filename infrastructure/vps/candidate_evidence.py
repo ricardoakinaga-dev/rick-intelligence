@@ -12,6 +12,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import tarfile
 from urllib.parse import parse_qs, unquote
@@ -83,7 +84,7 @@ def prepare():
             stream.write(key.upper()+'='+tools[key]+'\n')
 
 
-def inspect_oci(archive, expected, source, builder, service, output):
+def inspect_oci(archive, expected, source, builder, service, output, scan_layout=None):
     """Read without extracting paths; hash blobs before interpreting metadata.
 
     This checks construction identity, not reviewed materials/recipe authority,
@@ -128,7 +129,7 @@ def inspect_oci(archive, expected, source, builder, service, output):
                 if not re.fullmatch('sha256:[0-9a-f]{64}', digest):
                     raise Refusal('OCI descriptor SHA256 required')
                 data = read('blobs/sha256/'+digest.split(':')[1])
-                if len(data) != d.get('size'):
+                if len(data) != d.get('size') or 'sha256:'+hashlib.sha256(data).hexdigest() != digest:
                     raise Refusal('OCI descriptor size mismatch')
                 return parse(data)
 
@@ -182,8 +183,38 @@ def inspect_oci(archive, expected, source, builder, service, output):
                 or not any(m.get('uri') == uri and m.get('digest') == {'sha1': source} for m in p.get('materials', []))):
                 raise Refusal('exact remote Git source, Dockerfile and builder required')
             packages = spdx_packages(statements[SPDX]['predicate'])
-            write(output/'provenance.json', statements[PROVENANCE])
-            write(output/'sbom.json', statements[SPDX])
+            if output is not None:
+                write(output/'provenance.json', statements[PROVENANCE])
+                write(output/'sbom.json', statements[SPDX])
+            if scan_layout is not None:
+                # Trivy 0.74 accepts OCI directories, not OCI tar archives.
+                # Export only the selected, verified application's exact bytes;
+                # never extract archive paths or select an attestation as image.
+                scan_layout.mkdir(mode=0o700)
+                blob_folder = scan_layout/'blobs'/'sha256'
+                blob_folder.mkdir(mode=0o700, parents=True)
+                descriptors = [app, application['config'], *application['layers']]
+                selected = {}
+                for descriptor in descriptors:
+                    digest = descriptor.get('digest', '')
+                    if not re.fullmatch('sha256:[0-9a-f]{64}', digest):
+                        raise Refusal('scan layout SHA256 descriptor required')
+                    name = 'blobs/sha256/'+digest.split(':')[1]
+                    item = members.get(name)
+                    if item is None or not item.isfile() or item.size != descriptor.get('size'):
+                        raise Refusal('scan layout descriptor bytes missing or wrong size')
+                    if name in selected:
+                        continue
+                    selected[name] = descriptor
+                    target = blob_folder/digest.split(':')[1]
+                    with tar.extractfile(item) as src, target.open('xb') as dst:
+                        shutil.copyfileobj(src, dst, 1024*1024)
+                    if 'sha256:'+sha256(target) != digest:
+                        raise Refusal('scan layout copied bytes hash mismatch')
+                    target.chmod(0o400)
+                write(scan_layout/'oci-layout', {'imageLayoutVersion': '1.0.0'})
+                write(scan_layout/'index.json', {'schemaVersion': 2,
+                    'mediaType': 'application/vnd.oci.image.index.v1+json', 'manifests': [app]})
             return {'index_digest': expected, 'application_digest': app['digest'],
                     'configuration_digest': application['config']['digest'], 'sbom_packages': len(packages)}
 
@@ -224,7 +255,7 @@ def inventory():
     if quality['source_sha'] != source:
         raise Refusal('same-SHA construction record required')
     builder = f'https://github.com/{REPO}/actions/runs/'+os.environ['GITHUB_RUN_ID']
-    native = inspect_oci(OUT/'image.tar', os.environ['BUILT_DIGEST'], source, builder, service, OUT)
+    native = inspect_oci(OUT/'image.tar', os.environ['BUILT_DIGEST'], source, builder, service, None)
     report = parse((OUT/'scan.json').read_bytes())
     # Scan status is not inferred from exit-code=0: keep every severity, including UNKNOWN.
     findings = scan_result(report, native['configuration_digest'], service)
@@ -272,10 +303,17 @@ def verify_files():
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('command', choices=['prepare', 'inventory', 'verify-signature', 'verify-files', 'require-clean-scan'])
+    parser.add_argument('command', choices=['prepare', 'inspect', 'inventory', 'verify-signature', 'verify-files', 'require-clean-scan'])
     args = parser.parse_args()
     if args.command == 'prepare':
         prepare()
+    elif args.command == 'inspect':
+        service = os.environ['SERVICE']
+        if service not in SERVICES:
+            raise Refusal('known service required')
+        inspect_oci(OUT/'image.tar', os.environ['BUILT_DIGEST'], os.environ['GITHUB_SHA'],
+            f'https://github.com/{REPO}/actions/runs/'+os.environ['GITHUB_RUN_ID'], service,
+            OUT, Path(os.environ['RUNNER_TEMP'])/'rick-candidate-scan')
     elif args.command == 'inventory':
         inventory()
     elif args.command == 'verify-signature':

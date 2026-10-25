@@ -668,6 +668,39 @@ def scan_coverage(report, inventory, requirements=None):
         raise Refusal('scanner omitted reviewed runtime OS/application coverage')
     return {'os_family':system['Family'],'language_types':sorted(kind for cls,kind in covered if cls == 'lang-pkgs')}
 
+
+def scanner_index(inventory):
+    """Trivy's OCI directory view selects the already admitted application."""
+    runnable = inventory.get('runnable', [])
+    if len(runnable) != 1 or runnable[0].get('platform') != {'os':'linux','architecture':'amd64'}:
+        raise Refusal('sole admitted application required for scanner layout')
+    application = runnable[0]['digest']
+    if not re.fullmatch('sha256:[0-9a-f]{64}', application):
+        raise Refusal('admitted scanner application digest required')
+    member = inventory['members'].get('blobs/sha256/'+application.split(':')[1], {})
+    if member.get('type') != 'file' or not isinstance(member.get('size'), int) or member['size'] <= 0:
+        raise Refusal('admitted scanner manifest bytes required')
+    return (json.dumps({'schemaVersion':2, 'mediaType':'application/vnd.oci.image.index.v1+json',
+        'manifests':[{'mediaType':'application/vnd.oci.image.manifest.v1+json',
+                      'digest':application, 'size':member['size'], 'platform':runnable[0]['platform']}]},
+        sort_keys=True)+'\n').encode()
+
+
+def scanner_command(mounts, scanner):
+    # oci_evidence has already rejected links, traversal, extensions and every
+    # unreferenced member. The archive is an immutable private snapshot. Extract
+    # only inside the scanner container, never onto a writable host mount. The
+    # normalized index is another captured readonly input. No registry effect.
+    script = ('set -eu; scan_dir=$(mktemp -d); '
+              'trap \'rm -rf "$scan_dir"\' EXIT; '
+              'tar -xf /input/image.tar -C "$scan_dir"; '
+              'rm -f "$scan_dir/index.json"; '
+              'cp /input/scan-index.json "$scan_dir/index.json"; '
+              'trivy "$@" --input "$scan_dir"')
+    return ['docker','run','--rm',*mounts,'--entrypoint','/bin/sh',scanner,'-c',script,
+        'rick-oci-scan','image','--cache-dir','/output/trivy-cache','--scanners','vuln',
+        '--list-all-pkgs','--exit-code','0','--format','json','--output','/output/scan.json']
+
 @contextmanager
 def registry_auth():
     with tempfile.TemporaryDirectory(prefix='registry-auth-') as folder:
@@ -763,10 +796,9 @@ def _publish(captured):
     mounts = ['--user',f'{os.geteuid()}:{os.getegid()}',
               '--cap-drop=ALL','--security-opt=no-new-privileges',
               '-v',str(captured.inputs)+':/input:ro','-v',str(captured.outputs)+':/output:rw']
+    captured.write('scan-index.json', scanner_index(inventory))
     scan_identity = captured.prepare_output('scan.json')
-    checked_command(['docker','run','--rm',*mounts,scanner,'image','--input','/input/image.tar',
-        '--cache-dir','/output/trivy-cache','--scanners','vuln','--list-all-pkgs',
-        '--exit-code','0','--format','json','--output','/output/scan.json'])
+    checked_command(scanner_command(mounts, scanner))
     scan = captured.retain_output('scan.json', scan_identity)
     captured.export('scan.json', OUT/'scan.json')
     report = parse(scan.read())

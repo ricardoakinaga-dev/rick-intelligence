@@ -46,3 +46,26 @@ de histórico intacto e nenhuma execução de SQL no no-op.
 As saídas reais, inclusive execuções recusadas, ficam sob
 `.runtime/phase-3/candidate-build-*.log`. Esta narrativa não aceita tarefas nem
 aprova o perfil de produção.
+
+### Primeira execução remota e formato do scanner
+
+da46ac2 / quality 40230862139: os sete gates de código PASS. As três imagens
+foram realmente construídas com OCI/SBOM/proveniência, mas o scan falhou: Trivy
+0.74 suporta Docker tar ou diretório OCI, não tar OCI. Falha preservada. A
+proveniência nativa real da API passou no leitor, com 120 pacotes SPDX.
+
+Adaptação limitada: após validar o OCI, exportar somente os bytes da aplicação
+selecionada para layout temporário readonly, conferindo SHA256/tamanho novamente.
+No publicador existente, corrigir também o mesmo defeito: a captura privada já
+admitida fornece um índice normalizado readonly; extração ocorre somente dentro
+do container do scanner. Manter verificação dos snapshots antes/depois do tool,
+conferência do config digest, cobertura, reconciliação e políticas existentes.
+Nenhuma publicação GHCR foi executada.
+
+Provas locais no OCI remoto da API: os dois adaptadores reais de Trivy PASS,
+config digest idêntico ao OCI e zero achados, usando o DB local já baixado.
+60 regressões focadas PASS; regressão VPS completa corrigida: 764 passed,
+1 skipped, em clone privado com TMPDIR=/tmp. make validate PASS. Novo CI no SHA
+corrigido ainda necessário; não transferir PASS ou identidade do da46 para outro
+SHA. A política de oito gates de publish-images continua intacta e requer revisão
+da separação construção/promoção; artefatos deste novo lane não a ratificam.

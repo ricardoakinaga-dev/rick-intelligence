@@ -38,6 +38,19 @@ cada statement e o source/builder da proveniência. Isso não substitui a revis�
 de materiais, receitas, camadas ou política feita pela admissão de produção.
 Ver [formato nativo do BuildKit](https://docs.docker.com/build/metadata/attestations/attestation-storage/).
 
+Trivy 0.74 lê OCI em diretório. Depois da verificação, a lane copia somente
+manifest, configuração e layers da aplicação escolhida para um layout temporário
+montado readonly no scanner; confere novamente SHA256 e tamanho, sem extrair
+caminhos do tar. O `Metadata.ImageID` do scan precisa coincidir com o digest da
+configuração do OCI original. O arquivo original, com attestations, é conservado.
+Ver o [leitor OCI do Trivy](https://github.com/aquasecurity/trivy/blob/v0.74.0/pkg/fanal/image/oci.go).
+
+O publicador de produção também adapta o OCI para esse formato: usa um índice
+da aplicação já admitida como input privado readonly e extrai o arquivo
+previamente verificado somente dentro do container do scanner. As verificações
+de snapshot, digest da configuração, cobertura, reconciliação de SBOM e políticas
+continuam obrigatórias, antes de qualquer cópia para registry.
+
 Para inspeção, obtenha o SHA/run/attempt reais de Actions e baixe cada artefato
 em um diretório separado. Exemplo a executar na raiz de um checkout confiável
 desse SHA, usando os valores reais:
@@ -84,3 +97,10 @@ ambiente de deployment. A assinatura identifica a execução de CI; não constit
 revisão independente, selo do release packet ou decisão humana. O instalador
 de produção não admite esse schema. A publicação de imagens e promoção
 continuam exigindo suas políticas, autoridade e validações originais.
+
+Limite do caminho atual: `publish-images.yml` ainda exige a matriz PHASE3 entre
+seus oito gates. Como a promoção também consome imagens assinadas, o novo job
+resolve a obtenção de evidências para revisão, mas não autoriza publicação nem
+altera esse contrato. A revisão do fluxo de publicação precisa separar o aceite
+de construção do aceite de promoção, preservando a matriz completa na promoção;
+essa política não é aprovada pelo inventário assinado de CI.

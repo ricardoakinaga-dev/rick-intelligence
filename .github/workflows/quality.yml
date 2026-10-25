@@ -72,10 +72,15 @@ jobs:
             NODE_BUILD_IMAGE=${{ env.NODE_IMAGE }}
             NODE_RUNTIME_IMAGE=${{ env.NODE_IMAGE }}
             RICK_API_INTERNAL_URL=http://api:8000
-      - name: Scan the exact archive and retain all severity findings
+      - name: Verify native OCI and export exact application bytes for scanner
+        env:
+          BUILT_DIGEST: ${{ steps.build.outputs.digest }}
+        run: python3 infrastructure/vps/candidate_evidence.py inspect
+      - name: Scan the exact OCI application and retain all severity findings
         run: |
-          docker run --rm --volume "$PWD/candidate-evidence:/evidence" "$TRIVY_IMAGE" image \
-            --input /evidence/image.tar --scanners vuln --list-all-pkgs \
+          docker run --rm --volume "$PWD/candidate-evidence:/evidence" \
+            --volume "$RUNNER_TEMP/rick-candidate-scan:/scan:ro" "$TRIVY_IMAGE" image \
+            --input /scan --scanners vuln --list-all-pkgs \
             --format json --output /evidence/scan.json --exit-code 0
       - name: Bind OCI blobs, source, native statements and scan to inventory
         env:
