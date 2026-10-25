@@ -26,6 +26,7 @@ for path in reversed(source_paths()):
 from scripts.phase11.local_lab_environment import _inspect
 from scripts.state_of_art.runtime_preflight import canonical_compose_project
 from scripts.phase11 import redis_runtime_gate as gate
+from scripts.phase11.owned_docker_creation import run_creation
 
 LABEL = "rick.phase3.owned-run"
 DOCKER_HOST = "unix:///var/run/docker.sock"
@@ -53,10 +54,14 @@ class TLSLab:
         self.name = "rick-tls-redis-" + self.run_id
         self.created = False
 
-    def command(self, args, timeout=60):
+    def command(self, args, timeout=60, creation=False):
         if args[0] == "docker":
             args = ["docker", "--host", DOCKER_HOST, *args[1:]]
-        result = subprocess.run(args, capture_output=True, timeout=timeout)
+        if creation:
+            result = run_creation(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                  stdin=subprocess.DEVNULL, timeout=timeout)
+        else:
+            result = subprocess.run(args, capture_output=True, timeout=timeout)
         if result.returncode:
             raise RuntimeError("owned_tls_command_failed")
         return result.stdout
@@ -101,7 +106,7 @@ class TLSLab:
             args += ["--mount", f"type=bind,src={path},dst=/tls/{target},readonly"]
         args += ["--entrypoint", "redis-server", self.image, "/tls/redis.conf"]
         self.created = True
-        self.command(args)
+        self.command(args, creation=True)
         checked_container(self.name, self.run_id)
         deadline = time.monotonic() + 20
         while time.monotonic() < deadline:

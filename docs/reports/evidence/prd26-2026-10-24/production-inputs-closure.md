@@ -189,3 +189,22 @@ aprovada nem escondida: a versão/digest do perfil de release precisa de decisã
 e rebuild confiável. O contexto de código da aplicação foi conferido, mas as
 receitas/proveniência e a compatibilidade da toolchain continuam sujeitas a
 revisão independente. Produção permanece **NO-GO**.
+
+## Confirmação terminal antes da reconciliação
+
+O [quality f08f66c](https://github.com/ricardoakinaga-dev/rick-intelligence/actions/runs/40217743712)
+aprovou novamente os sete gates de código; a promoção continuou NO-GO.
+A conferência de recursos encontrou o Redis do ensaio de timeout anterior
+(`3877316eb372455a`) criado depois da verificação inicial de ausência. O evento
+mostrou que registrar a intenção antes do CLI não basta quando o timeout mata
+o cliente e deixa a criação no daemon continuar. O container foi removido após
+conferir o label, com prova em `late-creation-cleanup.json` no diretório do run.
+
+O helper compartilhado de criação agora mantém o CLI até sua resposta terminal
+antes de propagar o timeout original. O deadline de readiness não é aumentado:
+uma operação que excedeu o prazo continua FAIL; a reconciliação ocorre somente
+após a criação estar resolvida. Um daemon sem resposta mantém a operação
+pendente, sem emitir cleanup PASS. Isso se aplica às criações Redis/registry
+do laboratório e não muda deadlines ASGI. Quatro regressões passaram, incluindo
+processo real que grava o efeito após exceder o prazo; o efeito já existe quando
+o timeout chega ao dono, que pode então removê-lo sem criação tardia.

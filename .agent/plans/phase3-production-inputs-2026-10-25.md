@@ -111,3 +111,13 @@ Remoção do instalador incorporada aos dois Dockerfiles; cadeia remota precisa
 de novo SHA e de base/política de construção revisadas. Bases locais em cache
 executam Python3.12.15/Node22.23.2, divergindo do CI3.12.3/22.19.0; não aprovar
 essa diferença pelo builder. Fontes/receitas e resultados anteriores preservados.
+
+### Reconciliação causal da criação
+
+f08f66c aprovou sete gates de código. Conferência física encontrou Redis
+3877316eb372455a criado tardiamente após o cliente ser morto pelo timeout.
+Remoção conferida por label/ausência. Helper comum aguarda resposta terminal
+do CLI antes de propagar o timeout original; não eleva readiness/deadlines nem
+retorna cleanup PASS com criação pendente. Quatro regressões PASS, uma com
+processo real que grava o efeito depois do prazo e antes de retornar ao dono.
+Nova publicação/CI necessários; não reutilizar o f08 como aprovação desse patch.

@@ -23,6 +23,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 from scripts.phase11.frontend_supply_runtime_gate import _free_port, _parse_sbom
+from scripts.phase11.owned_docker_creation import run_creation
 
 
 def digest(path):
@@ -61,11 +62,13 @@ class Supply:
         self.started = False
         self.refs = {}
 
-    def command(self, argv, *, name, timeout=600):
+    def command(self, argv, *, name, timeout=600, creation=False):
         target = self.logs / (name + ".log")
         with target.open("w") as log:
-            result = subprocess.run(argv, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT,
-                stdin=subprocess.DEVNULL, timeout=timeout, check=False)
+            execute = run_creation if creation else subprocess.run
+            options = {} if creation else {"check": False}
+            result = execute(argv, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT,
+                stdin=subprocess.DEVNULL, timeout=timeout, **options)
         if result.returncode:
             raise RuntimeError(name + "_failed")
         return target
@@ -114,7 +117,7 @@ class Supply:
         self.started = True
         self.command(["docker", "run", "-d", "--name", self.registry, "--label", "rick.phase3.owned-run=" + self.run_id,
             "--publish", f"127.0.0.1:{self.port}:5000", "--memory", "256m", "--cpus", "1", "--log-driver", "none",
-            "--mount", f"type=bind,src={store},dst=/var/lib/registry", registry_image], name="registry-start", timeout=30)
+            "--mount", f"type=bind,src={store},dst=/var/lib/registry", registry_image], name="registry-start", timeout=30, creation=True)
         deadline = time.monotonic() + 20
         while time.monotonic() < deadline:
             try:

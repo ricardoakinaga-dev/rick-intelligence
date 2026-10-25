@@ -9,6 +9,23 @@ from scripts.phase11.check_canonical_ci import ROOT, WORKFLOWS, check_canonical_
 from scripts.phase11.check_canonical_ci import EXPECTED_SUITES, WRAPPER
 
 
+def test_creation_deadline_waits_for_terminal_side_effect_before_cleanup(tmp_path):
+    import subprocess
+    import sys
+    from scripts.phase11.owned_docker_creation import run_creation
+
+    marker = tmp_path / 'daemon-side-resource'
+    script = "import pathlib,sys,time; time.sleep(.10); pathlib.Path(sys.argv[1]).write_text('created')"
+    with pytest.raises(subprocess.TimeoutExpired):
+        run_creation([sys.executable, '-c', script, str(marker)], timeout=.001,
+                     stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    # A subprocess.run(timeout=...) would kill the client and return before
+    # this write. An owner may only reconcile after the real operation settles.
+    assert marker.read_text() == 'created'
+    marker.unlink()
+    assert not marker.exists()
+
+
 @pytest.mark.parametrize('resource', ['owned', 'absent', 'foreign'])
 def test_supply_creation_timeout_retains_cleanup_authority(tmp_path, monkeypatch, resource):
     import json
