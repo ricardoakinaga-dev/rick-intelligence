@@ -151,6 +151,7 @@ registrada em [onda local 1](<evidence/prd26-2026-10-24/local-wave-1.md>):
 - **PRD26-003:** drift documental de `production-runtime.md`, `release-readiness.md`, roadmap/plano AUD24 e INDEX corrigido; `make docs-check` 1.192 links, 0 erros.
 - **PRD26-010:** `TMPDIR` curto implementado no Playwright; caminho longo passou 5/5 e a matriz completa de produção passou **363/363** (LCP máx. 916 ms).
 - **PRD26-011:** mypy ampliado de 14 para 19 roots, 0/0; `make typecheck` PASS.
-- **PRD26-030/041:** PostgreSQL, multi-worker 8/8, Redis, S3/Qdrant e provider fixture passaram em laboratório loopback; `make ci` local também passou. Ver [gates locais](<evidence/prd26-2026-10-24/local-runtime-gates.md>). `production_safe=false`; golden path, restore, IdP e provider real continuam pendentes.
+- **PRD26-030/041:** PostgreSQL, multi-worker 8/8, Redis, S3/Qdrant e provider fixture passaram em laboratório loopback; `make ci` local também passou. Ver [gates locais](<evidence/prd26-2026-10-24/local-runtime-gates.md>). `production_safe=false`.
+- **PRD26-031:** golden path local `upload 202 → worker → published → retrieval 1 evidência → POST /api/v1/chat 200 com citação`, `publication_validation=verified`; falta ainda restore/DR, observabilidade e provider real.
 
 Os três contratos estão em `VERIFY`, não `DONE`. A nota 78,0 não foi recalculada e a decisão de produção continua `NO-GO` até os gates externos e o aceite formal.
