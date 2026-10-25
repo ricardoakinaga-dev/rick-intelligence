@@ -93,9 +93,16 @@ responderam `true`.
 **200**, `VETERINARIAN`, tenant `tenant-a`, workspace `workspace-a`, 7 permissões;
 `GET /health/ready` **503** fail-closed (14 checks `true`, 3 `false`).
 
+**Fluxo de chat:** foram semeados tenant `tenant-a`, usuário `user-reader`,
+membership `VETERINARIAN` e coleção `col-a` no PostgreSQL. `POST /api/v1/chat`
+com o token real respondeu **200** com `conversation_id`/`message_id`, histórico
+persistido, `evidence_status=NO_EVIDENCE`, `decision_action=ESCALATE` e resposta
+segura sem citações. O caminho não inventou evidência.
+
 **Limite:** a composição não foi admitida em `environment=production`; o 503
 é o comportamento correto para Redis local sem TLS e embedding fixture. Não é
-prova de readiness de produção.
+prova de readiness de produção. O chat não teve documento indexado; o golden
+path de ingestão continua pendente.
 
 ## 6. Limitações e próximo passo
 
