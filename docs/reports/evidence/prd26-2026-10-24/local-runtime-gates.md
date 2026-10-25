@@ -72,7 +72,26 @@ e o Docker 29 não publica portas de host nessa rede. Para acesso do host foi
 usado um override revisado com `internal: false` (porta 18080); isso habilita
 egress e deve ser tratado como escolha de laboratório, não como padrão.
 
-## 5. Limitações e próximo passo
+## 5. Composição externa local da API
+
+Foi construído `build_external_providers` com clientes reais: PostgreSQL,
+Redis, Qdrant, MinIO, Keycloak/OIDC e o provider fixture. O `create_app`
+canônico foi criado com essa composição e respondeu:
+
+- `GET /api/v1/auth/me` com token real do Keycloak: **200**, `VETERINARIAN`;
+- `GET /health/ready`: **503** fail-closed, com 14 checks `true` e 3 `false`.
+
+Os checks falsos são `redis` e `lease` (capacidade local sem TLS não recebe o
+mark `production_safe`) e `embedding_provider` (health check do fixture local).
+PostgreSQL, Qdrant, queue, identity, chat, auditoria, histórico, job journal,
+object store, retrieval, ingestion, vector store, storage e provider
+responderam `true`.
+
+**Limite:** a composição não foi admitida em `environment=production`; o 503
+é o comportamento correto para Redis local sem TLS. Não é prova de readiness
+de produção.
+
+## 6. Limitações e próximo passo
 
 - Containers e fixture são efêmeros e loopback; não autorizam promoção.
 - O gate de provider usa um servidor OpenAI-compatible local de fixture, não um
@@ -83,7 +102,7 @@ egress e deve ser tratado como escolha de laboratório, não como padrão.
   executar golden path e restore com composição autorizada e vincular os
   resultados ao pacote de release.
 
-## 6. Artefatos locais
+## 7. Artefatos locais
 
 `.runtime/phase-2/postgres-runtime-gate.json`,
 `.runtime/phase-3/multi-worker-runtime-gate.json`,
