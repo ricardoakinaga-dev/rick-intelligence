@@ -32,7 +32,7 @@ def _identity():
             "tenant_id": tenant,
             "workspace_id": claims["workspace_id"],
             "user_id": "user-reader",
-            "role": "VETERINARIAN",
+            "role": "KNOWLEDGE_MANAGER",
             "status": "active",
             "membership_status": "active",
             "authorized_collection_ids": ["col-a"],
@@ -65,6 +65,6 @@ def build(settings):
         rate_limit_namespace=namespace,
         lease=lease,
         worker_temp_root=".runtime/tmp/worker",
-        worker_scope=("tenant-a", "workspace-a", "collection-a"),
+        worker_scope=("tenant-a", "workspace-a", "col-a"),
         worker_health_check_required=False,
     )
