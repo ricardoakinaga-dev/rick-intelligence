@@ -97,6 +97,38 @@ def _wire_points(points):
     ).encode("utf-8")
 
 
+@pytest.mark.parametrize("vector", [[.1, .2], [0., 0.], [3., 4.], [1e30, -1e30]])
+def test_cosine_planner_binds_stable_binary32_storage_representation(vector):
+    import math
+    import struct
+    from rick_retrieval.qdrant import QdrantIndexSchema
+    from rick_ingestion.pipeline import IngestionService
+
+    transport = FakeTransport(lambda *_: _json_response({"result": True}))
+    store = QdrantHttpVectorStore("http://qdrant.test", "documents", transport=transport)
+    store._index_schema = QdrantIndexSchema(2, "Cosine", False)
+    planned = store.plan_upsert_batches([{**_point(), "vector": vector}])[0]
+    assert store.plan_upsert_batches(planned)[0] == planned
+    assert store.upsert_points(planned) == 1
+    wire = json.loads(transport.requests[0][3])["points"][0]["vector"]["dense"]
+    assert wire == planned[0]["vector"]
+    assert all(struct.unpack("!f", struct.pack("!f", value))[0] == value for value in wire)
+    if any(vector):
+        assert abs(math.hypot(*wire) - 1) <= 1e-7
+    observed = [{**planned[0], "vector": [float(format(value, ".8g")) for value in wire]}]
+    assert IngestionService._point_manifest(observed) == IngestionService._point_manifest(planned)
+
+
+def test_cosine_storage_rejects_binary32_overflow_before_io():
+    from rick_retrieval.qdrant import QdrantIndexSchema
+    transport = FakeTransport(lambda *_: pytest.fail("unexpected HTTP"))
+    store = QdrantHttpVectorStore("http://qdrant.test", "documents", transport=transport)
+    store._index_schema = QdrantIndexSchema(2, "Cosine", False)
+    with pytest.raises(QdrantValidationError):
+        store.plan_upsert_batches([{**_point(), "vector": [1e100, 0.]}])
+    assert transport.requests == []
+
+
 @pytest.mark.parametrize("max_points", [256, 7])
 def test_upsert_planner_bounds_realistic_http_batches(max_points):
     import httpx

@@ -40,9 +40,27 @@ EVIDENCE = {
     "chaos": ".runtime/phase-3/chaos-runtime-evidence.json",
     "soak": ".runtime/phase-3/soak-runtime-evidence.json",
 }
+LOCAL_OBSERVATIONS = (
+    ".runtime/phase-3/local-closure/product-probe.json",
+    ".runtime/phase-3/local-closure/frontend-supply.json",
+    ".runtime/phase-3/local-closure/observability.json",
+    ".runtime/phase-3/formal-local/tenant-current.json",
+    ".runtime/phase-3/formal-local/tenant-contention.json",
+    ".runtime/phase-3/formal-local/golden-current.json",
+    ".runtime/phase-3/formal-local/distributed.json",
+    ".runtime/phase-3/formal-local/frontend-supply.json",
+)
+VERIFICATION_ARTIFACTS = tuple(
+    f".runtime/phase-3/formal-local/{name}.log" for name in (
+        "regression-final", "retrieval-preparation-final", "final-boundaries", "lifecycle-final",
+        "validate-final", "compose-final", "typecheck-final", "handoff-final",
+    )
+)
 
 
 def safe_file(root: Path, raw: str) -> Path:
+    if not isinstance(raw, str) or not raw:
+        raise ValueError("unsafe_artifact_path")
     path = Path(raw)
     if not raw or path.is_absolute() or ".." in path.parts:
         raise ValueError("unsafe_artifact_path")
@@ -140,17 +158,36 @@ def prepare(root: Path, *, evidence=None) -> dict:
     digest = hashlib.sha256(json.dumps(sources, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
     rows = {name: inspect_evidence(root, path, checkout) for name, path in (EVIDENCE if evidence is None else evidence).items()}
     local = []
-    for name in ("product-probe", "frontend-supply", "observability"):
-        raw = f".runtime/phase-3/local-closure/{name}.json"
+    for raw in LOCAL_OBSERVATIONS:
         path = safe_file(root, raw)
         if path.is_file():
             try:
                 observation = load_json(path)
                 if not isinstance(observation, dict):
                     raise ValueError("nonobject_observation")
-                local.append({"path": raw, "sha256": sha256(path),
+                record = {"path": raw, "sha256": sha256(path),
                               "observed_status": observation.get("status", "INVALID"),
-                              "release_acceptance": False})
+                              "release_acceptance": False}
+                run_id = observation.get("run_id") or observation.get("runtime_run_id")
+                if isinstance(run_id, str) and run_id.isalnum() and len(run_id) <= 64:
+                    record["run_id"] = run_id
+                    record["raw_observations"] = []
+                    for name in ("tenant-observations", "golden-observations"):
+                        extra = f".runtime/phase-3/formal-local/{run_id}/{name}.json"
+                        source = safe_file(root, extra)
+                        if source.is_file():
+                            record["raw_observations"].append({"path": extra, "sha256": sha256(source)})
+                refs = observation.get("raw_artifacts", [])
+                if isinstance(refs, list):
+                    record["raw_artifacts"] = []
+                    for ref in refs:
+                        if not isinstance(ref, dict):
+                            raise ValueError("invalid_artifact_ref")
+                        source = safe_file(root, ref.get("path", ""))
+                        digest = sha256(source) if source.is_file() else None
+                        record["raw_artifacts"].append({"path": ref["path"], "sha256": digest,
+                            "hash_matches": digest is not None and digest == ref.get("sha256")})
+                local.append(record)
             except (ValueError, OSError):
                 local.append({"path": raw, "observed_status": "INVALID", "release_acceptance": False})
     return {
@@ -160,6 +197,14 @@ def prepare(root: Path, *, evidence=None) -> dict:
         "checkout": {field: checkout.get(field) for field in ("head", "tree", "status", "fingerprint")},
         "source_manifest_sha256": digest, "source_manifest": sources, "evidence": rows,
         "local_observations": local,
+        "verification_artifacts": [{"path": path, "sha256": sha256(safe_file(root, path))}
+            for path in VERIFICATION_ARTIFACTS if safe_file(root, path).is_file()],
+        "remaining_work": [
+            {"id": "tenant-timing", "required": "Resolve or bound timing variance under contention; retain the failed concurrent observation even if an idle run passes."},
+            {"id": "golden-evaluation", "required": "Approved claim-support evaluator/corpus and observed decision/response; the provider fixture cannot approve model quality."},
+            {"id": "observability", "required": "Complete canonical metrics/cardinality/alert/SLO matrix; a connected cross-process trace alone is insufficient."},
+            {"id": "frontend", "required": "Exercise every required product/error state and fix verified zoom/reflow failures; complete image/SBOM evidence."},
+        ],
         "required_inputs": [
             {"id": "production-profile", "owner": "operations/security",
              "required": "Reviewed TLS/auth profile, secret-store references and trusted certificates; rerun every gate."},
@@ -176,6 +221,7 @@ def prepare(root: Path, *, evidence=None) -> dict:
             "Preparation only, not the canonical verifier or a sealed release packet.",
             "Envelope metadata is untrusted; full semantic acceptance belongs to phase3_evidence/release_integrity.",
             "Regenerate after any source/artifact change. Fresh local evidence cannot confer release authority.",
+            "Local runtime observations are diagnostics on the source manifest, not commit-bound production envelopes.",
         ],
     }
 

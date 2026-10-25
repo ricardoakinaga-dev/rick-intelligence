@@ -61,6 +61,37 @@ def test_missing_runtime_authority_is_blocked(tmp_path: Path) -> None:
     assert payload["case_count"] == 0
 
 
+@pytest.mark.parametrize("stage", ["preflight", "case", "cleanup"])
+def test_owned_runtime_is_cleaned_on_failure_and_cleanup_failure_cannot_pass(tmp_path, monkeypatch, stage):
+    calls = []
+
+    class Runtime:
+        authorized = external = True
+        production_safe = False
+
+        async def preflight(self):
+            if stage == "preflight":
+                raise RuntimeError("safe-test-error")
+            return {"status": "ready"}
+
+        async def run_negative_case(self, **kwargs):
+            if stage == "case":
+                raise RuntimeError("safe-test-error")
+            return {"status": "denied", "allowed": False, "metadata_leak_free": True, "timing_leak_free": True}
+
+        async def cleanup(self):
+            calls.append("cleanup")
+            if stage == "cleanup":
+                raise RuntimeError("safe-test-error")
+
+    monkeypatch.setattr(gate, "_load_runtime", lambda *args, **kwargs: Runtime())
+    report = asyncio.run(gate.run_gate("runtime", root=tmp_path, output="gate.json"))
+    assert calls == ["cleanup"]
+    assert report["status"] == gate.FAIL
+    assert report["runtime_claim"] is False
+    assert report["cleanup_status"] == (gate.FAIL if stage == "cleanup" else gate.PASS)
+
+
 def test_external_runtime_must_reject_every_negative_case(tmp_path: Path) -> None:
     module = _runtime_module(tmp_path / "runtime.py")
     output = tmp_path / "tenant.json"

@@ -366,6 +366,8 @@ async def run_gate(
     if not 0.1 <= timeout <= MAX_TIMEOUT_SECONDS:
         raise _InvalidConfiguration()
     raw_path = (runtime_path or os.environ.get("RICK_TENANT_EVIDENCE_RUNTIME_PATH", "")).strip()
+    runtime = None
+    cleanup_status = NOT_RUN
     if not raw_path:
         status = BLOCKED_EXTERNAL
         cases: list[CaseResult] = []
@@ -445,12 +447,36 @@ async def run_gate(
             detail = "tenant/evidence runtime composition violates the gate contract"
             preflight_status = FAIL
             production_safe = False
+        except Exception:
+            status = FAIL
+            cases = []
+            preflight_status = FAIL
+            production_safe = False
+            detail = "tenant/evidence runtime execution failed before case completion"
+        finally:
+            cleanup = _value(runtime, "cleanup") if runtime is not None else None
+            if callable(cleanup):
+                try:
+                    result = cleanup()
+                    if inspect.isawaitable(result):
+                        await asyncio.wait_for(result, timeout=max(30.0, timeout))
+                    cleanup_status = PASS
+                except Exception:
+                    cleanup_status = FAIL
+                    status = FAIL
+                    production_safe = False
+                    detail = "owned runtime cleanup failed; no passing runtime claim"
+    runtime_run_id = _value(runtime, "run_id") if runtime is not None else None
+    if not isinstance(runtime_run_id, str) or not runtime_run_id.isalnum() or len(runtime_run_id) > 64:
+        runtime_run_id = None
     payload = {
         "schema_version": "phase11-tenant-evidence-runtime-gate.v1",
         "status": status,
         "runtime_claim": status == PASS,
         "production_safe": production_safe,
         "preflight_status": preflight_status,
+        "cleanup_status": cleanup_status,
+        "runtime_run_id": runtime_run_id,
         "case_count": len(cases),
         "cases": [case.to_dict() for case in cases],
         "detail": detail,

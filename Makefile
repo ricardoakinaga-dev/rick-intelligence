@@ -17,6 +17,16 @@ WEB_CURRENT_EVIDENCE_DIR ?= $(ROOT)/.runtime/qa/web-e2e
 
 .PHONY: ops-scope-preflight
 .PHONY: phase3-local-product-probe phase3-prepare-production
+.PHONY: phase3-local-tenant-evidence phase3-local-golden phase3-local-distributed
+
+phase3-local-tenant-evidence:
+	RICK_FORMAL_LAB_AUTHORIZED=1 PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)" $(PYTEST) "$(ROOT)/scripts/phase11/tenant_evidence_runtime_gate.py" --runtime-path scripts/phase11/local_tenant_evidence_runtime.py --timeout-seconds 60 --output .runtime/phase-3/formal-local/tenant-current.json
+
+phase3-local-golden:
+	RICK_FORMAL_LAB_AUTHORIZED=1 PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)" $(PYTEST) "$(ROOT)/scripts/phase11/golden_runtime_gate.py" --runtime-path scripts/phase11/local_golden_runtime.py --timeout-seconds 300 --output .runtime/phase-3/formal-local/golden-current.json
+
+phase3-local-distributed:
+	RICK_FORMAL_LAB_AUTHORIZED=1 PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)" $(PYTEST) "$(ROOT)/scripts/phase11/local_distributed_probe.py"
 
 phase3-local-product-probe:
 	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)" $(PYTEST) "$(ROOT)/scripts/phase11/local_product_probe.py" --from-dev-compose --provider-container "$${RICK_LOCAL_PROVIDER_CONTAINER:?set the disposable provider fixture container}" --managed-provider-fixture --allow-private-containers
@@ -32,6 +42,8 @@ help:
 	@printf '%s\n' 'RICK Intelligence root commands:'
 	@printf '%s\n' '  make bootstrap        prepare preserved runtimes and lockfile installs'
 	@printf '%s\n' '  make validate         verify skeleton, contracts, boundaries, and history'
+	@printf '%s\n' '  make phase3-local-tenant-evidence|golden|distributed run explicit local diagnostic compositions'
+	@printf '%s\n' '  make phase3-prepare-production index current evidence; emits PREPARED_NO_GO only'
 	@printf '%s\n' '  make dev              guarded canonical development compose lifecycle'
 	@printf '%s\n' '  make test-fast        focused preserved-component regression checks'
 	@printf '%s\n' '  make test             all available component tests and frontend smoke'

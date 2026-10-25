@@ -9,6 +9,32 @@ delimita o trabalho solicitado sem aceitar itens daquele backlog.
 
 ## Progress
 
+### Continuação após `5d66225`
+
+O novo pedido autoriza implementar os bloqueios técnicos restantes no lab,
+preservando produção/GO/revisão independente. Baseline confirmada limpa em
+`5d66225`. Próxima unidade: composição formal de tenant/evidence sobre HTTP,
+PostgreSQL, Qdrant/S3/Redis reais e sessões persistidas. Aceite: controle positivo
+de tenant A e B antes dos negativos; cada um dos 16 casos executa uma fronteira
+real e conserva medição; timing tem amostra/limite explícitos apenas para o lab;
+cleanup encerra somente processos próprios mesmo em erro. O gate inteiro deve
+falhar ao aceitar/levar dados indevidos, perder um caso ou não limpar recursos.
+Implementação e revisão própria não concedem `production_safe`.
+
+- [x] Composição formal tenant/evidence implementada: 16/16 PASS em execuções
+  anteriores; 15/16 sob contenção concorrente, com FAIL de timing preservado.
+  Sessões persistidas e cleanup também nos caminhos de erro.
+- [ ] Estabilidade/medição de timing sob carga; não há aprovação robusta.
+- [x] Composição golden e execução das 11 falhas em escopos independentes:
+  45/47 checks PASS; professor BLOCKED_EXTERNAL e stage trace incompleto.
+- [x] Trace real entre API/worker em processos separados: 49 spans, nove
+  categorias e vínculo causal obrigatório de enqueue para worker.
+- [x] Regressão principal: 478 testes PASS; pacote passa a indexar observações
+  formais e raw artifacts por hash, mantendo PREPARED_NO_GO.
+- [ ] Avaliador/corpus aprovado e observação completa de professor/decisão/response.
+- [ ] Métricas/alertas/cardinalidade/SLO; matrizes operacionais completas.
+- [ ] Dez estados restantes do frontend, zoom/reflow e supply chain completo.
+
 - [x] Checkout inicial limpo em `1641a28`; Compose dev saudável.
 - [x] Identificados envelopes locais e a rejeição correta da promoção.
 - [x] Humano selecionou concluir primeiro o laboratório e preparar o pacote.
@@ -55,8 +81,9 @@ Não substituir esses serviços por implementações em memória para alegar run
 
 ## Plan of Work
 
-Implementar somente composição/harness e preparação. Manter o gate formal
-intacto. Evidência inclui resultado por asserção e limitações; nenhuma operação
+Implementar composição/harness e preparação, corrigindo defeitos reproduzidos
+no produto e na invocação/cleanup dos gates. Preservar a quality bar congelada.
+Evidência inclui resultado por asserção e limitações; nenhuma operação
 não observada recebe PASS. Isolar tenants por run e fechar os recursos abertos.
 
 ## Concrete Steps
@@ -107,11 +134,24 @@ preservados bytes/hash da execução, restaurado input autêntico e implementado
 - 25/10: humano escolheu laboratório primeiro e preparação do pacote.
 - Reutilizar o grafo real é menor e mais fiel que criar outro pipeline.
 - Preservar inputs canônicos e registrar novos artefatos em diretório distinto.
+- Continuação: o caso de falha após commit exige recibo committed e um único
+  sucesso/replay, não rollback de publicação já confirmada. Before-publish
+  recuperado exige ainda preservação da baseline durante pending. Testes
+  negativos conservam a rejeição de evidência incompleta. A correção do gate
+  precisa de revisão independente; não altera a barra congelada nem concede GO.
+- Corrigido vetor Cosine enviado ao Qdrant para representação unitária binary32
+  estável, permitindo recuperação por manifesto exato sem tolerância arbitrária.
+- Restringir eventos globais de telemetria pela permissão tenants.read; métricas
+  agregadas continuam disponíveis a observability.read.
 
 ## Outcomes & Retrospective
 
 Preparação e probe local entregues; fechamento global permanece PARTIAL.
 Produção permanece NO-GO até evidência atual de todos os gates, revisão
-independente, perfil seguro e decisão humana. As composições formais golden/
-tenant, trace entre processos, matrizes operacionais e frontend completo ainda
-exigem implementação/evidência; não são declarados fechados por este plano.
+independente, perfil seguro e decisão humana. Tenant formal tem execuções PASS e FAIL de timing sob contenção preservado;
+trace entre processos tem observação local PASS. Golden tem 11/11 falhas PASS e depende do
+avaliador aprovado para fechar o restante; as matrizes operacionais e o frontend
+completo seguem abertos. A projeção do timestamp publicado no Qdrant tem uma
+reconciliação explícita no harness, que não demonstra cobertura automática em
+produção. O novo relatório é
+`docs/reports/evidence/prd26-2026-10-24/formal-runtime-closure.md`.

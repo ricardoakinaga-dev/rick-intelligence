@@ -81,6 +81,22 @@ def test_admin_metrics_are_bounded_and_redacted(client):
     assert "authorization" not in response.text.lower()
 
 
+def test_tenant_observability_permission_does_not_expose_global_request_events(client, app):
+    marker = "foreign-tenant-request-private"
+    app.state.telemetry.record_request(method="GET", path="/api/v1/documents/foreign-doc",
+        status=200, duration_ms=1, request_id=marker, correlation_id="foreign-correlation")
+    login_as(client, "km@example.com")
+    observed = client.get("/api/v1/admin/metrics")
+    assert observed.status_code == 200
+    assert observed.json()["events"] == []
+    assert observed.json()["counters"]
+    assert marker not in observed.text
+    # Read projection must not mutate the diagnostic buffer owned by operators.
+    assert marker in str(app.state.telemetry.snapshot())
+    login_as(client, "admin@example.com")
+    assert marker in client.get("/api/v1/admin/metrics").text
+
+
 def test_prometheus_metrics_are_protected_and_finite(client):
     assert client.get("/api/v1/admin/metrics/prometheus").status_code == 401
     login_as(client, "admin@example.com")

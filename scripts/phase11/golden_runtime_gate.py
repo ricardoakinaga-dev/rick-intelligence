@@ -46,6 +46,11 @@ import time
 import uuid
 from typing import Any
 
+# Explicit composition modules must share this gate's typed exceptions even
+# when the executable is launched by filename rather than imported as a module.
+if __name__ == "__main__":
+    sys.modules.setdefault("scripts.phase11.golden_runtime_gate", sys.modules[__name__])
+
 
 ROOT = Path(__file__).resolve().parents[2]
 GATE_ID = "RICK_GOLDEN_RUNTIME_PATH"
@@ -429,7 +434,14 @@ async def _invoke(
         if remaining <= 0:
             raise TimeoutError("bounded runtime deadline exceeded")
         effective_timeout = remaining if effective_timeout is None else min(effective_timeout, remaining)
-    result = target(*args, **_accepted_kwargs(target, kwargs))
+    selected_kwargs = _accepted_kwargs(target, kwargs)
+    try:
+        signature = inspect.signature(target)
+        positional = signature.bind_partial(*args).arguments
+    except (TypeError, ValueError):
+        positional = {}
+    selected_kwargs = {name: value for name, value in selected_kwargs.items() if name not in positional}
+    result = target(*args, **selected_kwargs)
     if not inspect.isawaitable(result):
         return result
     if effective_timeout is None:
@@ -1077,7 +1089,31 @@ def evaluate_failure_matrix(
             rows[point] = GateResult(f"failure_matrix.{point}", result if result in {FAIL, BLOCKED_EXTERNAL, NOT_RUN} else FAIL, "fault_case_not_passed")
             all_pass = False
             continue
-        invariant = check_failed_version_invariant(raw, baseline)
+        if point in {"before_publish", "after_publish"} and _read(raw, "publication_outcome", None) == "committed":
+            # A failure after the durable commit is a successful publication
+            # with a disrupted acknowledgement. Rolling it back would violate
+            # the product's established publication-receipt authority. Require
+            # stronger positive commit/replay evidence for this distinct case.
+            counts_match = (type(_read(raw, "point_count")) is int
+                and type(_read(raw, "chunk_count")) is int
+                and _read(raw, "point_count") > 0
+                and _read(raw, "point_count") == _read(raw, "chunk_count"))
+            committed = all(_read(raw, field) is True for field in (
+                "injected", "replay_verified", "receipt_bound_to_job", "projection_consistent", "previous_version_retired"))
+            committed = (committed and _read(raw, "failed") is False
+                and _read(raw, "new_version_published") is True
+                and type(_read(raw, "succeeded_attempts")) is int and _read(raw, "succeeded_attempts") == 1
+                and all(_nonempty(_read(raw, field)) for field in (
+                    "committed_document_id", "committed_version", "committed_checksum")) and counts_match)
+            if point == "before_publish":
+                committed = (committed and _read(raw, "recovered_from_pending") is True
+                    and _read(raw, "baseline_preserved_while_pending") is True
+                    and _read(raw, "published_version") == baseline.get("document_version")
+                    and _read(raw, "published_checksum") == baseline.get("checksum"))
+            invariant = GateResult("invariant.committed_publication_replay", PASS if committed else FAIL,
+                                   "committed_publication_replay_verified" if committed else "committed_publication_replay_unproven")
+        else:
+            invariant = check_failed_version_invariant(raw, baseline)
         if invariant.result != PASS:
             rows[point] = GateResult(f"failure_matrix.{point}", FAIL, invariant.detail)
             all_pass = False
@@ -1312,7 +1348,7 @@ async def _retrieve_evidence(
             expected_scope=dict(scope),
             timeout=timeout,
         )
-        if _operation_name(runtime.evidence, ("validate_bundle",)) == "validate_bundle":
+        if _operation_name(runtime.evidence, ("build_bundle", "issue", "validate", "validate_bundle")) == "validate_bundle":
             # A validator-only adapter returns a report, not a bundle.  It is
             # not enough to claim the evidence stage; the composition must
             # expose an issuing build operation.
@@ -1596,7 +1632,7 @@ async def _run_downstream(
             raise GateContractError("professor_response_empty")
         results.append(GateResult("professor", PASS, "professor_received_grounded_evidence"))
     except Exception as exc:
-        return [GateResult("professor", FAIL, _safe_error(exc))]
+        return [GateResult("professor", BLOCKED_EXTERNAL if isinstance(exc, GateBlocked) else FAIL, _safe_error(exc))]
 
     citation_support_metrics, citation_metrics_error = _citation_support_observation(professor_output)
     if citation_metrics_error is not None or citation_support_metrics is None:
@@ -1955,14 +1991,27 @@ async def _execute_runtime(
 
     token = _ACTIVE_DEADLINE.set(time.monotonic() + timeout_seconds)
     try:
-        return await _execute_runtime_inner(
-            runtime,
-            fixture,
-            run_id=run_id,
-            timeout_seconds=timeout_seconds,
-        )
+        try:
+            execution_results, details, lineage = await _execute_runtime_inner(
+                runtime, fixture, run_id=run_id, timeout_seconds=timeout_seconds)
+        except Exception as exc:
+            execution_results = [GateResult("gate_execution", FAIL, _safe_error(exc))]
+            details, lineage = {}, {}
     finally:
         _ACTIVE_DEADLINE.reset(token)
+        # Async clients must be closed on the loop that performed their I/O,
+        # before asyncio.run disposes it. Cleanup is still attempted on a
+        # preflight failure or cancellation, with an independent bounded budget.
+        cleanup_result = None
+        if callable(runtime.cleanup):
+            try:
+                await _invoke(runtime.cleanup, timeout=max(30.0, timeout_seconds))
+                cleanup_result = GateResult("runtime_cleanup", PASS, "owned_resources_closed")
+            except Exception as exc:
+                cleanup_result = GateResult("runtime_cleanup", FAIL, _safe_error(exc))
+    if cleanup_result is not None:
+        execution_results.append(cleanup_result)
+    return execution_results, details, lineage
 
 
 def _final_status(results: Sequence[GateResult], *, runtime: GoldenRuntime | None) -> str:

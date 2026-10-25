@@ -1646,6 +1646,7 @@ class IngestionService:
                     checksum=plan.checksum, parser_version=PARSER_VERSION,
                     chunker_version=CHUNKER_VERSION,
                     embedding_version=self.embedding_version,
+                    index_version=getattr(prepared_schema, "index_version", ""),
                 )
                 for plan in plans
             ]

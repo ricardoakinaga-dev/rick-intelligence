@@ -365,6 +365,21 @@ class PostgresIngestionApplicationService:
             if existing is None:
                 with stage_span("queue.enqueue", attributes={"queue.operation": "enqueue"}) as span:
                     try:
+                        # Persist the producer span, when it belongs to the
+                        # same request trace. A worker is causally downstream
+                        # of enqueue, not an unrelated sibling HTTP operation.
+                        producer = current_trace_context()
+                        supplied_parent = trace_carrier.get("traceparent", "")
+                        producer_parent = producer.get("traceparent", "")
+                        if producer_parent and (not supplied_parent or (
+                            len(producer_parent.split("-")) == 4
+                            and len(supplied_parent.split("-")) == 4
+                            and producer_parent.split("-")[1] == supplied_parent.split("-")[1]
+                        )):
+                            for carrier_key in ("traceparent", "tracestate"):
+                                value = producer.get(carrier_key)
+                                if isinstance(value, str) and 0 < len(value) <= 512:
+                                    payload[carrier_key] = value
                         record = self.queue.enqueue(
                             job_id=job_id,
                             idempotency_key=key,

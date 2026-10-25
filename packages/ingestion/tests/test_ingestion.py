@@ -51,6 +51,24 @@ def test_idempotent_reingest_no_drift(tmp_path):
     assert service.vectors.count_for_document(doc_id, "rag_phase0") == n_points
 
 
+@pytest.mark.parametrize("sparse", [False, True])
+def test_prepared_index_version_is_persisted_in_chunks_and_projection(tmp_path, sparse):
+    from rick_retrieval.qdrant import QdrantIndexSchema, HTTP_HYBRID_INDEX_VERSION
+
+    class PreparedVectors(InMemoryVectorStore):
+        def prepare_index(self, *, vector_dimensions):
+            return QdrantIndexSchema(vector_dimensions, "Cosine", sparse)
+
+    knowledge, vectors = InMemoryKnowledgeStore(), PreparedVectors()
+    service = IngestionService(knowledge=knowledge, vectors=vectors, embeddings=DeterministicHashEmbedding())
+    result = service.ingest(_doc(tmp_path / "lineage.txt", "Persist the prepared representation in canonical lineage."),
+                            workspace_id="w", collection_id="rag_phase0", tenant_id="default")
+    assert result.status == "published"
+    expected = HTTP_HYBRID_INDEX_VERSION if sparse else "dense-v1"
+    assert all(chunk.index_version == expected for chunk in knowledge.get_chunks(result.document_id))
+    assert all(point["payload"]["index_version"] == expected for point in vectors.all_points())
+
+
 def test_deduplicated_publication_uses_the_application_gate(tmp_path):
     service = _service()
     target = _doc(tmp_path / "guarded.txt", "Publication guard. " * 40)

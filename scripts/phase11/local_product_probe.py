@@ -75,10 +75,8 @@ def check_authority(settings) -> None:
         raise ProbeBlocked("explicit_local_service_targets_required")
 
 
-def create_graph(run_id: str):
+def create_graph(run_id: str, *, scope: dict | None = None):
     from core.config import ApiSettings
-    from scripts.phase11.local_lab_composition import build
-    from services.external_composition import build_external_providers
     import psycopg
     from psycopg.types.json import Jsonb
 
@@ -90,8 +88,8 @@ def create_graph(run_id: str):
                            embedding_api_key="", embedding_provider_kind="",
                            provider_embedding_dimensions=2)
     check_authority(settings)
-    scope = {"tenant_id": f"ph3-{run_id}", "workspace_id": f"ws-{run_id}",
-             "collection_id": f"col-{run_id}"}
+    scope = scope or {"tenant_id": f"ph3-{run_id}", "workspace_id": f"ws-{run_id}",
+                      "collection_id": f"col-{run_id}"}
     user_id = f"probe-{run_id}"
     # Values are parameters, never interpolated SQL. These are disposable
     # product rows, not a shadow probe schema or an installed migration.
@@ -107,11 +105,23 @@ def create_graph(run_id: str):
             "INSERT INTO rick_collections(tenant_id,workspace_id,collection_id,title,created_by) "
             "VALUES (%s,%s,%s,%s,%s)",
             (*scope.values(), "Synthetic runtime fixture", user_id))
-    inputs = replace(build(settings), created_by=user_id,
-                     worker_scope=tuple(scope.values()), worker_id=f"probe-{run_id}",
-                     worker_temp_root=str(ROOT / ".runtime/tmp" / f"probe-{run_id}"))
-    graph = build_external_providers(settings, inputs)
+    graph = build_graph(settings, scope, user_id)
     return graph, scope, user_id
+
+
+def build_graph(settings, scope: dict, user_id: str, *, identity=None):
+    """Reopen an already seeded disposable scope in another owned process."""
+    from scripts.phase11.local_lab_composition import build
+    from services.external_composition import build_external_providers
+
+    check_authority(settings)
+    inputs = replace(build(settings), created_by=user_id,
+                     worker_scope=tuple(scope.values()), worker_id=user_id,
+                     worker_temp_root=str(ROOT / ".runtime/tmp" / user_id))
+    if identity is not None:
+        inputs = replace(inputs, identity=identity,
+                         authorization_revalidator=identity.refresh_authorization_context)
+    return build_external_providers(settings, inputs)
 
 
 async def close_graph(graph) -> None:
@@ -119,7 +129,10 @@ async def close_graph(graph) -> None:
     errors = []
     seen = set()
     for resource in (graph.worker, graph._embedding_adapter, graph.ingestion,
+                     getattr(graph, "object_store", None), getattr(graph, "vector_store", None),
                      graph.provider, graph.rate_limiter.redis_client):
+        if resource is None:
+            continue
         if id(resource) in seen:
             continue
         seen.add(id(resource))

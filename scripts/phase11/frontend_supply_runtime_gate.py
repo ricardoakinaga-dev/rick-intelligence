@@ -712,17 +712,22 @@ async function axeAudit(page) {
 }
 
 async function screenReaderAudit(page) {
-  return page.evaluate(() => {
-    const controls = Array.from(document.querySelectorAll("button, a[href], input, textarea, select, [role='button']"));
-    const unlabeled = controls.filter((element) => {
-      const labelledBy = element.getAttribute("aria-labelledby");
-      const labelled = element.getAttribute("aria-label") || (labelledBy && document.getElementById(labelledBy)?.textContent) || (element.closest("label")?.textContent);
-      return !labelled || !labelled.trim();
-    });
-    const landmarks = Array.from(document.querySelectorAll("main, nav, header, footer, [role='main'], [role='navigation']"));
-    const headings = Array.from(document.querySelectorAll("h1, h2, h3, h4, h5, h6"));
-    return { controls: controls.length, unlabeled: unlabeled.length, landmarks: landmarks.length, headings: headings.length, passed: unlabeled.length === 0 && landmarks.length > 0 && headings.length > 0 };
-  });
+  const controls = page.locator("button, a[href], input:not([type='hidden']), textarea, select, [role='button']");
+  let visible = 0;
+  let unlabeled = 0;
+  for (let index = 0; index < await controls.count(); index += 1) {
+    const control = controls.nth(index);
+    if (!await control.isVisible()) continue;
+    visible += 1;
+    // Browser accessibility semantics include native text, associated labels,
+    // aria-labelledby lists and image alternatives. Reimplementing only
+    // aria-label incorrectly rejected named native buttons and links.
+    const firstLine = (await control.ariaSnapshot()).split("\n")[0];
+    if (!/^- [a-z]+ "[^\n]+"/.test(firstLine)) unlabeled += 1;
+  }
+  const landmarks = await page.locator("main, nav, header, footer, [role='main'], [role='navigation']").count();
+  const headings = await page.locator("h1, h2, h3, h4, h5, h6").count();
+  return { controls: visible, unlabeled, landmarks, headings, passed: unlabeled === 0 && landmarks > 0 && headings > 0 };
 }
 
 async function zoomAudit(page) {

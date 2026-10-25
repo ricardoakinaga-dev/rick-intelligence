@@ -119,7 +119,7 @@ def test_raw_and_preflight_tampering_are_visible(envelope):
     assert "preflight_hash_mismatch" in issues
 
 
-@pytest.mark.parametrize("raw", ["../outside", "/tmp/outside"])
+@pytest.mark.parametrize("raw", ["../outside", "/tmp/outside", None, True, []])
 def test_handoff_refuses_outside_paths(tmp_path, raw):
     with pytest.raises(ValueError):
         handoff.safe_file(tmp_path, raw)
@@ -150,6 +150,45 @@ def test_preparation_cannot_create_release_approval(tmp_path):
     assert payload["signed"] is False
     assert payload["human_decision"] == "PENDING"
     assert payload["independent_review"] == "PENDING"
+
+
+def test_handoff_binds_formal_runtime_and_raw_observations_without_promotion(tmp_path):
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    base = tmp_path / ".runtime/phase-3/formal-local"
+    base.mkdir(parents=True)
+    report = base / "tenant-current.json"
+    report.write_text(json.dumps({"status": "PASS", "run_id": "abc123"}))
+    raw = base / "abc123/tenant-observations.json"
+    raw.parent.mkdir()
+    raw.write_text('{"closed":true}')
+    payload = handoff.prepare(tmp_path, evidence={})
+    observation, = payload["local_observations"]
+    assert observation["observed_status"] == "PASS"
+    assert observation["sha256"] == handoff.sha256(report)
+    assert observation["raw_observations"] == [{"path": str(raw.relative_to(tmp_path)), "sha256": handoff.sha256(raw)}]
+    assert observation["release_acceptance"] is False
+    assert payload["promotable"] is False
+    assert {row["id"] for row in payload["remaining_work"]} == {"tenant-timing", "golden-evaluation", "observability", "frontend"}
+
+
+def test_handoff_exposes_tampered_trace_and_binds_verification_log(tmp_path):
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    base = tmp_path / ".runtime/phase-3/formal-local"
+    base.mkdir(parents=True)
+    trace = base / "trace.json"
+    trace.write_text('{"spans":[]}')
+    ref = {"path": str(trace.relative_to(tmp_path)), "sha256": handoff.sha256(trace)}
+    (base / "distributed.json").write_text(json.dumps({"status": "PASS", "raw_artifacts": [ref]}))
+    log = base / "validate-final.log"
+    log.write_text("PASS\n")
+    trace.write_text('{"tampered":true}')
+    payload = handoff.prepare(tmp_path, evidence={})
+    row, = payload["local_observations"]
+    assert row["raw_artifacts"][0]["hash_matches"] is False
+    assert payload["verification_artifacts"] == [{"path": str(log.relative_to(tmp_path)), "sha256": handoff.sha256(log)}]
+    (base / "distributed.json").write_text(json.dumps({"raw_artifacts": [{"path": None}]}))
+    invalid, = handoff.prepare(tmp_path, evidence={})["local_observations"]
+    assert invalid["observed_status"] == "INVALID"
 
 
 def test_embedding_dimensions_must_match_across_all_four_containers():

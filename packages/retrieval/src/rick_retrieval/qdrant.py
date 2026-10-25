@@ -338,6 +338,11 @@ class QdrantIndexSchema:
     distance: str
     sparse_enabled: bool
 
+    @property
+    def index_version(self) -> str:
+        """The prepared representation persisted in canonical chunk lineage."""
+        return HTTP_HYBRID_INDEX_VERSION if self.sparse_enabled else "dense-v1"
+
 
 @dataclass(frozen=True, slots=True)
 class QdrantHybridResult:
@@ -1467,6 +1472,12 @@ class QdrantHttpVectorStore:
         vector = _validate_vector(point.get("vector"), operation, self.limits.max_vector_dimensions)
         if self._index_schema is not None and len(vector) != self._index_schema.dense_dimensions:
             raise QdrantSchemaMismatchError(operation)
+        if self._index_schema is not None and self._index_schema.distance == "Cosine":
+            # Bind checkpoints to the stored representation. Qdrant normalizes
+            # Cosine vectors on upload; hashing an unnormalized request makes a
+            # valid pending publication permanently unrecoverable. Send stable
+            # unit binary32 values so the server does not transform them again.
+            vector = _cosine_storage_vector(vector, operation)
         payload_obj = point.get("payload")
         payload = _validate_json_mapping(payload_obj, operation)
         for field_name in ("tenant_id", "workspace_id", "collection_id"):
@@ -1812,6 +1823,25 @@ def _validate_id(value: object, operation: str) -> str:
 
 def _validate_field_name(value: object, operation: str) -> str:
     return _validate_id(value, operation)
+
+
+def _cosine_storage_vector(vector: list[float], operation: str) -> list[float]:
+    def binary32(value: float) -> float:
+        try:
+            rounded = struct.unpack("!f", struct.pack("!f", value))[0]
+        except (OverflowError, struct.error):
+            raise QdrantValidationError(operation) from None
+        if not math.isfinite(rounded):
+            raise QdrantValidationError(operation)
+        return rounded
+
+    values = [binary32(value) for value in vector]
+    length = math.hypot(*values)
+    # Qdrant preserves zero and already normalized vectors. This tighter band
+    # also keeps a second planner/upsert pass bit-identical to the first.
+    if length == 0 or abs(length - 1) <= 1e-7:
+        return values
+    return [binary32(value / length) for value in values]
 
 
 def _validate_vector(value: object, operation: str, max_dimensions: int) -> list[float]:

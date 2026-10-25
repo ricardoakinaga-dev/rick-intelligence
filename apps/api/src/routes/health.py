@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse, PlainTextResponse
 from core.lifecycle import collect_readiness_states, evaluate_readiness, safe_dependency_state
 from dependencies.identity import require_permission
 from dependencies.services import get_providers
+from services.authorization_service import has_permission
 
 router = APIRouter(tags=["System"])
 
@@ -100,7 +101,13 @@ async def admin_metrics(request: Request, session=Depends(require_permission("ob
     telemetry = getattr(request.app.state, "telemetry", None)
     if telemetry is None or not callable(getattr(telemetry, "snapshot", None)):
         return {"implementation": "unavailable", "export": {"status": "NOT_CONFIGURED", "destination": None}}
-    return telemetry.snapshot()
+    snapshot = telemetry.snapshot()
+    if not has_permission(session, "tenants.read"):
+        # The process event buffer spans all tenants. Observability permission
+        # alone grants aggregate service metrics, not another tenant's request
+        # or correlation identifiers. The internal snapshot remains intact.
+        snapshot = {**snapshot, "events": []}
+    return snapshot
 
 
 @router.get("/api/v1/admin/metrics/prometheus", response_class=PlainTextResponse)
