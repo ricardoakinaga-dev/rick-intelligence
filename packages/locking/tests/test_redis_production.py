@@ -135,6 +135,20 @@ def test_settings_from_env_is_explicit_and_redacts_credentials() -> None:
         RedisSettings.from_env({"RICK_ENV": "production", "RICK_REDIS_URL": "redis://localhost"})
 
 
+def test_native_async_vendor_context_requires_certificate_and_hostname() -> None:
+    """Exercise the pinned vendor TLS context without a socket or fake pool."""
+    import ssl
+    from redis.asyncio.connection import SSLConnection
+
+    options = _production_settings()._connection_options()
+    options.pop("max_connections")
+    options.pop("timeout")
+    connection = SSLConnection(**options)
+    context = connection.ssl_context.get()
+    assert context.verify_mode == ssl.CERT_REQUIRED
+    assert context.check_hostname is True
+
+
 def test_factory_uses_real_client_shape_with_bounded_tls_pool(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

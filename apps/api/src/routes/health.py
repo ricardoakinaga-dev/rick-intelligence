@@ -96,18 +96,22 @@ async def admin_health(request: Request, session=Depends(require_permission("obs
     }
 
 
-@router.get("/api/v1/admin/metrics")
-async def admin_metrics(request: Request, session=Depends(require_permission("observability.read"))):
-    telemetry = getattr(request.app.state, "telemetry", None)
-    if telemetry is None or not callable(getattr(telemetry, "snapshot", None)):
-        return {"implementation": "unavailable", "export": {"status": "NOT_CONFIGURED", "destination": None}}
-    snapshot = telemetry.snapshot()
+def _metrics_snapshot_for_session(snapshot, session):
+    """Filter payload visibility; this permission never denies the route."""
     if not has_permission(session, "tenants.read"):
         # The process event buffer spans all tenants. Observability permission
         # alone grants aggregate service metrics, not another tenant's request
         # or correlation identifiers. The internal snapshot remains intact.
         snapshot = {**snapshot, "events": []}
     return snapshot
+
+
+@router.get("/api/v1/admin/metrics")
+async def admin_metrics(request: Request, session=Depends(require_permission("observability.read"))):
+    telemetry = getattr(request.app.state, "telemetry", None)
+    if telemetry is None or not callable(getattr(telemetry, "snapshot", None)):
+        return {"implementation": "unavailable", "export": {"status": "NOT_CONFIGURED", "destination": None}}
+    return _metrics_snapshot_for_session(telemetry.snapshot(), session)
 
 
 @router.get("/api/v1/admin/metrics/prometheus", response_class=PlainTextResponse)

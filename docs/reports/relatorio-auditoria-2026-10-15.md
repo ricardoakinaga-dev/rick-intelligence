@@ -1,5 +1,7 @@
 # Nova auditoria de código — RICK Intelligence
 
+Nota de portabilidade (25/10/2026): referências a `.runtime` abaixo são caminhos locais, indisponíveis em clones. O [original byte a byte](<evidence/aud15-portability-20261025/relatorio-auditoria-2026-10-15.md>) foi preservado; resultados e decisões históricos permanecem os mesmos.
+
 **Observação:** 14/10/2026 no horário local, 15/10/2026 UTC. **Nota geral: 74,6/100 — 75/100 arredondada. Produção: NO-GO.**
 
 A implementação local é forte em arquitetura, testes, contratos e controles de autoridade. Correções recentes foram revalidadas, mas ainda há defeitos comprovados em logout OIDC, resistência a abuso e preservação de rascunhos. A suíte ampliada não passou; testes locais e build não substituem execução distribuída e evidência de produção.
@@ -59,11 +61,11 @@ A implementação local é forte em arquitetura, testes, contratos e controles d
 
 ### Evidência orientadora da matriz
 
-- Arquitetura/CI/docs: [README](<../../README.md#L63-L84>), [workflow canônico](<../../.github/workflows/quality.yml#L23-L61>) e [validação atual](<../../.runtime/audit-20261015/validate.log>).
+- Arquitetura/CI/docs: [README](<../../README.md#L63-L84>), [workflow canônico](<../../.github/workflows/quality.yml#L23-L61>) e validação atual (`../../.runtime/audit-20261015/validate.log`; artefato local não versionado).
 - Segurança e sessão: [autoridade de sessão](<../architecture/security/session-authority.md#L3-L24>), [OIDC](<../../packages/identity/src/rick_identity/oidc.py#L238-L295>), [regressões de revogação](<../../apps/api/tests/test_logout_revocation_failure.py#L22-L64>) e [regressões de abuso](<../../apps/api/tests/test_public_abuse_regressions.py#L18-L65>).
 - Dados/IA: [envelope de ingestão](<../../packages/ingestion/src/rick_ingestion/admission.py#L94-L127>), [limites do parser](<../../packages/ingestion/src/rick_ingestion/parsers.py#L39-L68>), [retrieval](<../../packages/retrieval/src/rick_retrieval/pipeline.py#L172-L225>), [autoridade de evidência](<../../packages/evidence/src/rick_evidence/validator.py#L75-L88>) e [pack sintético](<../evaluation/packs/rec22-local-v2/manifest.json#L1-L13>).
 - Worker/providers: [shutdown](<../../apps/worker/runtime.py#L1853-L1909>), [composição](<../../apps/worker/deployment_composition.py#L308-L392>), [regressões de corridas](<../../apps/worker/tests/test_shutdown_races.py#L25-L99>) e [resiliência](<../../packages/providers/src/rick_providers/resilience.py#L50-L151>).
-- Tipos/cobertura: [mypy](<../../mypy.ini#L6-L14>), [allowlist Vitest](<../../apps/web/vitest.config.ts#L8-L14>) e [resumo de cobertura](<../../.runtime/qa/web/coverage-summary.json>).
+- Tipos/cobertura: [mypy](<../../mypy.ini#L6-L14>), [allowlist Vitest](<../../apps/web/vitest.config.ts#L8-L14>) e resumo de cobertura (`../../.runtime/qa/web/coverage-summary.json`; artefato local não versionado).
 - Operação: [instrumentação](<../../apps/api/src/core/otel.py>), [sinks bounded](<../../packages/observability/src/rick_observability/events.py#L113-L127>), [backup file-level](<../../infrastructure/scripts/backup_restore.py#L1-L8>) e [runbook](<../operations/release-readiness.md#L11-L35>).
 
 ## 3. Verificações executadas
@@ -85,7 +87,7 @@ A implementação local é forte em arquitetura, testes, contratos e controles d
 | `git diff --check` | 0 | PASS. |
 | Probes OIDC/reset/eventloop/OTel e React/jsdom | 0 | Reproduziram falhas descritas abaixo. Exit 0 indica que o probe confirmou o defeito, não que o produto passou. |
 
-Logs: [Python ampliado](<../../.runtime/audit-20261015/pytest.log>), [regressões focadas](<../../.runtime/audit-20261015/regressions.log>), [web](<../../.runtime/audit-20261015/web.log>), [build](<../../.runtime/audit-20261015/build.log>), [checks com exits individuais](<../../.runtime/audit-20261015/checks-explicit.log>) e [inventário isolado](<../../.runtime/audit-20261015/inventory.log>).
+Logs: Python ampliado (`../../.runtime/audit-20261015/pytest.log`; artefato local não versionado), regressões focadas (`../../.runtime/audit-20261015/regressions.log`; artefato local não versionado), web (`../../.runtime/audit-20261015/web.log`; artefato local não versionado), build (`../../.runtime/audit-20261015/build.log`; artefato local não versionado), checks com exits individuais (`../../.runtime/audit-20261015/checks-explicit.log`; artefato local não versionado) e inventário isolado (`../../.runtime/audit-20261015/inventory.log`; artefato local não versionado).
 
 Comando principal de testes:
 
@@ -99,7 +101,7 @@ env -i PATH="$PATH" HOME="$HOME" LANG=C.UTF-8 PYTHONDONTWRITEBYTECODE=1 \
 
 **277 estão em testes VPS; 1 está no inventário Node. Nenhuma falha foi listada em apps ou packages.** Não converter esse recorte em PASS da suíte total.
 
-A principal barreira VPS é ambiental e foi diagnosticada: UID efetivo 1000; `/tmp` tem UID 1000 e modo 1777, enquanto `/usr`, `/proc` e outros ancestrais aparecem com UID 65534. O [contrato de captura](<../../infrastructure/vps/contracts.py#L75-L92>) só admite pai gravável com sticky bit quando pertence a root (UID 0), então a captura de um arquivo sintético privado falha com `unprotected input parent`. Parte das assertions seguintes falha em cascata antes de atingir o comportamento alvo; duas falhas mostram `chown` com EINVAL. [Diagnóstico de filesystem](<../../.runtime/audit-20261015/filesystem-probe.log>).
+A principal barreira VPS é ambiental e foi diagnosticada: UID efetivo 1000; `/tmp` tem UID 1000 e modo 1777, enquanto `/usr`, `/proc` e outros ancestrais aparecem com UID 65534. O [contrato de captura](<../../infrastructure/vps/contracts.py#L75-L92>) só admite pai gravável com sticky bit quando pertence a root (UID 0), então a captura de um arquivo sintético privado falha com `unprotected input parent`. Parte das assertions seguintes falha em cascata antes de atingir o comportamento alvo; duas falhas mostram `chown` com EINVAL. Diagnóstico de filesystem (`../../.runtime/audit-20261015/filesystem-probe.log`; artefato local não versionado).
 
 Isso **não comprova 277 bugs de produto**, nem comprova que todos esses testes passariam em outro host. A lane VPS permanece não validada neste ambiente; repetir em Linux com ownership/permissões representativos, sem enfraquecer a política. Diferentemente dela, o inventário Node falha também isoladamente e possui causa demonstrada no checkout.
 
@@ -113,7 +115,7 @@ IDs `AUD15-xx` pertencem exclusivamente a esta rodada. **Alta**: impacto de segu
 
 **Impacto:** falsa confirmação de término e trilha de auditoria incorreta no uso direto desse adapter. Não foi demonstrada exploração em implantação real, nem falha da revogação nativa corrigida. **Confiança alta.**
 
-**Fechamento:** explicitar contrato de logout federado, integrar broker/revogação ou rejeitar confirmação não suportada; provar que saída confirmada invalida a autoridade relevante e que erros não geram `completed`. [Probe reproduzível](<../../.runtime/audit-20261015/oidc-probe.py>) / [saída](<../../.runtime/audit-20261015/oidc-probe.log>).
+**Fechamento:** explicitar contrato de logout federado, integrar broker/revogação ou rejeitar confirmação não suportada; provar que saída confirmada invalida a autoridade relevante e que erros não geram `completed`. Probe reproduzível (`../../.runtime/audit-20261015/oidc-probe.py`; artefato local não versionado) / saída (`../../.runtime/audit-20261015/oidc-probe.log`; artefato local não versionado).
 
 ### AUD15-02 — Alta / P1 — reset público executa trabalho caro sem quota
 
@@ -121,7 +123,7 @@ A [confirmação de reset](<../../apps/api/src/routes/auth.py#L306-L317>) não c
 
 **Prova:** três tokens inexistentes, facade real com transaction/consume controlados: `400/400/400`, **hash=3, consume=3, limiter=0**, inclusive com limiter que nega. **Impacto:** CPU e acesso a persistência acessíveis anonimamente sem possuir token válido; não foi medido DoS ou throughput real. **Confiança alta.**
 
-**Fechamento:** quota antes de KDF/DB; reduzir trabalho para tokens inválidos preservando atomicidade e não enumeração; teste negativo garante zero KDF/consume quando barrado. [Probe](<../../.runtime/audit-20261015/reset-probe.py>) / [saída](<../../.runtime/audit-20261015/reset-probe.log>).
+**Fechamento:** quota antes de KDF/DB; reduzir trabalho para tokens inválidos preservando atomicidade e não enumeração; teste negativo garante zero KDF/consume quando barrado. Probe (`../../.runtime/audit-20261015/reset-probe.py`; artefato local não versionado) / saída (`../../.runtime/audit-20261015/reset-probe.log`; artefato local não versionado).
 
 ### AUD15-03 — Alta / P1 — chat perde pergunta ao ficar offline durante envio
 
@@ -129,7 +131,7 @@ O [envio](<../../apps/web/components/chat/chat-workspace.tsx#L694-L724>) limpa o
 
 **Prova React/jsdom:** pergunta existia antes do offline; após reconnect, draft vazio, pergunta ausente e nenhum retry. Callback tardio foi corretamente descartado. **Impacto:** perda do texto e do estado/chave de retry, não perda demonstrada no backend. **Confiança alta.**
 
-**Fechamento:** preservar pergunta/identidade do retry durante desconexão e descartar respostas tardias; teste deferred send → offline → online. [Probe de componentes reais](<../../.runtime/audit-20261015/web-probe.cjs>) / [saída](<../../.runtime/audit-20261015/web-probe.log>).
+**Fechamento:** preservar pergunta/identidade do retry durante desconexão e descartar respostas tardias; teste deferred send → offline → online. Probe de componentes reais (`../../.runtime/audit-20261015/web-probe.cjs`; artefato local não versionado) / saída (`../../.runtime/audit-20261015/web-probe.log`; artefato local não versionado).
 
 ### AUD15-04 — Alta / P1 — criação de caso apaga edições posteriores ao submit
 
@@ -137,7 +139,7 @@ O [create](<../../apps/web/components/cases/case-workspace.tsx#L167-L179>) envia
 
 **Prova React/jsdom:** payload continha A; novo draft B estava visível e habilitado; resposta A apagou título/resumo B. **Impacto:** alterações humanas não enviadas desaparecem silenciosamente. **Confiança alta.**
 
-**Fechamento:** congelar os campos durante envio ou versionar draft para limpar somente a revisão enviada; cobrir edição pós-submit e admissão duplicada. Mesma [saída de probe](<../../.runtime/audit-20261015/web-probe.log>).
+**Fechamento:** congelar os campos durante envio ou versionar draft para limpar somente a revisão enviada; cobrir edição pós-submit e admissão duplicada. Mesma saída de probe (`../../.runtime/audit-20261015/web-probe.log`; artefato local não versionado).
 
 ### AUD15-05 — Alta / P1 — sessão visual não sincroniza entre abas
 
@@ -153,7 +155,7 @@ O [catch amplo](<../../packages/identity/src/rick_identity/oidc.py#L291-L292>) t
 
 **Prova:** resolver indisponível → logout `200 signed_out`, me `401`; resolver restaurado → mesmo token me `200`. **Acesso falha fechado**, mas indisponibilidade vira falsa confirmação em vez de 503. **Confiança alta.**
 
-**Fechamento:** distinguir token inválido/membership negada de autoridade indisponível; último caso retorna erro seguro sem afirmar logout. [Saída OIDC](<../../.runtime/audit-20261015/oidc-probe.log>).
+**Fechamento:** distinguir token inválido/membership negada de autoridade indisponível; último caso retorna erro seguro sem afirmar logout. Saída OIDC (`../../.runtime/audit-20261015/oidc-probe.log`; artefato local não versionado).
 
 ### AUD15-07 — Média / P1 — identidade síncrona ocupa event loop ASGI
 
@@ -161,15 +163,15 @@ A [dependência async](<../../apps/api/src/dependencies/identity.py#L32-L56>) ex
 
 **Prova:** chamadas reais com PBKDF2 registraram loop ativo em login e nas duas validações. Inspeção dos adapters PG conecta essa fronteira a DB-API síncrono. **Impacto inferido:** latência de KDF/DB bloqueia outras requisições no mesmo loop; não foi medido throughput real. **Confiança alta sobre scheduling.**
 
-**Fechamento:** offload bounded ou adapter async com deadline; prova concorrente mostra requisição independente progredindo durante dependência lenta. [Probe](<../../.runtime/audit-20261015/eventloop-probe.py>) / [saída](<../../.runtime/audit-20261015/eventloop-probe.log>).
+**Fechamento:** offload bounded ou adapter async com deadline; prova concorrente mostra requisição independente progredindo durante dependência lenta. Probe (`../../.runtime/audit-20261015/eventloop-probe.py`; artefato local não versionado) / saída (`../../.runtime/audit-20261015/eventloop-probe.log`; artefato local não versionado).
 
 ### AUD15-08 — Média / P1 — inventário Node inconsistente com Git
 
-O [teste de inventário](<../../scripts/state_of_art/tests/test_frontend_supply_runtime.py#L208-L214>) espera só o web canônico. Git inclui também um [manifesto de snapshot](<../../.runtime/production-local-20261004/source/apps/web/package.json>). Falhou global e isoladamente.
+O [teste de inventário](<../../scripts/state_of_art/tests/test_frontend_supply_runtime.py#L208-L214>) espera só o web canônico. Git inclui também um manifesto de snapshot (`../../.runtime/production-local-20261004/source/apps/web/package.json`; artefato local não versionado). Falhou global e isoladamente.
 
 **Impacto:** gate de supply/inventário vermelho; não prova vulnerabilidade na dependência. **Confiança alta.**
 
-**Fechamento:** definir política explícita de snapshot/inventário e versionamento; o teste deve voltar a aprovar sem ignorar componentes executáveis legítimos. [Falha isolada](<../../.runtime/audit-20261015/inventory.log>).
+**Fechamento:** definir política explícita de snapshot/inventário e versionamento; o teste deve voltar a aprovar sem ignorar componentes executáveis legítimos. Falha isolada (`../../.runtime/audit-20261015/inventory.log`; artefato local não versionado).
 
 ### AUD15-09 — Média / P2 — casos mostram apenas primeira página
 
@@ -201,7 +203,7 @@ O [contextmanager](<../../apps/api/src/core/otel.py#L109-L128>) envolve o yield 
 
 **Prova:** carrier válido + ValueError sintético → RuntimeError `generator didn't stop after throw()`, original não preservado. **Limite importante:** o [caller atual do worker](<../../apps/worker/runtime.py#L1357-L1401>) captura erros do handler dentro do contexto e preserva o resultado; não foi demonstrada perda de job nem alteração de resposta API por esse defeito. Por isso, prioridade/severidade reduzidas. **Confiança alta no utilitário.**
 
-**Fechamento:** separar falha de entrada/cleanup da exceção do corpo; teste exige mesma exceção original em sucesso de attach e falha de detach. [Probe](<../../.runtime/audit-20261015/otel-probe.py>) / [saída](<../../.runtime/audit-20261015/otel-probe.log>).
+**Fechamento:** separar falha de entrada/cleanup da exceção do corpo; teste exige mesma exceção original em sucesso de attach e falha de detach. Probe (`../../.runtime/audit-20261015/otel-probe.py`; artefato local não versionado) / saída (`../../.runtime/audit-20261015/otel-probe.log`; artefato local não versionado).
 
 ## 5. Evolução desde a referência anterior
 

@@ -29,6 +29,20 @@ DEFAULT_OUTPUT = ".runtime/phase-2/redis-runtime-gate.json"
 REDIS_FAULT_CASES = ("circuit-breaker-recovery",)
 
 
+def tls_file_options(environment=None):
+    """Keep private CA and optional mTLS references on the native client port.
+
+    Certificate/hostname verification remains mandatory in the caller. Never
+    consume an insecure verification override to make a runtime probe pass.
+    """
+    source = os.environ if environment is None else environment
+    return {option: source.get(variable) or None for option, variable in (
+        ("tls_ca_file", "RICK_REDIS_TLS_CA_FILE"),
+        ("tls_cert_file", "RICK_REDIS_TLS_CERT_FILE"),
+        ("tls_key_file", "RICK_REDIS_TLS_KEY_FILE"),
+    )}
+
+
 @contextmanager
 def _reserve_output(root: Path, path_value: str):
     """Hold an exclusive file descriptor before work; never follow output links.
@@ -125,6 +139,7 @@ async def _run_checks(
             require_tls=True if require_tls else None,
             require_auth=True if parsed.password or require_tls else False,
             verify_tls=True,
+            **tls_file_options(),
             max_connections=8,
             pool_timeout=1.0,
             socket_connect_timeout=1.0,

@@ -18,7 +18,6 @@ import os
 from pathlib import Path
 import random
 import re
-import ssl
 import threading
 import time
 from typing import Callable, Literal
@@ -751,8 +750,10 @@ class RedisSettings:
         if self.password is not None:
             options["password"] = self.password
         if self.tls_enabled:
+            # redis.asyncio 5.2 accepts named requirements here. Passing an
+            # ssl.VerifyMode enum leaves its RedisSSLContext uninitialized.
             options["ssl_cert_reqs"] = (
-                ssl.CERT_REQUIRED if self.verify_tls else ssl.CERT_NONE
+                "required" if self.verify_tls else "none"
             )
             options["ssl_check_hostname"] = self.verify_tls
             if self.tls_ca_file is not None:

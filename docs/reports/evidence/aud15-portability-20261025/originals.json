@@ -1,0 +1,12 @@
+[
+  {
+    "path": "docs/reports/implementacao-auditoria-2026-10-15.md",
+    "original_sha256": "bf43e6a580b60493e3e9e903064e730ebef4da44c91040dcbf31d597a48e7be2",
+    "converted_local_references": 41
+  },
+  {
+    "path": "docs/reports/relatorio-auditoria-2026-10-15.md",
+    "original_sha256": "9707af8efcfbeb9138e210111045a447ed1fa85deb8bedd7ecd575084f0e3fcf",
+    "converted_local_references": 23
+  }
+]

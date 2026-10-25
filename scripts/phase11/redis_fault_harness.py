@@ -18,11 +18,18 @@ import time
 from urllib.parse import urlsplit
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "packages/contracts/src"))
 sys.path.insert(0, str(ROOT / "packages/locking/src"))
 
 
+def _docker_command(*args):
+    host = os.environ.get("RICK_REDIS_DOCKER_HOST")
+    return ["docker", *(["--host", host] if host else []), *args]
+
+
 async def _exercise() -> bool:
+    from scripts.phase11.redis_runtime_gate import tls_file_options
     from rick_locking import (
         RedisNamespace,
         RedisSettings,
@@ -39,6 +46,7 @@ async def _exercise() -> bool:
     settings = RedisSettings(
         url=url, environment="local", require_tls=None,
         require_auth=bool(parsed.password), verify_tls=True,
+        **tls_file_options(),
         max_connections=4, pool_timeout=1.0,
         socket_connect_timeout=0.5, socket_timeout=0.5, operation_timeout=1.0,
         retry_max_attempts=1, retry_base_delay_seconds=0.01, retry_max_delay_seconds=0.05,
@@ -53,7 +61,7 @@ async def _exercise() -> bool:
         print(f"debug before={before}", file=sys.stderr)
         if not before:
             return False
-        subprocess.run(["docker", "pause", container], check=True, capture_output=True, timeout=20)
+        subprocess.run(_docker_command("pause", container), check=True, capture_output=True, timeout=20)
         print("debug paused", file=sys.stderr)
         try:
             failed = False
@@ -70,7 +78,7 @@ async def _exercise() -> bool:
             if not failed:
                 return False
         finally:
-            subprocess.run(["docker", "unpause", container], check=True, capture_output=True, timeout=20)
+            subprocess.run(_docker_command("unpause", container), check=True, capture_output=True, timeout=20)
             print("debug unpaused", file=sys.stderr)
         deadline = time.monotonic() + 10
         while time.monotonic() < deadline:

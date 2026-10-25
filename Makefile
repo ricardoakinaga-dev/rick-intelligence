@@ -16,9 +16,12 @@ WEB_DIR := $(ROOT)/apps/web
 WEB_CURRENT_EVIDENCE_DIR ?= $(ROOT)/.runtime/qa/web-e2e
 
 .PHONY: ops-scope-preflight
-.PHONY: phase3-local-product-probe phase3-prepare-production
+.PHONY: phase3-local-product-probe phase3-prepare-production phase3-local-tls
 .PHONY: phase3-local-tenant-evidence phase3-local-golden phase3-local-distributed
 .PHONY: phase3-local-performance phase3-local-soak phase3-local-chaos phase3-local-frontend phase3-local-observability phase3-local-supply phase3-local-tenant-contention
+
+phase3-local-tls:
+	RICK_FORMAL_LAB_AUTHORIZED=1 PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)" $(PYTEST) "$(ROOT)/scripts/phase11/local_tls_bootstrap.py"
 
 phase3-local-performance phase3-local-soak:
 	RICK_FORMAL_LAB_AUTHORIZED=1 PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(ROOT)" $(PYTEST) "$(ROOT)/scripts/phase11/local_operational_harness.py" --lane $(patsubst phase3-local-%,%,$@)
