@@ -237,7 +237,14 @@ gerados envelopes commit-bound:
 | P1-05 restore | `restore-runtime-evidence.json` | `PASS` |
 | P1-09 file-security | `file-security-runtime-evidence.json` | `PASS` |
 
-O preflight gerado foi `sha256=45a0c1fe4c10981fd25a22a32ff3d1483331cbefa43c608410a43e9e61b6c867`.
+O preflight final foi `sha256=f84a7b87d8a6042530cce29da90fcb9328f1cf3363596529459d13d6f27f3c46`.
+
+A matriz `phase3-evidence` foi gerada e rejeitou a promoção: os sete
+envelopes estão `PASS` localmente, mas a matriz os classifica como
+`PARTIAL`/`BLOCKED_EXTERNAL` porque `production_safe=false` e falta revisão
+independente de produção. O artefato foi preservado como
+`prd26-capability-matrix.json` e o caminho canônico foi restaurado para manter
+`make validate` verde.
 O envelope P0-04 foi preservado em `prd26-postgres-runtime-evidence.json`; o
 caminho canônico é um control-input e foi restaurado para manter
 `make validate` verde. A adoção do novo envelope exige atualizar o control-input.
