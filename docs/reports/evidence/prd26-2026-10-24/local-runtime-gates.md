@@ -229,7 +229,7 @@ gerados envelopes commit-bound:
 
 | Capability | Evidência | Status |
 |---|---|---|
-| P0-04 PostgreSQL | `postgres-runtime-evidence.json` | `PASS` |
+| P0-04 PostgreSQL | `prd26-postgres-runtime-evidence.json` | `PASS` |
 | P0-05 multi-worker | `multi-worker-runtime-evidence.json` | `PASS` |
 | P0-06 Redis | `redis-runtime-evidence.json` | `PASS` |
 | P0-07 objeto/Qdrant | `object-qdrant-runtime-evidence.json` | `PASS` |
@@ -238,6 +238,9 @@ gerados envelopes commit-bound:
 | P1-09 file-security | `file-security-runtime-evidence.json` | `PASS` |
 
 O preflight gerado foi `sha256=45a0c1fe4c10981fd25a22a32ff3d1483331cbefa43c608410a43e9e61b6c867`.
+O envelope P0-04 foi preservado em `prd26-postgres-runtime-evidence.json`; o
+caminho canônico é um control-input e foi restaurado para manter
+`make validate` verde. A adoção do novo envelope exige atualizar o control-input.
 Accessos host usaram IPs de container loopback com `--allow-nonlocal`
 explícito; o compose mantém a rede interna.
 
