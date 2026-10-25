@@ -194,6 +194,12 @@ services:
     command: ["--config=/etc/otelcol-contrib/config.yaml"]
     volumes:
       - ./infrastructure/compose/otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml:ro
+    healthcheck:
+      # Distroless image: validate the mounted config as the bounded probe.
+      test: ["CMD", "/otelcol-contrib", "validate", "--config=/etc/otelcol-contrib/config.yaml"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
     ports:
       - 127.0.0.1:14317:4317
       - 127.0.0.1:14318:4318

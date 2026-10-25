@@ -106,6 +106,11 @@ COMPOSE_PROJECTS = {
     "docker-compose.staging.yml": "rick-intelligence-staging",
 }
 COMPOSE_REQUIRED_SERVICES = frozenset(REQUIRED_SERVICES)
+# One-shot bootstraps and alert routing are part of the lab but are not part
+# of the preflight service contract; they must not be mistaken for extras.
+COMPOSE_AUXILIARY_SERVICES = frozenset({
+    "alertmanager", "collector-ready", "migrate", "object-store-init", "qdrant-init",
+})
 COMPOSE_ENV_EXAMPLES = {
     "docker-compose.dev.yml": "infrastructure/compose/.env.dev.example",
     "docker-compose.staging.yml": "infrastructure/compose/.env.staging.example",
@@ -362,7 +367,7 @@ def _compose_health_records(compose: Path) -> tuple[list[dict[str, object]], lis
         service_name = item.get("Service", item.get("service"))
         if not isinstance(service_name, str) or not service_name.strip():
             errors.append("Compose service inventory contains a record without Service")
-        elif service_name not in COMPOSE_REQUIRED_SERVICES:
+        elif service_name not in COMPOSE_REQUIRED_SERVICES and service_name not in COMPOSE_AUXILIARY_SERVICES:
             errors.append(f"Compose service inventory contains unexpected service {service_name}")
     for service in sorted(COMPOSE_REQUIRED_SERVICES):
         matches = [
