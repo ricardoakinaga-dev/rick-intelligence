@@ -246,6 +246,17 @@ def test_candidate_construction_does_not_require_prior_image_promotion():
         with pytest.raises(contracts.Refusal):
             publish_guard.validate_run(run,missing,SOURCE)
 
+
+def test_candidate_stage_skip_never_satisfies_promotion():
+    run={'head_sha':SOURCE,'head_branch':'main','path':'.github/workflows/quality.yml','status':'completed',
+        'conclusion':'success','event':'workflow_dispatch','head_repository':{'full_name':contracts.REPO}}
+    jobs=[{'name':name,'conclusion':'success'} for name in publish_guard.REQUIRED_JOBS]
+    phase3='PHASE3 / capability evidence matrix'
+    jobs=[job for job in jobs if job['name']!=phase3]
+    jobs.append({'name':phase3,'conclusion':'skipped'})
+    with pytest.raises(contracts.Refusal,match='required quality job'):
+        publish_guard.validate_run(run,jobs,SOURCE)
+
 def signed(source=SOURCE,digest=D):
     from test_support import admission_fixture
     from construction_contract import canonical_sha256
