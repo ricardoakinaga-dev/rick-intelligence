@@ -722,11 +722,12 @@ def build_external_providers(
     ):
         if name == "worker" and inputs.worker_health_check_required is not True:
             continue
-        method_names = (
-            ("health_check", "readiness_check", "check_readiness", "check_health")
-            if name == "provider"
-            else ("readiness_check", "health_check", "check_readiness", "check_health")
-        )
+        if name == "provider":
+            method_names = ("health_check", "readiness_check", "check_readiness", "check_health")
+        elif name == "lease" and settings.environment in {"test", "dev", "local"}:
+            method_names = ("health_check", "readiness_check", "check_readiness", "check_health")
+        else:
+            method_names = ("readiness_check", "health_check", "check_readiness", "check_health")
         for method_name in method_names:
             method = getattr(component, method_name, None)
             if callable(method):

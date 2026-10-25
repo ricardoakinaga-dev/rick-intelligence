@@ -186,7 +186,17 @@ permanece `production_safe=false`; o endpoint devolvia 503.
 **Correção aplicada:** `_redis_health_probe` usa liveness (`health_check`)
 para `test`/`dev`/`local` e readiness (`readiness_check`) apenas para
 `production`; teste dedicado passou. O gate de produção não foi enfraquecido.
-O preflight ainda exige as imagens e a pilha Compose completas.
+
+**Compose local:** a pilha subiu com 16 serviços. Correções necessárias:
+`cap_add` do PostgreSQL, healthcheck do Qdrant via bash, healthcheck do web via
+`node fetch`, Redis sem AOF no lab, `entrypoint: ["python"]` nos one-shots e
+credencial root do MinIO para o bootstrap local.
+
+**Preflight ainda rejeitado:** o runner exige que `otel-collector` tenha
+healthcheck (a imagem é distroless) e rejeita serviços auxiliares
+(`alertmanager`, `collector-ready`, `migrate`, `object-store-init`,
+`qdrant-init`). É uma divergência entre o Compose dev e o contrato de
+preflight, não uma falha dos serviços.
 
 ## 8. File-security gate local
 
