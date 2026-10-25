@@ -136,3 +136,28 @@ Os deadlines configurados de 30/1000 ms foram preservados. Foram eliminadas
 inferências de progresso baseadas no tempo de admissão do runner, sem afirmar
 um SLO novo. Os 43 testes passaram; execução inline do getter também foi
 rejeitada por mutação isolada. Falhas anteriores continuam arquivadas.
+
+## Imagens e timeout de criação
+
+O [CI 39a468c](https://github.com/ricardoakinaga-dev/rick-intelligence/actions/runs/40215461074)
+aprovou os sete gates de código: FAST, UNIT, CONTRACT, SECURITY, FRONTEND,
+RAG-EVAL e SUPPLY-CHAIN. O workflow completo permaneceu NO-GO por inputs
+operacionais/de produção ausentes; isso não aprova deploy ou o corpus.
+
+O build local e os SBOMs das três imagens terminaram (87/87/58 componentes).
+Um probe TLS concorrente expirou durante a criação Docker, com cleanup PASS;
+uma execução após o build, TLS e cleanup passaram novamente. Os dois resultados
+foram preservados. Não é aprovação de concorrência/capacidade operacional.
+O scan efetivo da API detectou nove registros em pip/musl/zlib da base, enquanto
+os audits dos locks do projeto continuaram sem achados. A proposta de correção
+local dessas imagens fica separada dos inputs/políticas de release revisados.
+
+A criação de um registry local expirou no CLI, mas deixou o container no estado
+Created. O builder só registrava autoridade de cleanup após o retorno do CLI.
+A correção registra a tentativa antes da criação, verifica existência e label
+exato antes de remover e recusa recurso de outro dono. Três regressões passaram:
+recurso próprio, ausente e alheio. O órfão observado foi removido com conferência
+do label e verificação de ausência, sem tocar na pilha dev compartilhada.
+O relatório original da tentativa continua preservado; a verificação real de
+cleanup fica em `.runtime/phase-3/supply-local/patch-ca4b097f02bd/verified-cleanup.json`.
+Essa correção exige novo SHA e CI, mantendo o 39a468c como evidência anterior.

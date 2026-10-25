@@ -9,6 +9,39 @@ from scripts.phase11.check_canonical_ci import ROOT, WORKFLOWS, check_canonical_
 from scripts.phase11.check_canonical_ci import EXPECTED_SUITES, WRAPPER
 
 
+@pytest.mark.parametrize('resource', ['owned', 'absent', 'foreign'])
+def test_supply_creation_timeout_retains_cleanup_authority(tmp_path, monkeypatch, resource):
+    import json
+    import subprocess
+    from types import SimpleNamespace
+    from scripts.phase11 import local_supply_chain as supply
+
+    monkeypatch.setattr(supply, 'ROOT', tmp_path)
+    monkeypatch.setattr(supply, '_free_port', lambda: 45001)
+    owner = supply.Supply('timeout-fixture')
+    monkeypatch.setattr(owner, 'inspect', lambda _: {'Id': 'sha256:' + 'a' * 64})
+    commands = []
+    def command(args, **kwargs):
+        commands.append(args)
+        if args[:2] == ['docker', 'run']:
+            raise subprocess.TimeoutExpired(args, 30)
+    monkeypatch.setattr(owner, 'command', command)
+    with pytest.raises(subprocess.TimeoutExpired):
+        owner.start_registry()
+    assert owner.started is True
+    monkeypatch.setattr(supply.subprocess, 'run', lambda *a, **kw: SimpleNamespace(stdout='' if resource == 'absent' else 'container-id'))
+    label = owner.run_id if resource == 'owned' else 'another-owner'
+    monkeypatch.setattr(supply.subprocess, 'check_output', lambda *a, **kw: json.dumps([{'Config': {'Labels': {'rick.phase3.owned-run': label}}}]))
+    if resource == 'foreign':
+        with pytest.raises(ValueError, match='nonowned'):
+            owner.close()
+    else:
+        owner.close()
+        assert owner.started is False
+    removals = [args for args in commands if args[:3] == ['docker', 'rm', '-f']]
+    assert removals == ([['docker', 'rm', '-f', owner.registry]] if resource == 'owned' else [])
+
+
 @pytest.mark.parametrize('attack', [None, 'hash', 'traversal', 'absolute', 'duplicate', 'symlink', 'extra-member'])
 def test_historical_control_artifacts_reject_unsafe_or_forged_archives(tmp_path, monkeypatch, attack):
     import hashlib

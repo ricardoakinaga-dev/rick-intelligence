@@ -90,3 +90,14 @@ A segunda inferência equivalente (getter de reset, 104,11 ms) foi exposta no
 quality 5bbe0f6. Correção da família inteira por barreiras causais, conservando
 os deadlines 30/1000 ms, retenção de vaga, não consumo após deadline, quota e
 cancelamento resistente. 43 testes PASS e mutação inline do getter rejeitada.
+
+### Cleanup e imagens
+
+39a468c: sete gates de código PASS; workflow global NO-GO por inputs ausentes.
+Imagens locais/SBOMs 3/3 (87/87/58). Scan da API: nove registros pip/musl/zlib
+na base, sem substituir o resultado limpo dos locks. Propostas locais de patch
+ainda precisam de rescan e revisão/política de construção.
+Timeout real na criação de registry deixou órfão Created; corrigido marcador de
+cleanup antes da tentativa e existência/label antes da remoção. Três regressões
+PASS; órfão removido e ausência verificada. TLS durante build: startup timeout;
+após build: PASS/cleanup PASS, ambos preservados. Nenhum SLO foi ratificado.

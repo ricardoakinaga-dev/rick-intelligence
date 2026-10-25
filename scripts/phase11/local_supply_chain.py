@@ -109,10 +109,12 @@ class Supply:
         self.origin = f"127.0.0.1:{self.port}"
         store = self.output / "registry-data"
         store.mkdir()
+        # Docker can create the resource even when its CLI times out. Retain
+        # cleanup authority from the attempt, then verify ownership on removal.
+        self.started = True
         self.command(["docker", "run", "-d", "--name", self.registry, "--label", "rick.phase3.owned-run=" + self.run_id,
             "--publish", f"127.0.0.1:{self.port}:5000", "--memory", "256m", "--cpus", "1", "--log-driver", "none",
             "--mount", f"type=bind,src={store},dst=/var/lib/registry", registry_image], name="registry-start", timeout=30)
-        self.started = True
         deadline = time.monotonic() + 20
         while time.monotonic() < deadline:
             try:
@@ -188,10 +190,17 @@ class Supply:
     def close(self):
         if not self.started:
             return
+        existing = subprocess.run(["docker", "ps", "-a", "--filter", "name=^/" + self.registry + "$",
+            "--format", "{{.ID}}"], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+            timeout=15, check=True, text=True)
+        if not existing.stdout.strip():
+            self.started = False
+            return
         value = json.loads(subprocess.check_output(["docker", "inspect", self.registry], text=True))[0]
         if value["Config"]["Labels"].get("rick.phase3.owned-run") != self.run_id:
             raise ValueError("refusing_nonowned_registry_cleanup")
         self.command(["docker", "rm", "-f", self.registry], name="registry-stop", timeout=30)
+        self.started = False
 
 
 def main():
