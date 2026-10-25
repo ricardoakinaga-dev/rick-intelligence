@@ -155,5 +155,6 @@ registrada em [onda local 1](<evidence/prd26-2026-10-24/local-wave-1.md>):
 - **PRD26-031:** golden path local `upload 202 → worker → published → retrieval 1 evidência → POST /api/v1/chat 200 com citação`, `publication_validation=verified`.
 - **PRD26-032:** gate formal de restore `PASS` local, RPO 0,0 s/RTO 3,823 s; `production_safe=false`.
 - **File-security:** gate local **PASS 10/10** com parser isolado e casos hostis; `production_safe=false`.
+- **Phase 3:** preflight **PASS** e envelopes commit-bound **PASS** para PostgreSQL, multi-worker, Redis, objeto/Qdrant, provider, restore e file-security.
 
 Os três contratos estão em `VERIFY`, não `DONE`. A nota 78,0 não foi recalculada e a decisão de produção continua `NO-GO` até os gates externos e o aceite formal.

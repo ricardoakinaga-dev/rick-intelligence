@@ -222,7 +222,26 @@ uma homologação de todos os parsers ou de produção.
   executar golden path e restore com composição autorizada e vincular os
   resultados ao pacote de release.
 
-## 10. Artefatos locais
+## 10. Envelopes Phase 3 commit-bound (PASS)
+
+Com o preflight canônico **PASS** e a pilha dev com 16 serviços, foram
+gerados envelopes commit-bound:
+
+| Capability | Evidência | Status |
+|---|---|---|
+| P0-04 PostgreSQL | `postgres-runtime-evidence.json` | `PASS` |
+| P0-05 multi-worker | `multi-worker-runtime-evidence.json` | `PASS` |
+| P0-06 Redis | `redis-runtime-evidence.json` | `PASS` |
+| P0-07 objeto/Qdrant | `object-qdrant-runtime-evidence.json` | `PASS` |
+| P1-02 provider | `provider-runtime-evidence.json` | `PASS` |
+| P1-05 restore | `restore-runtime-evidence.json` | `PASS` |
+| P1-09 file-security | `file-security-runtime-evidence.json` | `PASS` |
+
+O preflight gerado foi `sha256=45a0c1fe4c10981fd25a22a32ff3d1483331cbefa43c608410a43e9e61b6c867`.
+Accessos host usaram IPs de container loopback com `--allow-nonlocal`
+explícito; o compose mantém a rede interna.
+
+## 11. Artefatos locais
 
 `.runtime/phase-2/postgres-runtime-gate.json`,
 `.runtime/phase-3/multi-worker-runtime-gate.json`,
