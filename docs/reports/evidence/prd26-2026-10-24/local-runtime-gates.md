@@ -174,6 +174,11 @@ evidence lineage e Qdrant. O runtime é local/loopback; não é produção.
 **Limite:** jobs/audit/evidence são tabelas de probe do laboratório, não as
 tabelas de produção; o `production_safe=false` é explícito.
 
+**Envelope Phase 3:** `make phase3-restore-runtime` executou o gate bruto com
+`PASS`, mas o envelope ficou `BLOCKED_EXTERNAL` porque
+`.runtime/phase-3/preflight.json` (topologia Compose canônica) está ausente.
+É um bloqueio de topologia, não do restore.
+
 ## 8. Limitações e próximo passo
 
 - Containers e fixture são efêmeros e loopback; não autorizam promoção.
