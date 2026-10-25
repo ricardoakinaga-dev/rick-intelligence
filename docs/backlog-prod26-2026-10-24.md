@@ -202,7 +202,7 @@ Este documento é **especificação**, não ledger de execução. Os 22 contrato
 **Entrega:** IdP/OIDC ou nativo Postgres conforme PRD26-D3; membership, sessão, revogação, logout e multi-workspace; duas réplicas de API e rate limiter compartilhado.
 **Aceite:** matriz de identidade/tenant sem vazamento; revogação e logout comprovados; cross-tenant negativo; nenhum cookie enganoso.
 **Evidência:** matriz + logs + IdP/config + negativos.
-**Status local (24/10):** `VERIFY` parcial — Keycloak 26.7.3, realm `rick`, client `rick-api`, usuário `reader`, password grant `PASS` e verificação OIDC real (RS256/issuer/audience) com sessão `VETERINARIAN`; membership store, revogação, multi-réplica e integração da API `NOT_RUN`. Ver [gates locais](<reports/evidence/prd26-2026-10-24/local-runtime-gates.md>).
+**Status local (24/10):** `VERIFY` parcial — Keycloak 26.7.3, realm `rick`, client `rick-api`, password grant `PASS`, verificação OIDC real (RS256/issuer/audience) e `GET /api/v1/auth/me` **200** com sessão `VETERINARIAN`; membership store, revogação, multi-réplica e composição externa completa `NOT_RUN`. Ver [gates locais](<reports/evidence/prd26-2026-10-24/local-runtime-gates.md>).
 **Herda:** PROD12-035; ADR-024.
 
 #### PRD26-041 — Provider/RAG live, budgets e falhas

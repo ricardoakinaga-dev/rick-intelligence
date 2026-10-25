@@ -56,9 +56,16 @@ issuer e a audiência reais; o `OIDCIdentityProvider` resolveu uma sessão
 autoritativa `VETERINARIAN` com tenant `tenant-a`, workspace `workspace-a`,
 7 permissões e coleção `col-a`.
 
-**Limite:** o membership resolver foi estático no probe; não há store de
-membership, usuários A/B, revogação/logout, multi-réplica ou integração da API
-com este IdP. É prova de verificação OIDC real, não de isolamento multi-tenant.
+**Integração com a API:** um `TestClient` do `create_app` canônico, com
+`OIDCIdentityProvider` e o token real do Keycloak, respondeu
+`GET /api/v1/auth/me` com **200**, `tenant-a`, `workspace-a`, papel
+`VETERINARIAN` e 7 permissões. Chat/auditoria/histórico foram in-memory nesse
+probe.
+
+**Limite:** o membership resolver foi estático; não há store de membership,
+usuários A/B, revogação/logout, cookies de sessão, multi-réplica ou composição
+externa completa. É prova de autenticação OIDC real na borda da API, não de
+isolamento multi-tenant completo.
 
 **Achado de infraestrutura:** o `compose.integration.yml` usa `internal: true`,
 e o Docker 29 não publica portas de host nessa rede. Para acesso do host foi
