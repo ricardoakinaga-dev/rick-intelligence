@@ -104,7 +104,21 @@ segura sem citações. O caminho não inventou evidência.
 prova de readiness de produção. O chat não teve documento indexado; o golden
 path de ingestão continua pendente.
 
-## 6. Limitações e próximo passo
+## 6. Golden path parcial — achado local
+
+O upload JSON autenticado respondeu **202** e criou um job durável `QUEUED`,
+com objeto no MinIO e checksum. O worker externo reivindicou o job, mas falhou
+na fase de indexação/verificação com `storage_unavailable`.
+
+Investigação discriminante: `S3ObjectStore.get` direto com o mesmo escopo e
+chave retornou os 156 bytes; o objeto e o checksum estão corretos. O job
+permaneceu em retry/`QUEUED` e um job anterior virou `DEAD_LETTER`. A causa
+provável está na escrita/verificação Qdrant/Knowledge, não no objeto.
+
+**Estado:** golden path **FAIL parcial**; nenhum documento foi publicado. É um
+defeito local real a corrigir antes de declarar ingestão ponta a ponta.
+
+## 7. Limitações e próximo passo
 
 - Containers e fixture são efêmeros e loopback; não autorizam promoção.
 - O gate de provider usa um servidor OpenAI-compatible local de fixture, não um
