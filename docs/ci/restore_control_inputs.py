@@ -138,8 +138,57 @@ def run(root, relative, *args):
                    cwd=root, check=True, env={**os.environ, 'PYTHONDONTWRITEBYTECODE': '1'})
 
 
+def read_runtime_history(root):
+    """Restore exact historical ledger artifacts, never substitute receipts."""
+    relative = 'docs/ci/control-artifacts/v1'
+    bundle = scoped(root, relative)
+    if not bundle.exists():  # Older, explicitly selected control-bundle fixtures.
+        return [], {}
+    manifest_path = scoped(root, relative + '/manifest.json')
+    if manifest_path.stat().st_size > 2 * 1024 * 1024:
+        raise ValueError('oversized historical artifact manifest')
+    manifest = load(manifest_path.read_bytes())
+    archive = scoped(root, relative + '/inputs.tar.xz')
+    if (manifest['schema_version'] != 'rick-ci-historical-artifacts.v1' or
+            archive.stat().st_size > MAX_TOTAL or sha(archive.read_bytes()) != manifest['archive_sha256']):
+        raise ValueError('historical artifact bundle checksum/schema mismatch')
+    entries = manifest['files']
+    if not entries or len(entries) > 200 or sum(e['size'] for e in entries) > MAX_TOTAL:
+        raise ValueError('invalid historical artifact inventory/size')
+    expected, data = {}, {}
+    prefixes = ('.runtime/prod12-control/', '.runtime/prod12-api/',
+                '.runtime/prod12-worker/', '.runtime/implementation-aud15-20261015/')
+    for e in entries:
+        target = e['target']
+        scoped(root, target)
+        parts = Path(target).parts
+        if (target != e['member'] or Path(target).as_posix() != target or target in expected or not target.startswith(prefixes) or
+                Path(target).suffix not in {'.json', '.jsonl', '.log', '.md', '.py', '.xml'} or
+                any(part.startswith('.env') for part in parts) or
+                type(e['size']) is not int or not 0 <= e['size'] <= MAX_MEMBER):
+            raise ValueError('unsafe historical artifact target')
+        expected[target] = e
+    with tarfile.open(archive, 'r:xz') as stream:
+        for member in stream:
+            e = expected.get(member.name)
+            if e is None or member.name in data or not member.isfile() or member.size != e['size']:
+                raise ValueError('historical artifact inventory/type mismatch')
+            content = stream.extractfile(member).read(MAX_MEMBER + 1)
+            if sha(content) != e['sha256']:
+                raise ValueError('historical artifact checksum mismatch')
+            data[member.name] = content
+    if set(data) != set(expected):
+        raise ValueError('missing historical artifact')
+    return entries, data
+
+
 def restore(root, bundle, check=False):
     manifest, data = read_bundle(bundle)
+    extra, extra_data = read_runtime_history(root)
+    if set(data) & set(extra_data):
+        raise ValueError('duplicate control/historical artifact target')
+    data.update(extra_data)
+    manifest = {**manifest, 'files': [*manifest['files'], *extra]}
     sys.path.insert(0, str(root / 'scripts/state_of_art'))
     views = module(root, 'scripts/state_of_art/review_control_views.py', 'ci_views')
     expected_views = views.expected_views(root)

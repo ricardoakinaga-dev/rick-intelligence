@@ -78,3 +78,32 @@ reais; suas falhas não devem ser ocultadas por condicionais de workflow.
 O publish-images existente não foi disparado: as políticas revisadas e um quality
 aprovado no SHA exato ainda são pré-condições. CI a8a83ca não prova código novo;
 a correção precisa de novo commit e de novo run remoto.
+
+## Segundo achado de clone e restauração fiel
+
+No [CI bde6c44](https://github.com/ricardoakinaga-dev/rick-intelligence/actions/runs/40213501168),
+SECURITY, CONTRACT, UNIT, FRONTEND, RAG-EVAL e SUPPLY-CHAIN passaram. FAST
+encontrou 51 arquivos históricos ausentes referenciados por ledgers/gates ativos.
+O bundle complementar em [control-artifacts](../../../ci/control-artifacts/README.md)
+conserva os 3.608.649 bytes originais, hashes e falhas; nenhuma referência ou
+aprovação dos ledgers foi reescrita. O restorer valida destinos limitados,
+inventário, tamanhos, hashes e ausência de conflitos antes de qualquer escrita.
+Sete casos de regressão cobrem payload íntegro, hash falso, traversal, path
+absoluto, duplicata, symlink e membro extra; todos passaram.
+
+A suíte ampliada da API terminou em **1.882 passed, 18 skipped**, cobertura
+**75,65%**. TLS também passou no candidato bde6c44 CLEAN (run
+`0be802285db84ff0`, cleanup PASS). O trace real teve 46 spans/nove categorias,
+API e worker distintos; a amostra de SLO registrou **breach** sob essa carga
+local. Isso foi preservado e não constitui aprovação de SLO/capacidade.
+O novo reparo de restauração exige outro commit/CI no mesmo branch; os resultados
+de bde6c44 não são apresentados como aprovação desse novo commit.
+
+O clone separado com histórico Git íntegro, dependências npm instaladas e
+nenhum artefato `.runtime` emprestado passou em **make validate**, incluindo
+restauração dos 51 originais e política de evidências sem a bolsa local. Foram
+verificados **1.138 links, zero erros**. A suíte canônica de CI passou em
+**305 testes**. Logs/recibo desse ensaio ficam em
+`.runtime/phase-3/unblock-a8a83ca/fresh-full-validate.log` e
+`fresh-full-result.json`. Não foram alterados o checker de links, o controlador,
+a política de retenção ou a quality bar congelada.

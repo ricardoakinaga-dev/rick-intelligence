@@ -9,6 +9,53 @@ from scripts.phase11.check_canonical_ci import ROOT, WORKFLOWS, check_canonical_
 from scripts.phase11.check_canonical_ci import EXPECTED_SUITES, WRAPPER
 
 
+@pytest.mark.parametrize('attack', [None, 'hash', 'traversal', 'absolute', 'duplicate', 'symlink', 'extra-member'])
+def test_historical_control_artifacts_reject_unsafe_or_forged_archives(tmp_path, monkeypatch, attack):
+    import hashlib
+    import importlib.util
+    import io
+    import json
+    import tarfile
+
+    monkeypatch.syspath_prepend(str(ROOT / 'docs/ci'))
+    spec = importlib.util.spec_from_file_location('historical_restore_test', ROOT / 'docs/ci/restore_control_inputs.py')
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    bundle = tmp_path / 'docs/ci/control-artifacts/v1'
+    bundle.mkdir(parents=True)
+    target = '.runtime/prod12-control/original-failure.log'
+    if attack == 'traversal':
+        target = '.runtime/prod12-control/../../README.md'
+    elif attack == 'absolute':
+        target = '/tmp/original-failure.log'
+    content = b'FAIL: original observation; never fabricated PASS\n'
+    entry = dict(target=target, member=target, size=len(content), sha256=hashlib.sha256(content).hexdigest())
+    if attack == 'hash':
+        entry['sha256'] = '0' * 64
+    with tarfile.open(bundle / 'inputs.tar.xz', 'w:xz') as stream:
+        item = tarfile.TarInfo(target)
+        if attack == 'symlink':
+            item.type, item.linkname = tarfile.SYMTYPE, '/tmp/foreign-file'
+            stream.addfile(item)
+        else:
+            item.size = len(content)
+            stream.addfile(item, io.BytesIO(content))
+        if attack == 'extra-member':
+            stream.addfile(tarfile.TarInfo('unlisted.log'))
+    manifest = dict(schema_version='rick-ci-historical-artifacts.v1',
+        archive_sha256=hashlib.sha256((bundle / 'inputs.tar.xz').read_bytes()).hexdigest(),
+        files=[entry, entry] if attack == 'duplicate' else [entry])
+    (bundle / 'manifest.json').write_text(json.dumps(manifest))
+    if attack is None:
+        entries, data = module.read_runtime_history(tmp_path)
+        assert data == {target: content}
+        assert entries == [entry]
+    else:
+        with pytest.raises(ValueError):
+            module.read_runtime_history(tmp_path)
+    assert not (tmp_path / '.runtime').exists()  # Validation never extracts.
+
+
 def _current_workflows() -> dict[str, str]:
     return {
         relative: (ROOT / relative).read_text(encoding="utf-8")

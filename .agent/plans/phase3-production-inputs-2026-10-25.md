@@ -37,7 +37,7 @@ em `.runtime/phase-3/unblock-a8a83ca/`.
 - [x] Exercitar Redis real isolado com TLS/mTLS, senha, leases, limite e circuito;
   rejeitar CA errada, hostname errado, cliente sem certificado, senha errada e
   downgrade plaintext. Chaves apenas em diretório privado ignorado.
-- [ ] Regressões, relatório e inventário de pendências atualizados.
+- [x] Regressões, relatório e inventário de pendências atualizados.
 
 O probe TLS é diagnóstico de laboratório com CA própria, nunca aprovação da
 CA/custos/topologia/identidade de produção. A promoção inteira permanece NO-GO
@@ -63,6 +63,16 @@ Verificado: 182 testes de segurança; 75 focados; 17 de regressão TLS; 266 web;
 make validate, compose-static, typecheck, web-build; auditorias test/runtime/npm
 com zero vulnerabilidades; trace real API/worker após atualização OTel PASS.
 TLS com proveniência fac0aebf030a428a PASS, cleanup PASS, source DIRTY (antes
-do commit), produção false. API coverage ampliada ainda em execução.
+do commit), produção false. API coverage ampliada: 1.882 passed, 18 skipped, 75,65%.
 Correções devem ser commitadas no mesmo branch candidato e um novo CI deve ser
 disparado; não importar a falha a8 como sucesso do novo SHA.
+
+### Portabilidade dos ledgers
+
+CI bde6c44: SECURITY/CONTRACT/UNIT/FRONTEND/RAG-EVAL/SUPPLY-CHAIN PASS;
+FAST FAIL por 51 artefatos históricos que só existiam localmente. Pacote
+complementar de bytes originais e hashes, sem alterar aceites/ledgers/bar.
+Regressão canônica completa: 305 passed, incluindo sete ataques ao loader.
+O restorer confere a união dos inventários antes de escrever, falhando em
+conflitos; não fabrica recibos nem permite importar aprovação.
+Nova continuação de CI permanece necessária para o SHA desse reparo.

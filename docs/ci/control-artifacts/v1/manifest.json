@@ -1,0 +1,314 @@
+{
+  "schema_version": "rick-ci-historical-artifacts.v1",
+  "source_head": "bde6c440d3a12d302c9e40054b8b53a94f4834b7",
+  "purpose": "Authentic PROD12/AUD15 artifacts already cited by the active ledgers; no rewritten ledger, imported approval, redaction or placeholder.",
+  "archive_sha256": "31c92f376bc51976d893d92d5568252f790ba4a9ec55975214d5fd54e8d83096",
+  "files": [
+    {
+      "member": ".runtime/implementation-aud15-20261015/control/adopt_aud15.py",
+      "target": ".runtime/implementation-aud15-20261015/control/adopt_aud15.py",
+      "size": 12614,
+      "sha256": "4ac3d1128613c91df7cfe8694bca8c8f93831794620a4a5ca36500eb9799d0ca"
+    },
+    {
+      "member": ".runtime/implementation-aud15-20261015/control/adopted-check-state.log",
+      "target": ".runtime/implementation-aud15-20261015/control/adopted-check-state.log",
+      "size": 1155,
+      "sha256": "14960a9030bc29fd547ff5647ca8618dc8e8422ab0800d13c5d3d172bb348d8c"
+    },
+    {
+      "member": ".runtime/implementation-aud15-20261015/control/backup-before-adoption/manifest.json",
+      "target": ".runtime/implementation-aud15-20261015/control/backup-before-adoption/manifest.json",
+      "size": 15201,
+      "sha256": "73f185d5bf940dcb241265b474aa4d8d18ecd4b045bc59f182c4c37b7ed29fce"
+    },
+    {
+      "member": ".runtime/implementation-aud15-20261015/control/check-state.log",
+      "target": ".runtime/implementation-aud15-20261015/control/check-state.log",
+      "size": 995,
+      "sha256": "ffa507c4716b473ba9f5d58035bca4598ec94d7723dc5277aafd6ec1821189ec"
+    },
+    {
+      "member": ".runtime/implementation-aud15-20261015/control/check_preservation.py",
+      "target": ".runtime/implementation-aud15-20261015/control/check_preservation.py",
+      "size": 3733,
+      "sha256": "e7ecdf2a59697feb396ab5c21951df41e102b9ea665c25c7b8d415b9164bda70"
+    },
+    {
+      "member": ".runtime/implementation-aud15-20261015/control/control-plane.log",
+      "target": ".runtime/implementation-aud15-20261015/control/control-plane.log",
+      "size": 1569,
+      "sha256": "4fb3e96cd337325e24b95b8887e9215cb303867c21ea1ff1f6ef8c72a0cf17d0"
+    },
+    {
+      "member": ".runtime/implementation-aud15-20261015/control/final-checkpoint/check-state-reconciled.log",
+      "target": ".runtime/implementation-aud15-20261015/control/final-checkpoint/check-state-reconciled.log",
+      "size": 995,
+      "sha256": "21727061f6cab4c994951d9bbb1d428a03260a5e6eea6ded022a0026816f67af"
+    },
+    {
+      "member": ".runtime/implementation-aud15-20261015/control/final-checkpoint/check-state.log",
+      "target": ".runtime/implementation-aud15-20261015/control/final-checkpoint/check-state.log",
+      "size": 1114,
+      "sha256": "a7e2c9ffb02d8e815797955fefd7cd423c5020a2bdf47512559cef6fce677bde"
+    },
+    {
+      "member": ".runtime/implementation-aud15-20261015/control/final-checkpoint/control-plane.log",
+      "target": ".runtime/implementation-aud15-20261015/control/final-checkpoint/control-plane.log",
+      "size": 1669,
+      "sha256": "81ebe4d8cb5e61716e626277a9c3f7889a273ff5914edb8756c16e95c845dae6"
+    },
+    {
+      "member": ".runtime/implementation-aud15-20261015/control/final-checkpoint/final-integrity-proof.json",
+      "target": ".runtime/implementation-aud15-20261015/control/final-checkpoint/final-integrity-proof.json",
+      "size": 2133,
+      "sha256": "4d7ffa6370b32f7ffb277eb32c2e2fe12d4ebb02b532a7b4cbbf0f9f4116f134"
+    },
+    {
+      "member": ".runtime/implementation-aud15-20261015/control/final-checkpoint/guarded-inputs.json",
+      "target": ".runtime/implementation-aud15-20261015/control/final-checkpoint/guarded-inputs.json",
+      "size": 978,
+      "sha256": "fa484d5c4f74f63762588871f5f44df2fcdfe74433394a615695a92b3b939f3a"
+    },
+    {
+      "member": ".runtime/implementation-aud15-20261015/control/final-checkpoint/make-validate.log",
+      "target": ".runtime/implementation-aud15-20261015/control/final-checkpoint/make-validate.log",
+      "size": 3102,
+      "sha256": "fd3208c0f2f650382be122dac061a40469de4e8009200bf126cf599b56e72685"
+    },
+    {
+      "member": ".runtime/implementation-aud15-20261015/control/final-checkpoint/preservation-original-floor.json",
+      "target": ".runtime/implementation-aud15-20261015/control/final-checkpoint/preservation-original-floor.json",
+      "size": 11869,
+      "sha256": "6cd28fe974e5a6ead844058f4766d7971095a785fcf4fd65feb51b3493a2b834"
+    },
+    {
+      "member": ".runtime/implementation-aud15-20261015/control/final-checkpoint/reconciled-control-plane.log",
+      "target": ".runtime/implementation-aud15-20261015/control/final-checkpoint/reconciled-control-plane.log",
+      "size": 1571,
+      "sha256": "6a9806d8601ac46a754b70de8c1ea03219fdec9ee5f15532929177546346b2e9"
+    },
+    {
+      "member": ".runtime/implementation-aud15-20261015/control/final-checkpoint/reconciled-diff-check.log",
+      "target": ".runtime/implementation-aud15-20261015/control/final-checkpoint/reconciled-diff-check.log",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "member": ".runtime/implementation-aud15-20261015/control/final-checkpoint/reconciled-make-validate.log",
+      "target": ".runtime/implementation-aud15-20261015/control/final-checkpoint/reconciled-make-validate.log",
+      "size": 3586,
+      "sha256": "b7555dfc2699c56129dac3b9f48cc74023f14be66bd0b5295969db54ebf1fb8e"
+    },
+    {
+      "member": ".runtime/implementation-aud15-20261015/control/final-checkpoint/reconciled-validation-results.json",
+      "target": ".runtime/implementation-aud15-20261015/control/final-checkpoint/reconciled-validation-results.json",
+      "size": 616,
+      "sha256": "4561cc09e00ee4fc161c3062bd4a112e204afb8785010c9158be9ece614e8fed"
+    },
+    {
+      "member": ".runtime/implementation-aud15-20261015/control/final-checkpoint/validation-results.json",
+      "target": ".runtime/implementation-aud15-20261015/control/final-checkpoint/validation-results.json",
+      "size": 1717,
+      "sha256": "74c92dc9d8dfba689fad8e76610fa098b3e5eafda41833ea56df6c54e067045d"
+    },
+    {
+      "member": ".runtime/implementation-aud15-20261015/control/make-validate.log",
+      "target": ".runtime/implementation-aud15-20261015/control/make-validate.log",
+      "size": 3583,
+      "sha256": "24a29f879b963a1d88185700cf4d55431d4163898edac28b6e29d223b32ea09c"
+    },
+    {
+      "member": ".runtime/implementation-aud15-20261015/control/preservation-proof.json",
+      "target": ".runtime/implementation-aud15-20261015/control/preservation-proof.json",
+      "size": 11869,
+      "sha256": "73c7db4d913a59708525328c8a46380d432442d2318558434d189e5ab8a94b97"
+    },
+    {
+      "member": ".runtime/implementation-aud15-20261015/control/recovery-tests.log",
+      "target": ".runtime/implementation-aud15-20261015/control/recovery-tests.log",
+      "size": 114,
+      "sha256": "ba4b436e3b65d9563aaad9077f2b4c3721602d30fa3a3957057ece0fe1f49c37"
+    },
+    {
+      "member": ".runtime/implementation-aud15-20261015/control/validation-results.json",
+      "target": ".runtime/implementation-aud15-20261015/control/validation-results.json",
+      "size": 2509,
+      "sha256": "a6354d1ae416ada601ee41ce7ebd01253e0eaf4c37b5bda1e36f87208f2849eb"
+    },
+    {
+      "member": ".runtime/implementation-aud15-20261015/lead/browser-production-4.log",
+      "target": ".runtime/implementation-aud15-20261015/lead/browser-production-4.log",
+      "size": 48036,
+      "sha256": "5de873197fffa59803976b05b83d3f84e13da3459fb089af56b90cd94e379c9c"
+    },
+    {
+      "member": ".runtime/implementation-aud15-20261015/lead/candidate-after-browser-round5.json",
+      "target": ".runtime/implementation-aud15-20261015/lead/candidate-after-browser-round5.json",
+      "size": 896,
+      "sha256": "112c0d35fac4fda37ed3253f3a51e614bce5fe14c42724d10f6ca53b4582ae23"
+    },
+    {
+      "member": ".runtime/implementation-aud15-20261015/lead/candidate-after-integrated-round5.json",
+      "target": ".runtime/implementation-aud15-20261015/lead/candidate-after-integrated-round5.json",
+      "size": 417,
+      "sha256": "69fd6ae7e898536175b75ccfcc1ac9e5cc5db55da2d49ad35cbbefa2cf5822d9"
+    },
+    {
+      "member": ".runtime/implementation-aud15-20261015/lead/candidate-before-final-round-5.json",
+      "target": ".runtime/implementation-aud15-20261015/lead/candidate-before-final-round-5.json",
+      "size": 91394,
+      "sha256": "34e2281519246ca502106511ea18a2c7a003d7756e1c6a4154b1edc8b2cf97ee"
+    },
+    {
+      "member": ".runtime/implementation-aud15-20261015/lead/ci-final-node22-4.log",
+      "target": ".runtime/implementation-aud15-20261015/lead/ci-final-node22-4.log",
+      "size": 19585,
+      "sha256": "bbb06ae7328d48cf36bb8bc8e41793a48253a247c8e114811b6081a6abf2482c"
+    },
+    {
+      "member": ".runtime/implementation-aud15-20261015/lead/final-critic.md",
+      "target": ".runtime/implementation-aud15-20261015/lead/final-critic.md",
+      "size": 7044,
+      "sha256": "42063a58c83a8e745fbf2d31707568e568897308dfd11cd66058e7aaaf25c629"
+    },
+    {
+      "member": ".runtime/implementation-aud15-20261015/lead/python-final-cohort.json",
+      "target": ".runtime/implementation-aud15-20261015/lead/python-final-cohort.json",
+      "size": 8612,
+      "sha256": "2ce39f7bf0b473f7245bcd2dbf440d1e4126747e9319fa01e49532354a78b77f"
+    },
+    {
+      "member": ".runtime/implementation-aud15-20261015/lead/python-full-3-control-complement.log",
+      "target": ".runtime/implementation-aud15-20261015/lead/python-full-3-control-complement.log",
+      "size": 108,
+      "sha256": "8072de49809f51f03035e15bbbd8d4ec115ec569ba83a334667e0a7a28ebda1b"
+    },
+    {
+      "member": ".runtime/implementation-aud15-20261015/lead/python-full-3-control-complement.xml",
+      "target": ".runtime/implementation-aud15-20261015/lead/python-full-3-control-complement.xml",
+      "size": 2446,
+      "sha256": "1dbcca62bed52ecc69b1c9c0e61b03dd10f9e708b1fbd71fdbc2174e57763458"
+    },
+    {
+      "member": ".runtime/implementation-aud15-20261015/lead/python-full-3.log",
+      "target": ".runtime/implementation-aud15-20261015/lead/python-full-3.log",
+      "size": 796057,
+      "sha256": "5b36d2671a2dea3d3aa18429acdfaef840efa454bfcb42c1ee85d7fc858917db"
+    },
+    {
+      "member": ".runtime/implementation-aud15-20261015/lead/python-full-3.xml",
+      "target": ".runtime/implementation-aud15-20261015/lead/python-full-3.xml",
+      "size": 2245493,
+      "sha256": "8dbb0be5fb408772a3f534bbfb38f8ab8c80b560cbf36021e60e6b66f5c398ee"
+    },
+    {
+      "member": ".runtime/implementation-aud15-20261015/lead/web-build-final-matrix-4.log",
+      "target": ".runtime/implementation-aud15-20261015/lead/web-build-final-matrix-4.log",
+      "size": 1528,
+      "sha256": "11dbf8d7fb5c989e916e0ced5b802abe429f286d3ace5fcc15bcd9125ecc2d73"
+    },
+    {
+      "member": ".runtime/prod12-api/logout-red-valid.json",
+      "target": ".runtime/prod12-api/logout-red-valid.json",
+      "size": 959,
+      "sha256": "6e6601a1c10f0ec2c49361dac09aae3c22471a6352291c54cf397be835832a73"
+    },
+    {
+      "member": ".runtime/prod12-control/agent-adopted.log",
+      "target": ".runtime/prod12-control/agent-adopted.log",
+      "size": 1060,
+      "sha256": "2f229033b506f9346210c232d45c4d8cd1890697b4f62a309b95c0deeb10e964"
+    },
+    {
+      "member": ".runtime/prod12-control/agent-baseline.log",
+      "target": ".runtime/prod12-control/agent-baseline.log",
+      "size": 994,
+      "sha256": "ca93e8d202410c6d848af1eb61ef3758bbca0687f19e3ad1d7a49827ea7bd54f"
+    },
+    {
+      "member": ".runtime/prod12-control/backup-before-relocation/manifest.json",
+      "target": ".runtime/prod12-control/backup-before-relocation/manifest.json",
+      "size": 1802,
+      "sha256": "b8f9738b000daf08002b0d413ffedd89c4d0dea95e256c1308c730609334881b"
+    },
+    {
+      "member": ".runtime/prod12-control/control-inputs-final.log",
+      "target": ".runtime/prod12-control/control-inputs-final.log",
+      "size": 418,
+      "sha256": "588bdfec84b7a8d75b6be506e76b8f4eea7e30ccde070c9be4c566584754a6e0"
+    },
+    {
+      "member": ".runtime/prod12-control/control-plane-final.log",
+      "target": ".runtime/prod12-control/control-plane-final.log",
+      "size": 1568,
+      "sha256": "8b1bd2822efd9a534cc1bc6ff55bcc172400db722b3085bab3360cc4c0c7c29a"
+    },
+    {
+      "member": ".runtime/prod12-control/gauntlet-baseline.log",
+      "target": ".runtime/prod12-control/gauntlet-baseline.log",
+      "size": 103,
+      "sha256": "fe7acc58c4850f15bbb50da0774d2f1b5b1fd62b58fa6192321791a49244fd20"
+    },
+    {
+      "member": ".runtime/prod12-control/gauntlet-drift-rejected.log",
+      "target": ".runtime/prod12-control/gauntlet-drift-rejected.log",
+      "size": 93,
+      "sha256": "067523a39c06b965ec8c94169f65e69684bfe964a4eba9097ac24beeac92c257"
+    },
+    {
+      "member": ".runtime/prod12-control/make-validate-final.log",
+      "target": ".runtime/prod12-control/make-validate-final.log",
+      "size": 3582,
+      "sha256": "c7910038e2113500a5a023dbf3db55f193550a2f539bfbd22eb3d30aaff6896e"
+    },
+    {
+      "member": ".runtime/prod12-control/preservation-proof.json",
+      "target": ".runtime/prod12-control/preservation-proof.json",
+      "size": 726,
+      "sha256": "74d6cfa8330da6c69130a7f07303176e88bd3ea2b4f589565abb2a56c5d9435a"
+    },
+    {
+      "member": ".runtime/prod12-control/provisional-event-repair-audit.json",
+      "target": ".runtime/prod12-control/provisional-event-repair-audit.json",
+      "size": 2007,
+      "sha256": "3948d472b755463a4ec77152b7987891afd444302b923339ccdf62781858cb55"
+    },
+    {
+      "member": ".runtime/prod12-control/recovery-tests-final.log",
+      "target": ".runtime/prod12-control/recovery-tests-final.log",
+      "size": 110,
+      "sha256": "23cd81316066f500ccc1b56e47a2926cbdc19eb6e32eb5fd1201898887059bae"
+    },
+    {
+      "member": ".runtime/prod12-control/recovery-tests-post-relocation.log",
+      "target": ".runtime/prod12-control/recovery-tests-post-relocation.log",
+      "size": 110,
+      "sha256": "01f751b137328f97b5d440a4fc354b498d90b679c59f8ef3510d4161e8e01b0a"
+    },
+    {
+      "member": ".runtime/prod12-control/rejected-entry/.agent/execution-log.jsonl",
+      "target": ".runtime/prod12-control/rejected-entry/.agent/execution-log.jsonl",
+      "size": 279630,
+      "sha256": "129c44a925558fad6eac1f7f87717f691d7803750e3f8844513773fded275d59"
+    },
+    {
+      "member": ".runtime/prod12-control/rejected-entry/.agent/gates/prod12-local-implementation-ready.json",
+      "target": ".runtime/prod12-control/rejected-entry/.agent/gates/prod12-local-implementation-ready.json",
+      "size": 4241,
+      "sha256": "6f1298a29cb8dd26e839756e75d55421aa2f4055203402b56427974c089f518c"
+    },
+    {
+      "member": ".runtime/prod12-control/relocation-result.json",
+      "target": ".runtime/prod12-control/relocation-result.json",
+      "size": 1238,
+      "sha256": "abcfcf963dabb5f3901efab3becf0a0e57bb02075e73c99e9522a24ee31428fd"
+    },
+    {
+      "member": ".runtime/prod12-worker/READY.md",
+      "target": ".runtime/prod12-worker/READY.md",
+      "size": 5700,
+      "sha256": "5b2881efaabd2840f55e3efee2af171ed952a46613b4c6300069d3ba7100a619"
+    }
+  ]
+}
