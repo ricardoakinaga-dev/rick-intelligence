@@ -179,7 +179,20 @@ tabelas de produção; o `production_safe=false` é explícito.
 `.runtime/phase-3/preflight.json` (topologia Compose canônica) está ausente.
 É um bloqueio de topologia, não do restore.
 
-## 8. Limitações e próximo passo
+## 8. File-security gate local
+
+`make file-security-runtime` com
+`RICK_FILE_SECURITY_RUNTIME_PATH=scripts/phase11/local_file_security_runtime.py`
+retornou **PASS** nos **10/10** casos obrigatórios: path-traversal, fake-mime,
+malformed-pdf, huge-page-count, deep-archives, decompression-bomb, polyglot,
+invalid-unicode, parser-hang e oversized-metadata. `production_safe=false`.
+
+**Limite:** oito casos usam o `ProcessParserRunner` real; `parser-hang` usa um
+filho limitado e morto para provar timeout/terminação, e `oversized-metadata`
+aplica a política de tamanho antes do parser. É evidência local do gate, não
+uma homologação de todos os parsers ou de produção.
+
+## 9. Limitações e próximo passo
 
 - Containers e fixture são efêmeros e loopback; não autorizam promoção.
 - O gate de provider usa um servidor OpenAI-compatible local de fixture, não um
@@ -190,7 +203,7 @@ tabelas de produção; o `production_safe=false` é explícito.
   executar golden path e restore com composição autorizada e vincular os
   resultados ao pacote de release.
 
-## 9. Artefatos locais
+## 10. Artefatos locais
 
 `.runtime/phase-2/postgres-runtime-gate.json`,
 `.runtime/phase-3/multi-worker-runtime-gate.json`,
