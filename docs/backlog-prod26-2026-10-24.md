@@ -185,7 +185,7 @@ Este documento é **especificação**, não ledger de execução. Os 22 contrato
 **Entrega:** `seed → backup → destroy → restore → rebuild → verify`; checksums, counts, ACL pós-restore, RPO/RTO e rollback/roll-forward.
 **Aceite:** restore verificado; RPO/RTO medidos; tenant A/B pós-restore; runbook atualizado; nenhuma simulação local aceita como DR.
 **Evidência:** relatório de restore + tempos + checksums + runbook.
-**Status local (24/10):** `VERIFY` parcial — `PASS` local no gate formal `make restore-runtime`: seed→backup→destroy→restore→rebuild→verify, RPO 0,0 s e RTO 3,823 s, componentes PostgreSQL/object/jobs/audit/evidence/Qdrant; `production_safe=false`; envelope Phase 3 `BLOCKED_EXTERNAL` por preflight de topologia ausente. Ver [gates locais](<reports/evidence/prd26-2026-10-24/local-runtime-gates.md>).
+**Status local (24/10):** `VERIFY` parcial — `PASS` local no gate formal `make restore-runtime`: seed→backup→destroy→restore→rebuild→verify, RPO 0,0 s e RTO 3,823 s, componentes PostgreSQL/object/jobs/audit/evidence/Qdrant; `production_safe=false`; envelope Phase 3 `BLOCKED_EXTERNAL` por preflight de topologia ausente; o Compose dev não fica ready porque Redis sem TLS mantém `production_safe=false`. Ver [gates locais](<reports/evidence/prd26-2026-10-24/local-runtime-gates.md>).
 **Herda:** PROD12-045.
 
 ### E4 — Identidade, providers e operação

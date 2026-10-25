@@ -179,6 +179,13 @@ tabelas de produção; o `production_safe=false` é explícito.
 `.runtime/phase-3/preflight.json` (topologia Compose canônica) está ausente.
 É um bloqueio de topologia, não do restore.
 
+**Causa do preflight:** o Compose dev usa `RICK_ENV=dev` e healthcheck
+`/health/ready`, mas o Redis local não tem TLS e o `RedisRateLimiter`
+permanece `production_safe=false`; o endpoint devolve 503 e `make up --wait`
+não admitiria a pilha. Corrigir exige decisão explícita entre Redis TLS no lab
+ou um contrato de readiness específico de dev; não se deve enfraquecer o gate
+de produção.
+
 ## 8. File-security gate local
 
 `make file-security-runtime` com
