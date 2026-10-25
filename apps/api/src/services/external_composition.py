@@ -356,6 +356,13 @@ def _canonical_job_result(job: object, result: object) -> JobResult:
     )
 
 
+def _redis_health_probe(settings: ApiSettings, rate_limiter: object) -> object:
+    """Select liveness for disposable dev/test and production readiness otherwise."""
+    if settings.environment in {"test", "dev", "local"}:
+        return rate_limiter.health_check
+    return rate_limiter.readiness_check
+
+
 def build_external_providers(
     settings: ApiSettings,
     inputs: ExternalCompositionInputs,
@@ -684,11 +691,14 @@ def build_external_providers(
             return ok if isinstance(ok, bool) else result
         return check
 
+    # Production/staging require the package-approved production capability
+    # (TLS + auth). A disposable dev/test lab may use a plain loopback Redis;
+    # its readiness is liveness only and never claims production safety.
     health_checks = {
         "postgres": probe(knowledge.health_check),
         "qdrant": probe(vectors.health_check),
         "queue": probe(queue.health_check),
-        "redis": probe(rate_limiter.readiness_check),
+        "redis": probe(_redis_health_probe(settings, rate_limiter)),
         "embedding_provider": probe(embeddings.health_check),
     }
     # Register checks at the same names used by the production lifecycle. A

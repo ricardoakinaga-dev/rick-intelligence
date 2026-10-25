@@ -181,10 +181,12 @@ tabelas de produção; o `production_safe=false` é explícito.
 
 **Causa do preflight:** o Compose dev usa `RICK_ENV=dev` e healthcheck
 `/health/ready`, mas o Redis local não tem TLS e o `RedisRateLimiter`
-permanece `production_safe=false`; o endpoint devolve 503 e `make up --wait`
-não admitiria a pilha. Corrigir exige decisão explícita entre Redis TLS no lab
-ou um contrato de readiness específico de dev; não se deve enfraquecer o gate
-de produção.
+permanece `production_safe=false`; o endpoint devolvia 503.
+
+**Correção aplicada:** `_redis_health_probe` usa liveness (`health_check`)
+para `test`/`dev`/`local` e readiness (`readiness_check`) apenas para
+`production`; teste dedicado passou. O gate de produção não foi enfraquecido.
+O preflight ainda exige as imagens e a pilha Compose completas.
 
 ## 8. File-security gate local
 
