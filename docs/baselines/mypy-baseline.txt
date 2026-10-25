@@ -29,3 +29,11 @@ apps/api/src/services/audit.py = 0
 apps/api/src/services/audit_event.py = 0
 apps/api/src/services/audit_operations_store.py = 0
 apps/api/src/services/postgres_audit.py = 0
+
+# PRD26-011 (2026-10-24): superfícies de segurança, CSRF, contexto de request,
+# erros e modelos adotadas com zero erros. Nenhum limite anterior foi reduzido.
+apps/api/src/core/security.py = 0
+apps/api/src/core/csrf.py = 0
+apps/api/src/core/request_context.py = 0
+apps/api/src/core/errors.py = 0
+apps/api/src/models.py = 0

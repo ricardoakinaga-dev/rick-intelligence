@@ -4,7 +4,7 @@
 **Baseline:** [auditoria AUD24](<reports/relatorio-auditoria-2026-10-24.md>) — 74,7/100.
 **Documentos relacionados:** [plano executivo](<plans/execplan-aud24-2026-10-24.md>) e [backlog](<backlog-auditoria-2026-10-24.md>).
 **Regra:** este roadmap não é ledger de execução, não adota tarefas no [controlador](<../.agent/backlog.json>) e não autoriza serviços externos, DDL real, deploy ou promoção. **AUD24-D1 ratificada:** [ADR-024](<architecture/adr/ADR-024-audit-outcome-and-revocation-ordering.md>) — A+ em duas etapas; OIDC fora do perfil de produção.
-**Status local em 24/10/2026:** M0/G0 `PASS`; M1 etapas 1–2 + 013–018 (live PG/IdP `NOT_RUN`); M2 020–025 (E2E `NOT_RUN`); M3 CONTRACT verde, candidato sujo (031/034 abertos); M4 040/042, 043 em medição, 041/044/045 pendentes; M5–M7 `BLOCKED_EXTERNAL` com [pacote preparado](operations/aud24-m5-m7-external-package.md).
+**Status local em 24/10/2026 (atualizado após M3/M5):** M0/G0 `PASS`; M1 010–018 locais `PASS` (IdP real `NOT_RUN`); M2 020–025 `PASS` com E2E 363/363 em produção; M3 CONTRACT verde e candidato limpo em `dc79ec6`, 031 coberto, 034 (CI remoto) `BLOCKED_EXTERNAL`; M4 040/042/043 com evidência, 041/044/045 com D04/AT humano pendentes; M5 PostgreSQL/Redis/S3/Qdrant e multi-worker **8/8** `PASS` em lab descartável; M6/M7 `BLOCKED_EXTERNAL`. Nenhum aceite, release ou promoção.
 
 ## 1. Objetivo e ponto de partida
 

@@ -1,6 +1,6 @@
 # Release and operations runbook
 
-Status: `REFERENCE / NOT_RUN`.
+Status: `REFERENCE / PARTIAL RUNTIME EVIDENCE`.
 
 The executable topology reference is
 `infrastructure/compose/compose.reference.yml`. It requires immutable
@@ -38,8 +38,12 @@ logging secret values.
 
 ## Current environment evidence
 
-Docker/Compose, external Postgres, Redis, Qdrant, object storage, production
-secrets, telemetry collector, and live deployment were unavailable in this
-run. Compose startup, migration execution, backup/restore, canary, rollback,
-alert delivery, and production performance are therefore `NOT_RUN`, not
-inferred from static files.
+On 24/10/2026 a disposable loopback lab ran PostgreSQL 16.4, Redis 7.4,
+Qdrant 1.12.5 and MinIO, applying 11 migrations and exercising queue fencing,
+DLQ/replay, S3/Qdrant lifecycle and a multi-worker crash matrix of 8/8 points
+([evidence](../reports/evidence/auditoria-2026-10-24/m5-lab-runtime.md)). This
+is lab evidence, not production topology. Production secrets, external
+identity, a paid provider, telemetry collector, integrated backup/restore,
+canary, rollback, performance/chaos/soak and live deployment remain `NOT_RUN`;
+Compose startup was validated statically only. None of those gaps is inferred
+from static files or from the lab's loopback containers.

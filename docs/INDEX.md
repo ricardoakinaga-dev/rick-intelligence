@@ -1,6 +1,7 @@
 # Índice canônico de documentação
 
 **Status:** CURRENT para o checkout auditado.
+**Atualização de avaliação — 24/10/2026 (AVAL24/PRD26):** a [avaliação independente AVAL24](<reports/avaliacao-independente-2026-10-24.md>) registra **78,0/100** e produção `NO-GO` no HEAD `dc79ec6`, worktree limpo no início da avaliação; 6.043 testes Python, 265 web e 363/363 E2E em produção. O [plano executivo PRD26](<plans/execplan-prod26-2026-10-24.md>), o [roadmap PRD26](<roadmap-prod26-2026-10-24.md>) e o [backlog PRD26](<backlog-prod26-2026-10-24.md>) propõem 22 contratos de coordenação/aceite, herdam AUD24/PROD12 sem duplicar IDs e mantêm oito marcos. Planejamento `PROPOSTO`: nenhum item foi adotado no [controlador](../.agent/backlog.json), nenhum aceite anterior foi alterado e nenhuma execução externa, DDL, deploy ou promoção foi autorizada.
 **Atualização de planejamento — 24/10/2026:** a [auditoria AUD24](<reports/relatorio-auditoria-2026-10-24.md>) registra **74,7/100** e produção `NO-GO` no checkout `48e383c` com worktree sujo. A decisão AUD24-D1 foi ratificada no [ADR-024](<architecture/adr/ADR-024-audit-outcome-and-revocation-ordering.md>) (A+ em duas etapas; OIDC fora do perfil de produção). A primeira onda e as etapas 1–2 da identidade foram executadas localmente: G0 PASS, 6.040 testes Python, 263 web, 1.875 testes de API (79,22%) e CONTRACT verde; permanecem o gate live PostgreSQL/IdP, a tipagem AUD24-018, o candidato sujo e as ondas externas, portanto `NO-GO`. O [plano executivo AUD24](<plans/execplan-aud24-2026-10-24.md>), o [roadmap AUD24](<roadmap-auditoria-2026-10-24.md>) e o [backlog AUD24](<backlog-auditoria-2026-10-24.md>) propõem 29 contratos novos, herdam as obrigações PROD12 e mantêm oito marcos. Planejamento `PROPOSTO`: nenhum item foi adotado no [controlador](../.agent/backlog.json), nenhum aceite anterior foi alterado e nenhuma execução externa, DDL, deploy ou promoção foi autorizada.
 **Atualização de planejamento — 15/10/2026:** o [relatório AUD15](<reports/relatorio-auditoria-2026-10-15.md>) fundamenta o [backlog complementar](<backlog-auditoria-2026-10-15.md>) com 24 contratos novos e o [roadmap AUD15](<roadmap-auditoria-2026-10-15.md>) com oito marcos. As obrigações externas continuam nos IDs PROD12 existentes; novos IDs não foram adotados por este planejamento, nenhum aceite anterior foi alterado e produção permanece `NO-GO`. Resultados de testes citados são os da auditoria, não novas execuções nesta elaboração.
 **Atualização de planejamento — 12/10/2026:** [roadmap de produção](roadmap-producao-2026-10-12.md) e [backlog PROD12](backlog-producao-2026-10-12.md) propostos com 56 tarefas e oito marcos. A [baseline de 12/10](reports/baseline-producao-2026-10-12.md) registra achados/resultados do SHA `48e383c25ca4af32aa7ffe7e2367360ca9742c58`; a suíte ampliada falhou (7.713 passed, 6 failed, 221 skipped) e `make validate` ficou bloqueado por raiz do run. Nenhum código/gate/ledger/aceite anterior foi alterado pelo planejamento; implementação e produção não autorizadas por esses documentos. Promoção `NO-GO`.
@@ -14,10 +15,10 @@
 |---|---|---|
 | Estado do produto e comandos | [README](../README.md) | CURRENT |
 | Contribuição e segurança operacional | [CONTRIBUTING](../CONTRIBUTING.md) | CURRENT |
-| Arquitetura executável | [system-architecture.md](architecture/system-architecture.md) e [production-runtime.md](architecture/production-runtime.md) | CURRENT, runtime externo NOT_RUN |
+| Arquitetura executável | [system-architecture.md](architecture/system-architecture.md) e [production-runtime.md](architecture/production-runtime.md) | CURRENT, runtime externo parcial (lab M5); produção NOT_RUN |
 | Limites de dependência | [dependency-boundaries.json](architecture/dependency-boundaries.json) | CURRENT como regra automatizada |
 | Segurança e autorização | [authorization.md](architecture/authorization.md) e [production-runtime.md](architecture/production-runtime.md) | CURRENT, integração externa pendente; `security/` preserva decisões e evidências dos legados |
-| Operação e promoção | [release-readiness.md](operations/release-readiness.md) | REFERENCE / NOT_RUN |
+| Operação e promoção | [release-readiness.md](operations/release-readiness.md) | REFERENCE / PARTIAL RUNTIME EVIDENCE |
 | Baseline do planejamento de produção | [baseline-producao-2026-10-12.md](reports/baseline-producao-2026-10-12.md) | SNAPSHOT observado em 12/10; não é nova execução nem aprovação |
 | Roadmap para produção | [roadmap-producao-2026-10-12.md](roadmap-producao-2026-10-12.md) | PROPOSTO; sequência/gates, sem status de execução concorrente |
 | Backlog para produção | [backlog-producao-2026-10-12.md](backlog-producao-2026-10-12.md) | Especificação de 56 contratos; adoção anterior em TODO registrada no plano ativo; status/aceite somente no controlador, sem encerramento pelo planejamento AUD15 |
@@ -33,6 +34,10 @@
 | Plano executivo AUD24 | [plano de 24/10](<plans/execplan-aud24-2026-10-24.md>) | PROPOSTO; workstreams, decisões humanas, gates e primeiros 10 dias |
 | Roadmap AUD24 | [roadmap de 24/10](<roadmap-auditoria-2026-10-24.md>) | PROPOSTO; oito marcos M0–M7, dependências e gates locais/externos/decisão |
 | Backlog AUD24 | [backlog de 24/10](<backlog-auditoria-2026-10-24.md>) | PROPOSTO; 29 contratos novos e herança PROD12, sem ledger de execução |
+| Avaliação independente mais recente | [AVAL24](<reports/avaliacao-independente-2026-10-24.md>) | SNAPSHOT observado em 24/10; 78,0/100; NO-GO; worktree limpo |
+| Plano executivo PRD26 | [plano de 24/10](<plans/execplan-prod26-2026-10-24.md>) | PROPOSTO; workstreams, gates e decisões humanas |
+| Roadmap PRD26 | [roadmap de 24/10](<roadmap-prod26-2026-10-24.md>) | PROPOSTO; oito marcos M0–M7 e caminho crítico |
+| Backlog PRD26 | [backlog de 24/10](<backlog-prod26-2026-10-24.md>) | PROPOSTO; 22 contratos de coordenação/aceite e herança AUD24/PROD12 |
 | Snapshot AUD15 preservado | [relatório AUD15](<reports/relatorio-auditoria-2026-10-15.md>) | Observação histórica de 14/10 local–15/10 UTC; 74,6/100; NO-GO, sem reexecução neste planejamento |
 | Backlog complementar AUD15 | [backlog de 15/10](<backlog-auditoria-2026-10-15.md>) | PROPOSTO; 24 contratos novos, vínculos PROD12 e aceites, sem novo ledger de execução |
 | Roadmap complementar AUD15 | [roadmap de 15/10](<roadmap-auditoria-2026-10-15.md>) | PROPOSTO; oito marcos, dependências e gates locais/externos/promoção |
@@ -51,6 +56,10 @@
 
 ## Evidências e relatórios
 
+- [Avaliação independente AVAL24](<reports/avaliacao-independente-2026-10-24.md>): 78,0/100, 26 dimensões, comandos/exit codes e limites; leitura read-only do HEAD `dc79ec6` limpo.
+- [Plano executivo PRD26](<plans/execplan-prod26-2026-10-24.md>): workstreams, oito marcos, governança e decisões humanas para fechar a distância até produção.
+- [Roadmap PRD26](<roadmap-prod26-2026-10-24.md>): oito marcos M0–M7, caminho crítico, herança AUD24/PROD12 e critérios de parada.
+- [Backlog PRD26](<backlog-prod26-2026-10-24.md>): 22 contratos de coordenação/aceite com prioridade, dependências e herança sem duplicação.
 - [Relatório AUD24](<reports/relatorio-auditoria-2026-10-24.md>): 74,7/100, comandos/exit codes, 26 dimensões, achados AUD24-01…12 e limites; leitura read-only do checkout sujo.
 - [Plano executivo AUD24](<plans/execplan-aud24-2026-10-24.md>): objetivo, workstreams, marcos, riscos, governança e decisões humanas.
 - [Roadmap AUD24](<roadmap-auditoria-2026-10-24.md>): oito marcos, caminho crítico, portões externos e critérios de parada.

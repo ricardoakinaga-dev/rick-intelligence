@@ -40,6 +40,14 @@ its observed baseline in
 These planning artifacts add current defects and map pending runtime obligations;
 they do not adopt execution tasks, supersede prior acceptance, authorize deployment,
 or change the NO-GO decision.
+The latest independent assessment is
+[`avaliacao-independente-2026-10-24.md`](docs/reports/avaliacao-independente-2026-10-24.md)
+(**78,0/100**, `dc79ec6` candidate clean at evaluation, still `NO-GO`), with the proposed
+[`executive plan PRD26`](docs/plans/execplan-prod26-2026-10-24.md),
+[`roadmap PRD26`](docs/roadmap-prod26-2026-10-24.md) and
+[`backlog PRD26`](docs/backlog-prod26-2026-10-24.md) to close acceptance,
+external evidence and release gaps. These are `PROPOSTO`; they do not adopt tasks
+in the controller or authorize production.
 The preserved runtime-closure audit is
 [`triple-aaa-runtime-closure-current-audit.md`](docs/reports/triple-aaa-runtime-closure-current-audit.md);
 the predecessor audit remains

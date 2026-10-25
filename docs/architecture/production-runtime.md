@@ -35,5 +35,11 @@ the cooperative runner and is never used as proof of external runtime health.
   could not be drained.
 
 The local test matrix proves contracts, fakes and the parser child boundary.
-It does not prove network connectivity, PostgreSQL locking, two-worker
-fencing, crash recovery, live SIGTERM, provider behavior or deployment health.
+The disposable M5 lab also proves, against loopback containers, PostgreSQL
+migrations/constraints/query plans/queue fencing/DLQ/replay, Redis
+namespaces/leases/rate limits/fault recovery, S3/Qdrant lifecycle and a
+multi-worker crash matrix of 8/8 points. That evidence is lab-scoped: it does
+not prove production topology, TLS/auth, external identity, a paid provider,
+live SIGTERM, integrated restore, distributed observability,
+performance/chaos/soak or deployment health. Those remain `NOT_RUN` or
+`BLOCKED_EXTERNAL` and are never inferred from static files.

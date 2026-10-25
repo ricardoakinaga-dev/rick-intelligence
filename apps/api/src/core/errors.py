@@ -10,6 +10,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.types import Receive, Scope, Send
 from core.request_context import normalize_correlation_id, normalize_request_id
 from core.security import SECURITY_HEADERS
 from core.transport import _TransportClosed, is_transport_only
@@ -204,11 +205,11 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 class _ServerErrorResponse(JSONResponse):
     """Let native ServerErrorMiddleware rethrow the original after transport loss."""
 
-    def __init__(self, original: Exception, **kwargs):
+    def __init__(self, original: Exception, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self.original = original
 
-    async def __call__(self, scope, receive, send):
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         # No synthetic 500 intent for an observed, transport-only exception.
         if is_transport_only(scope, self.original):
             return

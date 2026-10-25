@@ -1,6 +1,15 @@
 import { defineConfig } from "@playwright/test";
-import { readFileSync, readdirSync } from "node:fs";
+import { mkdirSync, readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
+
+// Chrome's process-singleton socket cannot exceed the platform sun_path limit.
+// Keep the browser temp root short even when the caller's TMPDIR points deep
+// inside a workspace checkout (AUD24-032 / PRD26-010).
+const e2eTempRoot = process.env.RICK_WEB_E2E_TMPDIR || "/tmp/rick-e2e";
+mkdirSync(e2eTempRoot, { recursive: true });
+process.env.TMPDIR = e2eTempRoot;
+process.env.TMP = e2eTempRoot;
+process.env.TEMP = e2eTempRoot;
 
 const packageRoot = resolve(__dirname, "../../packages");
 const apiPythonPath = [resolve(__dirname, "../api/src"), ...readdirSync(packageRoot, { withFileTypes: true }).filter(entry => entry.isDirectory()).map(entry => resolve(packageRoot, entry.name, "src"))].join(":");
