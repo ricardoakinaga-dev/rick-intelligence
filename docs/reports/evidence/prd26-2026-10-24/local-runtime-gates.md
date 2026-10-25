@@ -123,10 +123,17 @@ passou a usar `user-reader`. Após a correção, o worker publicou o job:
 no Qdrant; `GET /api/v1/documents` retornou 200. A recuperação direta retornou
 1 evidência com score.
 
-**Chat com evidência:** a recuperação funciona, mas o provider fixture não emite
-marcadores de citação; o Professor retorna `citation_invalid` e a API responde
-`generation_failed` (500). Isso é limitação do fixture, não prova de resposta
-grounded. Próximo passo: fixture que ecoe `[cite:<evidence_id>]`.
+**Chat com evidência:** a recuperação direta retornou 1 evidência
+(`chunk_...0000`, score 0,4007, checksum de documento presente). Um fixture
+compatível passou a devolver `[cite:<evidence_id>]`; mesmo assim o Professor
+retornou `CITATION_INVALID`, `evidence_count=0`,
+`publication_validation=failed` e `decision_reason=publication_sources_changed`.
+O marcador de citação foi reconhecido; a falha está na revalidação de
+publicação, não no fixture.
+
+**Próximo passo:** comparar `document_checksum`, `title`, `evidence_id` e
+escopo entre `EvidenceDecisionGate.issue` e `validate_publication`; corrigir a
+revalidação antes de testar resposta grounded com citação.
 
 **Estado:** golden path de **upload → worker → publicação** `PASS` local; resposta
 grounded com citação ainda pendente de fixture compatível.
