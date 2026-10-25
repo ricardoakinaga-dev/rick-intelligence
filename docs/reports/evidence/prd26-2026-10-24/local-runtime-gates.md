@@ -47,9 +47,12 @@ explícito em Redis, objeto/vetor e provider.
 
 O Keycloak **26.7.3** foi instalado e iniciado em modo dev, com admin local
 descartável. `GET /realms/master` responde **200** em `127.0.0.1:18080`.
-O realm, client OIDC, memberships e usuários sintéticos A/B **não** foram
-provisionados; a aplicação ainda não foi apontada para este IdP. É instalação
-local, não prova de login/revogação.
+Foram provisionados o realm **`rick`**, o client confidencial **`rick-api`**
+e o usuário **`reader@example.invalid`**. O discovery
+`/realms/rick/.well-known/openid-configuration` responde e o **password grant**
+retorna access/refresh token. A aplicação ainda não foi apontada para este IdP,
+não há membership/roles A/B e não houve teste de revogação/logout; é prova de
+instalação e login local, não de isolamento multi-tenant.
 
 **Achado de infraestrutura:** o `compose.integration.yml` usa `internal: true`,
 e o Docker 29 não publica portas de host nessa rede. Para acesso do host foi
