@@ -240,7 +240,14 @@ class DeploymentRuntime:
 
     def run_forever(self) -> object:
         try:
-            return self.worker.run_forever()
+            result = self.worker.run_forever()
+            health = getattr(self.worker, "health", None)
+            if callable(health) and getattr(health(), "reason", None) == "queue_unavailable":
+                # The native daemon stops after its finite queue-error budget.
+                # Surface that fatal stop to the entrypoint as a failure;
+                # returning normally incorrectly reports process exit 0.
+                raise RuntimeError("worker_queue_unavailable")
+            return result
         finally:
             self._admin_audit_stop.set()
 

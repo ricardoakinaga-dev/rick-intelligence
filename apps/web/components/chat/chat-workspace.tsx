@@ -1075,7 +1075,7 @@ function ScopedChatWorkspace() {
                 {pendingAssistant ? (
                   <article className={`${styles.message} ${styles.assistantMessage} ${styles.streamingMessage} ${pendingIsInterrupted ? styles.interruptedMessage : ""}`} aria-label={pendingIsInterrupted ? "Resposta interrompida" : "Resposta provisória em andamento"}>
                     <div className={styles.messageHeader}><span className={styles.messageAuthor}><span className={`${styles.messageAvatar} ${styles.assistantAvatar}`} aria-hidden="true"><Bot size={15} /></span><strong>RICK</strong></span><span role="status" aria-live="polite" className={pendingIsInterrupted ? styles.interruptedLabel : styles.streamingLabel}>{pendingIsInterrupted ? "Resposta interrompida · não finalizada" : `Resposta provisória · ${pendingAssistant.answer ? "validando fontes…" : "consultando fontes…"}`}</span></div>
-                    <div className={styles.messageContent}>{pendingAssistant.answer || <span className={styles.typingDots} aria-label="Gerando resposta"><i /><i /><i /></span>}</div>
+                    <div className={styles.messageContent}>{pendingAssistant.answer || <span className={styles.typingDots} aria-hidden="true"><i /><i /><i /></span>}</div>
                     {pendingAssistant.citations.length ? <CitationList citations={pendingAssistant.citations} messageId={pendingAssistant.id} responseNumber={messages.length + 1} /> : null}
                     {pendingIsInterrupted ? <p className={styles.interruptedNote} role="status">Este conteúdo parcial não foi marcado como resposta concluída nem deve ser usado sem uma nova consulta.</p> : null}
                   </article>

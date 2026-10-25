@@ -538,6 +538,7 @@ const password = process.env.RICK_FRONTEND_LOGIN_PASSWORD;
 const tenant = process.env.RICK_FRONTEND_LOGIN_TENANT || "default";
 const viewports = JSON.parse(process.env.RICK_FRONTEND_VIEWPORTS);
 const browserExecutable = process.env.RICK_FRONTEND_BROWSER_EXECUTABLE || undefined;
+const localStates = require(process.env.RICK_FRONTEND_STATE_MODULE);
 
 function safeError(error) {
   return String(error && error.message ? error.message : error)
@@ -757,6 +758,7 @@ async function runViewport(browser, viewport, index) {
     await page.goto(`${webBase}/login?next=%2Fapp`, { waitUntil: "domcontentloaded" });
     await page.waitForFunction(() => document.documentElement.dataset.rickHydrated === "true", null, { timeout: 15000 });
     await waitVisible(page.getByRole("heading", { name: "Entre para continuar." }));
+    await page.getByLabel("Identificador da organização", { exact: true }).fill(tenant);
     result.states.login = { observed: true, url: new URL(page.url()).pathname };
     const loginAxe = await axeAudit(page);
     const loginContrast = await contrastAudit(page);
@@ -800,7 +802,8 @@ async function runViewport(browser, viewport, index) {
 
     await page.goto(`${webBase}/app/chat`, { waitUntil: "domcontentloaded" });
     await waitVisible(page.getByLabel("Pergunta"));
-    await page.getByLabel("Pergunta").fill("Quais documentos estão disponíveis?");
+    if (typeof localStates.prepareViewport === "function") await localStates.prepareViewport({ page });
+    await page.getByLabel("Pergunta").fill(process.env.RICK_FRONTEND_PROBE_QUERY || "Quais documentos estão disponíveis?");
     const chatResponse = page.waitForResponse((response) => response.url().includes("/api/v1/chat"), { timeout: 20000 });
     await page.getByRole("button", { name: "Consultar", exact: true }).click();
     const chatObserved = await chatResponse;
@@ -814,17 +817,23 @@ async function runViewport(browser, viewport, index) {
     const chatScreenshot = path.join(screenshotDir, `chat-${viewport.name}.png`);
     await page.screenshot({ path: chatScreenshot, fullPage: true, caret: "initial" });
     result.screenshots.push({ state: "chat", path: chatScreenshot, sha256: await sha256(chatScreenshot) });
+    await localStates.run({ page, context, result, webBase, screenshotDir, viewport, sha256, consoleErrors, requestFailures });
     result.api_responses = apiResponses;
     result.console_errors = consoleErrors;
     result.request_failures = requestFailures;
-    result.unexpected_console_errors = consoleErrors.filter((item) => !/Failed to load resource: the server responded with a status of (401|404) \(/.test(item));
-    result.unexpected_request_failures = requestFailures.filter((item) => item.error !== "net::ERR_ABORTED");
+    result.unexpected_console_errors = consoleErrors.filter((item, index) => !result.expected_console_indices.includes(index) && !/Failed to load resource: the server responded with a status of (401|404) \(/.test(item));
+    result.unexpected_request_failures = requestFailures.filter((item, index) => !result.expected_request_failure_indices.includes(index) && item.error !== "net::ERR_ABORTED");
     result.checks.api_backed = { login_200: apiResponses.some((item) => item.path.endsWith("/auth/login") && item.status === 200), session_200: apiResponses.some((item) => item.path.endsWith("/auth/me") && item.status === 200), chat_2xx: apiResponses.some((item) => item.path.endsWith("/chat") && item.status >= 200 && item.status < 300), no_interception: true };
     result.checks.unexpected_runtime_errors = { console: result.unexpected_console_errors.length, request_failures: result.unexpected_request_failures.length, passed: result.unexpected_console_errors.length === 0 && result.unexpected_request_failures.length === 0 };
     await context.close();
     return result;
   } catch (error) {
     result.error = safeError(error);
+    try {
+      const failureScreenshot = path.join(screenshotDir, `failure-${viewport.name}.png`);
+      await page.screenshot({ path: failureScreenshot, fullPage: false });
+      result.screenshots.push({ state: "failure", path: failureScreenshot, sha256: await sha256(failureScreenshot) });
+    } catch (_captureError) { /* Preserve the original execution failure. */ }
     result.api_responses = apiResponses;
     result.console_errors = consoleErrors;
     result.request_failures = requestFailures;
@@ -837,7 +846,7 @@ async function main() {
   const report = { schema_version: "rick-frontend-browser-evidence.v1", real_runtime: true, fixture_interception: false, runtime_mode: process.env.RICK_FRONTEND_RUNTIME_MODE || "unknown", web_url: new URL(webBase).origin, api_url: new URL(apiBase).origin, viewports: [], checks: {}, screenshots: [], limitations: ["This is a local/API-backed browser observation; it is not a production or independent visual approval."] };
   let browser;
   try {
-    browser = await chromium.launch({ headless: true, executablePath: browserExecutable });
+    browser = await chromium.launch({ headless: process.env.RICK_FRONTEND_NATIVE_ZOOM !== "1", executablePath: browserExecutable });
     for (let index = 0; index < viewports.length; index += 1) {
       try {
         const item = await runViewport(browser, viewports[index], index);
@@ -861,7 +870,8 @@ async function main() {
       contrast: contrast.every((item) => item.failures && item.failures.length === 0 && item.unknown && item.unknown.length === 0),
       touch: all.filter((item) => item.viewport.width <= 375).every((item) => item.checks.touch && item.checks.touch.touch_points > 0 && item.checks.touch.below_minimum.length === 0),
       screen_reader: all.every((item) => item.checks.screen_reader && item.checks.screen_reader.passed),
-      zoom: all.every((item) => item.checks.zoom && item.checks.zoom.passed),
+      zoom: all.every((item) => item.checks.zoom && item.checks.zoom.passed)
+        && all.some((item) => item.checks.zoom && item.checks.zoom.method === "native-browser-zoom-x11" && item.checks.zoom.passed),
       state_upload: all.every((item) => item.states && item.states.upload && item.states.upload.observed === true),
       state_documents: all.every((item) => item.states && item.states.documents && item.states.documents.observed === true),
       state_sources: all.every((item) => item.states && item.states.sources && item.states.sources.observed === true),
@@ -989,6 +999,7 @@ def _run_browser_probe(
     production_runtime: bool,
     timeout: float,
     evidence_dir: Path,
+    owned_local_runtime: bool = False,
 ) -> tuple[list[dict[str, Any]], bool, dict[str, Any]]:
     node = _tool("node")
     module = _find_playwright_module(root)
@@ -1049,6 +1060,7 @@ def _run_browser_probe(
             env.update(
                 {
                     "RICK_FRONTEND_PLAYWRIGHT_MODULE": str(module),
+                    "RICK_FRONTEND_STATE_MODULE": str(root / "scripts/phase11/local_frontend_states.cjs"),
                     "RICK_FRONTEND_AXE_PATH": str(axe),
                     "RICK_FRONTEND_BROWSER_EXECUTABLE": browser,
                     "RICK_FRONTEND_WEB_URL": runtime_url,
@@ -1059,7 +1071,8 @@ def _run_browser_probe(
                     "RICK_FRONTEND_LOGIN_PASSWORD": password,
                     "RICK_FRONTEND_LOGIN_TENANT": os.getenv("RICK_FRONTEND_LOGIN_TENANT", "default"),
                     "RICK_FRONTEND_VIEWPORTS": json.dumps(VIEWPORTS),
-                    "RICK_FRONTEND_RUNTIME_MODE": "approved-external" if managed is None else ("managed-production" if production_runtime else "managed-dev"),
+                    "RICK_FRONTEND_RUNTIME_MODE": "owned-local-product" if owned_local_runtime else (
+                        "external-runtime" if managed is None else ("managed-production" if production_runtime else "managed-dev")),
                 }
             )
             try:
@@ -1620,7 +1633,7 @@ def run_gate(
         "status": status,
         "runtime_claim": browser_claim,
         "production_safe": production_safe,
-        "environment": "approved-external" if web_url else "local-managed-api-backed-test",
+        "environment": "external-runtime" if web_url else "local-managed-api-backed-test",
         "observed_at": time.time(),
         "duration_seconds": round(time.time() - started_at, 3),
         "viewports": list(VIEWPORTS),

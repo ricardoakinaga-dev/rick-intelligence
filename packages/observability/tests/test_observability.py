@@ -359,6 +359,18 @@ def test_metrics_are_bounded_and_deterministic() -> None:
         registry.increment("api.errors")
 
 
+def test_histogram_p99_distinguishes_tail_and_observes_retention() -> None:
+    histogram = Histogram("api.latency", max_samples=100)
+    assert histogram.snapshot()["p99"] is None
+    for value in range(1, 101):
+        histogram.observe(value)
+    assert histogram.snapshot()["p95"] == 95
+    assert histogram.snapshot()["p99"] == 99
+    histogram.observe(1000)
+    assert histogram.snapshot()["p99"] == 100
+    assert histogram.snapshot()["max"] == 1000
+
+
 def test_sampling_correlation_and_slo_states() -> None:
     assert should_sample("trace-1", 0) is False
     assert should_sample("trace-1", 1) is True

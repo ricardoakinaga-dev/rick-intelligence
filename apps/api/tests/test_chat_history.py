@@ -5,6 +5,33 @@ import pytest
 from apps.api.tests.support import login_as
 
 
+@pytest.mark.parametrize("stream", [False, True])
+def test_slow_context_read_does_not_block_unrelated_http_or_lease_tasks(client, stream):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Event
+    from services.chat_history import InMemoryChatHistoryStore
+
+    entered, release = Event(), Event()
+    class SlowRead(InMemoryChatHistoryStore):
+        def get_context(self, **kwargs):
+            entered.set()
+            if not release.wait(3):
+                raise RuntimeError("bounded-read-not-released")
+            return super().get_context(**kwargs)
+    client.app.state.providers.chat_history = SlowRead()
+    login_as(client, "km@example.com")
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        chat = pool.submit(client.post, "/api/v1/chat", json={"message": "read-only responsiveness probe", "stream": stream})
+        try:
+            assert entered.wait(2)
+            health = pool.submit(client.get, "/health/live")
+            assert health.result(timeout=.75).status_code == 200
+            assert not chat.done()
+        finally:
+            release.set()
+        assert chat.result(timeout=3).status_code == 200
+
+
 def test_persisted_history_json_decoder_rejects_oversized_and_nonfinite_values():
     from services.chat_history import _decode_json
 

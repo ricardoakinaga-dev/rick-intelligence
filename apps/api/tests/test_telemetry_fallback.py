@@ -27,6 +27,15 @@ def _load_fallback(monkeypatch):
     return module
 
 
+def test_fallback_exports_measured_p99_without_inventing_empty_latency(monkeypatch):
+    module = _load_fallback(monkeypatch)
+    histogram = module.Histogram("api.latency", max_samples=100)
+    assert histogram.snapshot()["p99"] is None
+    for value in range(1, 101):
+        histogram.observe(value)
+    assert histogram.snapshot()["p99"] == 99
+
+
 def test_fallback_timeout_none_does_not_call_sink_on_the_caller_thread(monkeypatch):
     telemetry = _load_fallback(monkeypatch)
     entered = threading.Event()

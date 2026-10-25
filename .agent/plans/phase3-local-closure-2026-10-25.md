@@ -9,6 +9,37 @@ delimita o trabalho solicitado sem aceitar itens daquele backlog.
 
 ## Progress
 
+### Continuação após `d655815`
+
+Baseline limpa confirmada em `d655815108e4f93228243f3aa09b9191c7269c47`.
+O pedido mantém laboratório primeiro, sem ratificar critérios de produção.
+Contrato desta unidade: implementar harnesses locais de performance/soak
+com workloads reais, tenant próprio, concorrências 1/10/50/100 e amostras
+por operação; CPU/RAM/FD/conexões observados em /proc e fila/attempts no PG.
+Perf inclui API, retrieval, chat, ingestão e throughput do worker. Soak terá
+perfis locais curto/estendido com duração explícita, não equivalentes à janela
+de produção aprovada. Ausência/erro/timeout e qualquer matriz incompleta não
+recebem PASS; todos os recursos próprios são fechados também em falha.
+Chaos exige dependências realmente isoladas antes de interromper serviços;
+nunca encerrar a pilha compartilhada. Frontend deve observar ações reais e
+preservar falhas de zoom/estados até haver prova, sem browser route fixtures.
+Aceite do golden exige avaliador/corpus aprovado fornecido pelo dono. O usuário
+confirmou que esses materiais não existem e autorizou seguir com o laboratório;
+a aprovação continua pendente, sem inventar um avaliador aprovado.
+
+Relatório desta continuação:
+`docs/reports/evidence/prd26-2026-10-24/operational-closure.md`.
+
+- [x] Performance 20/20, 1.610 operações, geração citada e recarga persistida;
+  tenant/evidence 16/16 com quatro atores e 327 respostas de carga HTTP 200.
+- [x] Soak 30/120 s PASS, 27/79 ciclos, limites locais explícitos; não é soak de produção.
+- [x] Chaos isolado 13/13; frontend PASS inclusive na imagem final por digest,
+  três viewports, axe, reflow e zoom nativo. Três imagens/SBOMs locais verificados.
+- [x] Observabilidade: trace causal 28 spans/nove estágios, 17/18 grupos e
+  alertas/SLO locais PASS; suporte semântico segue ausente sem avaliador aprovado.
+- [x] Regressão e relatório atualizados; handoff PREPARED_NO_GO sem aprovação
+  fabricada. Árvore alterada para revisão, sem commit/push automático.
+
 ### Continuação após `5d66225`
 
 O novo pedido autoriza implementar os bloqueios técnicos restantes no lab,

@@ -265,6 +265,21 @@ def test_external_gate_rejects_trace_missing_a_required_stage(fake_runtime) -> N
     assert results["distributed-trace-propagation"]["result"] == gate.FAIL
 
 
+def test_trace_poll_waits_for_indexing_and_independent_exporter_batches(monkeypatch):
+    trace = "a" * 32
+    spans = _full_trace(trace, incomplete=False)
+    responses = iter([
+        gate.HttpResponse(404, {}, b"{}"),
+        gate.HttpResponse(200, {}, json.dumps({"data": [{"spans": spans[1:]}]}).encode()),
+        gate.HttpResponse(200, {}, json.dumps({"data": [{"spans": spans}]}).encode()),
+    ])
+    monkeypatch.setattr(gate, "_http_request", lambda *args, **kwargs: next(responses))
+    endpoint = gate._safe_endpoint("http://127.0.0.1:16686/api/traces", label="trace", allow_nonlocal=False, require_tls=False)
+    result = gate._poll_trace(endpoint, trace, timeout=1, poll_interval=.001)
+    assert result["worker_descends_from_queue"]
+    assert result["span_count"] == len(spans)
+
+
 def test_endpoint_contract_rejects_credentials_and_nonlocal_without_authority() -> None:
     with pytest.raises(gate._InvalidConfigurationError):
         gate._safe_endpoint(
@@ -282,17 +297,39 @@ def test_endpoint_contract_rejects_credentials_and_nonlocal_without_authority() 
         )
 
 
-def test_trace_requires_stage_ancestry_and_remote_http_parent() -> None:
+def test_trace_accepts_sibling_auth_and_retrieval_in_one_remote_journey() -> None:
     trace_id = "1" * 32
     remote_parent = "2" * 16
     spans = _full_trace(trace_id, incomplete=False, initial_parent=remote_parent)
     spans[2]["references"] = [{"refType": "CHILD_OF", "spanID": spans[0]["spanID"]}]
+    result = gate._validate_trace({"data": [{"traceID": trace_id, "spans": spans}]},
+        expected_trace_id=trace_id, expected_remote_parent_id=remote_parent)
+    assert result["connected_causal_graph"] and result["worker_descends_from_queue"]
+    # Equal trace IDs are insufficient: a worker detached from its producer
+    # must still fail even when the graph shares a single request root.
+    spans[5]["references"] = [{"refType": "CHILD_OF", "spanID": spans[0]["spanID"]}]
     with pytest.raises(gate._RuntimeAssertionError, match="trace_stage_chain_invalid"):
         gate._validate_trace(
             {"data": [{"traceID": trace_id, "spans": spans}]},
             expected_trace_id=trace_id,
             expected_remote_parent_id=remote_parent,
         )
+
+
+@pytest.mark.parametrize("damage", ["duplicate", "cycle", "foreign_parent_trace", "second_root"])
+def test_causal_trace_rejects_ambiguous_or_disconnected_graphs(damage):
+    trace = "1" * 32
+    spans = _full_trace(trace, incomplete=False, initial_parent="2" * 16)
+    if damage == "duplicate":
+        spans.append(dict(spans[0]))
+    elif damage == "cycle":
+        spans[1]["references"] = [{"refType": "CHILD_OF", "spanID": spans[2]["spanID"]}]
+    elif damage == "foreign_parent_trace":
+        spans[1]["references"][0]["traceID"] = "3" * 32
+    else:
+        spans[-1]["references"] = []
+    with pytest.raises(gate._RuntimeAssertionError):
+        gate._validate_trace({"data": [{"spans": spans}]}, expected_trace_id=trace, expected_remote_parent_id="2" * 16)
 
 
 def test_trace_redaction_allows_tokenizer_but_rejects_credential_material() -> None:

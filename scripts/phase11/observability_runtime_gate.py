@@ -589,6 +589,7 @@ def _span_from_mapping(value: Mapping[str, object]) -> dict[str, object] | None:
     trace_id = _text_field(value, "traceId", "traceID", "trace_id")
     span_id = _text_field(value, "spanId", "spanID", "span_id")
     parent_id = _text_field(value, "parentSpanId", "parentSpanID", "parent_span_id")
+    parent_trace_id = None
     references = value.get("references")
     if parent_id is None and isinstance(references, list):
         for reference in references:
@@ -596,6 +597,7 @@ def _span_from_mapping(value: Mapping[str, object]) -> dict[str, object] | None:
                 candidate = _text_field(reference, "spanID", "spanId", "span_id")
                 if candidate:
                     parent_id = candidate
+                    parent_trace_id = _text_field(reference, "traceID", "traceId", "trace_id")
                     break
     # OTLP scope/resource objects also contain a ``name`` field.  A trace
     # record must expose at least one span identity; otherwise the recursive
@@ -610,11 +612,12 @@ def _span_from_mapping(value: Mapping[str, object]) -> dict[str, object] | None:
         "trace_id": trace_id,
         "span_id": span_id,
         "parent_id": parent_id,
+        "parent_trace_id": parent_trace_id,
         "attributes": attrs,
     }
 
 
-def _extract_spans(value: object, *, limit: int = 512) -> list[dict[str, object]]:
+def _extract_spans(value: object, *, limit: int = 512, deduplicate: bool = True) -> list[dict[str, object]]:
     spans: list[dict[str, object]] = []
     seen: set[tuple[object, ...]] = set()
 
@@ -629,7 +632,7 @@ def _extract_spans(value: object, *, limit: int = 512) -> list[dict[str, object]
                     candidate.get("span_id"),
                     candidate.get("name"),
                 )
-                if identity not in seen:
+                if not deduplicate or identity not in seen:
                     seen.add(identity)
                     spans.append(candidate)
             for child in node.values():
@@ -680,7 +683,9 @@ def _validate_trace(
 ) -> dict[str, object]:
     if not _trace_payload_is_redacted(payload):
         raise _RuntimeAssertionError("trace_redaction_failed")
-    spans = _extract_spans(payload)
+    spans = _extract_spans(payload, limit=513, deduplicate=False)
+    if len(spans) > 512:
+        raise _RuntimeAssertionError("trace_span_bound_exceeded")
     if not spans:
         raise _RuntimeAssertionError("trace_backend_returned_no_spans")
     normalized_expected = expected_trace_id.lower()
@@ -701,6 +706,9 @@ def _validate_trace(
         raise _RuntimeAssertionError("trace_span_ids_not_unique")
     for span in spans:
         parent_id = span.get("parent_id")
+        parent_trace_id = span.get("parent_trace_id")
+        if parent_trace_id is not None and str(parent_trace_id).lower() != normalized_expected:
+            raise _RuntimeAssertionError("trace_parent_trace_mismatch")
         if parent_id is not None and (
             not isinstance(parent_id, str) or not _HEX_SPAN_ID.fullmatch(parent_id)
             or parent_id.lower() == str(span["span_id"]).lower()
@@ -710,6 +718,26 @@ def _validate_trace(
             )
         ):
             raise _RuntimeAssertionError("trace_parent_link_invalid")
+
+    spans_by_id = {str(span["span_id"]).lower(): span for span in spans}
+    remote = (expected_remote_parent_id or "").lower()
+    ancestors: dict[str, set[str]] = {}
+    roots: set[str] = set()
+    for span_id, span in spans_by_id.items():
+        visited = {span_id}
+        current = span
+        while isinstance(current.get("parent_id"), str):
+            parent = str(current["parent_id"]).lower()
+            if parent in visited:
+                raise _RuntimeAssertionError("trace_parent_cycle")
+            visited.add(parent)
+            if parent == remote:
+                break
+            current = spans_by_id[parent]
+        ancestors[span_id] = visited - {span_id}
+        roots.add(remote if remote and remote in visited else str(current["span_id"]).lower())
+    if len(roots) != 1 or expected_remote_parent_id is not None and roots != {remote}:
+        raise _RuntimeAssertionError("trace_stage_chain_invalid")
 
     if collector_probe:
         return {
@@ -728,45 +756,33 @@ def _validate_trace(
     missing = [stage for stage, indexes in stage_spans.items() if not indexes]
     if missing:
         raise _RuntimeAssertionError("trace_stages_missing:" + ",".join(missing))
-    selected: list[int] = []
-    for stage in REQUIRED_TRACE_STAGES:
-        selected.append(stage_spans[stage][0])
-    if len(set(selected)) != len(selected):
+    # Distinct-stage matching must not depend on backend array order or choose
+    # a provider.embedding span as both worker and provider. Legitimate auth,
+    # retrieval and decision phases are siblings in an HTTP request, while the
+    # durable queue -> worker edge remains mandatory across process boundaries.
+    matched: dict[int, str] = {}
+    def assign(stage: str, visited: set[int]) -> bool:
+        for index in stage_spans[stage]:
+            if index in visited:
+                continue
+            visited.add(index)
+            previous = matched.get(index)
+            if previous is None or assign(previous, visited):
+                matched[index] = stage
+                return True
+        return False
+    if not all(assign(stage, set()) for stage in REQUIRED_TRACE_STAGES):
         raise _RuntimeAssertionError("trace_stages_not_distinct")
-    if expected_remote_parent_id is not None:
-        http_span = spans[selected[0]]
-        parent_id = http_span.get("parent_id")
-        if not isinstance(parent_id, str) or parent_id.lower() != expected_remote_parent_id.lower():
-            raise _RuntimeAssertionError("http_remote_parent_not_propagated")
-
-    # A trace ID shared by unrelated roots is not proof that context crossed
-    # the requested pipeline.  Permit intermediate framework spans, but make
-    # every required stage an ancestry descendant of the preceding stage.
-    spans_by_id = {str(span["span_id"]).lower(): span for span in spans}
-    selected_span_ids = [str(spans[index]["span_id"]).lower() for index in selected]
-    for previous_id, current_index in zip(selected_span_ids, selected[1:]):
-        ancestor = spans[current_index].get("parent_id")
-        visited: set[str] = set()
-        reached_previous = False
-        while isinstance(ancestor, str):
-            ancestor_id = ancestor.lower()
-            if ancestor_id == previous_id:
-                reached_previous = True
-                break
-            if ancestor_id in visited or ancestor_id == (expected_remote_parent_id or "").lower():
-                break
-            visited.add(ancestor_id)
-            ancestor_span = spans_by_id.get(ancestor_id)
-            if ancestor_span is None:
-                break
-            ancestor = ancestor_span.get("parent_id")
-        if not reached_previous:
-            raise _RuntimeAssertionError("trace_stage_chain_invalid")
+    queue_ids = {str(spans[index]["span_id"]).lower() for index in stage_spans["queue"]}
+    if not any(ancestors[str(spans[index]["span_id"]).lower()] & queue_ids for index in stage_spans["worker"]):
+        raise _RuntimeAssertionError("trace_stage_chain_invalid")
     return {
         "span_count": len(spans),
         "trace_ids": len(trace_ids),
         "stages": list(REQUIRED_TRACE_STAGES),
         "parent_links_checked": True,
+        "connected_causal_graph": True,
+        "worker_descends_from_queue": True,
     }
 
 
@@ -788,6 +804,12 @@ def _poll_trace(
             headers={"Accept": "application/json"},
         )
         if response.status == 404:
+            # Jaeger returns 404 until a newly ingested trace is indexed. A
+            # bounded retry distinguishes that normal delay from an absent
+            # endpoint; the deadline still fails closed.
+            if time.monotonic() < deadline:
+                time.sleep(min(poll_interval, max(0.0, deadline - time.monotonic())))
+                continue
             raise _RuntimeAssertionError("trace_backend_endpoint_not_found")
         if not 200 <= response.status < 300:
             raise _RuntimeAssertionError("trace_backend_query_rejected")
@@ -800,7 +822,14 @@ def _poll_trace(
                 collector_probe=collector_probe,
             )
         except _RuntimeAssertionError as exc:
-            if str(exc) in {"trace_backend_returned_no_spans", "trace_context_not_propagated"} and time.monotonic() < deadline:
+            code = str(exc)
+            # Independent exporter batches can expose children before their
+            # parents or stages. Revalidate the complete observation within
+            # the same deadline; malformed identities, cycles and redaction
+            # failures still reject immediately.
+            pending = code in {"trace_backend_returned_no_spans", "trace_context_not_propagated",
+                "trace_parent_link_invalid", "trace_stage_chain_invalid", "trace_stages_not_distinct"} or code.startswith("trace_stages_missing:")
+            if pending and time.monotonic() < deadline:
                 time.sleep(min(poll_interval, max(0.0, deadline - time.monotonic())))
                 continue
             if str(exc) == "trace_backend_returned_no_spans" and time.monotonic() >= deadline:
@@ -1521,8 +1550,10 @@ def _external_results(args: argparse.Namespace) -> tuple[list[GateResult], dict[
             results.append(GateResult("collector-backend-trace", PASS, f"trace backend returned the collector probe ({observation['span_count']} span)", scope="external-runtime"))
         except _BlockedExternalError:
             results.append(GateResult("collector-backend-trace", BLOCKED_EXTERNAL, "trace backend transport is unavailable", scope="external-runtime"))
-        except (_InvalidConfigurationError, _RuntimeAssertionError):
-            results.append(GateResult("collector-backend-trace", FAIL, "trace backend did not return the collector probe", scope="external-runtime"))
+        except (_InvalidConfigurationError, _RuntimeAssertionError) as error:
+            code = str(error)
+            code = code if re.fullmatch(r"[a-z][a-z0-9_:,.-]{0,255}", code) else "invalid_runtime_observation"
+            results.append(GateResult("collector-backend-trace", FAIL, f"trace backend did not return the collector probe ({code})", scope="external-runtime"))
 
     api_trace_id: str | None = None
     api_remote_parent_id: str | None = None
@@ -1554,8 +1585,10 @@ def _external_results(args: argparse.Namespace) -> tuple[list[GateResult], dict[
             )
         except _BlockedExternalError:
             results.append(GateResult("distributed-trace-propagation", BLOCKED_EXTERNAL, "trace backend transport is unavailable", scope="external-runtime"))
-        except (_InvalidConfigurationError, _RuntimeAssertionError):
-            results.append(GateResult("distributed-trace-propagation", FAIL, "trace context or required stage propagation failed", scope="external-runtime"))
+        except (_InvalidConfigurationError, _RuntimeAssertionError) as error:
+            code = str(error)
+            code = code if re.fullmatch(r"[a-z][a-z0-9_:,.-]{0,255}", code) else "invalid_runtime_observation"
+            results.append(GateResult("distributed-trace-propagation", FAIL, f"trace context or required stage propagation failed ({code})", scope="external-runtime"))
 
     try:
         metrics = _query_metrics(
@@ -1567,8 +1600,10 @@ def _external_results(args: argparse.Namespace) -> tuple[list[GateResult], dict[
         results.append(GateResult("metrics-slo-backend", PASS, f"Prometheus backend exposed {metrics['metric_group_count']} bounded metric groups and a healthy SLO", scope="external-runtime"))
     except _BlockedExternalError:
         results.append(GateResult("metrics-slo-backend", BLOCKED_EXTERNAL, "metrics backend transport is unavailable", scope="external-runtime"))
-    except (_InvalidConfigurationError, _RuntimeAssertionError):
-        results.append(GateResult("metrics-slo-backend", FAIL, "metrics inventory or SLO query did not satisfy the contract", scope="external-runtime"))
+    except (_InvalidConfigurationError, _RuntimeAssertionError) as error:
+        code = str(error)
+        code = code if re.fullmatch(r"[a-z][a-z0-9_:,.-]{0,255}", code) else "invalid_runtime_observation"
+        results.append(GateResult("metrics-slo-backend", FAIL, f"metrics inventory or SLO query did not satisfy the contract ({code})", scope="external-runtime"))
 
     alerts_raw = args.alerts_url or _env_first("RICK_OBSERVABILITY_ALERTS_URL", "RICK_PROMETHEUS_RULES_URL")
     if alerts_raw:

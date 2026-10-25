@@ -41,7 +41,17 @@ const conversation = fields({ ...texts("conversation_id", "title", "workspace_id
 const turn = fields({ ...texts("conversation_id", "message_id", "question", "answer"), citations: array(citation), metadata: maybe(object), created_at: optional(time) });
 const session = fields({ authenticated: v => v === true, ...texts("user_id", "email", "role", "canonical_role", "tenant_id", "workspace_id", "session_id"), permissions: maybe(array(string)), session_token: v => v === undefined || v === null });
 const job = fields({ ...texts("job_id", "status", "stage"), progress: number, attempt: count, document_id: optional(id), cancel_requested: maybe(boolean), retryable: maybe(boolean), error_code: optional(string), error_message: optional(string), tenant_id: optional(id), workspace_id: maybe(id), collection_id: maybe(id), metadata: maybe(fields({ execution: maybe(string), durability: maybe(string), restart_recovery: maybe(boolean), storage: maybe(string) })) });
-const jobEnvelope: Guard = v => fields({ ...texts("status", "job_id"), job, document: optional(document), document_id: optional(id), cancelled: maybe(boolean) })(v) && object(v) && object(v.job) && v.job_id === v.job.job_id && (v.document_id == null || v.job.document_id == null || v.document_id === v.job.document_id) && (v.document == null || object(v.document) && (v.document_id == null || v.document_id === v.document.document_id));
+// Job envelopes return a scoped reference, not a document catalog item. The
+// native API intentionally does not fetch a title for every polling response.
+const documentReference = fields(texts("document_id", "workspace_id", "collection_id", "status"));
+const jobEnvelope: Guard = v => fields({ ...texts("status", "job_id"), job, document: optional(documentReference), document_id: optional(id), cancelled: maybe(boolean) })(v)
+  && object(v) && object(v.job) && v.job_id === v.job.job_id
+  && (v.document_id == null || v.job.document_id == null || v.document_id === v.job.document_id)
+  && (v.document == null || object(v.document)
+    && (v.document_id == null || v.document_id === v.document.document_id)
+    && (v.job.document_id == null || v.job.document_id === v.document.document_id)
+    && (v.job.workspace_id == null || v.job.workspace_id === v.document.workspace_id)
+    && (v.job.collection_id == null || v.job.collection_id === v.document.collection_id));
 const agent = fields(texts("agent_id", "model_id", "catalog_version", "status", "purpose"));
 const hypothesis = fields(texts("hypothesis_id", "statement", "status"));
 const evidence = fields({ ...texts("evidence_id", "source_type", "source_id"), locator: optional(string), label: optional(string) });

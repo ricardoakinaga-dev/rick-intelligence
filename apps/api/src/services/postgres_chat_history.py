@@ -470,7 +470,7 @@ class PostgresChatHistoryStore:
                     AND a.metadata->>'turn_user_message_id' = u.message_id
                 WHERE u.tenant_id=%s AND u.workspace_id=%s AND u.user_id=%s
                   AND u.role='user'
-                  AND (%s IS NULL OR u.conversation_id=%s)
+                  AND (CAST(%s AS TEXT) IS NULL OR u.conversation_id=%s)
                 ORDER BY u.created_at DESC, u.message_id DESC
             """, (*scope, conversation_id, conversation_id))
             rows = self._many(cursor)

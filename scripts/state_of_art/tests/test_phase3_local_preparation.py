@@ -185,6 +185,9 @@ def test_handoff_exposes_tampered_trace_and_binds_verification_log(tmp_path):
     payload = handoff.prepare(tmp_path, evidence={})
     row, = payload["local_observations"]
     assert row["raw_artifacts"][0]["hash_matches"] is False
+    import hashlib
+    expected = hashlib.sha256(json.dumps(payload["source_manifest"], sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    assert payload["source_manifest_sha256"] == expected
     assert payload["verification_artifacts"] == [{"path": str(log.relative_to(tmp_path)), "sha256": handoff.sha256(log)}]
     (base / "distributed.json").write_text(json.dumps({"raw_artifacts": [{"path": None}]}))
     invalid, = handoff.prepare(tmp_path, evidence={})["local_observations"]

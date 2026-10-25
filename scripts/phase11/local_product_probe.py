@@ -109,18 +109,32 @@ def create_graph(run_id: str, *, scope: dict | None = None):
     return graph, scope, user_id
 
 
-def build_graph(settings, scope: dict, user_id: str, *, identity=None):
+def build_graph(settings, scope: dict, user_id: str, *, identity=None, worker_id: str | None = None,
+                worker_max_concurrency: int | None = None):
     """Reopen an already seeded disposable scope in another owned process."""
     from scripts.phase11.local_lab_composition import build
     from services.external_composition import build_external_providers
 
     check_authority(settings)
     inputs = replace(build(settings), created_by=user_id,
-                     worker_scope=tuple(scope.values()), worker_id=user_id,
+                     worker_scope=tuple(scope.values()), worker_id=worker_id or user_id,
                      worker_temp_root=str(ROOT / ".runtime/tmp" / user_id))
+    # A fixture's login IP bucket must not consume the shared dev namespace.
+    # Replicas of this synthetic tenant still share the actual Redis limiter
+    # and leases; only unrelated diagnostic runs receive separate prefixes.
+    from rick_locking import RedisNamespace, RedisRateLimiter, RedisLeaseClient
+    namespace = RedisNamespace.global_scope(environment=settings.environment,
+        prefix="rick-lab-" + hashlib.sha256(scope["tenant_id"].encode()).hexdigest()[:16])
+    inputs = replace(inputs, rate_limit_namespace=namespace,
+        rate_limiter=RedisRateLimiter(inputs.redis_client, namespace=namespace),
+        lease=RedisLeaseClient(inputs.redis_client, namespace=namespace))
     if identity is not None:
         inputs = replace(inputs, identity=identity,
                          authorization_revalidator=identity.refresh_authorization_context)
+    if worker_max_concurrency is not None:
+        if type(worker_max_concurrency) is not int or not 1 <= worker_max_concurrency <= 4:
+            raise ValueError("invalid_owned_worker_concurrency")
+        inputs = replace(inputs, worker_max_concurrency=worker_max_concurrency)
     return build_external_providers(settings, inputs)
 
 

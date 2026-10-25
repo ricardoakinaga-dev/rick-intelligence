@@ -361,7 +361,10 @@ class ChatApplicationService:
             if existing is not None:
                 return await self._cached_response(existing, context)
         self._prepare_conversation(session=session, conversation_id=conv_id, collection_id=collection_id)
-        history = self._read_context(session=session, conversation_id=conv_id, context=context)
+        # PostgreSQL context is a synchronous read. Keeping it on the ASGI
+        # loop can starve Redis lease deadlines for unrelated conversations.
+        history = await asyncio.to_thread(self._read_context,
+            session=session, conversation_id=conv_id, context=context)
         try:
             result = await self._generate(
                 message=message, context=context, conversation_id=conv_id,
@@ -582,7 +585,7 @@ class ChatApplicationService:
                         "message_id": msg_id, "provisional": True,
                     }
                     start_sent = True
-                    history = self._read_context(
+                    history = await asyncio.to_thread(self._read_context,
                         session=session, conversation_id=conv_id, context=context,
                     )
                     stream = stream_backend(

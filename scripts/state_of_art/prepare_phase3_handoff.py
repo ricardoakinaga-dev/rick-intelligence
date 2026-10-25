@@ -49,13 +49,32 @@ LOCAL_OBSERVATIONS = (
     ".runtime/phase-3/formal-local/golden-current.json",
     ".runtime/phase-3/formal-local/distributed.json",
     ".runtime/phase-3/formal-local/frontend-supply.json",
+    ".runtime/phase-3/formal-local/tenant-contention-current.json",
+    ".runtime/phase-3/operational-local/performance-current.json",
+    ".runtime/phase-3/operational-local/soak-current.json",
+    ".runtime/phase-3/chaos-local/current.json",
+    ".runtime/phase-3/frontend-local/current.json",
+    ".runtime/phase-3/observability-local/current.json",
+    ".runtime/phase-3/supply-local/current.json",
 )
 VERIFICATION_ARTIFACTS = tuple(
     f".runtime/phase-3/formal-local/{name}.log" for name in (
         "regression-final", "retrieval-preparation-final", "final-boundaries", "lifecycle-final",
         "validate-final", "compose-final", "typecheck-final", "handoff-final",
+        "operational-regression-final", "web-contract-tests", "chat-read-regression",
+        "worker-exit-regression", "causal-network-final", "lane-browser-regression",
     )
 )
+CURRENT_LOCAL = {
+    "golden": ".runtime/phase-3/formal-local/golden-current.json",
+    "tenant-contention": ".runtime/phase-3/formal-local/tenant-contention-current.json",
+    "performance": ".runtime/phase-3/operational-local/performance-current.json",
+    "soak": ".runtime/phase-3/operational-local/soak-current.json",
+    "chaos": ".runtime/phase-3/chaos-local/current.json",
+    "frontend": ".runtime/phase-3/frontend-local/current.json",
+    "observability": ".runtime/phase-3/observability-local/current.json",
+    "supply": ".runtime/phase-3/supply-local/current.json",
+}
 
 
 def safe_file(root: Path, raw: str) -> Path:
@@ -184,9 +203,9 @@ def prepare(root: Path, *, evidence=None) -> dict:
                         if not isinstance(ref, dict):
                             raise ValueError("invalid_artifact_ref")
                         source = safe_file(root, ref.get("path", ""))
-                        digest = sha256(source) if source.is_file() else None
-                        record["raw_artifacts"].append({"path": ref["path"], "sha256": digest,
-                            "hash_matches": digest is not None and digest == ref.get("sha256")})
+                        artifact_digest = sha256(source) if source.is_file() else None
+                        record["raw_artifacts"].append({"path": ref["path"], "sha256": artifact_digest,
+                            "hash_matches": artifact_digest is not None and artifact_digest == ref.get("sha256")})
                 local.append(record)
             except (ValueError, OSError):
                 local.append({"path": raw, "observed_status": "INVALID", "release_acceptance": False})
@@ -197,15 +216,19 @@ def prepare(root: Path, *, evidence=None) -> dict:
         "checkout": {field: checkout.get(field) for field in ("head", "tree", "status", "fingerprint")},
         "source_manifest_sha256": digest, "source_manifest": sources, "evidence": rows,
         "local_observations": local,
+        "current_local_results": {name: next((record for record in local if record["path"] == path),
+            {"path": path, "observed_status": "NOT_RUN", "release_acceptance": False}) for name, path in CURRENT_LOCAL.items()},
         "verification_artifacts": [{"path": path, "sha256": sha256(safe_file(root, path))}
             for path in VERIFICATION_ARTIFACTS if safe_file(root, path).is_file()],
         "remaining_work": [
-            {"id": "tenant-timing", "required": "Resolve or bound timing variance under contention; retain the failed concurrent observation even if an idle run passes."},
+            {"id": "tenant-timing", "required": "Review the bounded four-actor local experiment and preserved failures; approve and execute the production contention workload and timing policy."},
             {"id": "golden-evaluation", "required": "Approved claim-support evaluator/corpus and observed decision/response; the provider fixture cannot approve model quality."},
-            {"id": "observability", "required": "Complete canonical metrics/cardinality/alert/SLO matrix; a connected cross-process trace alone is insufficient."},
-            {"id": "frontend", "required": "Exercise every required product/error state and fix verified zoom/reflow failures; complete image/SBOM evidence."},
+            {"id": "observability", "required": "Supply an approved semantic claim-support observation; review local trace/metric/alert evidence and ratify production SLOs, timers and delivery destinations."},
+            {"id": "frontend", "required": "Review local states, accessibility and native zoom evidence; bind the final production frontend and immutable images/SBOMs to trusted CI, vulnerability scans, provenance and signatures."},
         ],
         "required_inputs": [
+            {"id": "approved-evaluation", "owner": "knowledge/model evaluation authority",
+             "required": "Approved corpus, claim-support evaluator, exact hashes and acceptance criteria; structural citation validation is insufficient."},
             {"id": "production-profile", "owner": "operations/security",
              "required": "Reviewed TLS/auth profile, secret-store references and trusted certificates; rerun every gate."},
             {"id": "operational-budgets", "owner": "operations",

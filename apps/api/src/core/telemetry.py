@@ -90,15 +90,17 @@ except ImportError:  # Keep a minimal, bounded local runtime for packaged API im
             with self._lock:
                 values = sorted(self._values)
             if not values:
-                return {"name": self.name, "labels": {}, "count": 0, "p50": None, "p95": None, "max": None}
+                return {"name": self.name, "labels": {}, "count": 0, "p50": None, "p95": None, "p99": None, "max": None}
             p50 = values[max(0, (len(values) + 1) // 2 - 1)]
             p95 = values[max(0, (len(values) * 95 + 99) // 100 - 1)]
+            p99 = values[max(0, (len(values) * 99 + 99) // 100 - 1)]
             return {
                 "name": self.name,
                 "labels": {},
                 "count": len(values),
                 "p50": round(p50, 6),
                 "p95": round(p95, 6),
+                "p99": round(p99, 6),
                 "max": round(values[-1], 6),
             }
 
@@ -1122,7 +1124,7 @@ class ApiTelemetry:
         latency = current.get("latency")
         if isinstance(latency, Mapping):
             for suffix, value in (("count", latency.get("count")), ("p50", latency.get("p50")),
-                                  ("p95", latency.get("p95")), ("max", latency.get("max"))):
+                                  ("p95", latency.get("p95")), ("p99", latency.get("p99")), ("max", latency.get("max"))):
                 if value is None:
                     continue
                 try:
@@ -1145,6 +1147,7 @@ class ApiTelemetry:
                 for suffix, value in (("count", histogram.get("count")),
                                       ("p50", histogram.get("p50")),
                                       ("p95", histogram.get("p95")),
+                                      ("p99", histogram.get("p99")),
                                       ("max", histogram.get("max"))):
                     if value is None:
                         continue

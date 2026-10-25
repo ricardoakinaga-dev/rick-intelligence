@@ -177,7 +177,7 @@ export type Job = {
 export type JobEnvelope = {
   status: string;
   job: Job;
-  document?: DocumentItem | null;
+  document?: Pick<DocumentItem, "document_id" | "workspace_id" | "collection_id" | "status"> | null;
   job_id: string;
   document_id?: string | null;
   cancelled?: boolean;

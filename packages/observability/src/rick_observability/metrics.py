@@ -68,13 +68,13 @@ class Histogram:
         with self._lock:
             values = sorted(self._values)
         if not values:
-            return {"name": self.name, "labels": dict(self.labels), "count": 0, "p50": None, "p95": None, "max": None}
+            return {"name": self.name, "labels": dict(self.labels), "count": 0, "p50": None, "p95": None, "p99": None, "max": None}
 
         def nearest(percentile: float) -> float:
             position = max(1, math.ceil(percentile * len(values)))
             return round(values[position - 1], 6)
 
-        return {"name": self.name, "labels": dict(self.labels), "count": len(values), "p50": nearest(.5), "p95": nearest(.95), "max": round(values[-1], 6)}
+        return {"name": self.name, "labels": dict(self.labels), "count": len(values), "p50": nearest(.5), "p95": nearest(.95), "p99": nearest(.99), "max": round(values[-1], 6)}
 
 
 class CounterRegistry:

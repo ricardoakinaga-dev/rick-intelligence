@@ -31,8 +31,8 @@ class TenantRuntime:
     external = True
     production_safe = False
 
-    def __init__(self, run_id: str):
-        self.owner = LabResources(run_id)
+    def __init__(self, run_id: str, *, isolated_postgres: bool = False):
+        self.owner = LabResources(run_id, isolated_postgres=isolated_postgres)
         self.run_id = self.owner.run_id
         self.authorized = True
         self.observations = []

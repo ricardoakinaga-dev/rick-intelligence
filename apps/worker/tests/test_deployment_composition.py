@@ -3,6 +3,8 @@ from __future__ import annotations
 from threading import Event
 from types import SimpleNamespace
 
+import pytest
+
 from deployment_composition import DeploymentRuntime
 
 
@@ -41,6 +43,19 @@ class _Reconciler:
     def process_once(self):
         self.processed.set()
         return 0
+
+
+@pytest.mark.parametrize("reason", ["ok", "closed", "shutting_down", "queue_unavailable"])
+def test_fatal_queue_stop_is_not_a_successful_daemon_exit(reason):
+    worker = _Worker()
+    worker.health = lambda: SimpleNamespace(reason=reason)
+    runtime = DeploymentRuntime(SimpleNamespace(worker=worker, health_checks={}))
+    if reason == "queue_unavailable":
+        with pytest.raises(RuntimeError, match="^worker_queue_unavailable$"):
+            runtime.run_forever()
+    else:
+        assert runtime.run_forever() is None
+    assert runtime._admin_audit_stop.is_set()
 
 
 def test_admin_audit_reconciler_runs_as_worker_sidecar_and_stops_cleanly():
