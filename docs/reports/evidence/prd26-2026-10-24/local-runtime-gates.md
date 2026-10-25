@@ -157,13 +157,16 @@ Foi executado um drill real, não o gate formal:
   auditoria **253** — iguais à origem.
 - MinIO: 3 objetos espelhados para `rick-restore-test`; os 3 checksums
   coincidem com o backup local.
+- Qdrant: snapshot da coleção `rick_dense_v1` com **554 KB**, SHA-256
+  `9dff8140b7c51c0e61ba6d2165bcf67eb76eff43093e5d6519bd227fb4363437`;
+  upload para `rick_restore_test` em **2,223 s**; contagem restaurada **1**.
 
 **RPO/RTO:** o dump foi tirado no mesmo estado da origem (RPO observado 0 para
 este snapshot); o RTO de PostgreSQL foi 1,883 s. Não são RPO/RTO de produção.
 
-**Limite:** Qdrant, jobs/audit/evidence como componentes formais e o gate
-`make restore-runtime` não foram exercitados; o resultado é evidência parcial,
-não `PASS` do gate.
+**Limite:** jobs/audit/evidence como componentes formais e o gate
+`make restore-runtime` não foram exercitados; o resultado é evidência parcial
+de PostgreSQL + objetos + Qdrant, não `PASS` do gate.
 
 ## 8. Limitações e próximo passo
 
