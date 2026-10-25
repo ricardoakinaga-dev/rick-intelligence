@@ -146,7 +146,26 @@ qualidade.
 **Estado:** golden path de **upload → worker → publicação** `PASS` local; resposta
 grounded com citação ainda pendente de fixture compatível.
 
-## 7. Limitações e próximo passo
+## 7. Drill de restore parcial — PostgreSQL + objetos
+
+Foi executado um drill real, não o gate formal:
+
+- `pg_dump -Fc` do banco `rick`: **87.521 bytes**, SHA-256
+  `f1434f4a893ecc68c74efe8e6347d626b5ae5ef01ee59052c07f63d6b9c4a1ab`.
+- restore em `rick_restore_test` em **1.883 ms**.
+- contagens restauradas: documentos **1**, chunks **1**, jobs **3**, eventos de
+  auditoria **253** — iguais à origem.
+- MinIO: 3 objetos espelhados para `rick-restore-test`; os 3 checksums
+  coincidem com o backup local.
+
+**RPO/RTO:** o dump foi tirado no mesmo estado da origem (RPO observado 0 para
+este snapshot); o RTO de PostgreSQL foi 1,883 s. Não são RPO/RTO de produção.
+
+**Limite:** Qdrant, jobs/audit/evidence como componentes formais e o gate
+`make restore-runtime` não foram exercitados; o resultado é evidência parcial,
+não `PASS` do gate.
+
+## 8. Limitações e próximo passo
 
 - Containers e fixture são efêmeros e loopback; não autorizam promoção.
 - O gate de provider usa um servidor OpenAI-compatible local de fixture, não um
@@ -157,7 +176,7 @@ grounded com citação ainda pendente de fixture compatível.
   executar golden path e restore com composição autorizada e vincular os
   resultados ao pacote de release.
 
-## 8. Artefatos locais
+## 9. Artefatos locais
 
 `.runtime/phase-2/postgres-runtime-gate.json`,
 `.runtime/phase-3/multi-worker-runtime-gate.json`,
