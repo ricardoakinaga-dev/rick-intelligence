@@ -82,14 +82,14 @@ jobs:
             --volume "$RUNNER_TEMP/rick-candidate-scan:/scan:ro" "$TRIVY_IMAGE" image \
             --input /scan --scanners vuln --list-all-pkgs \
             --format json --output /evidence/scan.json --exit-code 0
-      - name: Bind OCI blobs, source, native statements and scan to inventory
+      - name: Bind OCI, native statements, scan and reconciled SBOM scope to inventory v2
         env:
           BUILT_DIGEST: ${{ steps.build.outputs.digest }}
         run: python3 infrastructure/vps/candidate_evidence.py inventory
       - uses: sigstore/cosign-installer@d58896d6a1865668819e1d91763c7751a165e159 # v3.9.2
         with:
           cosign-release: v2.5.3
-      - name: Sign construction inventory using workflow OIDC and verify exact identity and SHA
+      - name: Sign inventory and SBOM scope using workflow OIDC and verify exact identity and SHA
         run: |
           cosign sign-blob --yes --bundle candidate-evidence/inventory.sigstore.json candidate-evidence/inventory.json
           python3 infrastructure/vps/candidate_evidence.py verify-signature

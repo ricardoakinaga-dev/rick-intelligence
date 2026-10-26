@@ -18,7 +18,8 @@ import tarfile
 from urllib.parse import parse_qs, unquote
 
 from contracts import ISSUER, REPO, SERVICES, Refusal, immutable, parse
-from publish_candidate import bounded_tar_headers, spdx_packages
+from publish_candidate import bounded_tar_headers, spdx_packages, reconcile_sbom
+from construction_contract import canonical_sha256
 
 ROOT = Path(__file__).resolve().parents[2]
 OUT = Path('candidate-evidence')
@@ -27,6 +28,8 @@ WORKFLOW = f'{REPO}/.github/workflows/quality.yml@{REF}'
 JOBS = ('fast', 'unit', 'contract', 'security', 'rag-eval', 'frontend', 'supply-chain')
 PROVENANCE = 'https://slsa.dev/provenance/v0.2'
 SPDX = 'https://spdx.dev/Document'
+SCHEMA_V1 = 'rick.candidate-build-evidence/v1'
+SCHEMA_V2 = 'rick.candidate-build-evidence/v2'
 
 
 def sha256(path):
@@ -259,10 +262,13 @@ def inventory():
     report = parse((OUT/'scan.json').read_bytes())
     # Scan status is not inferred from exit-code=0: keep every severity, including UNKNOWN.
     findings = scan_result(report, native['configuration_digest'], service)
+    scope = runtime_scope(report, parse((OUT/'sbom.json').read_bytes()))
+    write(OUT/'sbom-scope.json', scope)
     files = {p.name: {'sha256': sha256(p), 'bytes': p.stat().st_size}
              for p in OUT.iterdir() if p.is_file()}
-    record = {'schema': 'rick.candidate-build-evidence/v1', 'service': service,
+    record = {'schema': SCHEMA_V2, 'service': service,
               'source_sha': source, 'builder': builder, **native, 'files': files,
+              'sbom_scope': scope, 'sbom_scope_sha256': canonical_sha256(scope),
               'scan_findings': findings, 'scan_status': 'NO_FINDINGS' if findings == 0 else 'FINDINGS',
               'production_safe': False, 'promotion_authorized': False,
               'toolchain_review': 'MISSING', 'independent_review': 'MISSING',
@@ -278,12 +284,19 @@ def verify_signature():
                     '--certificate-github-workflow-ref', REF,
                     '--certificate-github-workflow-repository', REPO,
                     str(OUT/'inventory.json')], check=True, timeout=180)
-    verify_files()
+    verify_files(require_scope=True)
 
 
-def verify_files():
+def runtime_scope(report, statement):
+    scope = reconcile_sbom(report, statement)
+    scope['native_sbom_sha256'] = sha256(OUT/'sbom.json')
+    return scope
+
+
+def verify_files(*, require_scope=False):
     record = parse((OUT/'inventory.json').read_bytes())
-    if (record.get('schema') != 'rick.candidate-build-evidence/v1'
+    schema = record.get('schema')
+    if (schema not in {SCHEMA_V1, SCHEMA_V2}
         or record.get('source_sha') != os.environ['GITHUB_SHA']
         or record.get('service') not in SERVICES
         or record.get('production_safe') is not False
@@ -292,6 +305,10 @@ def verify_files():
         raise Refusal('exact-SHA nonpromotable construction inventory required')
     expected = {'image.tar', 'scan.json', 'sbom.json', 'provenance.json',
                 'quality.json', 'toolchain.json', 'buildx.json'}
+    if schema == SCHEMA_V2:
+        expected.add('sbom-scope.json')
+    elif require_scope or 'sbom_scope' in record or 'sbom_scope_sha256' in record:
+        raise Refusal('legacy inventory has no signed SBOM runtime scope')
     if set(record.get('files', {})) != expected:
         raise Refusal('closed construction file inventory required')
     for name, claimed in record['files'].items():
@@ -299,6 +316,20 @@ def verify_files():
         if (path.is_symlink() or not path.is_file() or path.stat().st_size != claimed.get('bytes')
             or sha256(path) != claimed.get('sha256')):
             raise Refusal('signed construction file bytes mismatch')
+    if schema == SCHEMA_V2:
+        report = parse((OUT/'scan.json').read_bytes())
+        statement = parse((OUT/'sbom.json').read_bytes())
+        findings = scan_result(report, record.get('configuration_digest'), record['service'])
+        if findings != record.get('scan_findings'):
+            raise Refusal('signed scan result differs from native report')
+        scope = runtime_scope(report, statement)
+        expected_hash = canonical_sha256(scope)
+        scope_file = parse((OUT/'sbom-scope.json').read_bytes())
+        if (record.get('sbom_scope') != scope
+            or record.get('sbom_scope_sha256') != expected_hash
+            or canonical_sha256(record.get('sbom_scope')) != expected_hash
+            or scope_file != scope or canonical_sha256(scope_file) != expected_hash):
+            raise Refusal('signed SBOM runtime scope differs from native inputs')
 
 
 def main():
@@ -319,7 +350,7 @@ def main():
     elif args.command == 'verify-signature':
         verify_signature()
     elif args.command == 'verify-files':
-        verify_files()
+        verify_files(require_scope=True)
     elif parse((OUT/'inventory.json').read_bytes())['scan_findings'] != 0:
         raise Refusal('candidate scan findings retained; production remains NO-GO')
 

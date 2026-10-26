@@ -24,13 +24,29 @@ Cada artefato `candidate-build-SHA-SERVICE-ATTEMPT` contém:
 - `provenance.json` e `sbom.json`: cópias dos statements do OCI;
 - `scan.json`: Trivy no arquivo OCI exato, com inventário e todas as severidades;
 - `quality.json`, `toolchain.json`, `buildx.json`: origem, gates e ferramentas;
-- `inventory.json`: hashes SHA256 e tamanhos desses sete arquivos;
+- `sbom-scope.json`: escopo reconciliado, com a origem de cada componente suplementar;
+- `inventory.json` v2: hashes SHA256 e tamanhos desses oito arquivos, o escopo
+  incorporado e seu hash canônico;
 - `inventory.sigstore.json`: assinatura keyless do inventário pela identidade CI.
 
 O inventário registra `production_safe=false`, `promotion_authorized=false`,
 `signature_scope=CI_CONSTRUCTION_INVENTORY_ONLY` e revisão/GO ausentes.
 Uma imagem com achados conserva seu scan e faz a lane falhar. Uma falha anterior
 à assinatura pode deixar somente diagnósticos; upload não implica completude.
+
+O escopo v2 é calculado no runner antes da assinatura. Seu
+`native_sbom_sha256` vincula os bytes de `sbom.json`; `sbom_scope_sha256` vincula
+o objeto canônico. A verificação confere os oito arquivos, reexecuta a
+reconciliação e exige igualdade entre o escopo incorporado, o arquivo e os inputs
+nativos. O hash canônico do objeto e o hash do arquivo JSON são conferências
+distintas. Os arquivos nativos não são filtrados nem reescritos.
+
+Inventários v1, inclusive os de 1125520, permanecem evidência histórica sem
+escopo assinado. A função Python admite sua verificação histórica com
+`require_scope=False`; os caminhos atuais de assinatura/CLI exigem v2. Essa
+compatibilidade não importa um escopo derivado localmente para a assinatura v1.
+O schema v2 é exclusivo de construção e não é o predicate do publicador de
+produção, uma assinatura de registry, revisão independente ou release seal.
 
 BuildKit armazena SBOM e proveniência como statements anexados ao índice OCI.
 O leitor confere os hashes dos blobs, a identidade da aplicação, o sujeito de
@@ -87,7 +103,7 @@ GITHUB_SHA=SHA PYTHONPATH=infrastructure/vps python3 - <<'PY'
 from pathlib import Path
 import candidate_evidence as ce
 ce.OUT = Path('.runtime/candidate-review/api')
-ce.verify_files()
+ce.verify_files(require_scope=True)
 print('construction file hashes verified; production approval remains absent')
 PY
 ```

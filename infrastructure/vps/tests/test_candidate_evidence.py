@@ -187,7 +187,7 @@ def test_signature_checks_exact_sha_ref_identity_issuer_and_file_bytes(tmp_path,
     commands = []
     monkeypatch.setattr(ce.subprocess, 'run', lambda argv, **kw: commands.append((argv, kw)))
     checked = []
-    monkeypatch.setattr(ce, 'verify_files', lambda: checked.append(True))
+    monkeypatch.setattr(ce, 'verify_files', lambda **kw: checked.append(kw))
     ce.verify_signature()
     argv, kwargs = commands[0]
     for flag, value in [('--certificate-identity', 'https://github.com/'+ce.WORKFLOW),
@@ -197,7 +197,7 @@ def test_signature_checks_exact_sha_ref_identity_issuer_and_file_bytes(tmp_path,
                         ('--certificate-github-workflow-repository', REPO)]:
         assert argv[argv.index(flag)+1] == value
     assert not any('insecure' in word for word in argv)
-    assert kwargs['check'] is True and checked == [True]
+    assert kwargs['check'] is True and checked == [{'require_scope': True}]
 
 
 def test_publication_scanner_uses_admitted_application_without_registry_effects(tmp_path):
